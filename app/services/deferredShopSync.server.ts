@@ -12,7 +12,7 @@ type AdminGraphql = {
 /** Per-shop chain so rapid saves still run every sync in order. */
 const shopWorkTail = new Map<string, Promise<void>>();
 
-function runAfterResponse(promise: Promise<unknown>): void {
+export function runAfterResponse(promise: Promise<unknown>): void {
   void import("@vercel/functions")
     .then((mod) => {
       if (typeof mod.waitUntil === "function") {

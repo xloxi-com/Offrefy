@@ -6,6 +6,7 @@ import { discountRuleDb } from "./discountRuleDb.server";
 import { getVolumeDiscountStorefrontPayload } from "../services/volumeDiscountStorefrontCache.server";
 import { volumeDiscountCampaignSyncSelect } from "./volumeDiscountCampaignSelect.server";
 import type { DiscountRuleRecord } from "../types/discountRule";
+import { getMemoryCachedJson, setMemoryCachedJson } from "./memoryCache.server";
 
 /** DB row shape for widget JSON — only fields required to build storefront payload. */
 export type VolumeDiscountCampaignStorefrontRow = Pick<
@@ -237,26 +238,25 @@ export async function buildStorefrontWidgetForProduct(
     return JSON.stringify({ version: 1, campaigns: [] });
   }
 
-  /* DB cache first — same payload as sync; skips DiscountRule query on hot path when cached. */
-  const [cached, rules] = await Promise.all([
-    getVolumeDiscountStorefrontPayload(shop),
-    discountRuleDb().findMany({
-      where: {
-        shop,
-        status: "active",
-        productId: {
-          in: [
-            ...new Set([productKey, variantKey, "*"].filter(Boolean)),
-          ],
-        },
-      },
-      select: { productId: true, campaignId: true },
-    }),
-  ]);
+  // 1. Try to get cached payload from memory cache first!
+  const fullMemKey = `widget:${shop}:full`;
+  let fullPayload = getMemoryCachedJson(fullMemKey);
+  let cachedDbReadDone = false;
 
-  if (cached?.payload) {
+  if (!fullPayload) {
+    // 2. Memory cache miss, read from database
+    const cachedRow = await getVolumeDiscountStorefrontPayload(shop);
+    cachedDbReadDone = true;
+    if (cachedRow?.payload) {
+      fullPayload = cachedRow.payload;
+      // Cache the full storefront payload in memory to make future product page loads instant
+      setMemoryCachedJson(fullMemKey, fullPayload, 45_000);
+    }
+  }
+
+  if (fullPayload) {
     const camp = pickStorefrontCampaignFromPayload(
-      cached.payload,
+      fullPayload,
       productKey,
       variantKey || null,
     );
@@ -264,6 +264,20 @@ export async function buildStorefrontWidgetForProduct(
       return JSON.stringify({ version: 1, campaigns: [camp] });
     }
   }
+
+  // 3. Fallback: query discount rules ONLY if we didn't find a cached payload/campaign
+  const rules = await discountRuleDb().findMany({
+    where: {
+      shop,
+      status: "active",
+      productId: {
+        in: [
+          ...new Set([productKey, variantKey, "*"].filter(Boolean)),
+        ],
+      },
+    },
+    select: { productId: true, campaignId: true },
+  });
 
   const ruleByProductId = new Map(
     rules.map((r: DiscountRuleRecord) => [r.productId, r.campaignId]),
@@ -307,9 +321,18 @@ export async function buildStorefrontWidgetForProduct(
   }
 
   if (!admin) {
-    if (cached?.payload) {
+    // If we haven't read from database yet, read it now as fallback
+    let fallbackPayload = fullPayload;
+    if (!fallbackPayload && !cachedDbReadDone) {
+      const cachedRow = await getVolumeDiscountStorefrontPayload(shop);
+      if (cachedRow?.payload) {
+        fallbackPayload = cachedRow.payload;
+        setMemoryCachedJson(fullMemKey, fallbackPayload, 45_000);
+      }
+    }
+    if (fallbackPayload) {
       const camp = pickStorefrontCampaignFromPayload(
-        cached.payload,
+        fallbackPayload,
         productKey,
         variantKey || null,
       );

@@ -24,7 +24,10 @@ import { Box, InlineGrid, Page } from "@shopify/polaris";
 import { APP_DISPLAY_NAME } from "../branding";
 import { prisma } from "../db.server";
 import { ensureVolumeDiscountFunctionDiscount } from "../services/volumeDiscountFunctionSync.server";
-import { scheduleVolumeDiscountShopSync } from "../services/deferredShopSync.server";
+import {
+  runAfterResponse,
+  scheduleVolumeDiscountShopSync,
+} from "../services/deferredShopSync.server";
 import { syncVolumeDiscountShop } from "../services/volumeDiscountFunctionSync.server";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -81,9 +84,11 @@ type VolumeDiscountCampaignDuplicateRow = {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, admin } = await authenticate.admin(request);
 
-  void ensureVolumeDiscountFunctionDiscount(admin, session.shop).catch((e) => {
-    console.warn("[volume-discount] ensure function discount", e);
-  });
+  runAfterResponse(
+    ensureVolumeDiscountFunctionDiscount(admin, session.shop).catch((e) => {
+      console.warn("[volume-discount] ensure function discount", e);
+    })
+  );
 
   const rows = await prisma.$queryRaw<
     Array<{
@@ -115,9 +120,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     `);
 
   /* Warm preview URL cache without blocking Offers table + header actions paint. */
-  void storefrontProductPreviewUrl(admin, session.shop).catch((e) => {
-    console.warn("[Offrefy] storefrontProductPreviewUrl warm", e);
-  });
+  runAfterResponse(
+    storefrontProductPreviewUrl(admin, session.shop).catch((e) => {
+      console.warn("[Offrefy] storefrontProductPreviewUrl warm", e);
+    })
+  );
 
   return {
     storefrontProductPreviewUrl: null as string | null,

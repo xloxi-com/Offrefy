@@ -203,18 +203,27 @@ function isStaleDiscountError(messages: string[]): boolean {
  * Ensures the single shared Function discount exists when there are active offers
  * but no stored discount id (e.g. after install or legacy migration).
  */
+const verifiedShops = new Set<string>();
+
 export async function ensureVolumeDiscountFunctionDiscount(
   admin: AdminGraphql,
   shop: string,
 ): Promise<void> {
+  if (verifiedShops.has(shop)) return;
   const [activeCount, state] = await Promise.all([
     prisma.volumeDiscountCampaign.count({
       where: { shop, status: "active" },
     }),
     prisma.volumeDiscountShopState.findUnique({ where: { shop } }),
   ]);
-  if (activeCount === 0 || state?.functionDiscountId) return;
+  if (activeCount === 0 || state?.functionDiscountId) {
+    if (state?.functionDiscountId) {
+      verifiedShops.add(shop);
+    }
+    return;
+  }
   await syncVolumeDiscountShop(admin, shop);
+  verifiedShops.add(shop);
 }
 
 /**
