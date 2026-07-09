@@ -19,11 +19,13 @@ function numericTailFromGid(gid) {
 export function cartLinesDiscountsGenerateFetch(input) {
   const ruleSource = input.discount?.ruleSource?.jsonValue;
   const head = input.discount?.campaignsFrag0?.jsonValue;
-  const remote =
-    (ruleSource &&
-      typeof ruleSource === "object" &&
-      ruleSource.mode === "api") ||
-    (head && typeof head === "object" && head.remote === true);
+  const apiMode =
+    ruleSource &&
+    typeof ruleSource === "object" &&
+    ruleSource.mode === "api";
+  const legacyRemote =
+    head && typeof head === "object" && head.remote === true;
+  const remote = apiMode || legacyRemote;
 
   if (!remote) {
     return { request: undefined };

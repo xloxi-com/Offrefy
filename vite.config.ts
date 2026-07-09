@@ -63,6 +63,8 @@ export default defineConfig({
     assetsInlineLimit: 4096,
     target: "es2022",
     cssMinify: true,
+    minify: "esbuild",
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks(id) {

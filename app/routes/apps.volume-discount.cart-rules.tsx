@@ -2,6 +2,10 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { lookupDiscountRulesForProducts } from "../utils/discountRules.server";
 import { cachedJsonResponse } from "../utils/httpCache.server";
+import {
+  getMemoryCachedJson,
+  setMemoryCachedJson,
+} from "../utils/memoryCache.server";
 
 /**
  * App proxy: POST /apps/volume-discount/cart-rules
@@ -69,8 +73,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   }
 
+  const sortedIds = [...productIds].sort().join(",");
+  const memKey = `cart-rules:${shop}:${sortedIds}`;
+  const memHit = getMemoryCachedJson(memKey);
+  if (memHit) {
+    return cachedJsonResponse(memHit, {
+      request,
+      maxAge: 30,
+      staleWhileRevalidate: 120,
+    });
+  }
+
   const rules = await lookupDiscountRulesForProducts(shop, productIds);
   const responseJson = JSON.stringify({ ok: true, rules });
+
+  setMemoryCachedJson(memKey, responseJson, 30_000);
 
   return cachedJsonResponse(responseJson, {
     request,

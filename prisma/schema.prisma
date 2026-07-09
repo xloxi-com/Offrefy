@@ -79,6 +79,7 @@ model VolumeDiscountCampaign {
   @@index([shop])
   @@index([shop, createdAt(sort: Desc)])
   @@index([shop, status])
+  @@index([shop, status, createdAt(sort: Desc)])
 }
 
 /// Flat per-product discount rules (source of truth for Function lookup). Rebuilt from active campaigns on sync.

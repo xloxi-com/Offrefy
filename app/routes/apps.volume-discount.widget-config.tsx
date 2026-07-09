@@ -10,6 +10,11 @@ import {
   upsertEmptyStorefrontPayload,
 } from "../services/volumeDiscountStorefrontCache.server";
 import { cachedJsonResponse } from "../utils/httpCache.server";
+import {
+  getMemoryCachedJson,
+  setMemoryCachedJson,
+} from "../utils/memoryCache.server";
+import { volumeDiscountCampaignSyncSelect } from "../utils/volumeDiscountCampaignSelect.server";
 import { buildStorefrontWidgetForProduct } from "../utils/storefrontWidgetConfig.server";
 
 /**
@@ -51,6 +56,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const variantId = url.searchParams.get("variant_id")?.trim() ?? "";
 
   if (productId) {
+    const memKey = `widget:${shop}:${productId}:${variantId || ""}`;
+    const memHit = getMemoryCachedJson(memKey);
+    if (memHit) {
+      return cachedJsonResponse(memHit, {
+        request,
+        maxAge: 120,
+        staleWhileRevalidate: 600,
+      });
+    }
     try {
       const value = await buildStorefrontWidgetForProduct(
         shop,
@@ -58,6 +72,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         variantId || null,
         admin ?? null,
       );
+      setMemoryCachedJson(memKey, value, 60_000);
       return cachedJsonResponse(value, {
         request,
         maxAge: 120,
@@ -70,11 +85,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   /* Cache-first: sync writes VolumeDiscountStorefrontPayload on every save — avoid DB + Admin on hot path. */
+  const fullMemKey = `widget:${shop}:full`;
+  const fullMemHit = getMemoryCachedJson(fullMemKey);
+  if (fullMemHit) {
+    return cachedJsonResponse(fullMemHit, {
+      request,
+      maxAge: 60,
+      staleWhileRevalidate: 300,
+    });
+  }
+
   const cached = await readStorefrontPayloadForServe(shop);
   if (cached) {
     if (cached.stale && admin) {
       scheduleStorefrontPayloadRevalidation(shop, admin);
     }
+    setMemoryCachedJson(fullMemKey, cached.body, 45_000);
     return cachedJsonResponse(cached.body, {
       request,
       maxAge: 60,
@@ -91,6 +117,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const rows = await prisma.volumeDiscountCampaign.findMany({
       where: { shop, status: "active" },
       orderBy: { createdAt: "asc" },
+      select: volumeDiscountCampaignSyncSelect,
     });
 
     if (rows.length === 0) {

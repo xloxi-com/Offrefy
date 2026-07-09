@@ -4,6 +4,9 @@
   var PROXY = "/apps/volume-discount/widget-config";
   /** @type {Map<string, Promise<object>>} */
   var fetchPromiseByKey = new Map();
+  /** Per-product dedupe: variant id rarely changes widget tiers for the same product. */
+  /** @type {Map<string, Promise<object>>} */
+  var fetchPromiseByProductId = new Map();
   /** Upper bound for widget qty + /cart/add.js line quantity (Shopify allows large lines; caps abuse). */
   var VD_MAX_LINE_QTY = 9999;
 
@@ -12,6 +15,11 @@
   }
 
   function fetchConfig(productId, variantId) {
+    var pid = String(productId || "");
+    if (pid) {
+      var byProduct = fetchPromiseByProductId.get(pid);
+      if (byProduct) return byProduct;
+    }
     var key = fetchConfigKey(productId, variantId);
     var existing = fetchPromiseByKey.get(key);
     if (existing) return existing;
@@ -31,15 +39,18 @@
       .then(function (res) {
         if (!res || !res.ok) {
           fetchPromiseByKey.delete(key);
+          if (pid) fetchPromiseByProductId.delete(pid);
           return { version: 1, campaigns: [] };
         }
         return res.json();
       })
       .catch(function () {
         fetchPromiseByKey.delete(key);
+        if (pid) fetchPromiseByProductId.delete(pid);
         return { version: 1, campaigns: [] };
       });
     fetchPromiseByKey.set(key, promise);
+    if (pid) fetchPromiseByProductId.set(pid, promise);
     return promise;
   }
 

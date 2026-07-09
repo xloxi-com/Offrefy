@@ -243,9 +243,10 @@ function loadProductRulesMap(discount, fetchResult) {
     }
   }
 
-  if (fetchResult?.body && typeof fetchResult.body === "string") {
+  const fetchBody = fetchResult?.body;
+  if (typeof fetchBody === "string" && fetchBody.length > 0) {
     try {
-      const parsed = JSON.parse(fetchResult.body);
+      const parsed = JSON.parse(fetchBody);
       const apiRules = parsed?.rules;
       if (apiRules && typeof apiRules === "object" && !Array.isArray(apiRules)) {
         for (const [pid, rule] of Object.entries(apiRules)) {
@@ -342,37 +343,81 @@ function numericTailFromGid(gid) {
 }
 
 /**
+ * Build O(1) lookup set from product/variant GIDs (includes numeric tails).
+ * @param {unknown} rawIds
+ */
+function buildProductIdMatchSet(rawIds) {
+  /** @type {Set<string>} */
+  const set = new Set();
+  if (rawIds == null) return set;
+  const ids = Array.isArray(rawIds) ? rawIds : [];
+  for (const raw of ids) {
+    const s = String(raw).trim();
+    if (!s) continue;
+    set.add(s);
+    const pn = numericTailFromGid(s);
+    if (pn) {
+      set.add(pn);
+      set.add(`gid://shopify/Product/${pn}`);
+      set.add(`gid://shopify/ProductVariant/${pn}`);
+    }
+  }
+  return set;
+}
+
+/**
+ * Match line product/variant to pre-built id set (GID, numeric tail, or substring).
+ * @param {string} productId
+ * @param {string} variantId
+ * @param {Set<string>} set
+ */
+function lineMatchesProductIdSet(productId, variantId, set) {
+  if (!set.size) return false;
+  if (set.has(productId) || set.has(variantId)) return true;
+  const pn = numericTailFromGid(productId);
+  const vn = numericTailFromGid(variantId);
+  if (pn && set.has(pn)) return true;
+  if (vn && set.has(vn)) return true;
+  if (pn && set.has(`gid://shopify/Product/${pn}`)) return true;
+  if (vn && set.has(`gid://shopify/ProductVariant/${vn}`)) return true;
+  return false;
+}
+
+/**
  * Match line product/variant to campaign productIds (GID, numeric tail, or substring).
  * @param {string} productId
  * @param {string} variantId
  * @param {unknown} rawIds
  */
 function lineMatchesProductIds(productId, variantId, rawIds) {
-  const ids = Array.isArray(rawIds) ? rawIds.map(String) : [];
-  const set = new Set(ids.map((s) => s.trim()).filter(Boolean));
-  if (set.has(productId) || set.has(variantId)) return true;
-  const pn = numericTailFromGid(productId);
-  const vn = numericTailFromGid(variantId);
-  for (const raw of set) {
-    const s = String(raw);
-    if (pn && (s.includes(`/Product/${pn}`) || s === pn)) return true;
-    if (vn && (s.includes(`/Variant/${vn}`) || s === vn)) return true;
-  }
-  return false;
+  return lineMatchesProductIdSet(
+    productId,
+    variantId,
+    buildProductIdMatchSet(rawIds),
+  );
 }
 
-/** Highest tier where quantity >= minQty. @param {unknown[]} tiers @param {number} qty */
-function pickTier(tiers, qty) {
-  let best = null;
-  const sorted = [...tiers].sort(
+/** @param {unknown[]} tiers */
+function sortTiersByMinQty(tiers) {
+  return [...tiers].sort(
     (a, b) => Number(a?.minQty ?? 0) - Number(b?.minQty ?? 0),
   );
+}
+
+/** Highest tier where quantity >= minQty. Expects tiers pre-sorted by minQty ascending. */
+function pickTierFromSorted(sorted, qty) {
+  let best = null;
   for (const t of sorted) {
     const minQty = Math.max(1, Math.floor(Number(t?.minQty ?? 1)));
     if (qty >= minQty) best = t;
     else break;
   }
   return best;
+}
+
+/** @param {unknown[]} tiers @param {number} qty */
+function pickTier(tiers, qty) {
+  return pickTierFromSorted(sortTiersByMinQty(tiers), qty);
 }
 
 /** @param {unknown} line @param {unknown} tier */
@@ -473,6 +518,8 @@ export function cartLinesDiscountsGenerateRun(input) {
     }
   }
 
+  const cartTotalQty = lines.reduce((s, l) => s + (l.quantity || 0), 0);
+
   /** @type {Map<string, { message: string, value: object, score: number }>} */
   const bestByLine = new Map();
 
@@ -496,8 +543,6 @@ export function cartLinesDiscountsGenerateRun(input) {
       else linesByProduct.set(productKey, [{ line, productKey }]);
     }
 
-    const cartTotalQty = lines.reduce((s, l) => s + (l.quantity || 0), 0);
-
     for (const [productKey, entries] of linesByProduct) {
       const compact =
         productRules[productKey] ??
@@ -507,14 +552,14 @@ export function cartLinesDiscountsGenerateRun(input) {
         continue;
       }
 
-      const tiers = expandCompactTiers(compact);
-      if (!tiers.length) continue;
+      const sortedTiers = sortTiersByMinQty(expandCompactTiers(compact));
+      if (!sortedTiers.length) continue;
 
       const label = String(compact.m ?? "Volume discount");
       const qtyMode = Q_REVERSE[String(compact.q ?? "v")] ?? "per-variant";
 
       if (qtyMode === "total-all") {
-        const tier = pickTier(tiers, cartTotalQty);
+        const tier = pickTierFromSorted(sortedTiers, cartTotalQty);
         for (const { line } of entries) {
           const value = tierToDiscountValue(line, tier);
           if (!value) continue;
@@ -533,7 +578,7 @@ export function cartLinesDiscountsGenerateRun(input) {
         }
       } else if (qtyMode === "per-product") {
         const totalQty = entries.reduce((s, e) => s + e.line.quantity, 0);
-        const tier = pickTier(tiers, totalQty);
+        const tier = pickTierFromSorted(sortedTiers, totalQty);
         for (const { line } of entries) {
           const value = tierToDiscountValue(line, tier);
           if (!value) continue;
@@ -552,7 +597,7 @@ export function cartLinesDiscountsGenerateRun(input) {
         }
       } else {
         for (const { line } of entries) {
-          const tier = pickTier(tiers, line.quantity);
+          const tier = pickTierFromSorted(sortedTiers, line.quantity);
           const value = tierToDiscountValue(line, tier);
           if (!value) continue;
           const sc = tierScore(line, tier);
@@ -585,25 +630,9 @@ export function cartLinesDiscountsGenerateRun(input) {
   const bestByLineCampaign = bestByLine;
 
   if (!hasProductRules) {
-    for (const campaign of campaigns) {
-    if (!campaign || typeof campaign !== "object") continue;
-    if (!isActiveCampaign(campaign)) continue;
-    if (!customerMatches(campaign)) continue;
-
-    const scope = String(campaign.productScope ?? "all");
-    let qtyMode = String(campaign.quantityCondition ?? "per-variant");
-    if (cfgVersion < 2 && qtyMode === "per-product") qtyMode = "per-variant";
-
-    const tiers = normalizeCampaignTiers(campaign.tiers);
-    if (!tiers.length) continue;
-
-    const displayRaw =
-      campaign.displayName != null ? String(campaign.displayName).trim() : "";
-    const label =
-      displayRaw || String(campaign.campaignName ?? "Volume discount");
-
+    /** Pre-parse cart lines once for campaign matching (avoids re-walking per campaign). */
     /** @type {{ line: typeof lines[0], variantId: string, productId: string }[]} */
-    const inScope = [];
+    const parsedLines = [];
     for (const line of lines) {
       const m = line.merchandise;
       if (
@@ -614,10 +643,40 @@ export function cartLinesDiscountsGenerateRun(input) {
       ) {
         continue;
       }
-      const productId = m.product.id;
-      const variantId = m.id;
+      parsedLines.push({
+        line,
+        variantId: m.id,
+        productId: m.product.id,
+      });
+    }
 
-      let ok = scope === "all";
+    for (const campaign of campaigns) {
+    if (!campaign || typeof campaign !== "object") continue;
+    if (!isActiveCampaign(campaign)) continue;
+    if (!customerMatches(campaign)) continue;
+
+    const scope = String(campaign.productScope ?? "all");
+    let qtyMode = String(campaign.quantityCondition ?? "per-variant");
+    if (cfgVersion < 2 && qtyMode === "per-product") qtyMode = "per-variant";
+
+    const sortedTiers = sortTiersByMinQty(normalizeCampaignTiers(campaign.tiers));
+    if (!sortedTiers.length) continue;
+
+    const displayRaw =
+      campaign.displayName != null ? String(campaign.displayName).trim() : "";
+    const label =
+      displayRaw || String(campaign.campaignName ?? "Volume discount");
+
+    const scopeAll = scope === "all";
+    const productIdSet =
+      scopeAll || scope === "collections"
+        ? null
+        : buildProductIdMatchSet(campaign.productIds);
+
+    /** @type {{ line: typeof lines[0], variantId: string, productId: string }[]} */
+    const inScope = [];
+    for (const entry of parsedLines) {
+      let ok = scopeAll;
       if (
         !ok &&
         (scope === "variants" ||
@@ -625,9 +684,13 @@ export function cartLinesDiscountsGenerateRun(input) {
           scope === "group-products" ||
           scope === "collections")
       ) {
-        ok = lineMatchesProductIds(productId, variantId, campaign.productIds);
+        ok = lineMatchesProductIdSet(
+          entry.productId,
+          entry.variantId,
+          productIdSet ?? new Set(),
+        );
       }
-      if (ok) inScope.push({ line, variantId, productId });
+      if (ok) inScope.push(entry);
     }
     if (!inScope.length) continue;
 
@@ -647,25 +710,28 @@ export function cartLinesDiscountsGenerateRun(input) {
     };
 
     if (qtyMode === "total-all") {
-      const totalQty = inScope.reduce((s, x) => s + x.line.quantity, 0);
-      applyTier(inScope, pickTier(tiers, totalQty), ` (qty ${totalQty})`);
+      applyTier(inScope, pickTierFromSorted(sortedTiers, cartTotalQty), ` (qty ${cartTotalQty})`);
     } else if (qtyMode === "per-collection") {
       const groups = Array.isArray(campaign.collectionGroups)
         ? campaign.collectionGroups
         : [];
       if (!groups.length && scope === "collections") {
         const totalQty = inScope.reduce((s, x) => s + x.line.quantity, 0);
-        applyTier(inScope, pickTier(tiers, totalQty), ` (qty ${totalQty})`);
+        applyTier(inScope, pickTierFromSorted(sortedTiers, totalQty), ` (qty ${totalQty})`);
       } else {
         for (const g of groups) {
           if (!g || typeof g !== "object") continue;
-          const gids = Array.isArray(g.productIds) ? g.productIds : [];
-          const grp = inScope.filter((x) =>
-            lineMatchesProductIds(x.productId, x.variantId, gids),
-          );
+          const gSet = buildProductIdMatchSet(g.productIds);
+          /** @type {typeof inScope} */
+          const grp = [];
+          for (const x of inScope) {
+            if (lineMatchesProductIdSet(x.productId, x.variantId, gSet)) {
+              grp.push(x);
+            }
+          }
           if (!grp.length) continue;
           const totalQty = grp.reduce((s, x) => s + x.line.quantity, 0);
-          applyTier(grp, pickTier(tiers, totalQty), ` (qty ${totalQty})`);
+          applyTier(grp, pickTierFromSorted(sortedTiers, totalQty), ` (qty ${totalQty})`);
         }
       }
     } else if (qtyMode === "per-product") {
@@ -677,11 +743,11 @@ export function cartLinesDiscountsGenerateRun(input) {
       }
       for (const [, grp] of byProduct) {
         const totalQty = grp.reduce((s, x) => s + x.line.quantity, 0);
-        applyTier(grp, pickTier(tiers, totalQty), ` (qty ${totalQty})`);
+        applyTier(grp, pickTierFromSorted(sortedTiers, totalQty), ` (qty ${totalQty})`);
       }
     } else {
       for (const entry of inScope) {
-        applyTier([entry], pickTier(tiers, entry.line.quantity), "");
+        applyTier([entry], pickTierFromSorted(sortedTiers, entry.line.quantity), "");
       }
     }
   }

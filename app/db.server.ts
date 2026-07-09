@@ -38,12 +38,35 @@ function clientHasExpectedModels(client: AppPrismaClient | undefined): boolean {
   );
 }
 
+/** Append Supabase/PgBouncer-friendly pool params for serverless when missing from DATABASE_URL. */
+function runtimeDatasourceUrl(): string | undefined {
+  const raw = process.env.DATABASE_URL?.trim();
+  if (!raw) return undefined;
+  try {
+    const url = new URL(raw);
+    if (!url.searchParams.has("pgbouncer") && url.port === "6543") {
+      url.searchParams.set("pgbouncer", "true");
+    }
+    if (!url.searchParams.has("connection_limit")) {
+      url.searchParams.set("connection_limit", "1");
+    }
+    if (!url.searchParams.has("pool_timeout")) {
+      url.searchParams.set("pool_timeout", "10");
+    }
+    return url.toString();
+  } catch {
+    return raw;
+  }
+}
+
 function createPrismaClient(): AppPrismaClient {
   /**
    * Supabase: use pooler URL on DATABASE_URL (port 6543, ?pgbouncer=true) for runtime.
    * Use DIRECT_URL (port 5432) for migrations only. Keeps serverless/worker warm paths fast.
    */
+  const datasourceUrl = runtimeDatasourceUrl();
   return new PrismaClientConstructor({
+    ...(datasourceUrl ? { datasourceUrl } : {}),
     log:
       process.env.PRISMA_LOG === "query"
         ? ["query", "warn", "error"]

@@ -1,5 +1,5 @@
-import type { VolumeDiscountCampaign } from "@prisma/client";
-
+import type { VolumeDiscountCampaignStorefrontRow } from "../utils/storefrontWidgetConfig.server";
+import { volumeDiscountCampaignSyncSelect } from "../utils/volumeDiscountCampaignSelect.server";
 import { prisma } from "../db.server";
 import { buildStorefrontWidgetValue } from "../utils/storefrontWidgetConfig.server";
 
@@ -54,6 +54,7 @@ export function scheduleStorefrontPayloadRevalidation(
       const rows = await prisma.volumeDiscountCampaign.findMany({
         where: { shop, status: "active" },
         orderBy: { createdAt: "asc" },
+        select: volumeDiscountCampaignSyncSelect,
       });
       const payload =
         rows.length === 0
@@ -109,7 +110,7 @@ export async function upsertEmptyStorefrontPayload(shop: string): Promise<void> 
 
 export async function rebuildAndPersistStorefrontPayload(
   shop: string,
-  rows: VolumeDiscountCampaign[],
+  rows: VolumeDiscountCampaignStorefrontRow[],
   admin: AdminGraphql,
 ): Promise<string> {
   const payload =

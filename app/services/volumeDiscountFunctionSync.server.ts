@@ -1,4 +1,5 @@
-import type { VolumeDiscountCampaign } from "@prisma/client";
+import type { VolumeDiscountCampaignSyncRow } from "../utils/volumeDiscountCampaignSelect.server";
+import { volumeDiscountCampaignSyncSelect } from "../utils/volumeDiscountCampaignSelect.server";
 import { prisma } from "../db.server";
 import { buildVolumeDiscountFunctionConfig } from "../utils/volumeDiscountFunctionConfig.server";
 import {
@@ -20,6 +21,11 @@ import {
   splitProductRuleIndexIntoMetafieldChunks,
 } from "../utils/productRuleIndex.server";
 import { mergeCampaignConfigFromMetafieldNodes } from "../utils/volumeDiscountCampaignMetafieldChunks.server";
+import {
+  fingerprintMetafieldEntries,
+  readLiveDiscountMetafieldFingerprint,
+} from "../utils/syncConfigFingerprint.server";
+import { getVolumeDiscountStorefrontPayload } from "./volumeDiscountStorefrontCache.server";
 
 type AdminGraphql = {
   graphql: (
@@ -41,7 +47,7 @@ function customerTagsFromRowJson(value: unknown): string[] {
 }
 
 function collectCustomerSegmentTags(
-  rows: VolumeDiscountCampaign[],
+  rows: Pick<VolumeDiscountCampaignSyncRow, "customerType" | "customerTags">[],
 ): string[] {
   const s = new Set<string>();
   for (const r of rows) {
@@ -80,7 +86,7 @@ const READ_APP_DISCOUNT_METAFIELDS = `#graphql
 async function tryConfigByFilteringExistingMetafield(
   admin: AdminGraphql,
   discountNodeId: string,
-  activeRows: VolumeDiscountCampaign[],
+  activeRows: VolumeDiscountCampaignSyncRow[],
 ): Promise<{ version: number; campaigns: unknown[] } | null> {
   if (activeRows.length === 0) return null;
   try {
@@ -210,6 +216,7 @@ export async function syncVolumeDiscountShop(
     prisma.volumeDiscountCampaign.findMany({
       where: { shop, status: "active" },
       orderBy: { createdAt: "asc" },
+      select: volumeDiscountCampaignSyncSelect,
     }),
     prisma.volumeDiscountShopState.findUnique({
       where: { shop },
@@ -256,7 +263,7 @@ export async function syncVolumeDiscountShop(
   const config = reused
     ? reused
     : await buildVolumeDiscountFunctionConfig(
-        activeRows.map((r: VolumeDiscountCampaign) => ({
+        activeRows.map((r) => ({
           id: r.id,
           campaignName: r.campaignName,
           displayName: r.displayName,
@@ -281,17 +288,6 @@ export async function syncVolumeDiscountShop(
   }
 
   const keepId = state?.functionDiscountId ?? null;
-  const { errors: purgeErrors } = await purgeLegacyVolumeDiscountNodes(
-    admin,
-    shop,
-    keepId,
-  );
-  if (purgeErrors.length) {
-    console.warn(
-      "[volume-discount] legacy discount cleanup:",
-      purgeErrors.join("; "),
-    );
-  }
 
   let campaignMfEntries: { key: string; value: string }[];
   let needsRemoteLookup = false;
@@ -320,15 +316,23 @@ export async function syncVolumeDiscountShop(
       tiers: c.tiers,
     }));
 
-    const [, built] = await Promise.all([
-      rebuildDiscountRulesForShop(shop, rulesInput),
-      Promise.resolve().then(() => {
+    const [{ errors: purgeErrors }, built] = await Promise.all([
+      purgeLegacyVolumeDiscountNodes(admin, shop, keepId),
+      Promise.resolve().then(async () => {
+        await rebuildDiscountRulesForShop(shop, rulesInput);
         const productIndex = buildProductRuleIndex({
           campaigns: campaignsForRules,
         });
         return splitProductRuleIndexIntoMetafieldChunks(productIndex);
       }),
     ]);
+
+    if (purgeErrors.length) {
+      console.warn(
+        "[volume-discount] legacy discount cleanup:",
+        purgeErrors.join("; "),
+      );
+    }
 
     campaignMfEntries = built.chunks;
     needsRemoteLookup = built.needsRemoteLookup;
@@ -340,7 +344,6 @@ export async function syncVolumeDiscountShop(
   const inputVariables = JSON.stringify({
     customerSegmentTags: collectCustomerSegmentTags(activeRows),
   });
-  const startsAt = new Date().toISOString();
   const metafields = [
     ...campaignMfEntries.map((entry) => ({
       namespace: MF_NS,
@@ -366,10 +369,33 @@ export async function syncVolumeDiscountShop(
     },
   ];
 
+  const metafieldFingerprint = fingerprintMetafieldEntries(
+    metafields.map((m) => ({ key: m.key, value: m.value })),
+  );
+
+  const widgetJsonFull = buildStorefrontWidgetJsonString(
+    activeRows,
+    config.campaigns as unknown[],
+  );
+  const widgetJson = compactStorefrontShopMetafieldPayload(widgetJsonFull);
+
+  const discountIdExisting = state?.functionDiscountId;
+  if (discountIdExisting) {
+    const [liveFp, cachedPayload] = await Promise.all([
+      readLiveDiscountMetafieldFingerprint(admin, discountIdExisting),
+      getVolumeDiscountStorefrontPayload(shop),
+    ]);
+    if (
+      liveFp === metafieldFingerprint &&
+      cachedPayload?.payload === widgetJsonFull
+    ) {
+      return { discountIds: [discountIdExisting], errors: [] };
+    }
+  }
+
   const baseInput = {
     title: "Offrefy — Quantity breaks",
     functionHandle: functionHandle(),
-    startsAt,
     discountClasses: ["PRODUCT"],
     combinesWith: {
       productDiscounts: true,
@@ -423,7 +449,12 @@ export async function syncVolumeDiscountShop(
         ?.discountId ?? state.functionDiscountId;
   } else {
     const res = await admin.graphql(CREATE_APP_DISCOUNT, {
-      variables: { d: baseInput },
+      variables: {
+        d: {
+          ...baseInput,
+          startsAt: new Date().toISOString(),
+        },
+      },
     });
     const parsed = (await res.json()) as {
       errors?: { message: string }[];
@@ -490,11 +521,6 @@ export async function syncVolumeDiscountShop(
     }),
   ]);
 
-  const widgetJsonFull = buildStorefrontWidgetJsonString(
-    activeRows,
-    config.campaigns as unknown[],
-  );
-  const widgetJson = compactStorefrontShopMetafieldPayload(widgetJsonFull);
   const gid = await shopGidPromise;
   await syncShopStorefrontWidgetMetafield(
     admin,

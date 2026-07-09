@@ -1,7 +1,7 @@
-import type { VolumeDiscountCampaign } from "@prisma/client";
-
 import { prisma } from "../db.server";
+import type { VolumeDiscountCampaignStorefrontRow } from "../utils/storefrontWidgetConfig.server";
 import { buildStorefrontWidgetValue } from "../utils/storefrontWidgetConfig.server";
+import { getVolumeDiscountStorefrontPayload } from "./volumeDiscountStorefrontCache.server";
 
 type AdminGraphql = {
   graphql: (
@@ -125,7 +125,7 @@ export async function resolveStorefrontWidgetShopGid(
 
 export async function syncShopStorefrontWidgetMetafield(
   admin: AdminGraphql,
-  rows: VolumeDiscountCampaign[],
+  rows: VolumeDiscountCampaignStorefrontRow[],
   shop: string,
   /** Full widget JSON for DB cache + app-proxy fallback. */
   prebuiltWidgetJson?: string,
@@ -143,13 +143,23 @@ export async function syncShopStorefrontWidgetMetafield(
 
   let shopId: string | null = resolvedShopGid ?? null;
 
+  const existingRow = await getVolumeDiscountStorefrontPayload(shop).catch(
+    () => null,
+  );
+  /** Skip Admin metafield write when DB cache already matches and shop metafield uses the same JSON. */
+  const skipShopMetafieldWrite =
+    shopMetafieldJson == null &&
+    existingRow?.payload === cacheValue;
+
   if (shopId) {
     try {
-      await prisma.volumeDiscountStorefrontPayload.upsert({
-        where: { shop },
-        create: { shop, payload: cacheValue },
-        update: { payload: cacheValue },
-      });
+      if (existingRow?.payload !== cacheValue) {
+        await prisma.volumeDiscountStorefrontPayload.upsert({
+          where: { shop },
+          create: { shop, payload: cacheValue },
+          update: { payload: cacheValue },
+        });
+      }
     } catch (e) {
       console.warn("[Offrefy] storefront DB cache:", e);
     }
@@ -189,6 +199,10 @@ export async function syncShopStorefrontWidgetMetafield(
       console.warn("[Offrefy] shop id missing for storefront metafield");
       return;
     }
+  }
+
+  if (skipShopMetafieldWrite) {
+    return;
   }
 
   const setRes = await admin.graphql(METAFIELDS_SET, {

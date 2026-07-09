@@ -4,12 +4,29 @@ import { prisma } from "../db.server";
 import { normalizeCatalogIdKey } from "./discountRules.server";
 import { discountRuleDb } from "./discountRuleDb.server";
 import { getVolumeDiscountStorefrontPayload } from "../services/volumeDiscountStorefrontCache.server";
+import { volumeDiscountCampaignSyncSelect } from "./volumeDiscountCampaignSelect.server";
 import type { DiscountRuleRecord } from "../types/discountRule";
 
-/** DB row shape for widget JSON (explicit `widgetDisplay` for strict TS / older generated clients). */
-export type VolumeDiscountCampaignStorefrontRow = VolumeDiscountCampaign & {
-  widgetDisplay?: Prisma.JsonValue;
-};
+/** DB row shape for widget JSON — only fields required to build storefront payload. */
+export type VolumeDiscountCampaignStorefrontRow = Pick<
+  VolumeDiscountCampaign,
+  | "id"
+  | "campaignName"
+  | "displayName"
+  | "productScope"
+  | "quantityCondition"
+  | "customerType"
+  | "customerTags"
+  | "productIds"
+  | "collectionIds"
+  | "tiers"
+  | "widgetDisplay"
+  | "status"
+  | "countdownStartsAt"
+  | "countdownEndsAt"
+  | "createdAt"
+  | "updatedAt"
+>;
 
 import { buyLabelsForQuantityTiers } from "./buyLabelsForQuantityTiers";
 import {
@@ -260,6 +277,7 @@ export async function buildStorefrontWidgetForProduct(
 
   const row = await prisma.volumeDiscountCampaign.findFirst({
     where: { shop, id: campaignId, status: "active" },
+    select: volumeDiscountCampaignSyncSelect,
   });
   if (!row) {
     return JSON.stringify({ version: 1, campaigns: [] });
