@@ -23,6 +23,7 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { Box, InlineGrid, Page } from "@shopify/polaris";
 import { APP_DISPLAY_NAME } from "../branding";
 import { prisma } from "../db.server";
+import { scheduleVolumeDiscountShopSync } from "../services/deferredShopSync.server";
 import { syncVolumeDiscountShop } from "../services/volumeDiscountFunctionSync.server";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -169,17 +170,12 @@ export async function action({ request }: ActionFunctionArgs) {
         count: targetIds.length,
       };
     }
-    const { errors } = await syncVolumeDiscountShop(admin, session.shop);
-    if (errors.length) {
-      return {
-        ok: false as const,
-        error: `Offers removed but Shopify discounts could not sync: ${errors.join(" ")}`,
-      };
-    }
+    scheduleVolumeDiscountShopSync(admin, session.shop);
     return {
       ok: true as const,
       intent: "delete" as const,
       count: targetIds.length,
+      syncPending: true as const,
     };
   }
 
@@ -235,14 +231,12 @@ export async function action({ request }: ActionFunctionArgs) {
       where: { shop: session.shop, id: { in: campaignIds } },
       data: { status },
     });
-    const { errors } = await syncVolumeDiscountShop(admin, session.shop);
-    if (errors.length) {
-      return { ok: false as const, error: errors.join(" ") };
-    }
+    scheduleVolumeDiscountShopSync(admin, session.shop);
     return {
       ok: true as const,
       intent: intent === "bulkActivate" ? ("bulkActivate" as const) : ("bulkDeactivate" as const),
       count: campaignIds.length,
+      syncPending: true as const,
     };
   }
 

@@ -30,6 +30,7 @@ export type VolumeDiscountCampaignStorefrontRow = Pick<
 
 import { buyLabelsForQuantityTiers } from "./buyLabelsForQuantityTiers";
 import {
+  buildCampaignConfigFromDbRow,
   buildVolumeDiscountFunctionConfig,
   type FunctionTierConfig,
 } from "./volumeDiscountFunctionConfig.server";
@@ -237,7 +238,22 @@ export async function buildStorefrontWidgetForProduct(
   }
 
   /* DB cache first — same payload as sync; skips DiscountRule query on hot path when cached. */
-  const cached = await getVolumeDiscountStorefrontPayload(shop);
+  const [cached, rules] = await Promise.all([
+    getVolumeDiscountStorefrontPayload(shop),
+    discountRuleDb().findMany({
+      where: {
+        shop,
+        status: "active",
+        productId: {
+          in: [
+            ...new Set([productKey, variantKey, "*"].filter(Boolean)),
+          ],
+        },
+      },
+      select: { productId: true, campaignId: true },
+    }),
+  ]);
+
   if (cached?.payload) {
     const camp = pickStorefrontCampaignFromPayload(
       cached.payload,
@@ -248,19 +264,6 @@ export async function buildStorefrontWidgetForProduct(
       return JSON.stringify({ version: 1, campaigns: [camp] });
     }
   }
-
-  const lookupKeys = [
-    ...new Set([productKey, variantKey, "*"].filter(Boolean)),
-  ];
-
-  const rules = await discountRuleDb().findMany({
-    where: {
-      shop,
-      status: "active",
-      productId: { in: lookupKeys },
-    },
-    select: { productId: true, campaignId: true },
-  });
 
   const ruleByProductId = new Map(
     rules.map((r: DiscountRuleRecord) => [r.productId, r.campaignId]),
@@ -281,6 +284,26 @@ export async function buildStorefrontWidgetForProduct(
   });
   if (!row) {
     return JSON.stringify({ version: 1, campaigns: [] });
+  }
+
+  const matchedKey = productKey || variantKey || undefined;
+  const builtFromDb = buildCampaignConfigFromDbRow(
+    {
+      id: row.id,
+      campaignName: row.campaignName,
+      displayName: row.displayName,
+      productScope: row.productScope,
+      quantityCondition: row.quantityCondition,
+      customerType: row.customerType,
+      customerTags: row.customerTags,
+      productIds: row.productIds,
+      collectionIds: row.collectionIds,
+      tiers: row.tiers,
+    },
+    matchedKey,
+  );
+  if (builtFromDb) {
+    return buildStorefrontWidgetJsonString([row], [builtFromDb]);
   }
 
   if (!admin) {

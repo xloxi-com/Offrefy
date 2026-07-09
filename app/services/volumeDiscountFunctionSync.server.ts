@@ -344,6 +344,7 @@ export async function syncVolumeDiscountShop(
 
   let campaignMfEntries: { key: string; value: string }[];
   let needsRemoteLookup = false;
+  let widgetJsonFull: string;
   try {
     const campaignsForRules = (config.campaigns as {
       id: string;
@@ -369,7 +370,7 @@ export async function syncVolumeDiscountShop(
       tiers: c.tiers,
     }));
 
-    const [{ errors: purgeErrors }, built] = await Promise.all([
+    const [{ errors: purgeErrors }, built, widgetJsonBuilt] = await Promise.all([
       options.purgeLegacy
         ? purgeLegacyVolumeDiscountNodes(admin, shop, keepId)
         : Promise.resolve({ deleted: [] as string[], errors: [] as string[] }),
@@ -380,7 +381,14 @@ export async function syncVolumeDiscountShop(
         });
         return splitProductRuleIndexIntoMetafieldChunks(productIndex);
       }),
+      Promise.resolve().then(() =>
+        buildStorefrontWidgetJsonString(
+          activeRows,
+          config.campaigns as unknown[],
+        ),
+      ),
     ]);
+    widgetJsonFull = widgetJsonBuilt;
 
     if (purgeErrors.length) {
       console.warn(
@@ -395,6 +403,8 @@ export async function syncVolumeDiscountShop(
     const msg = e instanceof Error ? e.message : String(e);
     return { discountIds: [], errors: [msg] };
   }
+
+  const widgetJson = compactStorefrontShopMetafieldPayload(widgetJsonFull);
 
   const inputVariables = JSON.stringify({
     customerSegmentTags: collectCustomerSegmentTags(activeRows),
@@ -427,12 +437,6 @@ export async function syncVolumeDiscountShop(
   const metafieldFingerprint = fingerprintMetafieldEntries(
     metafields.map((m) => ({ key: m.key, value: m.value })),
   );
-
-  const widgetJsonFull = buildStorefrontWidgetJsonString(
-    activeRows,
-    config.campaigns as unknown[],
-  );
-  const widgetJson = compactStorefrontShopMetafieldPayload(widgetJsonFull);
 
   const discountIdExisting = state?.functionDiscountId;
   if (discountIdExisting && liveMetafieldNodes) {

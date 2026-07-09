@@ -11,10 +11,11 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "../db.server";
-import { syncVolumeDiscountShop } from "../services/volumeDiscountFunctionSync.server";
+import { scheduleVolumeDiscountShopSync } from "../services/deferredShopSync.server";
 import { authenticate } from "../shopify.server";
 import { parseVolumeDiscountForm } from "../utils/volumeDiscountForm.server";
 import type { VolumeDiscountNewOfferPreset } from "../types/volumeDiscount";
+import { IndeterminateLinearProgress } from "../components/IndeterminateLinearProgress";
 import { adminEmbeddedPath } from "../utils/adminEmbeddedPath";
 
 const VolumeDiscountCreateView = lazy(() =>
@@ -92,16 +93,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   /* Draft offers are not in the aggregate discount — skip slow GraphQL (collection expansion, metafields). */
   if (d.campaignStatus === "active") {
-    const { errors } = await syncVolumeDiscountShop(admin, session.shop, {
+    scheduleVolumeDiscountShopSync(admin, session.shop, {
       changedCampaignIds: [record.id],
     });
-    if (errors.length) {
-      await prisma.volumeDiscountCampaign.delete({ where: { id: record.id } });
-      return { ok: false as const, error: errors.join(" ") };
-    }
   }
 
-  return { ok: true as const, campaignId: record.id };
+  return { ok: true as const, campaignId: record.id, syncPending: true as const };
 };
 
 export default function VolumeDiscountNewRoute() {
@@ -117,12 +114,12 @@ export default function VolumeDiscountNewRoute() {
   const { search } = location;
   const shopify = useAppBridge();
   const onSuccess = useCallback(() => {
-    shopify.toast.show("Offer created in Shopify");
+    shopify.toast.show("Offer saved — syncing to Shopify");
     navigate(adminEmbeddedPath("/app", search));
   }, [navigate, search, shopify]);
 
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<IndeterminateLinearProgress fixed />}>
       <VolumeDiscountCreateView
         key={`${location.pathname}${location.search}`}
         onBack={() => navigate(adminEmbeddedPath("/app", search))}

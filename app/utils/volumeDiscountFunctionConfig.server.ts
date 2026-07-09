@@ -231,20 +231,24 @@ function campaignNeedsRebuild(
   return opts.changedCampaignIds.includes(campaignId);
 }
 
+export type CampaignConfigRowInput = {
+  id: string;
+  campaignName: string;
+  displayName?: string | null;
+  productScope: string;
+  quantityCondition: string;
+  customerType: string;
+  customerTags: unknown;
+  productIds: unknown;
+  collectionIds: unknown;
+  tiers: unknown;
+};
+
 function buildOneCampaignConfig(
-  row: {
-    id: string;
-    campaignName: string;
-    displayName?: string | null;
-    productScope: string;
-    quantityCondition: string;
-    customerType: string;
-    customerTags: unknown;
-    productIds: unknown;
-    collectionIds: unknown;
-    tiers: unknown;
-  },
+  row: CampaignConfigRowInput,
   collectionProducts: Map<string, string[]>,
+  /** When set (e.g. DiscountRule match), collection scope skips Admin GraphQL expansion. */
+  matchedProductKey?: string,
 ): unknown | null {
   const scope = row.productScope as VolumeDiscountProductScope;
   let productIds = jsonStringArray(row.productIds);
@@ -252,11 +256,15 @@ function buildOneCampaignConfig(
     scope === "collections" ? jsonStringArray(row.collectionIds) : [];
 
   if (scope === "collections") {
-    const expanded: string[] = [];
-    for (const cid of colIds) {
-      expanded.push(...(collectionProducts.get(cid) ?? []));
+    if (matchedProductKey) {
+      productIds = compactProductIdsForDiscountFunction([matchedProductKey]);
+    } else {
+      const expanded: string[] = [];
+      for (const cid of colIds) {
+        expanded.push(...(collectionProducts.get(cid) ?? []));
+      }
+      productIds = compactProductIdsForDiscountFunction([...new Set(expanded)]);
     }
-    productIds = compactProductIdsForDiscountFunction([...new Set(expanded)]);
   } else {
     productIds = compactProductIdsForDiscountFunction(productIds);
   }
@@ -306,6 +314,21 @@ function buildOneCampaignConfig(
     ...(collectionGroups?.length ? { collectionGroups } : {}),
     tiers: tierList,
   };
+}
+
+/**
+ * Build one campaign config from DB only — no collection GraphQL.
+ * Use on app-proxy per-product widget path when DiscountRule already matched the product.
+ */
+export function buildCampaignConfigFromDbRow(
+  row: CampaignConfigRowInput,
+  matchedProductKey?: string,
+): FunctionCampaignConfig | null {
+  return buildOneCampaignConfig(
+    row,
+    new Map(),
+    matchedProductKey,
+  ) as FunctionCampaignConfig | null;
 }
 
 /**

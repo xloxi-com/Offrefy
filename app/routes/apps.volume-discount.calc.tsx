@@ -1,10 +1,61 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { prisma } from "../db.server";
+import { lookupDiscountRulesForProducts } from "../utils/discountRules.server";
 import { authenticate } from "../shopify.server";
+import type { DiscountEngineCalcRequest } from "../utils/unlimitedDiscountEngineCalc.server";
 import {
   computeUnlimitedDiscountPreview,
-  type DiscountEngineCalcRequest,
+  type DiscountEngineCampaignRow,
 } from "../utils/unlimitedDiscountEngineCalc.server";
+
+const CALC_CAMPAIGN_SELECT = {
+  id: true,
+  campaignName: true,
+  displayName: true,
+  productScope: true,
+  quantityCondition: true,
+  customerType: true,
+  customerTags: true,
+  productIds: true,
+  tiers: true,
+  widgetDisplay: true,
+  status: true,
+  createdAt: true,
+} as const;
+
+/** Load only campaigns that can apply to cart lines (via DiscountRule), not every active row. */
+async function loadCampaignsForCalc(
+  shop: string,
+  body: DiscountEngineCalcRequest,
+): Promise<DiscountEngineCampaignRow[]> {
+  const productIds = (body.items ?? []).map((i) => String(i.product_id ?? ""));
+  if (!productIds.length) {
+    return prisma.volumeDiscountCampaign.findMany({
+      where: { shop, status: "active" },
+      orderBy: { createdAt: "asc" },
+      select: CALC_CAMPAIGN_SELECT,
+    });
+  }
+
+  const rules = await lookupDiscountRulesForProducts(shop, productIds);
+  const campaignIds = [
+    ...new Set(
+      Object.values(rules)
+        .map((r) => r.campaignId)
+        .filter(Boolean),
+    ),
+  ];
+
+  if (!campaignIds.length) {
+    return [];
+  }
+
+  return prisma.volumeDiscountCampaign.findMany({
+    where: { shop, status: "active", id: { in: campaignIds } },
+    orderBy: { createdAt: "asc" },
+    select: CALC_CAMPAIGN_SELECT,
+  });
+}
 
 /**
  * App proxy: POST /apps/volume-discount/calc
@@ -79,24 +130,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   }
 
-  const campaigns = await prisma.volumeDiscountCampaign.findMany({
-    where: { shop, status: "active" },
-    orderBy: { createdAt: "asc" },
-    select: {
-      id: true,
-      campaignName: true,
-      displayName: true,
-      productScope: true,
-      quantityCondition: true,
-      customerType: true,
-      customerTags: true,
-      productIds: true,
-      tiers: true,
-      widgetDisplay: true,
-      status: true,
-      createdAt: true,
-    },
-  });
+  const campaigns = await loadCampaignsForCalc(shop, body);
 
   try {
     const result = computeUnlimitedDiscountPreview(campaigns, body);

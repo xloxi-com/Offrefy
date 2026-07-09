@@ -11,8 +11,10 @@ import type { Prisma } from "@prisma/client";
 
 import { prisma } from "../db.server";
 import { planCampaignSaveSync } from "../utils/campaignSyncDelta.server";
-import { refreshStorefrontWidgetForShop } from "../services/refreshStorefrontWidget.server";
-import { syncVolumeDiscountShop } from "../services/volumeDiscountFunctionSync.server";
+import {
+  scheduleStorefrontWidgetRefresh,
+  scheduleVolumeDiscountShopSync,
+} from "../services/deferredShopSync.server";
 import { deleteAutomaticDiscounts } from "../services/volumeDiscountShopify.server";
 import { authenticate } from "../shopify.server";
 import {
@@ -29,6 +31,7 @@ import {
   normalizeVolumeDiscountWidgetDisplay,
   type VolumeDiscountWidgetDisplay,
 } from "../utils/widgetDisplay";
+import { IndeterminateLinearProgress } from "../components/IndeterminateLinearProgress";
 import { adminEmbeddedPath } from "../utils/adminEmbeddedPath";
 
 const VolumeDiscountCreateView = lazy(() =>
@@ -205,23 +208,14 @@ export const action = async ({
   );
 
   if (syncPlan.kind === "full") {
-    const { errors } = await syncVolumeDiscountShop(admin, session.shop, {
+    scheduleVolumeDiscountShopSync(admin, session.shop, {
       changedCampaignIds: [id],
     });
-    if (errors.length) {
-      return { ok: false as const, error: errors.join(" ") };
-    }
   } else if (syncPlan.kind === "storefront_only") {
-    const { errors } = await refreshStorefrontWidgetForShop(
-      admin,
-      session.shop,
-    );
-    if (errors.length) {
-      return { ok: false as const, error: errors.join(" ") };
-    }
+    scheduleStorefrontWidgetRefresh(admin, session.shop);
   }
 
-  return { ok: true as const, campaignId: id };
+  return { ok: true as const, campaignId: id, syncPending: true as const };
 };
 
 const fallbackTier = {
@@ -242,7 +236,7 @@ export default function VolumeDiscountEditRoute() {
   const { search } = useLocation();
   const shopify = useAppBridge();
   const onSuccess = useCallback(() => {
-    shopify.toast.show("Offer updated");
+    shopify.toast.show("Offer saved — syncing to Shopify");
   }, [shopify]);
 
   const parsedTiers = normalizeTiersFromDb(campaign.tiers);
@@ -258,7 +252,7 @@ export default function VolumeDiscountEditRoute() {
   );
 
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<IndeterminateLinearProgress fixed />}>
       <VolumeDiscountCreateView
         key={campaign.id}
         onBack={() => navigate(adminEmbeddedPath("/app", search))}
