@@ -1,0 +1,21 @@
+api_version = "2026-01"
+
+[[extensions]]
+name = "Offrefy — Quantity breaks"
+handle = "volume-discount-fn"
+type = "function"
+uid = "765ae274-2507-da32-0bc8-186fd0ef0505e19418b4"
+description = "One automatic discount applies every volume tier from the app (saves Shopify discount slots)."
+
+  [[extensions.targeting]]
+  target = "cart.lines.discounts.generate.run"
+  input_query = "src/cart_lines_discounts_generate_run.graphql"
+  export = "cart-lines-discounts-generate-run"
+
+  [extensions.input.variables]
+  namespace = "volume_discount"
+  key = "input_variables"
+
+  [extensions.build]
+  command = ""
+  path = "dist/function.wasm"
