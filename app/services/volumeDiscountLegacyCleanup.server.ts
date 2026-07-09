@@ -54,7 +54,8 @@ function isManagedVolumeDiscountTitle(title: string): boolean {
 
 /**
  * Removes legacy per-campaign automatic discounts so the shop stays at **one**
- * shared Function discount (1/25 slots). Safe to run before every sync.
+ * shared Function discount (1/25 slots).
+ * Skips listing all store discounts when DB shows no legacy ids (hot-path save).
  */
 export async function purgeLegacyVolumeDiscountNodes(
   admin: AdminGraphql,
@@ -73,6 +74,15 @@ export async function purgeLegacyVolumeDiscountNodes(
         legacyFromDb.add(id);
       }
     }
+  }
+
+  if (legacyFromDb.size === 0 && keepDiscountNodeId) {
+    return { deleted: [], errors: [] };
+  }
+
+  if (legacyFromDb.size > 0) {
+    const { errors } = await deleteAutomaticDiscounts(admin, [...legacyFromDb]);
+    return { deleted: [...legacyFromDb], errors };
   }
 
   const toDelete = new Set<string>();

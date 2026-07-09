@@ -59,7 +59,7 @@ export function scheduleStorefrontPayloadRevalidation(
       const payload =
         rows.length === 0
           ? EMPTY_PAYLOAD
-          : await buildStorefrontWidgetValue(rows, admin);
+          : await buildStorefrontWidgetValue(rows, admin, shop);
       await prisma.volumeDiscountStorefrontPayload.upsert({
         where: { shop },
         create: { shop, payload },
@@ -116,7 +116,7 @@ export async function rebuildAndPersistStorefrontPayload(
   const payload =
     rows.length === 0
       ? EMPTY_PAYLOAD
-      : await buildStorefrontWidgetValue(rows, admin);
+      : await buildStorefrontWidgetValue(rows, admin, shop);
   await prisma.volumeDiscountStorefrontPayload.upsert({
     where: { shop },
     create: { shop, payload },

@@ -20,11 +20,12 @@ import {
   buildProductRuleIndex,
   splitProductRuleIndexIntoMetafieldChunks,
 } from "../utils/productRuleIndex.server";
-import { mergeCampaignConfigFromMetafieldNodes } from "../utils/volumeDiscountCampaignMetafieldChunks.server";
 import {
   fingerprintMetafieldEntries,
   readLiveDiscountMetafieldFingerprint,
 } from "../utils/syncConfigFingerprint.server";
+import { invalidateMemoryCachePrefix } from "../utils/memoryCache.server";
+import { mergeCampaignConfigFromMetafieldNodes } from "../utils/volumeDiscountCampaignMetafieldChunks.server";
 import { getVolumeDiscountStorefrontPayload } from "./volumeDiscountStorefrontCache.server";
 
 type AdminGraphql = {
@@ -225,7 +226,7 @@ export async function syncVolumeDiscountShop(
 
   if (activeRows.length === 0) {
     if (state?.functionDiscountId) {
-      const shopGidPromise = resolveStorefrontWidgetShopGid(admin);
+      const shopGidPromise = resolveStorefrontWidgetShopGid(admin, shop);
       const [{ errors: delErr }, gid] = await Promise.all([
         deleteAutomaticDiscounts(admin, [state.functionDiscountId]),
         shopGidPromise,
@@ -252,7 +253,7 @@ export async function syncVolumeDiscountShop(
   }
 
   /* Shop GID + metafield read are independent; overlap them before any heavy collection GraphQL. */
-  const shopGidPromise = resolveStorefrontWidgetShopGid(admin);
+  const shopGidPromise = resolveStorefrontWidgetShopGid(admin, shop);
   const reused = await (state?.functionDiscountId
     ? tryConfigByFilteringExistingMetafield(
         admin,
@@ -276,6 +277,7 @@ export async function syncVolumeDiscountShop(
           tiers: r.tiers,
         })),
         admin,
+        shop,
       );
 
   if (!config.campaigns.length) {
@@ -530,6 +532,8 @@ export async function syncVolumeDiscountShop(
     gid ?? undefined,
     widgetJson,
   );
+
+  invalidateMemoryCachePrefix(`widget:${shop}:`);
 
   return { discountIds: [discountId], errors: [] };
 }

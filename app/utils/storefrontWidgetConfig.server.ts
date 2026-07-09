@@ -313,6 +313,7 @@ export async function buildStorefrontWidgetForProduct(
       },
     ],
     admin,
+    shop,
   );
 
   return buildStorefrontWidgetJsonString([row], campaigns);
@@ -321,6 +322,7 @@ export async function buildStorefrontWidgetForProduct(
 export async function buildStorefrontWidgetValue(
   rows: VolumeDiscountCampaignStorefrontRow[],
   admin: AdminGraphql,
+  shop?: string,
 ): Promise<string> {
   const { campaigns } = await buildVolumeDiscountFunctionConfig(
     rows.map((r) => ({
@@ -336,6 +338,7 @@ export async function buildStorefrontWidgetValue(
       tiers: r.tiers,
     })),
     admin,
+    shop,
   );
 
   return buildStorefrontWidgetJsonString(rows, campaigns);

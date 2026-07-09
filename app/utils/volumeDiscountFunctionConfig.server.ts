@@ -5,6 +5,10 @@ import type {
 } from "../types/volumeDiscount";
 import { normalizeVolumeDiscountCustomerType } from "../types/volumeDiscount";
 import { normalizeTiersFromDb } from "./volumeDiscountTier";
+import {
+  getCachedCollectionProductIds,
+  setCachedCollectionProductIds,
+} from "./adminGraphqlCache.server";
 
 type AdminGraphql = {
   graphql: (
@@ -143,7 +147,13 @@ const COLLECTION_PRODUCTS = `#graphql
 async function productIdsForCollection(
   admin: AdminGraphql,
   collectionGid: string,
+  shop?: string,
 ): Promise<string[]> {
+  if (shop) {
+    const cached = getCachedCollectionProductIds(shop, collectionGid);
+    if (cached) return cached;
+  }
+
   const ids: string[] = [];
   let after: string | null = null;
   const maxPages = 40;
@@ -174,6 +184,10 @@ async function productIdsForCollection(
     after = pi.endCursor;
   }
 
+  if (shop && ids.length) {
+    setCachedCollectionProductIds(shop, collectionGid, ids);
+  }
+
   return ids;
 }
 
@@ -182,6 +196,7 @@ const COLLECTION_GRAPHQL_CONCURRENCY = 20;
 async function resolveCollectionProductIds(
   admin: AdminGraphql,
   collectionGids: string[],
+  shop?: string,
 ): Promise<Map<string, string[]>> {
   const unique = [...new Set(collectionGids)];
   const map = new Map<string, string[]>();
@@ -192,7 +207,7 @@ async function resolveCollectionProductIds(
     const pairs = await Promise.all(
       chunk.map(
         async (cid) =>
-          [cid, await productIdsForCollection(admin, cid)] as const,
+          [cid, await productIdsForCollection(admin, cid, shop)] as const,
       ),
     );
     for (const [cid, ids] of pairs) {
@@ -219,6 +234,7 @@ export async function buildVolumeDiscountFunctionConfig(
     tiers: unknown;
   }[],
   admin: AdminGraphql,
+  shop?: string,
 ): Promise<{ version: number; campaigns: unknown[] }> {
   const collectionGids: string[] = [];
   for (const row of args) {
@@ -229,6 +245,7 @@ export async function buildVolumeDiscountFunctionConfig(
   const collectionProducts = await resolveCollectionProductIds(
     admin,
     collectionGids,
+    shop,
   );
 
   const campaigns: unknown[] = [];

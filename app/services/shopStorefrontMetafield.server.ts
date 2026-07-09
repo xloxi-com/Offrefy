@@ -1,6 +1,12 @@
 import { prisma } from "../db.server";
-import type { VolumeDiscountCampaignStorefrontRow } from "../utils/storefrontWidgetConfig.server";
-import { buildStorefrontWidgetValue } from "../utils/storefrontWidgetConfig.server";
+import {
+  getCachedShopGid,
+  setCachedShopGid,
+} from "../utils/adminGraphqlCache.server";
+import {
+  buildStorefrontWidgetValue,
+  type VolumeDiscountCampaignStorefrontRow,
+} from "../utils/storefrontWidgetConfig.server";
 import { getVolumeDiscountStorefrontPayload } from "./volumeDiscountStorefrontCache.server";
 
 type AdminGraphql = {
@@ -97,7 +103,13 @@ async function ensureStorefrontWidgetDefinition(
  */
 export async function resolveStorefrontWidgetShopGid(
   admin: AdminGraphql,
+  shop?: string,
 ): Promise<string | null> {
+  if (shop) {
+    const cached = getCachedShopGid(shop);
+    if (cached) return cached;
+  }
+
   try {
     await ensureStorefrontWidgetDefinition(admin);
   } catch (e) {
@@ -120,6 +132,7 @@ export async function resolveStorefrontWidgetShopGid(
     console.warn("[Offrefy] shop id missing for storefront metafield");
     return null;
   }
+  if (shop) setCachedShopGid(shop, id);
   return id;
 }
 
@@ -138,7 +151,7 @@ export async function syncShopStorefrontWidgetMetafield(
     prebuiltWidgetJson ??
     (rows.length === 0
       ? JSON.stringify({ version: 1, campaigns: [] })
-      : await buildStorefrontWidgetValue(rows, admin));
+      : await buildStorefrontWidgetValue(rows, admin, shop));
   const metafieldValue = shopMetafieldJson ?? cacheValue;
 
   let shopId: string | null = resolvedShopGid ?? null;

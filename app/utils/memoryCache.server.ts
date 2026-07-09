@@ -40,3 +40,9 @@ export function setMemoryCachedJson(
   pruneIfNeeded();
   store.set(key, { body, expiresAt: Date.now() + Math.max(1, ttlMs) });
 }
+
+export function invalidateMemoryCachePrefix(prefix: string): void {
+  for (const key of store.keys()) {
+    if (key.startsWith(prefix)) store.delete(key);
+  }
+}

@@ -10,6 +10,8 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "../db.server";
+import { planCampaignSaveSync } from "../utils/campaignSyncDelta.server";
+import { refreshStorefrontWidgetForShop } from "../services/refreshStorefrontWidget.server";
 import { syncVolumeDiscountShop } from "../services/volumeDiscountFunctionSync.server";
 import { deleteAutomaticDiscounts } from "../services/volumeDiscountShopify.server";
 import { authenticate } from "../shopify.server";
@@ -183,16 +185,35 @@ export const action = async ({
     } as unknown as Prisma.VolumeDiscountCampaignUpdateInput,
   });
 
-  const normStatus = (s: string) => String(s).toLowerCase();
-  const wasDraft = normStatus(existing.status) === "draft";
-  const nowDraft = d.campaignStatus === "draft";
-  const needsShopifySync =
-    !wasDraft ||
-    !nowDraft ||
-    normStatus(existing.status) !== normStatus(d.campaignStatus);
+  const syncPlan = planCampaignSaveSync(
+    {
+      status: existing.status,
+      campaignName: existing.campaignName,
+      displayName: existing.displayName,
+      productScope: existing.productScope,
+      quantityCondition: existing.quantityCondition,
+      customerType: existing.customerType,
+      customerTags: existing.customerTags,
+      productIds: existing.productIds,
+      collectionIds: existing.collectionIds,
+      tiers: existing.tiers,
+      widgetDisplay: existing.widgetDisplay,
+      countdownStartsAt: existing.countdownStartsAt,
+      countdownEndsAt: existing.countdownEndsAt,
+    },
+    d,
+  );
 
-  if (needsShopifySync) {
+  if (syncPlan.kind === "full") {
     const { errors } = await syncVolumeDiscountShop(admin, session.shop);
+    if (errors.length) {
+      return { ok: false as const, error: errors.join(" ") };
+    }
+  } else if (syncPlan.kind === "storefront_only") {
+    const { errors } = await refreshStorefrontWidgetForShop(
+      admin,
+      session.shop,
+    );
     if (errors.length) {
       return { ok: false as const, error: errors.join(" ") };
     }
