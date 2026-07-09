@@ -2,7 +2,7 @@
 
 client_id = "5bc674730835cd4d44ce63b0da5cbd59"
 name = "Offrefy"
-application_url = "https://example.com"
+application_url = "https://offrefy.vercel.app"
 embedded = true
 
 [build]
@@ -26,9 +26,9 @@ optional_scopes = [ ]
 use_legacy_install_flow = false
 
 [auth]
-redirect_urls = [ ]
+redirect_urls = [ "https://offrefy.vercel.app/auth/callback" ]
 
 [app_proxy]
-url = "https://example.com"
+url = "https://offrefy.vercel.app"
 subpath = "volume-discount"
 prefix = "apps"
