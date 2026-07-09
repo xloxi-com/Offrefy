@@ -1,0 +1,16 @@
+/* Tailwind without Preflight — avoids resetting Shopify Polaris in the embedded admin */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* Scan app sources only (avoids Vite css-analysis touching arbitrary files under /public). */
+@source "../**/*.{js,ts,jsx,tsx,css}";
+
+@theme {
+  --color-vd-maroon: #6b1d1e;
+  --color-vd-maroon-hover: #551618;
+  --color-vd-border: #9e2a2b;
+  --color-vd-pink: #fff5f5;
+  --color-vd-countdown-bg: #fce8e8;
+  --color-vd-countdown-text: #b42318;
+  --color-vd-save: #784a4f;
+}

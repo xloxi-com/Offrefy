@@ -1,0 +1,105 @@
+// https://pris.ly/d/prisma-schema
+// Supabase: DATABASE_URL = pooler :6543; DIRECT_URL = direct db.<ref>.supabase.co :5432 (migrations).
+// Do not wrap the DB password in [brackets] inside the URI.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Session {
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+
+  @@index([shop])
+}
+
+/// One automatic app discount (Shopify Function) per shop — holds all tier rules in a metafield.
+model VolumeDiscountShopState {
+  shop               String @id
+  functionDiscountId String
+}
+
+/// Cached JSON for app proxy + storefront when Admin session is unavailable (same payload as shop metafield).
+model VolumeDiscountStorefrontPayload {
+  shop      String   @id
+  payload   String   @db.Text
+  updatedAt DateTime @updatedAt
+}
+
+model VolumeDiscountCampaign {
+  id                  String   @id @default(cuid())
+  shop                String
+  campaignName        String
+  displayName         String?
+  productScope        String
+  quantityCondition   String
+  customerType        String
+  /// Customer tags for "with specific tag" / "without specific tag" rules (JSON string array)
+  customerTags        Json     @default("[]")
+  /// Product or variant GIDs (JSON string array); used when scope targets products / variants / group
+  productIds          Json     @default("[]")
+  /// Collection GIDs when productScope is collections
+  collectionIds       Json     @default("[]")
+  /// Tier definitions (JSON array)
+  tiers               Json
+  /// Product-page widget copy + colors + typography (normalized on read)
+  widgetDisplay       Json     @default("{}")
+  /// Linked DiscountAutomaticNode GID(s); active offers share one app Function discount
+  shopifyDiscountIds  Json     @default("[]")
+  /// draft | active | archived
+  status              String   @default("active")
+  /// When set, countdown is hidden until this instant (UTC). Optional promo window start.
+  countdownStartsAt   DateTime?
+  /// Sale / promo end instant (UTC). Canonical timer endpoint; admin “Time countdown” updates this from “now”.
+  countdownEndsAt     DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([shop])
+  @@index([shop, createdAt(sort: Desc)])
+  @@index([shop, status])
+}
+
+/// Flat per-product discount rules (source of truth for Function lookup). Rebuilt from active campaigns on sync.
+model DiscountRule {
+  id                String   @id @default(cuid())
+  shop              String
+  campaignId        String
+  /// Numeric Shopify product id (digits only) for O(1) cart line lookup
+  productId         String
+  status            String   @default("active")
+  tiers             Json
+  quantityCondition String   @default("per-variant")
+  customerType      String   @default("everyone")
+  customerTags      Json     @default("[]")
+  displayName       String?
+  campaignName      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([shop, campaignId, productId])
+  @@index([shop, productId, status])
+  @@index([shop, campaignId])
+  @@index([shop, status])
+}

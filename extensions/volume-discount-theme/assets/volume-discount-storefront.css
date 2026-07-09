@@ -1,0 +1,1209 @@
+/*
+ * Offrefy — quantity breaks (storefront + app embed)
+ * Fluid type + spacing: readable on small phones, balanced on desktop.
+ */
+
+.volume-discount-embed {
+  box-sizing: border-box;
+  /* Fill the theme product column — no inner max-width so CTA/cards align with form buttons */
+  margin-block: clamp(0.75rem, 3vw, 1.25rem);
+  margin-inline: 0;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding-inline: 0;
+
+  /*
+   * Match the storefront body font (theme settings → typography).
+   * Dawn / many OS 2.0: --font-body-family
+   * Horizon / double-dash tokens: --font-body--family
+   * Some themes: --font-paragraph-family
+   */
+  --vd-theme-font-body: var(
+    --font-body-family,
+    var(--font-body--family, var(--font-paragraph-family, inherit))
+  );
+  --vd-theme-font-heading: var(
+    --font-heading-family,
+    var(--font-heading--family, var(--vd-theme-font-body))
+  );
+  font-family: var(--vd-theme-font-body);
+  line-height: 1.5;
+  color: #1a1a1a;
+  -webkit-font-smoothing: antialiased;
+
+  /* Palette (overridden per campaign via inline --vd-* on this node) */
+  --vd-maroon: #6b1d1e;
+  --vd-maroon-border: #9e2a2b;
+  --vd-maroon-cta-hover: #551618;
+  --vd-badge-bg: #6b1d1e;
+  --vd-badge-text: #ffffff;
+  --vd-badge-size-scale: 1;
+  --vd-pink-bg: #fdf6f6;
+  --vd-countdown-bg: #fce8e8;
+  --vd-countdown-text: #b42318;
+  --vd-muted: #5c5c5c;
+  --vd-save: #784a4f;
+  --vd-option-subtext: #784a4f;
+  --vd-card-border: #e3e3e3;
+
+  /* Surfaces & elevation */
+  --vd-surface: #ffffff;
+  --vd-surface-muted: #fafafa;
+  --vd-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04),
+    0 2px 8px rgba(15, 23, 42, 0.05);
+  --vd-shadow-card-hover: 0 2px 6px rgba(15, 23, 42, 0.06),
+    0 8px 20px rgba(15, 23, 42, 0.07);
+  --vd-shadow-selected: 0 1px 2px rgba(107, 29, 30, 0.06),
+    0 6px 20px rgba(107, 29, 30, 0.1);
+  --vd-radius-card: 14px;
+  /* Main CTA; set from widget display (separate from tier cards). */
+  --vd-radius-cta: 14px;
+  --vd-radius-control: 10px;
+  --vd-radius-pill: 999px;
+
+  /* Fluid type (mobile floor → desktop cap) */
+  --vd-text-xs: clamp(0.8125rem, 0.35vw + 0.74rem, 0.875rem); /* 13–14px */
+  --vd-text-sm: clamp(0.875rem, 0.45vw + 0.78rem, 0.9375rem); /* 14–15px */
+  --vd-text-md: clamp(0.9375rem, 0.55vw + 0.82rem, 1.0625rem); /* 15–17px */
+  --vd-text-lg: clamp(1.0625rem, 0.75vw + 0.85rem, 1.25rem); /* 17–20px */
+  --vd-text-xl: clamp(1.125rem, 1vw + 0.88rem, 1.375rem); /* 18–22px */
+
+  /* Layout rhythm — align with admin preview (~Polaris space-300/400) */
+  --vd-gap: 0.875rem;
+  --vd-card-pad: clamp(14px, 2.8vw, 18px);
+  --vd-radio: 24px;
+  --vd-leader: calc(var(--vd-radio) + var(--vd-gap));
+
+  /* Weight scale — aligns heading/price/CTA vs secondary copy */
+  --vd-fw-strong: 700;
+  --vd-fw-accent: 600;
+  --vd-fw-body: 500;
+  --vd-fw-normal: 400;
+}
+
+.volume-discount-embed[data-vd-font-scale="compact"] {
+  --vd-text-xs: clamp(0.75rem, 0.28vw + 0.7rem, 0.8125rem);
+  --vd-text-sm: clamp(0.8125rem, 0.32vw + 0.74rem, 0.875rem);
+  --vd-text-md: clamp(0.875rem, 0.4vw + 0.78rem, 0.9375rem);
+  --vd-text-lg: clamp(0.9375rem, 0.55vw + 0.8rem, 1.0625rem);
+  --vd-text-xl: clamp(1rem, 0.65vw + 0.82rem, 1.125rem);
+}
+
+.volume-discount-embed[data-vd-font-scale="comfortable"] {
+  --vd-text-xs: clamp(0.875rem, 0.4vw + 0.78rem, 0.9375rem);
+  --vd-text-sm: clamp(0.9375rem, 0.5vw + 0.82rem, 1rem);
+  --vd-text-md: clamp(1rem, 0.6vw + 0.86rem, 1.125rem);
+  --vd-text-lg: clamp(1.125rem, 0.8vw + 0.9rem, 1.375rem);
+  --vd-text-xl: clamp(1.25rem, 1.05vw + 0.92rem, 1.5rem);
+}
+
+/* Tight horizontal inset only on very narrow viewports (edge-to-edge in product column otherwise) */
+@media (max-width: 379px) {
+  .volume-discount-embed {
+    padding-inline: clamp(0.25rem, 2.5vw, 0.5rem);
+  }
+}
+
+.volume-discount-embed *,
+.volume-discount-embed *::before,
+.volume-discount-embed *::after {
+  box-sizing: border-box;
+}
+
+.volume-discount-embed__inner {
+  width: 100%;
+  max-width: 100%;
+}
+
+.vd-bundle {
+  width: 100%;
+  font-size: var(--vd-fs-buy, 16px);
+  font-weight: var(--vd-fw-normal, 400);
+  font-variant-numeric: tabular-nums;
+}
+
+.vd-section-title {
+  margin: 0 0 clamp(0.45rem, 2vw, 0.65rem);
+  padding: 0;
+  text-align: center;
+  font-family: var(--vd-theme-font-heading);
+  font-size: var(--vd-fs-title, 20px);
+  font-weight: var(--vd-fw-strong, 700);
+  line-height: 1.25;
+  color: inherit;
+}
+
+/* Header — layout from widgetDisplay (data-vd-header-*, --vd-heading-text-align, --vd-countdown-justify) */
+.vd-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vd-gap) clamp(0.75rem, 3vw, 1.25rem);
+  margin-bottom: clamp(0.85rem, 2.2vw, 1.15rem);
+  padding-bottom: clamp(0.65rem, 2vw, 0.85rem);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.volume-discount-embed[data-vd-header-layout="stacked"] .vd-topbar {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+.vd-topbar .vd-title {
+  order: 1;
+}
+
+.vd-topbar .vd-countdown {
+  order: 2;
+}
+
+.volume-discount-embed[data-vd-header-swap="1"] .vd-topbar .vd-title {
+  order: 2;
+}
+
+.volume-discount-embed[data-vd-header-swap="1"] .vd-topbar .vd-countdown {
+  order: 1;
+}
+
+.volume-discount-embed[data-vd-header-layout="stacked"] .vd-topbar .vd-title {
+  flex: 0 0 auto;
+  width: 100%;
+}
+
+.volume-discount-embed[data-vd-header-layout="stacked"] .vd-topbar .vd-countdown {
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Narrow screens: stack + center when enabled in app (data-vd-header-mobile-stack="1") */
+@media (max-width: 749px) {
+  .volume-discount-embed[data-vd-header-mobile-stack="1"][data-vd-header-layout="split"]
+    .vd-topbar,
+  .volume-discount-embed[data-vd-header-mobile-stack="1"][data-vd-header-layout="stacked"]
+    .vd-topbar {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .volume-discount-embed[data-vd-header-mobile-stack="1"] .vd-topbar .vd-title {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+    text-align: center;
+  }
+
+  .volume-discount-embed[data-vd-header-mobile-stack="1"] .vd-topbar .vd-countdown {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+    justify-content: center;
+  }
+}
+
+.vd-title {
+  margin: 0;
+  font-family: var(--vd-theme-font-heading);
+  font-size: var(--vd-fs-title, 20px);
+  font-weight: var(--vd-fw-strong, 700);
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #141414;
+  text-align: var(--vd-heading-text-align, start);
+}
+
+.vd-countdown {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: var(--vd-countdown-justify, flex-end);
+  gap: 0.35rem 0.5rem;
+  flex: 1 1 auto;
+  min-width: min(100%, 11rem);
+}
+
+.vd-countdown-line {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  max-width: 100%;
+}
+
+.volume-discount-embed[data-vd-header-layout="stacked"] .vd-countdown {
+  text-align: inherit;
+}
+
+.vd-countdown-muted {
+  font-size: var(--vd-fs-cd-label, 13px);
+  font-weight: var(--vd-fw-normal, 400);
+  color: var(--vd-muted);
+  line-height: 1.3;
+}
+
+.vd-countdown-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--vd-radius-pill);
+  background: var(--vd-countdown-bg);
+  color: var(--vd-countdown-text);
+  font-weight: var(--vd-fw-accent, 600);
+  font-size: var(--vd-fs-cd-badge, 13px);
+  white-space: nowrap;
+  border: 1px solid rgba(180, 35, 24, 0.12);
+  box-shadow: 0 1px 2px rgba(180, 35, 24, 0.06);
+}
+
+/* Cards — clear rhythm + elevation */
+.vd-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  overflow: visible;
+}
+
+/* Room for floating top badge (half pill sits above card top) */
+.vd-cards > label.vd-card--badge-top-float:first-of-type {
+  margin-top: 0.4rem;
+}
+
+.vd-cards > label.vd-card--badge-top-float ~ label.vd-card--badge-top-float {
+  margin-top: 0.35rem;
+}
+
+/* Hide native radio — theme CSS often restyles inputs and caused a “double circle” */
+.vd-sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+  opacity: 0 !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
+
+.volume-discount-embed label.vd-card > input[type="radio"].vd-sr-only {
+  position: absolute !important;
+  left: -9999px !important;
+  top: auto !important;
+  width: 1px !important;
+  height: 1px !important;
+}
+
+.vd-card {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  cursor: pointer;
+  border-radius: var(--vd-radius-card);
+  border: 1px solid var(--vd-card-border);
+  background: var(--vd-surface);
+  box-shadow: var(--vd-shadow-card);
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+  overflow: visible;
+}
+
+/* Floating badge on top edge (badge position: top left / center / right) */
+label.vd-card.vd-card--badge-top-float {
+  position: relative;
+}
+
+.vd-card:hover:not(.vd-card--selected) {
+  border-color: #cfcfcf;
+  box-shadow: var(--vd-shadow-card-hover);
+  transform: translateY(-1px);
+}
+
+/*
+ * Tier <label> borders: themes often add blue/accent borders or ring shadows on
+ * product form labels. Force our neutral border + shadow inside the embed.
+ */
+.volume-discount-embed label.vd-card:not(.vd-card--selected) {
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: var(--vd-card-border) !important;
+  box-shadow: var(--vd-shadow-card) !important;
+  outline: none !important;
+}
+
+.volume-discount-embed label.vd-card:not(.vd-card--selected):hover {
+  border-color: #cfcfcf !important;
+  box-shadow: var(--vd-shadow-card-hover) !important;
+}
+
+.volume-discount-embed label.vd-card.vd-card--selected {
+  border-width: 2px !important;
+  border-style: solid !important;
+  border-color: var(--vd-maroon) !important;
+  box-shadow: var(--vd-shadow-selected) !important;
+  outline: none !important;
+}
+
+.volume-discount-embed label.vd-card.vd-card--selected:hover {
+  border-color: var(--vd-maroon) !important;
+  box-shadow: var(--vd-shadow-selected) !important;
+}
+
+.volume-discount-embed label.vd-card:focus,
+.volume-discount-embed label.vd-card:focus-within,
+.volume-discount-embed label.vd-card:focus-visible {
+  outline: none !important;
+}
+
+/* Keyboard focus — brand color (not theme blue) */
+.vd-card:focus-within input.vd-sr-only:focus-visible ~ .vd-card__inner {
+  outline: 2px solid var(--vd-maroon);
+  outline-offset: 2px;
+  border-radius: calc(var(--vd-radius-card) - 4px);
+}
+
+.vd-card--selected {
+  background: linear-gradient(
+    165deg,
+    #fffefb 0%,
+    var(--vd-pink-bg) 55%,
+    var(--vd-pink-bg) 100%
+  );
+  border-width: 2px;
+  border-color: var(--vd-maroon);
+  box-shadow: var(--vd-shadow-selected);
+  transform: none;
+}
+
+.vd-card--selected:hover {
+  border-color: var(--vd-maroon);
+  box-shadow: var(--vd-shadow-selected);
+  transform: none;
+}
+
+.vd-card__inner {
+  display: block;
+  padding: var(--vd-card-pad);
+}
+
+.vd-card__row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vd-gap);
+  min-width: 0;
+}
+
+.vd-row-main {
+  display: flex;
+  align-items: center;
+  gap: var(--vd-gap);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.vd-card__text-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.vd-radio-circle {
+  flex-shrink: 0;
+  width: var(--vd-radio);
+  height: var(--vd-radio);
+  margin-top: 0;
+  border-radius: 50%;
+  border: 2px solid var(--vd-radio-border, #bdbdbd);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--vd-surface);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.vd-card--selected .vd-radio-circle {
+  border-color: var(--vd-radio-accent, var(--vd-maroon));
+}
+
+/* Inner dot: 50% of outer circle (percent avoids fragile calc() on --vd-radio). */
+.vd-card--selected .vd-radio-circle::after {
+  content: "";
+  width: 50%;
+  height: 50%;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 50%;
+  background: var(--vd-radio-accent, var(--vd-maroon));
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.vd-card__mid {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.55rem;
+}
+
+.vd-buy {
+  font-weight: var(--vd-fw-strong, 700);
+  font-size: var(--vd-fs-buy, 16px);
+  line-height: 1.25;
+}
+
+.vd-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 2px 20px;
+  border-radius: var(--vd-radius-pill);
+  background: var(--vd-badge-bg);
+  color: var(--vd-badge-text);
+  font-size: calc(var(--vd-fs-badge, 12px) * var(--vd-badge-size-scale, 1));
+  font-weight: var(--vd-fw-accent, 600);
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-sizing: border-box;
+  box-shadow: 0 1px 2px rgba(107, 29, 30, 0.2);
+}
+
+/* Badge on its own row (below label or after subtext) — not inline with .vd-buy */
+.vd-badge-pill--row {
+  align-self: flex-start;
+  margin-top: 0.05rem;
+}
+
+/* Top-edge badge overlapping card top border — align via modifier class */
+.vd-card__badge-top--float {
+  position: absolute;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  margin: 0;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.vd-card__badge-top--float.vd-card__badge-top--align-end {
+  right: var(--vd-card-pad);
+  left: auto;
+  transform: translateY(-50%);
+  justify-content: flex-end;
+  max-width: calc(100% - 2 * var(--vd-card-pad));
+}
+
+.vd-card__badge-top--float.vd-card__badge-top--align-start {
+  left: var(--vd-card-pad);
+  right: auto;
+  transform: translateY(-50%);
+  justify-content: flex-start;
+  max-width: calc(100% - 2 * var(--vd-card-pad));
+}
+
+.vd-card__badge-top--float.vd-card__badge-top--align-center {
+  left: 50%;
+  right: auto;
+  transform: translate(-50%, -50%);
+  justify-content: center;
+  width: max-content;
+  max-width: calc(100% - 2 * var(--vd-card-pad));
+}
+
+.vd-card__badge-top--float .vd-badge-pill {
+  pointer-events: auto;
+  max-width: 100%;
+}
+
+/* Stacked above strike/price in the right column */
+.vd-badge-pill--pricecol {
+  align-self: flex-end;
+  margin-bottom: 0.18rem;
+}
+
+.vd-card__pricecol {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  text-align: right;
+  min-width: 0;
+  gap: 0.15rem;
+}
+
+.vd-strike {
+  display: inline-block;
+  max-width: 100%;
+  text-decoration: none;
+  color: var(--vd-muted);
+  font-weight: var(--vd-fw-normal, 400);
+  font-size: var(--vd-fs-compare, 13px);
+  line-height: 1.15;
+  position: relative;
+  font-variant-numeric: tabular-nums;
+}
+
+.vd-strike::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: max(1px, 0.0625em) solid currentColor;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.vd-price-strong {
+  font-weight: var(--vd-fw-strong, 700);
+  font-size: var(--vd-fs-price, 17px);
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+  color: #111;
+}
+
+.vd-you-save--under {
+  display: block;
+  margin-top: 0;
+  font-size: var(--vd-fs-save, 12px);
+  color: var(--vd-save);
+  font-weight: var(--vd-fw-body, 500);
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  text-align: left;
+  max-width: 100%;
+}
+
+.vd-option-subtext--under {
+  display: block;
+  margin-top: 0;
+  font-size: var(--vd-fs-option-subtext, var(--vd-fs-save, 12px));
+  color: var(--vd-option-subtext, var(--vd-save));
+  font-weight: var(--vd-fw-body, 500);
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  text-align: left;
+  max-width: 100%;
+}
+
+/* Expanded tier — single compact row (# · variant · total · qty · Add) */
+.vd-card__expand {
+  display: none;
+  width: 100%;
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
+}
+
+.vd-card:has(input.vd-sr-only:checked) .vd-card__expand {
+  display: block;
+}
+
+.vd-card__divider {
+  height: 1px;
+  margin: 0 0 0.4rem;
+  border: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(107, 29, 30, 0.12) 15%,
+    rgba(107, 29, 30, 0.12) 85%,
+    transparent
+  );
+}
+
+.vd-expand-compact {
+  /* One height for variant select, qty strip, and “+ Add” (30px incl. borders via box-sizing) */
+  --vd-compact-control-h: 30px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.45rem;
+  width: 100%;
+  padding: 0.35rem 0.45rem;
+  border-radius: var(--vd-radius-control);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.vd-expand-compact--no-variant .vd-line-total,
+.vd-expand-compact--no-qty .vd-line-total {
+  margin-inline-start: 0.25rem;
+}
+
+.vd-expand-compact--no-line-total .vd-expand-trailing {
+  margin-inline-start: auto;
+}
+
+.vd-expand-trailing {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.4rem;
+  margin-inline-start: auto;
+}
+
+.vd-tier-idx {
+  font-size: var(--vd-fs-cd-label, 12px);
+  font-weight: var(--vd-fw-normal, 400);
+  color: var(--vd-muted);
+  line-height: var(--vd-compact-control-h, 30px);
+  flex: 0 0 auto;
+}
+
+.vd-select-wrap {
+  flex: 1 1 6.5rem;
+  min-width: min(100%, 5.5rem);
+  max-width: 12rem;
+}
+
+.vd-variant-select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--vd-compact-control-h, 30px);
+  padding: 0 0.45rem;
+  border-radius: var(--vd-radius-control);
+  border: 1px solid var(--vd-card-border);
+  font: inherit;
+  font-size: var(--vd-fs-buy, 16px);
+  background: var(--vd-surface);
+  color: inherit;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.vd-variant-select:hover {
+  border-color: #c8c8c8;
+}
+
+.vd-variant-select:focus {
+  outline: none;
+  border-color: var(--vd-maroon);
+  box-shadow: 0 0 0 3px rgba(107, 29, 30, 0.12);
+}
+
+.vd-qty-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+
+.vd-cart-qty-alert {
+  margin: 0;
+  padding: 0;
+  font-size: var(--vd-fs-save, 12px);
+  font-weight: var(--vd-fw-body, 500);
+  color: var(--vd-countdown-text, #b42318);
+  line-height: 1.45;
+  text-align: left;
+  max-width: 14rem;
+  box-sizing: border-box;
+}
+
+.vd-cart-qty-alert[hidden] {
+  display: none !important;
+}
+
+.vd-cart-qty-alert--global {
+  margin: 0.55rem 0 0;
+  padding: 0.55rem 0.85rem;
+  max-width: none;
+  text-align: center;
+  border-radius: var(--vd-radius-control, 10px);
+  background: var(--vd-countdown-bg, #fce8e8);
+  font-size: var(--vd-text-sm, 0.9375rem);
+}
+
+.vd-qty-group {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  min-width: 9.75rem;
+  height: var(--vd-compact-control-h, 30px);
+  min-height: var(--vd-compact-control-h, 30px);
+  border-radius: var(--vd-radius-control);
+  border: 1px solid rgba(107, 29, 30, 0.16);
+  overflow: hidden;
+  background: var(--vd-surface);
+}
+
+.vd-qty-btn {
+  box-sizing: border-box;
+  width: var(--vd-compact-control-h, 30px);
+  min-width: var(--vd-compact-control-h, 30px);
+  height: var(--vd-compact-control-h, 30px);
+  min-height: var(--vd-compact-control-h, 30px);
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  background: linear-gradient(180deg, #ffffff 0%, #f9f9f9 100%);
+  color: #2a2a2a;
+  cursor: pointer;
+  font-size: 0.9375rem;
+  font-weight: var(--vd-fw-accent, 600);
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.vd-qty-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #fdf8f8 0%, #f5eded 100%);
+  color: var(--vd-maroon);
+}
+
+.vd-qty-btn:active:not(:disabled) {
+  background: #efe8e8;
+}
+
+.vd-qty-btn:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--vd-maroon);
+  outline-offset: -2px;
+}
+
+.vd-qty-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+  color: #888;
+}
+
+.vd-qty-value {
+  box-sizing: border-box;
+  min-width: 2.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  font-weight: var(--vd-fw-strong, 700);
+  font-size: var(--vd-fs-buy, 16px);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  border-left: 1px solid rgba(107, 29, 30, 0.1);
+  border-right: 1px solid rgba(107, 29, 30, 0.1);
+  background: linear-gradient(180deg, #f3f1f1 0%, #ebe8e8 100%);
+  color: #1a1a1a;
+  padding-inline: 0.4rem;
+  letter-spacing: 0.02em;
+}
+
+input.vd-qty-value {
+  box-sizing: border-box;
+  display: block;
+  flex: 0 0 auto;
+  width: 6.25rem;
+  min-width: 5.75rem;
+  max-width: 7rem;
+  margin: 0;
+  padding-block: 0;
+  padding-inline: 0.35rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: inherit;
+  font-size: inherit;
+  font-variant-numeric: inherit;
+  line-height: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-align: center;
+}
+
+input.vd-qty-value:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.vd-line-total {
+  font-weight: var(--vd-fw-strong, 700);
+  font-size: var(--vd-fs-price, 16px);
+  line-height: var(--vd-compact-control-h, 30px);
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+.vd-add-outline {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0;
+  height: var(--vd-compact-control-h, 30px);
+  min-height: var(--vd-compact-control-h, 30px);
+  padding: 0 0.65rem;
+  border-radius: var(--vd-radius-control);
+  border: 1px solid rgba(107, 29, 30, 0.2);
+  background: linear-gradient(180deg, #ffffff 0%, #fdfbfb 100%);
+  color: var(--vd-maroon);
+  font-weight: var(--vd-fw-strong, 700);
+  font-size: var(--vd-fs-compare, 13px);
+  font-family: inherit;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.vd-add-outline:hover:not(:disabled) {
+  background: linear-gradient(180deg, #fff8f8 0%, #fceeee 100%);
+  border-color: var(--vd-maroon);
+}
+
+.vd-add-outline:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.vd-add-outline:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vd-add-outline:focus-visible {
+  outline: 2px solid var(--vd-maroon);
+  outline-offset: 2px;
+}
+
+/* CTA — min 48px tap height on touch */
+.vd-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: max(3rem, 48px);
+  margin-top: clamp(1rem, 2.8vw, 1.35rem);
+  padding: 0.8rem 1.15rem;
+  border: none;
+  border-radius: var(--vd-radius-cta, var(--vd-radius-card));
+  background: var(--vd-maroon);
+  color: #fff;
+  font-size: var(--vd-fs-cta, 17px);
+  font-weight: var(--vd-fw-strong, 700);
+  font-family: inherit;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  text-align: center;
+  transition:
+    background 0.18s ease,
+    transform 0.12s ease;
+}
+
+.vd-cta:hover:not(:disabled) {
+  background: var(--vd-maroon-cta-hover);
+}
+
+.vd-cta:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.vd-cta:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.vd-cta:focus-visible {
+  outline: 2px solid var(--vd-maroon);
+  outline-offset: 2px;
+}
+
+.vd-stock-alert {
+  margin: 0.65rem 0 0;
+  padding: 0.55rem 0.85rem;
+  border-radius: var(--vd-radius-control, 10px);
+  background: var(--vd-countdown-bg, #fce8e8);
+  color: var(--vd-countdown-text, #b42318);
+  font-size: var(--vd-text-sm, 0.9375rem);
+  font-weight: var(--vd-fw-body, 500);
+  text-align: center;
+  line-height: 1.45;
+  box-sizing: border-box;
+}
+
+.vd-stock-alert[hidden] {
+  display: none !important;
+  margin: 0;
+  padding: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.vd-footnote {
+  margin: clamp(0.55rem, 2vw, 0.75rem) 0 0;
+  font-size: var(--vd-fs-footnote, 12px);
+  font-weight: var(--vd-fw-normal, 400);
+  color: var(--vd-muted);
+  text-align: center;
+  line-height: 1.5;
+  max-width: 28rem;
+  margin-inline: auto;
+  opacity: 0.92;
+}
+
+/* Narrow: stack header + price block */
+@media (max-width: 24rem) {
+  .vd-topbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .vd-countdown {
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  .vd-card__row {
+    flex-wrap: wrap;
+  }
+
+  .vd-card__pricecol {
+    width: 100%;
+    flex-basis: 100%;
+    align-items: flex-start;
+    text-align: left;
+    padding-left: var(--vd-leader);
+    margin-top: 0.35rem;
+  }
+
+  .vd-expand-compact {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .vd-expand-compact .vd-line-total {
+    margin-inline-start: 0;
+    text-align: start;
+    width: 100%;
+  }
+
+  .vd-expand-trailing {
+    margin-inline-start: 0;
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+/*
+ * Hide theme variant UI when Display → “Hide variant selector in theme” is on.
+ * JS also sets display:none on nodes; these rules catch Dawn/Horizon pickers and reduce FOUC.
+ */
+html[data-vd-hide-theme-variant="1"] form[action*="/cart/add"] variant-selects,
+html[data-vd-hide-theme-variant="1"] form[action*="/cart/add"] variant-radios {
+  display: none !important;
+}
+
+html[data-vd-hide-theme-variant="1"] form[action*="/cart/add"] fieldset.product-form__input:has(
+    input[type="radio"][name^="options"]
+  ),
+html[data-vd-hide-theme-variant="1"] form[action*="/cart/add"] fieldset.product-form__input:has(
+    select[name^="options"]
+  ),
+html[data-vd-hide-theme-variant="1"] form[action*="/cart/add"] fieldset.product-form__input:has(
+    select[name="id"]
+  ),
+html[data-vd-hide-theme-variant="1"] form[action*="/cart/add"] .product-form__input:has(
+    input[type="radio"][name^="options"]
+  ),
+html[data-vd-hide-theme-variant="1"] form[action*="/cart/add"] .product-form__input:has(
+    select[name^="options"]
+  ) {
+  display: none !important;
+}
+
+html[data-vd-hide-theme-variant="1"] .shopify-section--main-product variant-selects,
+html[data-vd-hide-theme-variant="1"] .shopify-section--main-product variant-radios,
+html[data-vd-hide-theme-variant="1"] product-info variant-selects,
+html[data-vd-hide-theme-variant="1"] product-info variant-radios {
+  display: none !important;
+}
+
+/* Theme quantity control — Display → “Hide quantity selector in theme” */
+html[data-vd-hide-theme-qty="1"] form[action*="/cart/add"] quantity-input,
+html[data-vd-hide-theme-qty="1"] form[action*="/cart/add"] .product-form__quantity {
+  display: none !important;
+}
+
+html[data-vd-hide-theme-qty="1"]
+  form[action*="/cart/add"]
+  fieldset.product-form__input:has(input[name="quantity"]:not([type="hidden"])):not(
+    :has([name^="options"])
+  ):not(:has(select[name="id"])) {
+  display: none !important;
+}
+
+html[data-vd-hide-theme-qty="1"]
+  form[action*="/cart/add"]
+  .product-form__input:has(input[name="quantity"]:not([type="hidden"])):not(:has([name^="options"])) {
+  display: none !important;
+}
+
+html[data-vd-hide-theme-qty="1"] .shopify-section--main-product quantity-input,
+html[data-vd-hide-theme-qty="1"] product-info quantity-input {
+  display: none !important;
+}
+
+/*
+ * Volume table — parity with admin Product Page preview
+ * (`QuantityBreaksTailwindPreview` → `.volumeTableWrap` / `.volumeTable`).
+ * Do not override `.vd-topbar` here: use Display “Heading layout” + data-vd-header-* like the preview.
+ */
+.vd-bundle--volume-table .vd-title {
+  color: var(--vd-maroon);
+}
+
+.vd-cards--volume-table {
+  display: block;
+  margin-top: 0.15rem;
+  width: 100%;
+  min-width: 0;
+}
+
+/*
+ * Outer clips backgrounds/borders to border-radius. Inner handles horizontal scroll.
+ * (Same pattern as admin `.volumeTableWrap` / `.volumeTableScroll`.)
+ */
+.vd-volume-table-scroll {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--vd-card-border);
+  border-radius: var(--vd-radius-card);
+  background: var(--vd-surface);
+  overflow: hidden;
+}
+
+.vd-volume-table-scroll-inner {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Mirrors admin `.volumeTable` */
+.vd-volume-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: var(--vd-fs-buy, 0.9375rem);
+  background: transparent;
+  border: none;
+  margin: 0;
+}
+
+.vd-volume-table thead th {
+  padding-block: var(--vd-vt-cell-pad-block, 0.65rem);
+  font-size: var(--vd-fs-buy, 0.9375rem);
+  font-weight: var(--vd-fw-strong, 600);
+  text-align: center;
+  vertical-align: middle;
+  color: var(--vd-maroon);
+  background: var(--vd-countdown-bg);
+  border: 1px solid var(--vd-card-border);
+}
+
+.vd-volume-table thead th:nth-child(1) {
+  width: 36%;
+  text-align: var(--vd-vt-col1-text-align, start);
+  padding-inline-start: var(--vd-vt-col1-pad-inline-start, 0.75rem);
+  padding-inline-end: var(--vd-vt-col1-pad-inline-end, 0.6rem);
+}
+
+.vd-volume-table thead th:nth-child(2) {
+  width: 28%;
+  text-align: var(--vd-vt-col2-text-align, center);
+  padding-inline-start: var(--vd-vt-col2-pad-inline-start, 0.6rem);
+  padding-inline-end: var(--vd-vt-col2-pad-inline-end, 0.6rem);
+  color: var(--vd-vt-discount-fg, var(--vd-save));
+}
+
+.vd-volume-table thead th:nth-child(3) {
+  width: 36%;
+  text-align: var(--vd-vt-col3-text-align, end);
+  padding-inline-start: var(--vd-vt-col3-pad-inline-start, 0.6rem);
+  padding-inline-end: var(--vd-vt-col3-pad-inline-end, 0.75rem);
+}
+
+.vd-volume-table td {
+  padding-block: var(--vd-vt-cell-pad-block, 0.7rem);
+  text-align: center;
+  vertical-align: middle;
+  background: var(--vd-surface);
+  border: 1px solid var(--vd-card-border);
+}
+
+.vd-volume-table tbody td:nth-child(1) {
+  text-align: var(--vd-vt-col1-text-align, start);
+  padding-inline-start: var(--vd-vt-col1-pad-inline-start, 0.75rem);
+  padding-inline-end: var(--vd-vt-col1-pad-inline-end, 0.6rem);
+  color: var(--vd-muted);
+}
+
+.vd-volume-table tbody td:nth-child(2) {
+  text-align: var(--vd-vt-col2-text-align, center);
+  padding-inline-start: var(--vd-vt-col2-pad-inline-start, 0.6rem);
+  padding-inline-end: var(--vd-vt-col2-pad-inline-end, 0.6rem);
+  color: var(--vd-vt-discount-fg, var(--vd-save));
+  font-weight: var(--vd-fw-accent, 600);
+}
+
+.vd-volume-table tbody td:nth-child(3) {
+  text-align: var(--vd-vt-col3-text-align, end);
+  padding-inline-start: var(--vd-vt-col3-pad-inline-start, 0.6rem);
+  padding-inline-end: var(--vd-vt-col3-pad-inline-end, 0.75rem);
+}
+
+.vd-volume-table td[data-vd-discount-cell] {
+  font-size: inherit;
+}
+
+.vd-volume-table .vd-price-strong {
+  font-size: var(--vd-fs-price, 1rem);
+  font-weight: var(--vd-fw-strong, 600);
+  line-height: 1.3;
+  color: var(--vd-maroon);
+}
+
+/* Volume table rows are informational only (no tier radio / selection). */
+
+/* Main CTA padding matches admin Product Page preview button */
+.vd-bundle--volume-table .vd-cta {
+  padding: 0.875rem 1rem;
+}

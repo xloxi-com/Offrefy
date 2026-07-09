@@ -1,0 +1,27 @@
+/*
+ * Segmented filter tabs (All / Active / Draft): pressed = Shopify inverse (near-black).
+ * Scoped to .Polaris-ButtonGroup--variantSegmented so other pressed buttons stay default.
+ */
+.Polaris-ButtonGroup--variantSegmented .Polaris-Button--pressed,
+.Polaris-ButtonGroup--variantSegmented .Polaris-Button--pressed:hover,
+.Polaris-ButtonGroup--variantSegmented .Polaris-Button--pressed:active,
+.Polaris-ButtonGroup--variantSegmented .Polaris-Button--pressed:focus-visible {
+  background: var(--p-color-bg-inverse);
+  color: var(--p-color-text-inverse);
+  box-shadow: none;
+}
+
+.Polaris-ButtonGroup--variantSegmented
+  .Polaris-Button--pressed.Polaris-Button--pressed
+  svg,
+.Polaris-ButtonGroup--variantSegmented
+  .Polaris-Button--pressed.Polaris-Button--pressed:hover
+  svg,
+.Polaris-ButtonGroup--variantSegmented
+  .Polaris-Button--pressed.Polaris-Button--pressed:active
+  svg,
+.Polaris-ButtonGroup--variantSegmented
+  .Polaris-Button--pressed.Polaris-Button--pressed:focus-visible
+  svg {
+  fill: var(--p-color-text-inverse);
+}

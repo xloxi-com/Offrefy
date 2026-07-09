@@ -1,0 +1,78 @@
+/* Select offer type — equal-height grid cells + footer pinned to card bottom */
+
+.gridCell {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  min-width: 0;
+  height: 100%;
+}
+
+.cardFill {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+}
+
+/* Card → ShadowBevel root → inner Box: stretch to grid cell without Polaris class names */
+.cardFill > * {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+}
+
+.cardFill > * > * {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+}
+
+.cardColumn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--p-space-400, 1rem);
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+.cardBody {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--p-space-400, 1rem);
+  min-width: 0;
+}
+
+/* Static preview image — same aspect + fill for both offer types */
+.previewImageFrame {
+  width: 100%;
+  aspect-ratio: 440 / 360;
+  min-height: 0;
+  border-radius: var(--p-border-radius-200, 8px);
+  overflow: hidden;
+  background: var(--p-color-bg-surface-secondary, #f6f6f7);
+}
+
+.previewImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+}
+
+.cardFooter {
+  flex-shrink: 0;
+}

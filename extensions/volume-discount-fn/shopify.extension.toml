@@ -5,16 +5,25 @@ name = "Offrefy — Quantity breaks"
 handle = "volume-discount-fn"
 type = "function"
 uid = "765ae274-2507-da32-0bc8-186fd0ef0505e19418b4"
-description = "One automatic discount applies every volume tier from the app (saves Shopify discount slots)."
+description = "One automatic Product Discount reads unlimited campaigns from discount metafields (saves Shopify's ~25 discount slot cap)."
 
   [[extensions.targeting]]
   target = "cart.lines.discounts.generate.run"
-  input_query = "src/cart_lines_discounts_generate_run.graphql"
+  input_query = "src/input.graphql"
   export = "cart-lines-discounts-generate-run"
 
+  [[extensions.targeting]]
+  target = "cart.lines.discounts.generate.fetch"
+  input_query = "src/fetch.graphql"
+  export = "cart-lines-discounts-generate-fetch"
+
+  # Populates $customerSegmentTags from discount metafield volume_discount.input_variables
   [extensions.input.variables]
   namespace = "volume_discount"
   key = "input_variables"
+
+  [extensions.capabilities]
+  network_access = true
 
   [extensions.build]
   command = ""

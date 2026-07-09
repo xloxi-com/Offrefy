@@ -1,0 +1,7 @@
+# Theme app extension lives here.
+root: extensions/volume-discount-theme
+
+# App blocks under blocks/*.liquid render snippets; some Theme Check runs (or repo-as-root) still
+# miss those edges, which falsely flags snippets as orphaned.
+OrphanedSnippet:
+  enabled: false

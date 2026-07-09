@@ -1,0 +1,24 @@
+# cart.lines.discounts.generate.run — metafield: discount.custom.discounts (JSON)
+# Variant GID is on merchandise.id; run.js targets each line with cartLine.id (one variant per line).
+query RunInput {
+  cart {
+    lines {
+      id
+      quantity
+      merchandise {
+        ... on ProductVariant {
+          id
+          product {
+            id
+          }
+        }
+      }
+    }
+  }
+  discount {
+    discountClasses
+    customDiscounts: metafield(namespace: "custom", key: "discounts") {
+      jsonValue
+    }
+  }
+}

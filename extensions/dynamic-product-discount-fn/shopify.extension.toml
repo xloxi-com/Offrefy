@@ -1,0 +1,17 @@
+api_version = "2026-01"
+
+[[extensions]]
+name = "Dynamic product discount (metafield DB)"
+handle = "dynamic-product-discount-fn"
+type = "function"
+uid = "b8c9d0e1-f2a3-4567-8901-23456789abcd"
+description = "Applies up to 25 per-product discounts from discount.custom.discounts JSON metafield (no Admin API)."
+
+  [[extensions.targeting]]
+  target = "cart.lines.discounts.generate.run"
+  input_query = "src/run.graphql"
+  export = "dynamic-product-discount-run"
+
+  [extensions.build]
+  command = ""
+  path = "dist/function.wasm"

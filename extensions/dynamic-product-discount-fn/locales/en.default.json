@@ -1,0 +1,4 @@
+{
+  "name": "Dynamic product discount (metafield DB)",
+  "description": "Applies up to 25 per-product discounts from discount.custom.discounts JSON."
+}

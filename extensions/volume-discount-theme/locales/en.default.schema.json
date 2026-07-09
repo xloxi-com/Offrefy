@@ -1,0 +1,22 @@
+{
+  "volume_discount": {
+    "blocks": {
+      "quantity_breaks": {
+        "name": "Quantity breaks",
+        "paragraph": "Shows tier pricing and updates cart quantity. Add under Product information. If it appears in the theme editor but not on the live site, turn on “Offrefy (global)” under Theme settings → App embeds, then save the theme."
+      },
+      "embed": {
+        "name": "Offrefy (global)",
+        "paragraph": "Turn this ON on the live theme: loads scripts and shows the quantity widget on product pages even if you did not add the “Quantity breaks” block. If you use the block too, only the block placement is kept (no duplicate)."
+      }
+    },
+    "settings": {
+      "show_section_heading": "Enable section title",
+      "show_section_heading_info": "On: show the section title above the widget (uses “Section title” below). Off: hide it.",
+      "section_heading": "Section title",
+      "section_heading_info": "Shown only when “Enable section title” is on.",
+      "heading": "Promo heading",
+      "heading_info": "Shown in the widget header with the sale countdown. Stacking on small screens is controlled in the app (offer → Stack heading and timer on small screens)."
+    }
+  }
+}

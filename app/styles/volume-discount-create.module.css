@@ -1,0 +1,226 @@
+/* Centered editor shell — form + preview (matches admin max content width). */
+.pageContentMax {
+  display: flex;
+  flex-direction: column;
+  gap: var(--p-space-300, 0.75rem);
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  box-sizing: border-box;
+}
+
+/* Two columns: form (left) + sticky preview (right) */
+.formWithPreview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 30rem);
+  gap: var(--p-space-400, 1rem);
+  align-items: start;
+  width: 100%;
+}
+
+.formColumn {
+  min-width: 0;
+}
+
+.previewColumn {
+  position: sticky;
+  top: var(--p-space-300, 0.75rem);
+  align-self: start;
+  min-width: 0;
+}
+
+@media (max-width: 48rem) {
+  .formWithPreview {
+    grid-template-columns: 1fr;
+  }
+
+  /* Product preview first on narrow viewports (matches mobile-first admin flow). */
+  .previewColumn {
+    position: static;
+    order: -1;
+  }
+
+  .formColumn {
+    order: 1;
+  }
+}
+
+/* Buy from, Value, Unit — one row (wraps on very narrow). */
+.tierFieldsRow {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr) minmax(0, 1fr) minmax(3.75rem, 0.85fr);
+  gap: var(--p-space-200, 0.5rem);
+  align-items: end;
+  width: 100%;
+}
+
+.tierFieldsRow > * {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 26rem) {
+  .tierFieldsRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Quantity-breaks preview viewport — device toggle narrows “mobile” canvas */
+.previewViewport {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  contain: layout style;
+}
+
+.previewViewportMobile {
+  max-width: 390px;
+  margin-inline: auto;
+}
+
+.previewViewportDesktop {
+  max-width: none;
+}
+
+/* Widget appearance — font sizes in two columns (row = label + slider + px + input) */
+.widgetFontSizeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--p-space-800, 2rem);
+  row-gap: var(--p-space-400, 1rem);
+  width: 100%;
+  align-items: start;
+}
+
+@media (max-width: 36rem) {
+  .widgetFontSizeGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.widgetFontSizeRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--p-space-150, 0.375rem);
+  min-width: 0;
+}
+
+.widgetFontSizeControlRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--p-space-200, 0.5rem);
+  width: 100%;
+  min-width: 0;
+}
+
+.widgetFontSizeSliderWrap {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.widgetFontSizeInputWrap {
+  width: 5.75rem;
+  flex-shrink: 0;
+}
+
+/* Font weight tier selects (Strong / Accent / Body / Normal) */
+.widgetFontWeightGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--p-space-400, 1rem);
+  width: 100%;
+}
+
+@media (max-width: 36rem) {
+  .widgetFontWeightGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Appearance template picker (10 presets + Custom) */
+.appearanceTemplateGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+  gap: var(--p-space-200, 0.5rem);
+  width: 100%;
+}
+
+.appearanceTemplateCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--p-space-150, 0.375rem);
+  padding: var(--p-space-200, 0.5rem) var(--p-space-150, 0.375rem);
+  margin: 0;
+  border: var(--p-border-width-025, 1px) solid var(--p-color-border-secondary);
+  border-radius: var(--p-border-radius-200, 0.5rem);
+  background: var(--p-color-bg-surface);
+  cursor: pointer;
+  text-align: center;
+  font: inherit;
+  color: inherit;
+  box-sizing: border-box;
+  min-width: 0;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.appearanceTemplateCard:hover {
+  border-color: var(--p-color-border-hover);
+}
+
+.appearanceTemplateCard:focus-visible {
+  outline: var(--p-border-width-050, 2px) solid var(--p-color-border-focus);
+  outline-offset: 2px;
+}
+
+.appearanceTemplateCardSelected {
+  border-color: var(--p-color-border-emphasis);
+  box-shadow: 0 0 0 1px var(--p-color-border-emphasis);
+}
+
+.appearanceTemplateSwatch {
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--p-border-radius-full, 9999px);
+  border: var(--p-border-width-025, 1px) solid var(--p-color-border-secondary);
+  flex-shrink: 0;
+}
+
+.appearanceTemplateSwatchCustom {
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--p-border-radius-full, 9999px);
+  border: var(--p-border-width-025, 1px) solid var(--p-color-border-secondary);
+  flex-shrink: 0;
+  background: linear-gradient(
+    135deg,
+    #f43f5e 0%,
+    #f59e0b 33%,
+    #22c55e 66%,
+    #3b82f6 100%
+  );
+}
+
+.appearanceTemplateLabel {
+  font-size: var(--p-font-size-275, 0.75rem);
+  line-height: var(--p-font-line-height-400, 1rem);
+  word-break: break-word;
+}
+
+/* Match storefront `.volume-discount-embed` font resolution (Dawn + Horizon + inherit). */
+:global(.vd-admin-qb-preview) {
+  --vd-theme-font-body: var(
+    --font-body-family,
+    var(--font-body--family, var(--font-paragraph-family, inherit))
+  );
+  --vd-theme-font-heading: var(
+    --font-heading-family,
+    var(--font-heading--family, var(--vd-theme-font-body))
+  );
+  font-family: var(--vd-theme-font-body);
+}

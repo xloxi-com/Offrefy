@@ -1,0 +1,21 @@
+{% comment %}
+  App embed (body) — Theme settings → App embeds.
+  Loads storefront JS/CSS. On product pages, also outputs the quantity-breaks widget if the section block was not added (data-vd-embed-fallback; removed in JS when a section block exists).
+{% endcomment %}
+{% render 'vd-storefront-assets' %}
+{% if request.page_type == 'product' %}
+  {% render 'vd-quantity-breaks', vd_from_embed: true %}
+{% endif %}
+
+{% schema %}
+{
+  "name": "t:volume_discount.blocks.embed.name",
+  "target": "body",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "t:volume_discount.blocks.embed.paragraph"
+    }
+  ]
+}
+{% endschema %}

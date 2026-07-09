@@ -1,0 +1,155 @@
+/* Embedded admin: keep Sync / Export / Import visible on first paint (Polaris PageActions measure). */
+.offersPageShell :global(.Polaris-Page-Header__RightAlign) {
+  flex-wrap: nowrap;
+  min-width: max-content;
+}
+
+.offersPageShell :global(.Polaris-Page-Header__Actions) {
+  flex-wrap: nowrap;
+}
+
+/*
+ * Table width constraints only — do NOT set overflow-x/y on this wrapper.
+ * overflow-x:auto + overflow-y:visible forces overflow-y to compute to auto (CSS spec),
+ * which shows a bogus vertical scrollbar. Polaris IndexTable scrolls horizontally
+ * via its own .Polaris-IndexTable-ScrollContainer.
+ */
+.tableWrap {
+  width: 100%;
+  max-width: 100%;
+  max-inline-size: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/*
+ * Polaris IndexTable defaults canScrollRight to true until resize runs, so
+ * --tableStickyScrolling applies briefly and paints a drop-shadow “border” on
+ * the sticky last column (Actions), then it disappears. Remove that filter here;
+ * sticky positioning from --tableStickyLast is unchanged.
+ */
+@media (min-width: 30.625em) {
+  .tableWrap
+    :global(.Polaris-IndexTable--tableStickyScrolling
+      .Polaris-IndexTable__TableCell:last-child),
+  .tableWrap
+    :global(.Polaris-IndexTable--stickyTableHeaderStickyScrolling
+      .Polaris-IndexTable__TableCell:last-child),
+  .tableWrap
+    :global(.Polaris-IndexTable--tableStickyScrolling
+      .Polaris-IndexTable__TableHeading--last),
+  .tableWrap
+    :global(.Polaris-IndexTable--stickyTableHeaderStickyScrolling
+      .Polaris-IndexTable__TableHeading--last) {
+    filter: none;
+  }
+}
+
+/* IndexTable row click toggles selection in bulk mode; keep name = edit only */
+.nameEditButton {
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: var(--p-font-weight-semibold);
+  color: var(--p-color-text);
+  text-align: start;
+}
+
+.nameEditButton:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.nameEditButton:disabled {
+  cursor: not-allowed;
+  opacity: var(--p-opacity-disabled);
+}
+
+/* Floating bulk actions — sits a bit above the bottom; position offset via inline transform when dragging */
+.bulkActionBar {
+  position: fixed;
+  /* Above IndexTable / scroll regions; below Polaris Modal (typically higher) */
+  z-index: 520;
+  bottom: max(4.5rem, calc(env(safe-area-inset-bottom, 0px) + 3.5rem));
+  left: 50%;
+  max-width: calc(100vw - 2rem);
+  width: max-content;
+  box-sizing: border-box;
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.bulkActionBar:active {
+  cursor: grabbing;
+}
+
+.bulkActionBar :global(button),
+.bulkActionBar :global(a) {
+  cursor: pointer;
+}
+
+/* Compact hit target — sits left of “N selected” in the same row */
+.bulkBarDragHandle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-inline: calc(var(--p-space-100) * -1);
+  padding: var(--p-space-100);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  color: var(--p-color-text-secondary);
+  border-radius: var(--p-border-radius-200);
+}
+
+.bulkBarDragHandle:active {
+  cursor: grabbing;
+}
+
+.bulkActionBarPanel {
+  min-width: min(100%, 26rem);
+  /* Crisper text while parent uses transform (avoids subpixel blur) */
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+/*
+ * Activate: Shopify-style black / inverse fill (same token pattern as Polaris
+ * ContextualSaveBar tertiary actions).
+ */
+.bulkBarActivate :global(.Polaris-Button.Polaris-Button--variantTertiary) {
+  --pc-button-bg: var(--p-color-bg-fill-inverse);
+  --pc-button-bg_hover: var(--p-color-bg-fill-inverse-hover);
+  --pc-button-bg_active: var(--p-color-bg-fill-inverse-active);
+  --pc-button-bg_pressed: var(--p-color-bg-fill-inverse-active);
+  --pc-button-bg_disabled: var(--p-color-bg-fill-inverse);
+  --pc-button-color: var(--p-color-text-inverse);
+  --pc-button-color_hover: var(--p-color-text-inverse);
+  --pc-button-color_active: var(--p-color-text-inverse);
+  --pc-button-color_disabled: var(--p-color-text-secondary);
+  --pc-button-icon-fill: currentColor;
+  box-shadow: none;
+}
+
+/* RR <Link> for edit icon — tertiary icon button hit area */
+.editIconLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 28px;
+  min-inline-size: 28px;
+  border-radius: var(--p-border-radius-200);
+  color: var(--p-color-text);
+  text-decoration: none;
+}
+
+.editIconLink:hover {
+  background: var(--p-color-bg-fill-transparent-hover);
+}
+
+.editIconLink:focus-visible {
+  outline: var(--p-border-width-050) solid var(--p-color-border-focus);
+  outline-offset: var(--p-space-050);
+}

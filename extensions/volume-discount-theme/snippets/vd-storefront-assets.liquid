@@ -1,0 +1,31 @@
+{% comment %}
+  Injected once per page. Section block + body embed both render this snippet; Liquid `render` isolates
+  scope so `increment` is not reliable for deduping. Dedupe by whether the bundle script is already in
+  the document so we never skip injection when a stale window flag survives a soft navigation.
+{% endcomment %}
+<script>
+(function () {
+  if (document.querySelector('script[src*="volume-discount-storefront.js"]')) {
+    window.__vdStorefrontAssetsLoaded = true;
+    return;
+  }
+  window.__vdStorefrontAssetsLoaded = true;
+  var head = document.head || document.getElementsByTagName('head')[0];
+  var cssHref = {{ 'volume-discount-storefront.css' | asset_url | json }};
+  var scriptSrc = {{ 'volume-discount-storefront.js' | asset_url | json }};
+  var cssPreload = document.createElement('link');
+  cssPreload.rel = 'preload';
+  cssPreload.as = 'style';
+  cssPreload.href = cssHref;
+  head.appendChild(cssPreload);
+  var css = document.createElement('link');
+  css.rel = 'stylesheet';
+  css.href = cssHref;
+  head.appendChild(css);
+  var s = document.createElement('script');
+  s.src = scriptSrc;
+  s.defer = true;
+  s.fetchPriority = 'low';
+  (document.body || head).appendChild(s);
+})();
+</script>
