@@ -26,7 +26,9 @@ import {
   UndoIcon,
 } from "@shopify/polaris-icons";
 import {
+  lazy,
   startTransition,
+  Suspense,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -36,7 +38,6 @@ import {
 } from "react";
 import { useFetcher } from "react-router";
 
-import { QuantityBreaksTailwindPreview } from "./QuantityBreaksTailwindPreview";
 import { WidgetDisplayColorField } from "./WidgetDisplayColorField";
 import createStyles from "../styles/volume-discount-create.module.css";
 import { buyLabelsForQuantityTiers } from "../utils/buyLabelsForQuantityTiers";
@@ -105,6 +106,22 @@ import {
   normalizeVolumeDiscountCustomerType,
 } from "../types/volumeDiscount";
 import { normalizeTierValueForForm } from "../utils/volumeDiscountTier";
+
+const QuantityBreaksTailwindPreview = lazy(() =>
+  import("./QuantityBreaksTailwindPreview").then((m) => ({
+    default: m.QuantityBreaksTailwindPreview,
+  })),
+);
+
+function PreviewPanelFallback() {
+  return (
+    <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+      <Text as="p" tone="subdued">
+        Loading preview…
+      </Text>
+    </Box>
+  );
+}
 
 /** Cart & checkout label default for new offers (`{{ discount }}` = tier %). */
 const DEFAULT_VOLUME_DISCOUNT_DISPLAY_NAME = "{{ discount }} OFF";
@@ -3512,19 +3529,21 @@ export function VolumeDiscountCreateView({
                             padding={{ xs: "300", sm: "400" }}
                             background="bg-surface"
                           >
-                            <QuantityBreaksTailwindPreview
-                              rows={productPagePreviewRows}
-                              currencySymbol="$"
-                              display={widgetDisplay}
-                              previewDevice={previewDevice}
-                              countdownPreviewNonce={countdownPreviewNonce}
-                              countdownEndsAtIso={
-                                countdownEndsAtLocal.trim()
-                                  ? datetimeLocalToIsoUtc(countdownEndsAtLocal)
-                                  : null
-                              }
-                              countdownStartsAtIso={null}
-                            />
+                            <Suspense fallback={<PreviewPanelFallback />}>
+                              <QuantityBreaksTailwindPreview
+                                rows={productPagePreviewRows}
+                                currencySymbol="$"
+                                display={widgetDisplay}
+                                previewDevice={previewDevice}
+                                countdownPreviewNonce={countdownPreviewNonce}
+                                countdownEndsAtIso={
+                                  countdownEndsAtLocal.trim()
+                                    ? datetimeLocalToIsoUtc(countdownEndsAtLocal)
+                                    : null
+                                }
+                                countdownStartsAtIso={null}
+                              />
+                            </Suspense>
                           </Box>
                         </div>
                       </Box>

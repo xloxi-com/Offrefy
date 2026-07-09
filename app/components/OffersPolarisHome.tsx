@@ -65,6 +65,7 @@ import {
   buildOffersSampleCsv,
   OFFERS_SAMPLE_CSV_FILENAME,
 } from "../utils/offersCsvSample";
+import { preloadVolumeDiscountEditor } from "../utils/preloadVolumeDiscountEditor.client";
 
 export type OfferTab = "all" | "active" | "draft";
 
@@ -307,6 +308,14 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
 
   const { mode, setMode } = useSetIndexFiltersMode(IndexFiltersMode.Default);
   const [pageIndex, setPageIndex] = useState(0);
+
+  useEffect(() => {
+    preloadVolumeDiscountEditor();
+  }, []);
+
+  const warmEditorChunk = useCallback(() => {
+    preloadVolumeDiscountEditor();
+  }, []);
 
   const { pageRows, total, rangeStart, rangeEnd, hasPrevious, hasNext } =
     useMemo(() => {
@@ -766,9 +775,12 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
   const pagePrimaryAction = useMemo(
     () => ({
       content: "Create offer",
-      onAction: () => setScreen("select"),
+      onAction: () => {
+        warmEditorChunk();
+        setScreen("select");
+      },
     }),
-    [setScreen],
+    [setScreen, warmEditorChunk],
   );
 
   const pageSecondaryActions = useMemo(
@@ -850,7 +862,13 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
             minutes.
           </Text>
         </BlockStack>
-        <Button variant="primary" onClick={() => setScreen("select")}>
+        <Button
+          variant="primary"
+          onClick={() => {
+            warmEditorChunk();
+            setScreen("select");
+          }}
+        >
           Create offer
         </Button>
       </BlockStack>
@@ -922,10 +940,12 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                   <IndexTable.Cell>
                     <Link
                       to={offerEditTo(c.id)}
-                      prefetch="intent"
+                      prefetch="render"
                       className={styles.nameEditButton}
                       title={c.campaignName}
                       aria-label={`Edit ${c.campaignName}`}
+                      onMouseEnter={warmEditorChunk}
+                      onFocus={warmEditorChunk}
                       onClick={(e) => {
                         e.stopPropagation();
                         if (listMutationPending) e.preventDefault();
@@ -972,9 +992,11 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                     <InlineStack gap="0" blockAlign="center" wrap={false}>
                       <Link
                         to={offerEditTo(c.id)}
-                        prefetch="intent"
+                        prefetch="render"
                         className={styles.editIconLink}
                         aria-label="Edit"
+                        onMouseEnter={warmEditorChunk}
+                        onFocus={warmEditorChunk}
                         onClick={(e) => {
                           e.stopPropagation();
                           if (listMutationPending) e.preventDefault();

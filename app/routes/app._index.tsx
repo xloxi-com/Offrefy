@@ -23,6 +23,7 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { Box, InlineGrid, Page } from "@shopify/polaris";
 import { APP_DISPLAY_NAME } from "../branding";
 import { prisma } from "../db.server";
+import { ensureVolumeDiscountFunctionDiscount } from "../services/volumeDiscountFunctionSync.server";
 import { scheduleVolumeDiscountShopSync } from "../services/deferredShopSync.server";
 import { syncVolumeDiscountShop } from "../services/volumeDiscountFunctionSync.server";
 import { authenticate } from "../shopify.server";
@@ -79,6 +80,10 @@ type VolumeDiscountCampaignDuplicateRow = {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, admin } = await authenticate.admin(request);
+
+  void ensureVolumeDiscountFunctionDiscount(admin, session.shop).catch((e) => {
+    console.warn("[volume-discount] ensure function discount", e);
+  });
 
   const rows = await prisma.$queryRaw<
     Array<{
@@ -292,6 +297,11 @@ export default function Index() {
   const [sortSelected, setSortSelected] = useState<string[]>(["created desc"]);
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
+  const nextDefaultCampaignName = useMemo(
+    () => `Offer ${campaigns.length + 1}`,
+    [campaigns.length],
+  );
+
   const toastSoon = useCallback(
     (label: string) => {
       shopify.toast.show(`${label} — coming soon`);
@@ -380,6 +390,11 @@ export default function Index() {
                           search,
                           { preset: "quantity" },
                         ),
+                        {
+                          state: {
+                            defaultCampaignName: nextDefaultCampaignName,
+                          },
+                        },
                       )
                     }
                   />
@@ -394,6 +409,11 @@ export default function Index() {
                           search,
                           { preset: "volume" },
                         ),
+                        {
+                          state: {
+                            defaultCampaignName: nextDefaultCampaignName,
+                          },
+                        },
                       )
                     }
                   />

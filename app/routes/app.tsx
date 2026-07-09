@@ -6,6 +6,7 @@ import type {
   LinksFunction,
   LoaderFunctionArgs,
   MetaFunction,
+  ShouldRevalidateFunctionArgs,
 } from "react-router";
 import {
   Outlet,
@@ -18,9 +19,8 @@ import en from "@shopify/polaris/locales/en.json";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
-import { ensureVolumeDiscountFunctionDiscount } from "../services/volumeDiscountFunctionSync.server";
-import { authenticate } from "../shopify.server";
 import { APP_DISPLAY_NAME } from "../branding";
+import { authenticate } from "../shopify.server";
 import { adminEmbeddedPath } from "../utils/adminEmbeddedPath";
 
 /**
@@ -41,15 +41,29 @@ export const links: LinksFunction = () => [
 export const meta: MetaFunction = () => [{ title: APP_DISPLAY_NAME }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin, session } = await authenticate.admin(request);
-
-  void ensureVolumeDiscountFunctionDiscount(admin, session.shop).catch((e) => {
-    console.warn("[volume-discount] ensure function discount", e);
-  });
-
+  await authenticate.admin(request);
   // eslint-disable-next-line no-undef
   return { apiKey: process.env.SHOPIFY_API_KEY || "" };
 };
+
+/** apiKey is static — skip re-auth on every /app/* child navigation (Create/Edit). */
+export function shouldRevalidate({
+  currentUrl,
+  nextUrl,
+  formMethod,
+  defaultShouldRevalidate,
+}: ShouldRevalidateFunctionArgs) {
+  if (formMethod && formMethod !== "GET") {
+    return defaultShouldRevalidate;
+  }
+  if (
+    currentUrl.pathname.startsWith("/app") &&
+    nextUrl.pathname.startsWith("/app")
+  ) {
+    return false;
+  }
+  return defaultShouldRevalidate;
+}
 
 export default function App() {
   const { apiKey } = useLoaderData<typeof loader>();

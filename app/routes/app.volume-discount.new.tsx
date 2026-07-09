@@ -1,5 +1,5 @@
 import { useAppBridge } from "@shopify/app-bridge-react";
-import { lazy, Suspense, useCallback } from "react";
+import { Suspense, useCallback } from "react";
 import type {
   ActionFunctionArgs,
   HeadersFunction,
@@ -10,32 +10,25 @@ import { useLoaderData, useLocation, useNavigate, useSearchParams } from "react-
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import type { Prisma } from "@prisma/client";
 
+import { VolumeDiscountCreateView } from "../components/VolumeDiscountCreateView";
+import { IndeterminateLinearProgress } from "../components/IndeterminateLinearProgress";
 import { prisma } from "../db.server";
 import { scheduleVolumeDiscountShopSync } from "../services/deferredShopSync.server";
 import { authenticate } from "../shopify.server";
 import { parseVolumeDiscountForm } from "../utils/volumeDiscountForm.server";
 import type { VolumeDiscountNewOfferPreset } from "../types/volumeDiscount";
-import { IndeterminateLinearProgress } from "../components/IndeterminateLinearProgress";
 import { adminEmbeddedPath } from "../utils/adminEmbeddedPath";
 
-const VolumeDiscountCreateView = lazy(() =>
-  import("../components/VolumeDiscountCreateView").then((m) => ({
-    default: m.VolumeDiscountCreateView,
-  })),
-);
+type NewOfferNavigationState = {
+  defaultCampaignName?: string;
+};
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
-  const count = await prisma.volumeDiscountCampaign.count({
-    where: { shop: session.shop },
-  });
+  await authenticate.admin(request);
   const presetParam = new URL(request.url).searchParams.get("preset");
   const newOfferPreset: VolumeDiscountNewOfferPreset =
     presetParam === "volume" ? "volume_table" : "quantity_breaks";
-  return {
-    defaultCampaignName: `Offer ${count + 1}`,
-    newOfferPreset,
-  };
+  return { newOfferPreset };
 };
 
 /** React Router may skip re-running loaders when only the query string changes (same path, no dynamic params). Preset lives in `?preset=` — always revalidate on search change. */
@@ -102,17 +95,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function VolumeDiscountNewRoute() {
-  const { defaultCampaignName, newOfferPreset: loaderPreset } =
-    useLoaderData<typeof loader>();
+  const { newOfferPreset: loaderPreset } = useLoaderData<typeof loader>();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const navState = location.state as NewOfferNavigationState | null;
   const newOfferPreset = newOfferPresetFromSearchParam(
     searchParams.get("preset"),
     loaderPreset,
   );
   const navigate = useNavigate();
-  const location = useLocation();
   const { search } = location;
   const shopify = useAppBridge();
+  const defaultCampaignName =
+    navState?.defaultCampaignName?.trim() || "Offer";
   const onSuccess = useCallback(() => {
     shopify.toast.show("Offer saved — syncing to Shopify");
     navigate(adminEmbeddedPath("/app", search));
