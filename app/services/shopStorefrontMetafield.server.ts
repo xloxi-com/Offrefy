@@ -146,6 +146,8 @@ export async function syncShopStorefrontWidgetMetafield(
   resolvedShopGid?: string,
   /** When set, written to the shop metafield instead of `prebuiltWidgetJson` (large catalogs). */
   shopMetafieldJson?: string,
+  /** Stored on `VolumeDiscountStorefrontPayload` for instant Sync-all no-op. */
+  syncRowFingerprint?: string,
 ): Promise<void> {
   const cacheValue =
     prebuiltWidgetJson ??
@@ -169,9 +171,25 @@ export async function syncShopStorefrontWidgetMetafield(
       if (existingRow?.payload !== cacheValue) {
         await prisma.volumeDiscountStorefrontPayload.upsert({
           where: { shop },
-          create: { shop, payload: cacheValue },
-          update: { payload: cacheValue },
+          create: {
+            shop,
+            payload: cacheValue,
+            ...(syncRowFingerprint ? { syncRowFingerprint } : {}),
+          },
+          update: {
+            payload: cacheValue,
+            ...(syncRowFingerprint ? { syncRowFingerprint } : {}),
+          },
         });
+      } else if (syncRowFingerprint) {
+        try {
+          await prisma.volumeDiscountStorefrontPayload.update({
+            where: { shop },
+            data: { syncRowFingerprint },
+          });
+        } catch {
+          /* column optional until migrated */
+        }
       }
     } catch (e) {
       console.warn("[Offrefy] storefront DB cache:", e);
@@ -181,8 +199,15 @@ export async function syncShopStorefrontWidgetMetafield(
       prisma.volumeDiscountStorefrontPayload
         .upsert({
           where: { shop },
-          create: { shop, payload: cacheValue },
-          update: { payload: cacheValue },
+          create: {
+            shop,
+            payload: cacheValue,
+            ...(syncRowFingerprint ? { syncRowFingerprint } : {}),
+          },
+          update: {
+            payload: cacheValue,
+            ...(syncRowFingerprint ? { syncRowFingerprint } : {}),
+          },
         })
         .catch((e) => {
           console.warn("[Offrefy] storefront DB cache:", e);

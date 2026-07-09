@@ -92,7 +92,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   /* Draft offers are not in the aggregate discount — skip slow GraphQL (collection expansion, metafields). */
   if (d.campaignStatus === "active") {
-    const { errors } = await syncVolumeDiscountShop(admin, session.shop);
+    const { errors } = await syncVolumeDiscountShop(admin, session.shop, {
+      changedCampaignIds: [record.id],
+    });
     if (errors.length) {
       await prisma.volumeDiscountCampaign.delete({ where: { id: record.id } });
       return { ok: false as const, error: errors.join(" ") };

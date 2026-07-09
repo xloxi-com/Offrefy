@@ -27,6 +27,19 @@ import {
 import { invalidateMemoryCachePrefix } from "../utils/memoryCache.server";
 import { mergeCampaignConfigFromMetafieldNodes } from "../utils/volumeDiscountCampaignMetafieldChunks.server";
 import { getVolumeDiscountStorefrontPayload } from "./volumeDiscountStorefrontCache.server";
+import {
+  existingCampaignsByIdFromMetafieldNodes,
+  readDiscountVolumeMetafieldNodes,
+} from "../utils/discountMetafieldRead.server";
+import { rowSyncFingerprint } from "../utils/syncRowFingerprint.server";
+
+export type SyncShopOptions = {
+  recursionDepth?: number;
+  /** Edit save: collection GraphQL only for these campaign ids. */
+  changedCampaignIds?: string[];
+  /** Sync all: scan/delete legacy automatic discounts. */
+  purgeLegacy?: boolean;
+};
 
 type AdminGraphql = {
   graphql: (
@@ -211,8 +224,11 @@ export async function ensureVolumeDiscountFunctionDiscount(
 export async function syncVolumeDiscountShop(
   admin: AdminGraphql,
   shop: string,
-  recursionDepth = 0,
+  options: SyncShopOptions = {},
 ): Promise<{ discountIds: string[]; errors: string[] }> {
+  const recursionDepth = options.recursionDepth ?? 0;
+  const incrementalIds = options.changedCampaignIds;
+
   const [activeRows, state] = await Promise.all([
     prisma.volumeDiscountCampaign.findMany({
       where: { shop, status: "active" },
@@ -252,32 +268,67 @@ export async function syncVolumeDiscountShop(
     return { discountIds: [], errors: [] };
   }
 
-  /* Shop GID + metafield read are independent; overlap them before any heavy collection GraphQL. */
+  const rowFp = rowSyncFingerprint(activeRows);
+
+  if (!incrementalIds?.length && recursionDepth === 0) {
+    try {
+      const cached = await prisma.volumeDiscountStorefrontPayload.findUnique({
+        where: { shop },
+        select: { syncRowFingerprint: true },
+      });
+      if (
+        cached?.syncRowFingerprint === rowFp &&
+        state?.functionDiscountId
+      ) {
+        return { discountIds: [state.functionDiscountId], errors: [] };
+      }
+    } catch {
+      /* column may be missing until migration — continue full sync */
+    }
+  }
+
   const shopGidPromise = resolveStorefrontWidgetShopGid(admin, shop);
-  const reused = await (state?.functionDiscountId
-    ? tryConfigByFilteringExistingMetafield(
-        admin,
-        state.functionDiscountId,
-        activeRows,
-      )
-    : Promise.resolve(null));
+  const liveMetafieldNodes = state?.functionDiscountId
+    ? await readDiscountVolumeMetafieldNodes(admin, state.functionDiscountId)
+    : null;
+  const existingCampaignsById = liveMetafieldNodes
+    ? existingCampaignsByIdFromMetafieldNodes(liveMetafieldNodes)
+    : new Map<string, unknown>();
+
+  const reused =
+    incrementalIds?.length || !state?.functionDiscountId
+      ? null
+      : await tryConfigByFilteringExistingMetafield(
+          admin,
+          state.functionDiscountId,
+          activeRows,
+        );
+
+  const rowArgs = activeRows.map((r) => ({
+    id: r.id,
+    campaignName: r.campaignName,
+    displayName: r.displayName,
+    productScope: r.productScope,
+    quantityCondition: r.quantityCondition,
+    customerType: r.customerType,
+    customerTags: r.customerTags,
+    productIds: r.productIds,
+    collectionIds: r.collectionIds,
+    tiers: r.tiers,
+  }));
+
   const config = reused
     ? reused
     : await buildVolumeDiscountFunctionConfig(
-        activeRows.map((r) => ({
-          id: r.id,
-          campaignName: r.campaignName,
-          displayName: r.displayName,
-          productScope: r.productScope,
-          quantityCondition: r.quantityCondition,
-          customerType: r.customerType,
-          customerTags: r.customerTags,
-          productIds: r.productIds,
-          collectionIds: r.collectionIds,
-          tiers: r.tiers,
-        })),
+        rowArgs,
         admin,
         shop,
+        incrementalIds?.length
+          ? {
+              changedCampaignIds: incrementalIds,
+              existingCampaignsById,
+            }
+          : undefined,
       );
 
   if (!config.campaigns.length) {
@@ -319,7 +370,9 @@ export async function syncVolumeDiscountShop(
     }));
 
     const [{ errors: purgeErrors }, built] = await Promise.all([
-      purgeLegacyVolumeDiscountNodes(admin, shop, keepId),
+      options.purgeLegacy
+        ? purgeLegacyVolumeDiscountNodes(admin, shop, keepId)
+        : Promise.resolve({ deleted: [] as string[], errors: [] as string[] }),
       Promise.resolve().then(async () => {
         await rebuildDiscountRulesForShop(shop, rulesInput);
         const productIndex = buildProductRuleIndex({
@@ -382,7 +435,28 @@ export async function syncVolumeDiscountShop(
   const widgetJson = compactStorefrontShopMetafieldPayload(widgetJsonFull);
 
   const discountIdExisting = state?.functionDiscountId;
-  if (discountIdExisting) {
+  if (discountIdExisting && liveMetafieldNodes) {
+    const liveFp = fingerprintMetafieldEntries(liveMetafieldNodes);
+    if (liveFp === metafieldFingerprint) {
+      const cachedPayload = await getVolumeDiscountStorefrontPayload(shop);
+      if (cachedPayload?.payload === widgetJsonFull) {
+        try {
+          await prisma.volumeDiscountStorefrontPayload.upsert({
+            where: { shop },
+            create: {
+              shop,
+              payload: widgetJsonFull,
+              syncRowFingerprint: rowFp,
+            },
+            update: { syncRowFingerprint: rowFp },
+          });
+        } catch {
+          /* syncRowFingerprint column optional until migrated */
+        }
+        return { discountIds: [discountIdExisting], errors: [] };
+      }
+    }
+  } else if (discountIdExisting) {
     const [liveFp, cachedPayload] = await Promise.all([
       readLiveDiscountMetafieldFingerprint(admin, discountIdExisting),
       getVolumeDiscountStorefrontPayload(shop),
@@ -439,7 +513,10 @@ export async function syncVolumeDiscountShop(
         await prisma.volumeDiscountShopState.deleteMany({
           where: { shop },
         });
-        return syncVolumeDiscountShop(admin, shop, 1);
+        return syncVolumeDiscountShop(admin, shop, {
+          ...options,
+          recursionDepth: 1,
+        });
       }
       return {
         discountIds: [],
@@ -481,7 +558,11 @@ export async function syncVolumeDiscountShop(
       await shopGidPromise.catch(() => {});
       if (recursionDepth === 0 && isAutomaticDiscountLimitError(ueMsgs)) {
         await purgeLegacyVolumeDiscountNodes(admin, shop, null);
-        return syncVolumeDiscountShop(admin, shop, 1);
+        return syncVolumeDiscountShop(admin, shop, {
+          ...options,
+          recursionDepth: 1,
+          purgeLegacy: true,
+        });
       }
       if (isAutomaticDiscountLimitError(ueMsgs)) {
         return {
@@ -512,26 +593,28 @@ export async function syncVolumeDiscountShop(
     });
   }
 
-  await prisma.$transaction([
-    prisma.volumeDiscountCampaign.updateMany({
-      where: { shop, status: "active" },
-      data: { shopifyDiscountIds: [discountId] },
-    }),
-    prisma.volumeDiscountCampaign.updateMany({
-      where: { shop, status: { not: "active" } },
-      data: { shopifyDiscountIds: [] },
-    }),
-  ]);
-
   const gid = await shopGidPromise;
-  await syncShopStorefrontWidgetMetafield(
-    admin,
-    activeRows,
-    shop,
-    widgetJsonFull,
-    gid ?? undefined,
-    widgetJson,
-  );
+  await Promise.all([
+    prisma.$transaction([
+      prisma.volumeDiscountCampaign.updateMany({
+        where: { shop, status: "active" },
+        data: { shopifyDiscountIds: [discountId] },
+      }),
+      prisma.volumeDiscountCampaign.updateMany({
+        where: { shop, status: { not: "active" } },
+        data: { shopifyDiscountIds: [] },
+      }),
+    ]),
+    syncShopStorefrontWidgetMetafield(
+      admin,
+      activeRows,
+      shop,
+      widgetJsonFull,
+      gid ?? undefined,
+      widgetJson,
+      rowFp,
+    ),
+  ]);
 
   invalidateMemoryCachePrefix(`widget:${shop}:`);
 

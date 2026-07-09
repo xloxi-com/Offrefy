@@ -205,7 +205,9 @@ export const action = async ({
   );
 
   if (syncPlan.kind === "full") {
-    const { errors } = await syncVolumeDiscountShop(admin, session.shop);
+    const { errors } = await syncVolumeDiscountShop(admin, session.shop, {
+      changedCampaignIds: [id],
+    });
     if (errors.length) {
       return { ok: false as const, error: errors.join(" ") };
     }

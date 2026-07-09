@@ -184,7 +184,9 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   if (intent === "syncAll") {
-    const { errors } = await syncVolumeDiscountShop(admin, session.shop);
+    const { errors } = await syncVolumeDiscountShop(admin, session.shop, {
+      purgeLegacy: true,
+    });
     if (errors.length) {
       return { ok: false as const, error: errors.join(" ") };
     }

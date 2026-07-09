@@ -42,9 +42,11 @@ model VolumeDiscountShopState {
 
 /// Cached JSON for app proxy + storefront when Admin session is unavailable (same payload as shop metafield).
 model VolumeDiscountStorefrontPayload {
-  shop      String   @id
-  payload   String   @db.Text
-  updatedAt DateTime @updatedAt
+  shop                String   @id
+  payload             String   @db.Text
+  /// Hash of active campaign rows at last successful sync — instant no-op for Sync all.
+  syncRowFingerprint  String?
+  updatedAt           DateTime @updatedAt
 }
 
 model VolumeDiscountCampaign {

@@ -109,7 +109,7 @@ export async function refreshStorefrontWidgetForShop(
 
   const widgetJsonFull = buildStorefrontWidgetJsonString(rows, builtCampaigns);
   const widgetJson = compactStorefrontShopMetafieldPayload(widgetJsonFull);
-  const gid = await resolveStorefrontWidgetShopGid(admin);
+  const gid = await resolveStorefrontWidgetShopGid(admin, shop);
   await syncShopStorefrontWidgetMetafield(
     admin,
     rows,

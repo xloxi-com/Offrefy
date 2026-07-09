@@ -217,6 +217,97 @@ async function resolveCollectionProductIds(
   return map;
 }
 
+export type BuildFunctionConfigOptions = {
+  /** Rebuild only these campaigns; reuse `existingCampaignsById` for the rest. */
+  changedCampaignIds?: string[];
+  existingCampaignsById?: Map<string, unknown>;
+};
+
+function campaignNeedsRebuild(
+  campaignId: string,
+  opts?: BuildFunctionConfigOptions,
+): boolean {
+  if (!opts?.changedCampaignIds?.length) return true;
+  return opts.changedCampaignIds.includes(campaignId);
+}
+
+function buildOneCampaignConfig(
+  row: {
+    id: string;
+    campaignName: string;
+    displayName?: string | null;
+    productScope: string;
+    quantityCondition: string;
+    customerType: string;
+    customerTags: unknown;
+    productIds: unknown;
+    collectionIds: unknown;
+    tiers: unknown;
+  },
+  collectionProducts: Map<string, string[]>,
+): unknown | null {
+  const scope = row.productScope as VolumeDiscountProductScope;
+  let productIds = jsonStringArray(row.productIds);
+  const colIds =
+    scope === "collections" ? jsonStringArray(row.collectionIds) : [];
+
+  if (scope === "collections") {
+    const expanded: string[] = [];
+    for (const cid of colIds) {
+      expanded.push(...(collectionProducts.get(cid) ?? []));
+    }
+    productIds = compactProductIdsForDiscountFunction([...new Set(expanded)]);
+  } else {
+    productIds = compactProductIdsForDiscountFunction(productIds);
+  }
+
+  const rawQ = String(row.quantityCondition ?? "per-variant");
+  const q =
+    rawQ === "total-all"
+      ? "total-all"
+      : rawQ === "per-collection"
+        ? "per-collection"
+        : rawQ === "per-product"
+          ? "per-product"
+          : "per-variant";
+  const cust = normalizeVolumeDiscountCustomerType(
+    String(row.customerType ?? "everyone"),
+  );
+  const tagList = jsonStringArray(row.customerTags);
+  const tierList = bestTiersFromPayload(normalizeTiersFromDb(row.tiers));
+  if (tierList.length === 0) return null;
+
+  const displayName =
+    typeof row.displayName === "string" && row.displayName.trim() !== ""
+      ? row.displayName.trim()
+      : null;
+
+  const collectionGroups =
+    scope === "collections" && colIds.length > 0
+      ? colIds.map((cid) => ({
+          collectionId: cid,
+          productIds: compactProductIdsForDiscountFunction([
+            ...(collectionProducts.get(cid) ?? []),
+          ]),
+        }))
+      : undefined;
+
+  return {
+    id: row.id,
+    campaignId: row.id,
+    status: "active",
+    campaignName: row.campaignName,
+    displayName,
+    productScope: scope,
+    quantityCondition: q,
+    customerType: cust,
+    customerTags: tagList,
+    productIds,
+    ...(collectionGroups?.length ? { collectionGroups } : {}),
+    tiers: tierList,
+  };
+}
+
 /**
  * Build JSON consumed by the Discount Function (one metafield for all active campaigns).
  */
@@ -235,9 +326,11 @@ export async function buildVolumeDiscountFunctionConfig(
   }[],
   admin: AdminGraphql,
   shop?: string,
+  buildOpts?: BuildFunctionConfigOptions,
 ): Promise<{ version: number; campaigns: unknown[] }> {
   const collectionGids: string[] = [];
   for (const row of args) {
+    if (!campaignNeedsRebuild(row.id, buildOpts)) continue;
     if ((row.productScope as VolumeDiscountProductScope) === "collections") {
       collectionGids.push(...jsonStringArray(row.collectionIds));
     }
@@ -249,69 +342,18 @@ export async function buildVolumeDiscountFunctionConfig(
   );
 
   const campaigns: unknown[] = [];
+  const existing = buildOpts?.existingCampaignsById;
 
   for (const row of args) {
-    const scope = row.productScope as VolumeDiscountProductScope;
-    let productIds = jsonStringArray(row.productIds);
-    const colIds =
-      scope === "collections" ? jsonStringArray(row.collectionIds) : [];
-
-    if (scope === "collections") {
-      const expanded: string[] = [];
-      for (const cid of colIds) {
-        expanded.push(...(collectionProducts.get(cid) ?? []));
-      }
-      productIds = compactProductIdsForDiscountFunction([...new Set(expanded)]);
-    } else {
-      productIds = compactProductIdsForDiscountFunction(productIds);
+    if (
+      !campaignNeedsRebuild(row.id, buildOpts) &&
+      existing?.has(row.id)
+    ) {
+      campaigns.push(existing.get(row.id));
+      continue;
     }
-
-    const rawQ = String(row.quantityCondition ?? "per-variant");
-    const q =
-      rawQ === "total-all"
-        ? "total-all"
-        : rawQ === "per-collection"
-          ? "per-collection"
-          : rawQ === "per-product"
-            ? "per-product"
-            : "per-variant";
-    const cust = normalizeVolumeDiscountCustomerType(
-      String(row.customerType ?? "everyone"),
-    );
-    const tagList = jsonStringArray(row.customerTags);
-    const tierList = bestTiersFromPayload(normalizeTiersFromDb(row.tiers));
-    if (tierList.length === 0) continue;
-
-    const displayName =
-      typeof row.displayName === "string" && row.displayName.trim() !== ""
-        ? row.displayName.trim()
-        : null;
-
-    /** Always send for `collections` scope so per-collection mode always has buckets (avoids empty metafield). */
-    const collectionGroups =
-      scope === "collections" && colIds.length > 0
-        ? colIds.map((cid) => ({
-            collectionId: cid,
-            productIds: compactProductIdsForDiscountFunction([
-              ...(collectionProducts.get(cid) ?? []),
-            ]),
-          }))
-        : undefined;
-
-    campaigns.push({
-      id: row.id,
-      campaignId: row.id,
-      status: "active",
-      campaignName: row.campaignName,
-      displayName,
-      productScope: scope,
-      quantityCondition: q,
-      customerType: cust,
-      customerTags: tagList,
-      productIds,
-      ...(collectionGroups?.length ? { collectionGroups } : {}),
-      tiers: tierList,
-    });
+    const built = buildOneCampaignConfig(row, collectionProducts);
+    if (built) campaigns.push(built);
   }
 
   return { version: 2, campaigns };
