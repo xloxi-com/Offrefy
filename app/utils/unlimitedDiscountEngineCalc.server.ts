@@ -273,12 +273,45 @@ export function computeUnlimitedDiscountPreview(
     return b.createdAt.getTime() - a.createdAt.getTime();
   });
 
+  function parseFunctionTiersFromDbRule(rawTiers: unknown): FunctionTierConfig[] {
+    const arr = Array.isArray(rawTiers) ? rawTiers : [];
+    const out: FunctionTierConfig[] = [];
+    for (const t of arr) {
+      if (!t || typeof t !== "object") continue;
+      const minQty = Math.max(1, Math.floor(Number(t.minQuantity ?? t.minQty ?? 1)));
+      const val = Number(t.value ?? 0);
+      const type = String(t.discountType ?? "").toLowerCase();
+
+      if (t.percent != null) {
+        out.push({ minQty, percent: Number(t.percent) });
+      } else if (t.fixedPricePerUnit != null) {
+        out.push({ minQty, fixedPricePerUnit: Number(t.fixedPricePerUnit) });
+      } else if (t.fixedAmount != null) {
+        out.push({ minQty, fixedAmount: Number(t.fixedAmount), appliesToEachItem: Boolean(t.appliesToEachItem) });
+      } else if (type === "percentage" || type === "percent") {
+        out.push({ minQty, percent: val });
+      } else if (type === "fixed_price" || type === "fixed_price_per_unit") {
+        out.push({ minQty, fixedPricePerUnit: val });
+      } else if (type === "fixed" || type === "fixed_amount") {
+        out.push({ minQty, fixedAmount: val, appliesToEachItem: Boolean(t.appliesToEachItem || t.each) });
+      }
+    }
+    return out.sort((a, b) => a.minQty - b.minQty);
+  }
+
   /** Per-request tier cache — same tiers reused across cart lines for one campaign. */
   const tiersByCampaignId = new Map<string, FunctionTierConfig[]>();
   function tiersForCampaign(row: DiscountEngineCampaignRow): FunctionTierConfig[] {
     let cached = tiersByCampaignId.get(row.id);
     if (!cached) {
-      cached = bestTiersFromPayload(normalizeTiersFromDb(row.tiers));
+      const rawTiers = row.tiers as any;
+      const isCampaignFormat = Array.isArray(rawTiers) && rawTiers.length > 0 && typeof rawTiers[0] === "object" && rawTiers[0].buyFrom !== undefined;
+      
+      if (isCampaignFormat) {
+        cached = bestTiersFromPayload(normalizeTiersFromDb(rawTiers));
+      } else {
+        cached = parseFunctionTiersFromDbRule(rawTiers);
+      }
       tiersByCampaignId.set(row.id, cached);
     }
     return cached;
@@ -289,6 +322,9 @@ export function computeUnlimitedDiscountPreview(
     customerMatches(row, loggedIn, tags),
   );
 
+  const MAX_DISCOUNT_CART_PRODUCTS = 25;
+  const discountedProductIds = new Set<string>();
+
   const outItems: DiscountEngineCalcLineOut[] = [];
   let totalOrig = 0;
   let totalDisc = 0;
@@ -298,10 +334,18 @@ export function computeUnlimitedDiscountPreview(
     const orig = Math.max(0, Math.round(Number(line.line_subtotal_cents)));
     totalOrig += orig;
 
-    if (qty <= 0 || orig <= 0) {
+    const productId = String(line.product_id ?? "").trim();
+    const variantId = String(line.variant_id ?? "").trim();
+
+    if (
+      qty <= 0 ||
+      orig <= 0 ||
+      (!discountedProductIds.has(productId) &&
+        discountedProductIds.size >= MAX_DISCOUNT_CART_PRODUCTS)
+    ) {
       outItems.push({
-        variant_id: String(line.variant_id ?? ""),
-        product_id: String(line.product_id ?? ""),
+        variant_id: variantId,
+        product_id: productId,
         quantity: qty,
         original_cents: orig,
         discounted_cents: orig,
@@ -310,8 +354,6 @@ export function computeUnlimitedDiscountPreview(
       totalDisc += orig;
       continue;
     }
-
-    const variantId = String(line.variant_id ?? "").trim();
 
     const matching: DiscountEngineCampaignRow[] = [];
     for (const row of customerEligible) {
@@ -365,9 +407,13 @@ export function computeUnlimitedDiscountPreview(
     const finalCents = Math.max(0, remaining);
     totalDisc += finalCents;
 
+    if (applied.length > 0) {
+      discountedProductIds.add(productId);
+    }
+
     outItems.push({
       variant_id: variantId,
-      product_id: String(line.product_id ?? ""),
+      product_id: productId,
       quantity: qty,
       original_cents: orig,
       discounted_cents: finalCents,

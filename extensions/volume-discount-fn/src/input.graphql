@@ -36,6 +36,9 @@ query CartInput($customerSegmentTags: [String!]!) {
           id
           product {
             id
+            tiersMetafield: metafield(namespace: "volume_discount", key: "tiers") {
+              jsonValue
+            }
           }
         }
       }
@@ -47,20 +50,5 @@ query CartInput($customerSegmentTags: [String!]!) {
   }
   discount {
     discountClasses
-    campaignsFrag0: metafield(namespace: "volume_discount", key: "campaigns") {
-      jsonValue
-    }
-    campaignsFrag1: metafield(namespace: "volume_discount", key: "campaigns_1") {
-      jsonValue
-    }
-    campaignsFrag2: metafield(namespace: "volume_discount", key: "campaigns_2") {
-      jsonValue
-    }
-    campaignsFrag3: metafield(namespace: "volume_discount", key: "campaigns_3") {
-      jsonValue
-    }
-    campaignsFrag4: metafield(namespace: "volume_discount", key: "campaigns_4") {
-      jsonValue
-    }
   }
 }

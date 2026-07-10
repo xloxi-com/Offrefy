@@ -152,12 +152,17 @@ export async function rebuildDiscountRulesForShop(
 export async function lookupDiscountRulesForProducts(
   shop: string,
   productIds: string[],
+  options?: { maxProducts?: number },
 ): Promise<Record<string, ProductRulePayload>> {
+  const maxProducts = Math.min(
+    Math.max(1, options?.maxProducts ?? 25),
+    25,
+  );
   const keys = [
     ...new Set(
       productIds.map(normalizeProductIdKey).filter(Boolean),
     ),
-  ];
+  ].slice(0, maxProducts);
   if (!keys.length) return {};
 
   const rows = await discountRuleDb().findMany({

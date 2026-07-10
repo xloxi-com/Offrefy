@@ -32,6 +32,10 @@
           ? "&variant_id=" + encodeURIComponent(String(variantId))
           : "");
     }
+    var shopDomain = window.Shopify && window.Shopify.shop ? window.Shopify.shop : "";
+    if (shopDomain) {
+      url += (url.indexOf("?") === -1 ? "?" : "&") + "shop=" + encodeURIComponent(shopDomain);
+    }
     var promise = fetch(url, {
       credentials: "same-origin",
       headers: { Accept: "application/json" },
@@ -2531,6 +2535,14 @@
       });
       return;
     }
+
+    var embedFallback = root.getAttribute("data-vd-embed-fallback") === "true";
+    if (embedFallback) {
+      var form = document.querySelector('form[action*="/cart/add"]');
+      if (form && form.parentNode && root.parentNode !== form.parentNode) {
+        form.parentNode.insertBefore(root, form);
+      }
+    }
     var variantId = root.getAttribute("data-variant-id");
     var productGid = root.getAttribute("data-product-gid");
     var variantGid = root.getAttribute("data-variant-gid");
@@ -2575,6 +2587,44 @@
     }
 
     var inline = sanitizeWidgetConfig(parseInline(scriptEl), designMode);
+
+    var matched = pickCampaign(
+      inline,
+      productId,
+      variantId,
+      productGid,
+      variantGid,
+    );
+
+    if (designMode && (!matched || !matched.tiers || !matched.tiers.length)) {
+      matched = {
+        id: "_preview",
+        campaignName: "Preview",
+        productScope: "all",
+        tiers: [
+          { minQty: 1, buyLabel: "Buy 1", badge: "Most Popular ⚡", activeByDefault: true, percent: 0 },
+          { minQty: 3, buyLabel: "Buy 3+", badge: null, activeByDefault: false, percent: 10 },
+          { minQty: 5, buyLabel: "Buy 5+", badge: null, activeByDefault: false, percent: 15 }
+        ],
+        widgetDisplay: WD_DEFAULT
+      };
+    }
+
+    if (matched && matched.tiers && matched.tiers.length) {
+      mountBundle(
+        root,
+        mount,
+        matched,
+        String(configId || "vd"),
+        unitCents,
+        currency,
+        heading,
+        sectionHeading,
+        variants,
+      );
+      return;
+    }
+
     var usePerProductApi =
       inline.mode === "per_product" ||
       !Array.isArray(inline.campaigns) ||
@@ -2599,28 +2649,6 @@
 
     if (usePerProductApi) {
       fetchConfig(productId, variantId).then(finishFetch);
-      return;
-    }
-
-    var matched = pickCampaign(
-      inline,
-      productId,
-      variantId,
-      productGid,
-      variantGid,
-    );
-    if (matched && matched.tiers && matched.tiers.length) {
-      mountBundle(
-        root,
-        mount,
-        matched,
-        String(configId || "vd"),
-        unitCents,
-        currency,
-        heading,
-        sectionHeading,
-        variants,
-      );
       return;
     }
 

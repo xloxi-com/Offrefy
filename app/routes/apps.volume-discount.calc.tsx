@@ -99,20 +99,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   let session: Awaited<
     ReturnType<typeof authenticate.public.appProxy>
-  >["session"];
+  >["session"] | undefined;
 
   try {
     ({ session } = await authenticate.public.appProxy(request));
   } catch (e) {
-    console.warn("[volume-discount] calc app proxy auth failed", e);
-    return new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), {
-      status: 401,
-      headers: jsonHeaders,
-    });
+    console.warn("[volume-discount] calc app proxy auth failed, trying fallback", e);
   }
 
   const shop =
-    session?.shop ?? new URL(request.url).searchParams.get("shop") ?? "";
+    session?.shop ??
+    new URL(request.url).searchParams.get("shop") ??
+    request.headers.get("x-shopify-shop-domain") ??
+    "";
   if (!shop) {
     return new Response(JSON.stringify({ ok: false, error: "Missing shop" }), {
       status: 400,
@@ -129,6 +128,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       headers: jsonHeaders,
     });
   }
+
+  console.log("[CALC REQUEST]:", {
+    shop,
+    body,
+  });
 
   const campaigns = await loadCampaignsForCalc(shop, body);
 

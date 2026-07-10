@@ -52,6 +52,20 @@ const MF_NS = "volume_discount";
 const MF_KEY_INPUT_VARS = "input_variables";
 const MF_KEY_RULE_SOURCE = "rule_source";
 
+const METAFIELDS_SET_MUTATION = `#graphql
+  mutation VolumeDiscountShopWidgetMetafieldsSet($metafields: [MetafieldsSetInput!]!) {
+    metafieldsSet(metafields: $metafields) {
+      metafields {
+        id
+      }
+      userErrors {
+        field
+        message
+      }
+    }
+  }
+`;
+
 function customerTagsFromRowJson(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -195,7 +209,10 @@ function isStaleDiscountError(messages: string[]): boolean {
     t.includes("could not find") ||
     t.includes("not found") ||
     t.includes("no longer exists") ||
-    t.includes("resource not found")
+    t.includes("resource not found") ||
+    t.includes("invalid") ||
+    t.includes("access denied") ||
+    t.includes("access_denied")
   );
 }
 
@@ -384,7 +401,104 @@ export async function syncVolumeDiscountShop(
         ? purgeLegacyVolumeDiscountNodes(admin, shop, keepId)
         : Promise.resolve({ deleted: [] as string[], errors: [] as string[] }),
       Promise.resolve().then(async () => {
+        const oldRules = await prisma.discountRule.findMany({
+          where: { shop, status: "active" },
+          select: { productId: true },
+        });
+        const oldProductIds = new Set(
+          oldRules.map((r) => r.productId).filter((id) => id !== "*")
+        );
+
         await rebuildDiscountRulesForShop(shop, rulesInput);
+
+        const newRules = await prisma.discountRule.findMany({
+          where: { shop, status: "active" },
+        });
+
+        const metafieldsToSet: Array<{
+          ownerId: string;
+          namespace: string;
+          key: string;
+          type: string;
+          value: string;
+        }> = [];
+
+        const newProductIds = new Set<string>();
+
+        for (const row of newRules) {
+          if (row.productId === "*") continue;
+          newProductIds.add(row.productId);
+
+          const productGid = `gid://shopify/Product/${row.productId}`;
+          
+          let tiersArray: any[] = [];
+          if (Array.isArray(row.tiers)) {
+            tiersArray = row.tiers;
+          } else if (typeof row.tiers === "string") {
+            try {
+              tiersArray = JSON.parse(row.tiers);
+            } catch {}
+          }
+
+          const compactTiers = tiersArray.map((t) => {
+            const minQty = Number(t.minQuantity || t.minQty || 1);
+            const val = Number(t.value ?? 0);
+            if (t.discountType === "percentage") return { m: minQty, p: val };
+            if (t.discountType === "fixed_price") return { m: minQty, fp: val };
+            if (t.discountType === "fixed") return { m: minQty, f: val, ...(t.appliesToEachItem ? { e: 1 } : {}) };
+            return null;
+          }).filter(Boolean);
+
+          const compactRule = {
+            c: row.campaignId,
+            m: (row.displayName || row.campaignName || "Volume discount").slice(0, 80),
+            q: row.quantityCondition === "total-all" ? "a" : row.quantityCondition === "per-collection" ? "c" : row.quantityCondition === "per-product" ? "p" : "v",
+            ct: row.customerType === "logged-in-tag-any" ? "t" : row.customerType === "logged-in" ? "l" : "e",
+            tg: Array.isArray(row.customerTags) ? row.customerTags : [],
+            t: compactTiers,
+          };
+
+          metafieldsToSet.push({
+            ownerId: productGid,
+            namespace: "volume_discount",
+            key: "tiers",
+            type: "json",
+            value: JSON.stringify(compactRule),
+          });
+        }
+
+        for (const oldId of oldProductIds) {
+          if (!newProductIds.has(oldId)) {
+            const productGid = `gid://shopify/Product/${oldId}`;
+            metafieldsToSet.push({
+              ownerId: productGid,
+              namespace: "volume_discount",
+              key: "tiers",
+              type: "json",
+              value: JSON.stringify({ t: [] }),
+            });
+          }
+        }
+
+        if (metafieldsToSet.length > 0) {
+          const BATCH_SIZE = 25;
+          for (let i = 0; i < metafieldsToSet.length; i += BATCH_SIZE) {
+            const chunk = metafieldsToSet.slice(i, i + BATCH_SIZE);
+            try {
+              const res = await admin.graphql(METAFIELDS_SET_MUTATION, {
+                variables: { metafields: chunk },
+              });
+              const parsed = (await res.json()) as any;
+              const ue = parsed.data?.metafieldsSet?.userErrors ?? [];
+              if (ue.length) {
+                console.warn("[volume-discount] product metafieldsSet userErrors:", JSON.stringify(ue));
+              }
+            } catch (err) {
+              console.error("[volume-discount] product metafieldsSet error:", err);
+            }
+          }
+        }
+
         const productIndex = buildProductRuleIndex({
           campaigns: campaignsForRules,
         });
@@ -436,7 +550,7 @@ export async function syncVolumeDiscountShop(
       key: MF_KEY_RULE_SOURCE,
       type: "json",
       value: JSON.stringify({
-        mode: needsRemoteLookup ? "api" : "metafield",
+        mode: "api",
         apiPath: "/apps/volume-discount/cart-rules",
         shopDomain: shop,
       }),

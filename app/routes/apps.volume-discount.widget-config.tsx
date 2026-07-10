@@ -33,21 +33,28 @@ function emptyJson(request: Request) {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   let admin: Awaited<
     ReturnType<typeof authenticate.public.appProxy>
-  >["admin"];
+  >["admin"] | undefined;
   let session: Awaited<
     ReturnType<typeof authenticate.public.appProxy>
-  >["session"];
+  >["session"] | undefined;
 
   try {
     ({ admin, session } = await authenticate.public.appProxy(request));
   } catch (e) {
-    console.warn("[volume-discount] widget-config app proxy auth failed", e);
-    return emptyJson(request);
+    console.warn("[volume-discount] widget-config app proxy auth failed, trying fallback", e);
   }
 
   const url = new URL(request.url);
+  console.log("[WIDGET-CONFIG REQUEST]:", {
+    url: request.url,
+    headers: Object.fromEntries(request.headers.entries()),
+    searchParams: Object.fromEntries(url.searchParams.entries()),
+  });
   const shop =
-    session?.shop ?? url.searchParams.get("shop") ?? "";
+    session?.shop ??
+    url.searchParams.get("shop") ??
+    request.headers.get("x-shopify-shop-domain") ??
+    "";
   if (!shop) {
     return emptyJson(request);
   }

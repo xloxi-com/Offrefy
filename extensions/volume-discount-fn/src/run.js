@@ -210,12 +210,13 @@ function loadCampaignsFromDiscount(discount) {
 }
 
 /**
- * Merge v4 product-index shards + optional API fetch body into a rules map.
+ * Merge v4 product-index shards + optional API fetch body + product-level metafields into a rules map.
  * @param {unknown} discount
  * @param {unknown} fetchResult
+ * @param {unknown[]} lines
  * @returns {Record<string, unknown>}
  */
-function loadProductRulesMap(discount, fetchResult) {
+function loadProductRulesMap(discount, fetchResult, lines) {
   /** @type {Record<string, unknown>} */
   const rules = {};
 
@@ -256,6 +257,15 @@ function loadProductRulesMap(discount, fetchResult) {
       }
     } catch {
       void 0;
+    }
+  }
+
+  for (const line of lines ?? []) {
+    const product = line.merchandise?.product;
+    const pid = numericTailFromGid(product?.id);
+    const tiersMetafield = product?.tiersMetafield?.jsonValue;
+    if (pid && tiersMetafield && typeof tiersMetafield === "object") {
+      rules[pid] = tiersMetafield;
     }
   }
 
@@ -445,6 +455,7 @@ function tierScore(line, tier) {
 
 /** @param {unknown} line @param {unknown} tier */
 function tierToDiscountValue(line, tier) {
+  if (!tier) return null;
   if (tier.percent != null) {
     const p = Number(tier.percent);
     if (!Number.isFinite(p) || p <= 0 || p > 100) return null;
@@ -485,6 +496,7 @@ export function cartLinesDiscountsGenerateRun(input) {
   const productRules = loadProductRulesMap(
     input.discount,
     input.fetchResult,
+    lines,
   );
   const hasProductRules = Object.keys(productRules).length > 0;
 
@@ -560,6 +572,7 @@ export function cartLinesDiscountsGenerateRun(input) {
 
       if (qtyMode === "total-all") {
         const tier = pickTierFromSorted(sortedTiers, cartTotalQty);
+        if (!tier) continue;
         for (const { line } of entries) {
           const value = tierToDiscountValue(line, tier);
           if (!value) continue;
@@ -579,6 +592,7 @@ export function cartLinesDiscountsGenerateRun(input) {
       } else if (qtyMode === "per-product") {
         const totalQty = entries.reduce((s, e) => s + e.line.quantity, 0);
         const tier = pickTierFromSorted(sortedTiers, totalQty);
+        if (!tier) continue;
         for (const { line } of entries) {
           const value = tierToDiscountValue(line, tier);
           if (!value) continue;
@@ -598,6 +612,7 @@ export function cartLinesDiscountsGenerateRun(input) {
       } else {
         for (const { line } of entries) {
           const tier = pickTierFromSorted(sortedTiers, line.quantity);
+          if (!tier) continue;
           const value = tierToDiscountValue(line, tier);
           if (!value) continue;
           const sc = tierScore(line, tier);
@@ -753,8 +768,27 @@ export function cartLinesDiscountsGenerateRun(input) {
   }
   }
 
+  const MAX_DISCOUNT_CART_PRODUCTS = 25;
+  const discountedProductIds = new Set();
+  const cappedBestByLine = new Map();
+
+  for (const line of lines) {
+    const cand = bestByLine.get(line.id);
+    if (!cand) continue;
+    const prodId = line?.merchandise?.product?.id ?? "";
+    if (!prodId) continue;
+
+    if (
+      discountedProductIds.has(prodId) ||
+      discountedProductIds.size < MAX_DISCOUNT_CART_PRODUCTS
+    ) {
+      discountedProductIds.add(prodId);
+      cappedBestByLine.set(line.id, cand);
+    }
+  }
+
   const grouped = new Map();
-  for (const [lineId, cand] of bestByLine) {
+  for (const [lineId, cand] of cappedBestByLine) {
     const { message, value } = cand;
     const key = JSON.stringify({ message, value });
     let group = grouped.get(key);

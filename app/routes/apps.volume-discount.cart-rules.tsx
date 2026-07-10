@@ -35,15 +35,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     ({ session } = await authenticate.public.appProxy(request));
   } catch (e) {
-    console.warn("[volume-discount] cart-rules app proxy auth failed", e);
-    return new Response(JSON.stringify({ ok: false, rules: {} }), {
-      status: 401,
-      headers: jsonHeaders,
-    });
+    console.warn("[volume-discount] cart-rules app proxy auth failed, trying fallback", e);
   }
 
   const shop =
-    session?.shop ?? new URL(request.url).searchParams.get("shop") ?? "";
+    session?.shop ??
+    new URL(request.url).searchParams.get("shop") ??
+    request.headers.get("x-shopify-shop-domain") ??
+    "";
   if (!shop) {
     return new Response(JSON.stringify({ ok: false, rules: {} }), {
       status: 400,
@@ -61,8 +60,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   }
 
+  console.log("[CART-RULES REQUEST]:", {
+    shop,
+    body,
+  });
+
   const productIds = Array.isArray(body.product_ids)
-    ? body.product_ids.map(String)
+    ? [...new Set(body.product_ids.map(String).filter(Boolean))].slice(0, 25)
     : [];
 
   if (productIds.length === 0) {
@@ -84,7 +88,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   }
 
-  const rules = await lookupDiscountRulesForProducts(shop, productIds);
+  const rules = await lookupDiscountRulesForProducts(shop, productIds, { maxProducts: 25 });
   const responseJson = JSON.stringify({ ok: true, rules });
 
   setMemoryCachedJson(memKey, responseJson, 30_000);

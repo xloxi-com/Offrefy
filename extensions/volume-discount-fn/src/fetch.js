@@ -18,18 +18,6 @@ function numericTailFromGid(gid) {
  */
 export function cartLinesDiscountsGenerateFetch(input) {
   const ruleSource = input.discount?.ruleSource?.jsonValue;
-  const head = input.discount?.campaignsFrag0?.jsonValue;
-  const apiMode =
-    ruleSource &&
-    typeof ruleSource === "object" &&
-    ruleSource.mode === "api";
-  const legacyRemote =
-    head && typeof head === "object" && head.remote === true;
-  const remote = apiMode || legacyRemote;
-
-  if (!remote) {
-    return { request: undefined };
-  }
 
   const shopDomain =
     ruleSource &&
@@ -48,6 +36,7 @@ export function cartLinesDiscountsGenerateFetch(input) {
     return { request: undefined };
   }
 
+  const MAX_CART_DISCOUNT_PRODUCTS = 25;
   /** @type {string[]} */
   const productIds = [];
   const seen = new Set();
@@ -57,7 +46,9 @@ export function cartLinesDiscountsGenerateFetch(input) {
     const n = numericTailFromGid(m.product.id);
     if (!n || seen.has(n)) continue;
     seen.add(n);
-    productIds.push(n);
+    if (productIds.length < MAX_CART_DISCOUNT_PRODUCTS) {
+      productIds.push(n);
+    }
   }
 
   if (!productIds.length) {
