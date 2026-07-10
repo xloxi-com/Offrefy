@@ -1,0 +1,402 @@
+{
+  "buildManifest": {
+    "serverBundles": {
+      "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0": {
+        "id": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+        "file": "build/server/nodejs_eyJydW50aW1lIjoibm9kZWpzIn0/index.js",
+        "config": {
+          "runtime": "nodejs"
+        }
+      }
+    },
+    "routeIdToServerBundleId": {
+      "routes/apps.volume-discount.widget-config": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/apps.volume-discount.cart-rules": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/webhooks.app.scopes_update": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/apps.volume-discount.calc": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/webhooks.app.uninstalled": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/auth.login": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/cart-rules": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/auth.$": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/_index": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/app.volume-discount.$id": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/app.volume-discount.new": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/app.offers.export": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/app.offers.import": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/app.additional": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/app._index": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0"
+    },
+    "routes": {
+      "root": {
+        "id": "root",
+        "file": "app/root.tsx",
+        "path": "",
+        "config": {}
+      },
+      "routes/apps.volume-discount.widget-config": {
+        "id": "routes/apps.volume-discount.widget-config",
+        "parentId": "root",
+        "file": "app/routes/apps.volume-discount.widget-config.tsx",
+        "path": "apps/volume-discount/widget-config",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/apps.volume-discount.cart-rules": {
+        "id": "routes/apps.volume-discount.cart-rules",
+        "parentId": "root",
+        "file": "app/routes/apps.volume-discount.cart-rules.tsx",
+        "path": "apps/volume-discount/cart-rules",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/webhooks.app.scopes_update": {
+        "id": "routes/webhooks.app.scopes_update",
+        "parentId": "root",
+        "file": "app/routes/webhooks.app.scopes_update.tsx",
+        "path": "webhooks/app/scopes_update",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/apps.volume-discount.calc": {
+        "id": "routes/apps.volume-discount.calc",
+        "parentId": "root",
+        "file": "app/routes/apps.volume-discount.calc.tsx",
+        "path": "apps/volume-discount/calc",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/webhooks.app.uninstalled": {
+        "id": "routes/webhooks.app.uninstalled",
+        "parentId": "root",
+        "file": "app/routes/webhooks.app.uninstalled.tsx",
+        "path": "webhooks/app/uninstalled",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/auth.login": {
+        "id": "routes/auth.login",
+        "parentId": "root",
+        "file": "app/routes/auth.login/route.tsx",
+        "path": "auth/login",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/cart-rules": {
+        "id": "routes/cart-rules",
+        "parentId": "root",
+        "file": "app/routes/cart-rules.tsx",
+        "path": "cart-rules",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/auth.$": {
+        "id": "routes/auth.$",
+        "parentId": "root",
+        "file": "app/routes/auth.$.tsx",
+        "path": "auth/*",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/_index": {
+        "id": "routes/_index",
+        "parentId": "root",
+        "file": "app/routes/_index/route.tsx",
+        "index": true,
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/app": {
+        "id": "routes/app",
+        "parentId": "root",
+        "file": "app/routes/app.tsx",
+        "path": "app",
+        "config": {}
+      },
+      "routes/app.volume-discount.$id": {
+        "id": "routes/app.volume-discount.$id",
+        "parentId": "routes/app",
+        "file": "app/routes/app.volume-discount.$id.tsx",
+        "path": "volume-discount/:id",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/app.volume-discount.new": {
+        "id": "routes/app.volume-discount.new",
+        "parentId": "routes/app",
+        "file": "app/routes/app.volume-discount.new.tsx",
+        "path": "volume-discount/new",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/app.offers.export": {
+        "id": "routes/app.offers.export",
+        "parentId": "routes/app",
+        "file": "app/routes/app.offers.export.tsx",
+        "path": "offers/export",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/app.offers.import": {
+        "id": "routes/app.offers.import",
+        "parentId": "routes/app",
+        "file": "app/routes/app.offers.import.tsx",
+        "path": "offers/import",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/app.additional": {
+        "id": "routes/app.additional",
+        "parentId": "routes/app",
+        "file": "app/routes/app.additional.tsx",
+        "path": "additional",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/app._index": {
+        "id": "routes/app._index",
+        "parentId": "routes/app",
+        "file": "app/routes/app._index.tsx",
+        "index": true,
+        "config": {
+          "runtime": "nodejs"
+        }
+      }
+    }
+  },
+  "reactRouterConfig": {
+    "appDirectory": "D:/Code Project/shopify apps/Offrefy/Offrefys/volume-discount/app",
+    "basename": "/",
+    "buildDirectory": "D:/Code Project/shopify apps/Offrefy/Offrefys/volume-discount/build",
+    "future": {
+      "unstable_optimizeDeps": false,
+      "unstable_passThroughRequests": false,
+      "unstable_subResourceIntegrity": false,
+      "unstable_trailingSlashAwareDataRequests": false,
+      "unstable_previewServerPrerendering": false,
+      "v8_middleware": false,
+      "v8_splitRouteModules": false,
+      "v8_viteEnvironmentApi": false
+    },
+    "routes": {
+      "root": {
+        "id": "root",
+        "file": "root.tsx",
+        "path": ""
+      },
+      "routes/apps.volume-discount.widget-config": {
+        "id": "routes/apps.volume-discount.widget-config",
+        "parentId": "root",
+        "file": "routes/apps.volume-discount.widget-config.tsx",
+        "path": "apps/volume-discount/widget-config"
+      },
+      "routes/apps.volume-discount.cart-rules": {
+        "id": "routes/apps.volume-discount.cart-rules",
+        "parentId": "root",
+        "file": "routes/apps.volume-discount.cart-rules.tsx",
+        "path": "apps/volume-discount/cart-rules"
+      },
+      "routes/webhooks.app.scopes_update": {
+        "id": "routes/webhooks.app.scopes_update",
+        "parentId": "root",
+        "file": "routes/webhooks.app.scopes_update.tsx",
+        "path": "webhooks/app/scopes_update"
+      },
+      "routes/apps.volume-discount.calc": {
+        "id": "routes/apps.volume-discount.calc",
+        "parentId": "root",
+        "file": "routes/apps.volume-discount.calc.tsx",
+        "path": "apps/volume-discount/calc"
+      },
+      "routes/webhooks.app.uninstalled": {
+        "id": "routes/webhooks.app.uninstalled",
+        "parentId": "root",
+        "file": "routes/webhooks.app.uninstalled.tsx",
+        "path": "webhooks/app/uninstalled"
+      },
+      "routes/auth.login": {
+        "id": "routes/auth.login",
+        "parentId": "root",
+        "file": "routes/auth.login/route.tsx",
+        "path": "auth/login"
+      },
+      "routes/cart-rules": {
+        "id": "routes/cart-rules",
+        "parentId": "root",
+        "file": "routes/cart-rules.tsx",
+        "path": "cart-rules"
+      },
+      "routes/auth.$": {
+        "id": "routes/auth.$",
+        "parentId": "root",
+        "file": "routes/auth.$.tsx",
+        "path": "auth/*"
+      },
+      "routes/_index": {
+        "id": "routes/_index",
+        "parentId": "root",
+        "file": "routes/_index/route.tsx",
+        "index": true
+      },
+      "routes/app": {
+        "id": "routes/app",
+        "parentId": "root",
+        "file": "routes/app.tsx",
+        "path": "app"
+      },
+      "routes/app.volume-discount.$id": {
+        "id": "routes/app.volume-discount.$id",
+        "parentId": "routes/app",
+        "file": "routes/app.volume-discount.$id.tsx",
+        "path": "volume-discount/:id"
+      },
+      "routes/app.volume-discount.new": {
+        "id": "routes/app.volume-discount.new",
+        "parentId": "routes/app",
+        "file": "routes/app.volume-discount.new.tsx",
+        "path": "volume-discount/new"
+      },
+      "routes/app.offers.export": {
+        "id": "routes/app.offers.export",
+        "parentId": "routes/app",
+        "file": "routes/app.offers.export.tsx",
+        "path": "offers/export"
+      },
+      "routes/app.offers.import": {
+        "id": "routes/app.offers.import",
+        "parentId": "routes/app",
+        "file": "routes/app.offers.import.tsx",
+        "path": "offers/import"
+      },
+      "routes/app.additional": {
+        "id": "routes/app.additional",
+        "parentId": "routes/app",
+        "file": "routes/app.additional.tsx",
+        "path": "additional"
+      },
+      "routes/app._index": {
+        "id": "routes/app._index",
+        "parentId": "routes/app",
+        "file": "routes/app._index.tsx",
+        "index": true
+      }
+    },
+    "routeDiscovery": {
+      "mode": "lazy",
+      "manifestPath": "/__manifest"
+    },
+    "serverBuildFile": "index.js",
+    "serverModuleFormat": "esm",
+    "ssr": true,
+    "allowedActionOrigins": false,
+    "unstable_routeConfig": [
+      {
+        "id": "root",
+        "path": "",
+        "file": "root.tsx",
+        "children": [
+          {
+            "id": "routes/apps.volume-discount.widget-config",
+            "file": "routes/apps.volume-discount.widget-config.tsx",
+            "path": "apps/volume-discount/widget-config"
+          },
+          {
+            "id": "routes/apps.volume-discount.cart-rules",
+            "file": "routes/apps.volume-discount.cart-rules.tsx",
+            "path": "apps/volume-discount/cart-rules"
+          },
+          {
+            "id": "routes/webhooks.app.scopes_update",
+            "file": "routes/webhooks.app.scopes_update.tsx",
+            "path": "webhooks/app/scopes_update"
+          },
+          {
+            "id": "routes/apps.volume-discount.calc",
+            "file": "routes/apps.volume-discount.calc.tsx",
+            "path": "apps/volume-discount/calc"
+          },
+          {
+            "id": "routes/webhooks.app.uninstalled",
+            "file": "routes/webhooks.app.uninstalled.tsx",
+            "path": "webhooks/app/uninstalled"
+          },
+          {
+            "id": "routes/auth.login",
+            "file": "routes/auth.login/route.tsx",
+            "path": "auth/login"
+          },
+          {
+            "id": "routes/cart-rules",
+            "file": "routes/cart-rules.tsx",
+            "path": "cart-rules"
+          },
+          {
+            "id": "routes/auth.$",
+            "file": "routes/auth.$.tsx",
+            "path": "auth/*"
+          },
+          {
+            "id": "routes/_index",
+            "file": "routes/_index/route.tsx",
+            "index": true
+          },
+          {
+            "id": "routes/app",
+            "file": "routes/app.tsx",
+            "path": "app",
+            "children": [
+              {
+                "id": "routes/app.volume-discount.$id",
+                "file": "routes/app.volume-discount.$id.tsx",
+                "path": "volume-discount/:id"
+              },
+              {
+                "id": "routes/app.volume-discount.new",
+                "file": "routes/app.volume-discount.new.tsx",
+                "path": "volume-discount/new"
+              },
+              {
+                "id": "routes/app.offers.export",
+                "file": "routes/app.offers.export.tsx",
+                "path": "offers/export"
+              },
+              {
+                "id": "routes/app.offers.import",
+                "file": "routes/app.offers.import.tsx",
+                "path": "offers/import"
+              },
+              {
+                "id": "routes/app.additional",
+                "file": "routes/app.additional.tsx",
+                "path": "additional"
+              },
+              {
+                "id": "routes/app._index",
+                "file": "routes/app._index.tsx",
+                "index": true
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "viteConfig": {
+    "build": {
+      "assetsDir": "assets"
+    }
+  }
+}
