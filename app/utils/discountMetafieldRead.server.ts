@@ -10,13 +10,10 @@ export type AdminGraphql = {
 const READ_DISCOUNT_MF_NODES = `#graphql
   query VolumeDiscountReadDiscountMetafieldNodes($id: ID!) {
     discountNode(id: $id) {
-      __typename
-      ... on DiscountAutomaticApp {
-        metafields(first: 50, namespace: "volume_discount") {
-          nodes {
-            key
-            value
-          }
+      metafields(first: 50, namespace: "volume_discount") {
+        nodes {
+          key
+          value
         }
       }
     }
@@ -36,15 +33,12 @@ export async function readDiscountVolumeMetafieldNodes(
       errors?: { message: string }[];
       data?: {
         discountNode?: {
-          __typename?: string;
           metafields?: { nodes?: { key: string; value: string }[] };
         } | null;
       };
     };
     if (parsed.errors?.length) return null;
-    const node = parsed.data?.discountNode;
-    if (node?.__typename !== "DiscountAutomaticApp") return null;
-    return node.metafields?.nodes ?? [];
+    return parsed.data?.discountNode?.metafields?.nodes ?? [];
   } catch {
     return null;
   }

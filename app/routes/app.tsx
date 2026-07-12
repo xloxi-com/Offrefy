@@ -10,6 +10,7 @@ import type {
 } from "react-router";
 import {
   Outlet,
+  redirect,
   useLoaderData,
   useLocation,
   useRouteError,
@@ -22,6 +23,7 @@ import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { APP_DISPLAY_NAME } from "../branding";
 import { authenticate } from "../shopify.server";
 import { adminEmbeddedPath } from "../utils/adminEmbeddedPath";
+import { withShopFromEmbeddedHost } from "../utils/embeddedShop.server";
 
 /**
  * Re-register critical CSS for the embedded admin shell so SPA transitions
@@ -41,6 +43,10 @@ export const links: LinksFunction = () => [
 export const meta: MetaFunction = () => [{ title: APP_DISPLAY_NAME }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const url = withShopFromEmbeddedHost(new URL(request.url));
+  if (url.toString() !== request.url) {
+    throw redirect(`${url.pathname}?${url.searchParams.toString()}`);
+  }
   await authenticate.admin(request);
   // eslint-disable-next-line no-undef
   return { apiKey: process.env.SHOPIFY_API_KEY || "" };
@@ -68,13 +74,17 @@ export function shouldRevalidate({
 export default function App() {
   const { apiKey } = useLoaderData<typeof loader>();
   const { search } = useLocation();
-  const offersHref = adminEmbeddedPath("/app", search);
+  const offersHref = adminEmbeddedPath("/app/offers", search);
+  const analyticsHref = adminEmbeddedPath("/app/analytics", search);
+  const settingsHref = adminEmbeddedPath("/app/settings", search);
 
   return (
     <PolarisAppProvider i18n={en}>
       <AppProvider embedded apiKey={apiKey}>
         <s-app-nav>
+          <s-link href={analyticsHref}>Analytics</s-link>
           <s-link href={offersHref}>Offers</s-link>
+          <s-link href={settingsHref}>Settings</s-link>
         </s-app-nav>
         <Outlet />
       </AppProvider>

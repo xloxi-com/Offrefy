@@ -58,7 +58,7 @@ export type OffersImportActionData =
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
   const url = new URL(request.url);
-  return redirect(adminEmbeddedPath("/app", url.search));
+  return redirect(adminEmbeddedPath("/app/offers", url.search));
 };
 
 export const action = async ({

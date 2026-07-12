@@ -3,29 +3,99 @@
   scope so `increment` is not reliable for deduping. Dedupe by whether the bundle script is already in
   the document so we never skip injection when a stale window flag survives a soft navigation.
 {% endcomment %}
+{% liquid
+  assign vd_widget = shop.metafields.volume_discount.storefront_widget.value
+  assign locale_base = request.locale.iso_code | split: '-' | first | downcase
+  assign vd_cart_discount = '{{ discount }} OFF'
+  assign vd_cart_discount_qty = '(qty {{ qty }})'
+
+  if vd_widget and vd_widget.translations and vd_widget.translations[locale_base]
+    assign locale_trans = vd_widget.translations[locale_base]
+    if locale_trans.transCartDiscount != blank
+      assign vd_cart_discount = locale_trans.transCartDiscount
+    elsif locale_trans.transDiscount != blank
+      assign vd_cart_discount = '{{ discount }} ' | append: locale_trans.transDiscount
+    endif
+    if locale_trans.transCartDiscountQty != blank
+      assign vd_cart_discount_qty = locale_trans.transCartDiscountQty
+    elsif locale_trans.transQty != blank
+      assign vd_cart_discount_qty = '(' | append: locale_trans.transQty | append: ' {{ qty }})'
+    endif
+  endif
+%}
 <script>
 (function () {
-  if (document.querySelector('script[src*="volume-discount-storefront.js"]')) {
-    window.__vdStorefrontAssetsLoaded = true;
-    return;
-  }
-  window.__vdStorefrontAssetsLoaded = true;
-  var head = document.head || document.getElementsByTagName('head')[0];
-  var cssHref = {{ 'volume-discount-storefront.css' | asset_url | json }};
+  var VD_ASSET_VERSION = "1.19.9";
+  window.__vdStorefrontLocale = {{ request.locale.iso_code | json }};
+  window.__vdAssetVersion = VD_ASSET_VERSION;
+  window.__vdCartBadgeTemplates = {
+    locale: {{ locale_base | json }},
+    discount: {{ vd_cart_discount | json }},
+    qty: {{ vd_cart_discount_qty | json }}
+  };
+  {% if vd_widget and vd_widget.translations %}
+  window.__vdStorefrontTranslations = {{ vd_widget.translations | json }};
+  {% endif %}
+
+  (function syncVdCartLocaleAttribute() {
+    var loc = window.__vdStorefrontLocale;
+    if (!loc && document.documentElement) {
+      var lang = document.documentElement.getAttribute("lang");
+      if (lang) loc = lang;
+    }
+    if (!loc) {
+      var m = String(location.pathname || "").match(/^\/([a-z]{2}(?:-[a-z]{2})?)(\/|$)/i);
+      if (m && m[1]) loc = m[1];
+    }
+    if (!loc) loc = "en";
+    loc = String(loc).toLowerCase().split("-")[0];
+    var root = "/";
+    try {
+      if (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) {
+        root = window.Shopify.routes.root;
+        if (root.slice(-1) !== "/") root += "/";
+      }
+    } catch (e) {}
+    fetch(root + "cart/update.js", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ attributes: { vd_locale: loc } }),
+    }).catch(function () {});
+  })();
+
   var scriptSrc = {{ 'volume-discount-storefront.js' | asset_url | json }};
-  var cssPreload = document.createElement('link');
-  cssPreload.rel = 'preload';
-  cssPreload.as = 'style';
+  scriptSrc +=
+    (scriptSrc.indexOf("?") === -1 ? "?" : "&") +
+    "vd=" +
+    encodeURIComponent(VD_ASSET_VERSION);
+
+  var existing = document.querySelector('script[src*="volume-discount-storefront.js"]');
+  if (existing) {
+    if (existing.getAttribute("data-vd-asset-version") === VD_ASSET_VERSION) {
+      window.__vdStorefrontAssetsLoaded = true;
+      return;
+    }
+    existing.parentNode && existing.parentNode.removeChild(existing);
+  }
+
+  window.__vdStorefrontAssetsLoaded = true;
+  var head = document.head || document.getElementsByTagName("head")[0];
+  var cssHref = {{ 'volume-discount-storefront.css' | asset_url | json }};
+  var cssPreload = document.createElement("link");
+  cssPreload.rel = "preload";
+  cssPreload.as = "style";
   cssPreload.href = cssHref;
   head.appendChild(cssPreload);
-  var css = document.createElement('link');
-  css.rel = 'stylesheet';
+  var css = document.createElement("link");
+  css.rel = "stylesheet";
   css.href = cssHref;
   head.appendChild(css);
-  var s = document.createElement('script');
+  var s = document.createElement("script");
   s.src = scriptSrc;
   s.defer = true;
-  s.fetchPriority = 'low';
+  s.fetchPriority = "low";
+  s.setAttribute("data-vd-asset-version", VD_ASSET_VERSION);
   (document.body || head).appendChild(s);
 })();
 </script>

@@ -10,13 +10,10 @@ type AdminGraphql = {
 const READ_DISCOUNT_MF = `#graphql
   query VolumeDiscountReadDiscountMetafieldFingerprint($id: ID!) {
     discountNode(id: $id) {
-      __typename
-      ... on DiscountAutomaticApp {
-        metafields(first: 50, namespace: "volume_discount") {
-          nodes {
-            key
-            value
-          }
+      metafields(first: 50, namespace: "volume_discount") {
+        nodes {
+          key
+          value
         }
       }
     }
@@ -44,15 +41,12 @@ export async function readLiveDiscountMetafieldFingerprint(
       errors?: { message: string }[];
       data?: {
         discountNode?: {
-          __typename?: string;
           metafields?: { nodes?: { key: string; value: string }[] };
         } | null;
       };
     };
     if (parsed.errors?.length) return null;
-    const node = parsed.data?.discountNode;
-    if (node?.__typename !== "DiscountAutomaticApp") return null;
-    const nodes = node.metafields?.nodes ?? [];
+    const nodes = parsed.data?.discountNode?.metafields?.nodes ?? [];
     if (!nodes.length) return null;
     return fingerprintMetafieldEntries(nodes);
   } catch {

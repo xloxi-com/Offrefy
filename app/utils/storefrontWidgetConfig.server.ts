@@ -6,7 +6,11 @@ import { discountRuleDb } from "./discountRuleDb.server";
 import { getVolumeDiscountStorefrontPayload } from "../services/volumeDiscountStorefrontCache.server";
 import { volumeDiscountCampaignSyncSelect } from "./volumeDiscountCampaignSelect.server";
 import type { DiscountRuleRecord } from "../types/discountRule";
-import { getMemoryCachedJson, setMemoryCachedJson } from "./memoryCache.server";
+import { getMemoryCachedJson, setMemoryCachedJson, invalidateMemoryCachePrefix } from "./memoryCache.server";
+import {
+  loadStorefrontTranslationsForShop,
+} from "./storefrontTranslations.server";
+import type { StorefrontTranslationsMap } from "./storefrontTranslations";
 
 /** DB row shape for widget JSON — only fields required to build storefront payload. */
 export type VolumeDiscountCampaignStorefrontRow = Pick<
@@ -27,6 +31,7 @@ export type VolumeDiscountCampaignStorefrontRow = Pick<
   | "countdownEndsAt"
   | "createdAt"
   | "updatedAt"
+  | "shop"
 >;
 
 import { buyLabelsForQuantityTiers } from "./buyLabelsForQuantityTiers";
@@ -130,13 +135,23 @@ function optionSubtextForMinQty(
  * Merge DB rows + function-config campaigns into storefront widget JSON (no GraphQL).
  * Use with the result of `buildVolumeDiscountFunctionConfig` to avoid running it twice on save.
  */
-export function buildStorefrontWidgetJsonString(
+export async function buildStorefrontWidgetJsonString(
   rows: VolumeDiscountCampaignStorefrontRow[],
   builtCampaigns: unknown[],
-): string {
+): Promise<string> {
   const built = builtCampaigns as StorefrontWidgetCampaign[];
   const rowById = new Map(rows.map((r) => [r.id, r]));
   const out: StorefrontWidgetCampaign[] = [];
+
+  const shop = rows[0]?.shop;
+  let translations = {};
+  if (shop) {
+    try {
+      translations = await loadStorefrontTranslationsForShop(shop);
+    } catch (e) {
+      console.error("[volume-discount] Failed querying translations", e);
+    }
+  }
 
   for (const c of built) {
     const row = rowById.get(c.id);
@@ -169,6 +184,7 @@ export function buildStorefrontWidgetJsonString(
   return JSON.stringify({
     version: 1,
     campaigns: out,
+    translations,
   });
 }
 
@@ -179,7 +195,19 @@ export function compactStorefrontShopMetafieldPayload(fullWidgetJson: string): s
   if (fullWidgetJson.length <= STOREFRONT_WIDGET_INLINE_MAX_CHARS) {
     return fullWidgetJson;
   }
-  return JSON.stringify({ version: 1, mode: "per_product", campaigns: [] });
+  try {
+    const parsed = JSON.parse(fullWidgetJson) as {
+      translations?: StorefrontTranslationsMap;
+    };
+    return JSON.stringify({
+      version: 1,
+      mode: "per_product",
+      campaigns: [],
+      translations: parsed.translations ?? {},
+    });
+  } catch {
+    return JSON.stringify({ version: 1, mode: "per_product", campaigns: [] });
+  }
 }
 
 function storefrontProductMatch(
@@ -218,6 +246,23 @@ function pickStorefrontCampaignFromPayload(
     void 0;
   }
   return null;
+}
+
+function buildSingleCampaignWidgetPayload(
+  campaign: StorefrontWidgetCampaign,
+  translations: StorefrontTranslationsMap,
+): string {
+  return JSON.stringify({
+    version: 1,
+    campaigns: [campaign],
+    translations,
+  });
+}
+
+async function resolveStorefrontTranslationsForWidget(
+  shop: string,
+): Promise<StorefrontTranslationsMap> {
+  return loadStorefrontTranslationsForShop(shop);
 }
 
 /**
@@ -261,7 +306,8 @@ export async function buildStorefrontWidgetForProduct(
       variantKey || null,
     );
     if (camp) {
-      return JSON.stringify({ version: 1, campaigns: [camp] });
+      const translations = await resolveStorefrontTranslationsForWidget(shop);
+      return buildSingleCampaignWidgetPayload(camp, translations);
     }
   }
 
@@ -317,7 +363,7 @@ export async function buildStorefrontWidgetForProduct(
     matchedKey,
   );
   if (builtFromDb) {
-    return buildStorefrontWidgetJsonString([row], [builtFromDb]);
+    return await buildStorefrontWidgetJsonString([row], [builtFromDb]);
   }
 
   if (!admin) {
@@ -337,7 +383,8 @@ export async function buildStorefrontWidgetForProduct(
         variantKey || null,
       );
       if (camp) {
-        return JSON.stringify({ version: 1, campaigns: [camp] });
+        const translations = await resolveStorefrontTranslationsForWidget(shop);
+        return buildSingleCampaignWidgetPayload(camp, translations);
       }
     }
     return JSON.stringify({ version: 1, campaigns: [] });
@@ -362,7 +409,7 @@ export async function buildStorefrontWidgetForProduct(
     shop,
   );
 
-  return buildStorefrontWidgetJsonString([row], campaigns);
+  return await buildStorefrontWidgetJsonString([row], campaigns);
 }
 
 export async function buildStorefrontWidgetValue(
@@ -387,5 +434,5 @@ export async function buildStorefrontWidgetValue(
     shop,
   );
 
-  return buildStorefrontWidgetJsonString(rows, campaigns);
+  return await buildStorefrontWidgetJsonString(rows, campaigns);
 }

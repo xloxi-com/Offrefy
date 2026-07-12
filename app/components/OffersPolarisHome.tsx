@@ -1,15 +1,12 @@
-import type { PointerEvent as ReactPointerEvent } from "react";
 import {
   Fragment,
   memo,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
-import { createPortal } from "react-dom";
 import { Link, useFetcher, useLocation } from "react-router";
 import {
   Badge,
@@ -20,7 +17,6 @@ import {
   Checkbox,
   DropZone,
   Icon,
-  INDEX_TABLE_SELECT_ALL_ITEMS,
   IndexFilters,
   IndexFiltersMode,
   IndexTable,
@@ -35,13 +31,12 @@ import {
 } from "@shopify/polaris";
 import type {
   IndexFiltersProps,
-  MenuGroupDescriptor,
   TabProps,
 } from "@shopify/polaris";
 import {
+  ArrowUpIcon,
   DeleteIcon,
   DiscountIcon,
-  DragHandleIcon,
   DuplicateIcon,
   EditIcon,
 } from "@shopify/polaris-icons";
@@ -75,6 +70,7 @@ export type OfferCampaignRow = {
   productScope: string;
   status: string;
   createdAt: string;
+  updatedAt: string;
   widgetPresentation: VolumeDiscountWidgetPresentation;
 };
 
@@ -138,33 +134,17 @@ const offerTabs: TabProps[] = [
 
 const PAGE_SIZE = 50;
 
-/** Padding from iframe viewport edges so the bulk bar is never clipped */
-const BULK_BAR_VIEWPORT_PAD = 10;
-
-function computeBulkBarViewportDelta(
-  rect: DOMRect,
-  vw: number,
-  vh: number,
-  pad: number,
-): { dx: number; dy: number } {
-  let dx = 0;
-  let dy = 0;
-  if (rect.width > vw - 2 * pad) {
-    dx = pad - rect.left;
-  } else {
-    if (rect.left < pad) dx = pad - rect.left;
-    else if (rect.right > vw - pad) dx = vw - pad - rect.right;
-  }
-  if (rect.height > vh - 2 * pad) {
-    dy = pad - rect.top;
-  } else {
-    if (rect.top < pad) dy = pad - rect.top;
-    else if (rect.bottom > vh - pad) dy = vh - pad - rect.bottom;
-  }
-  return { dx, dy };
-}
-
 const sortOptions: NonNullable<IndexFiltersProps["sortOptions"]> = [
+  {
+    label: "Last modified",
+    value: "modified desc",
+    directionLabel: "Newest first",
+  },
+  {
+    label: "Last modified",
+    value: "modified asc",
+    directionLabel: "Oldest first",
+  },
   {
     label: "Date created",
     value: "created desc",
@@ -178,6 +158,45 @@ const sortOptions: NonNullable<IndexFiltersProps["sortOptions"]> = [
   { label: "Campaign name", value: "name asc", directionLabel: "A–Z" },
   { label: "Campaign name", value: "name desc", directionLabel: "Z–A" },
 ];
+
+function CampaignNameSortHeader({
+  sortSelected,
+  onSort,
+}: {
+  sortSelected: string[];
+  onSort: (value: string[]) => void;
+}) {
+  const sort = sortSelected[0] ?? "modified desc";
+  const isNameAsc = sort === "name asc";
+  const isNameDesc = sort === "name desc";
+  const isNameSort = isNameAsc || isNameDesc;
+
+  const toggleNameSort = () => {
+    onSort([isNameAsc ? "name desc" : "name asc"]);
+  };
+
+  return (
+    <InlineStack gap="100" blockAlign="center" wrap={false}>
+      <Text as="span" variant="bodySm" fontWeight="semibold">
+        Campaign name
+      </Text>
+      <span className={styles.nameSortArrowWrap}>
+        <Button
+          variant="plain"
+          size="micro"
+          icon={ArrowUpIcon}
+          accessibilityLabel={
+            isNameDesc
+              ? "Sort campaign name Z to A"
+              : "Sort campaign name A to Z"
+          }
+          pressed={isNameSort}
+          onClick={toggleNameSort}
+        />
+      </span>
+    </InlineStack>
+  );
+}
 
 function tabIndex(offerTab: OfferTab): number {
   if (offerTab === "active") return 1;
@@ -220,91 +239,6 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     null,
   );
   const [importModalOpen, setImportModalOpen] = useState(false);
-
-  const [bulkBarOffset, setBulkBarOffset] = useState({ x: 0, y: 0 });
-  const [bulkBarPortalReady, setBulkBarPortalReady] = useState(false);
-  const [bulkBarViewportTick, setBulkBarViewportTick] = useState(0);
-  const bulkBarRef = useRef<HTMLDivElement | null>(null);
-  const bulkBarOffsetRef = useRef(bulkBarOffset);
-  const bulkBarDragRef = useRef<{
-    startX: number;
-    startY: number;
-    origX: number;
-    origY: number;
-  } | null>(null);
-
-  useEffect(() => {
-    bulkBarOffsetRef.current = bulkBarOffset;
-  }, [bulkBarOffset]);
-
-  useEffect(() => {
-    setBulkBarPortalReady(true);
-    try {
-      sessionStorage.removeItem("vd-bulk-bar-offset");
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  useEffect(() => {
-    const onResize = () => {
-      setBulkBarViewportTick((t) => t + 1);
-    };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  const onBulkBarPointerDown = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      if (e.button !== 0) return;
-      const t = e.target;
-      if (
-        t instanceof Element &&
-        t.closest(
-          "button,a,input,select,textarea,[contenteditable='true']",
-        )
-      ) {
-        return;
-      }
-      e.preventDefault();
-      e.currentTarget.setPointerCapture(e.pointerId);
-      bulkBarDragRef.current = {
-        startX: e.clientX,
-        startY: e.clientY,
-        origX: bulkBarOffsetRef.current.x,
-        origY: bulkBarOffsetRef.current.y,
-      };
-    },
-    [],
-  );
-
-  const onBulkBarPointerMove = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      const s = bulkBarDragRef.current;
-      if (!s) return;
-      const nx = s.origX + (e.clientX - s.startX);
-      const ny = s.origY + (e.clientY - s.startY);
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      const next = {
-        x: Math.round(Math.max(-vw * 2, Math.min(vw * 2, nx))),
-        y: Math.round(Math.max(-vh * 2, Math.min(vh * 2, ny))),
-      };
-      bulkBarOffsetRef.current = next;
-      setBulkBarOffset(next);
-    },
-    [],
-  );
-
-  const onBulkBarPointerUp = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      bulkBarDragRef.current = null;
-      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-        e.currentTarget.releasePointerCapture(e.pointerId);
-      }
-    },
-    [],
-  );
 
   const { mode, setMode } = useSetIndexFiltersMode(IndexFiltersMode.Default);
   const [pageIndex, setPageIndex] = useState(0);
@@ -356,27 +290,10 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
       selection?: string | [number, number],
       _position?: number,
     ) => {
-      const pageIds = pageRows.map((c) => c.id);
       const allFilteredIds = filteredCampaigns.map((c) => c.id);
 
       if (selectionType === IndexTableSelectionType.Page) {
-        if (!toggleType) {
-          setSelectedResources([]);
-          return;
-        }
-        setSelectedResources((prev) => {
-          const everyPageSelected =
-            pageRows.length > 0 &&
-            pageRows.every((c) => prev.includes(c.id));
-          const allFilteredSelected =
-            filteredCampaigns.length > 0 &&
-            prev.length === filteredCampaigns.length &&
-            filteredCampaigns.every((c) => prev.includes(c.id));
-          if (everyPageSelected && !allFilteredSelected) {
-            return allFilteredIds;
-          }
-          return pageIds;
-        });
+        setSelectedResources(toggleType ? allFilteredIds : []);
         return;
       }
 
@@ -447,50 +364,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     [pageRows, filteredCampaigns],
   );
 
-  const selectedItemsCountForTable = useMemo(() => {
-    const totalFiltered = filteredCampaigns.length;
-    if (totalFiltered === 0) return 0;
-    const allFilteredSelected =
-      selectedResources.length === totalFiltered &&
-      filteredCampaigns.every((c) => selectedResources.includes(c.id));
-    if (allFilteredSelected) return totalFiltered;
-    const everyPageSelected =
-      pageRows.length > 0 &&
-      pageRows.every((c) => selectedResources.includes(c.id));
-    if (everyPageSelected && selectedResources.length < totalFiltered) {
-      return INDEX_TABLE_SELECT_ALL_ITEMS;
-    }
-    return selectedResources.length;
-  }, [filteredCampaigns, pageRows, selectedResources]);
-
-  /** When the current page is fully selected but more offers exist, show a disclosure (like Shopify admin) with two actions. */
-  const offersTablePromotedBulkActions = useMemo(():
-    | MenuGroupDescriptor[]
-    | undefined => {
-    if (filteredCampaigns.length <= pageRows.length) return undefined;
-    if (selectedItemsCountForTable !== INDEX_TABLE_SELECT_ALL_ITEMS) {
-      return undefined;
-    }
-    return [
-      {
-        title: `${pageRows.length} selected`,
-        actions: [
-          {
-            content: "Select all in this store",
-            onAction: () => {
-              setSelectedResources(filteredCampaigns.map((c) => c.id));
-            },
-          },
-          {
-            content: "Unselect all",
-            onAction: () => {
-              setSelectedResources([]);
-            },
-          },
-        ],
-      },
-    ];
-  }, [filteredCampaigns, pageRows, selectedItemsCountForTable]);
+  const selectedItemsCountForTable = selectedResources.length;
 
   useEffect(() => {
     clearSelection();
@@ -517,11 +391,11 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
         clearSelection();
       } else if (d.intent === "bulkActivate") {
         const n = d.count ?? 1;
-        notify(n > 1 ? `${n} offers activated` : "Offer activated");
+        notify(n > 1 ? `${n} offers set to active` : "Offer set to active");
         clearSelection();
       } else if (d.intent === "bulkDeactivate") {
         const n = d.count ?? 1;
-        notify(n > 1 ? `${n} offers deactivated` : "Offer deactivated");
+        notify(n > 1 ? `${n} offers set to draft` : "Offer set to draft");
         clearSelection();
       }
       onCampaignsMutated();
@@ -677,6 +551,28 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     listFetcher.submit(fd, { method: "post", action: listIndexAction });
   };
 
+  const offersTableBulkActions = useMemo(
+    () => [
+      {
+        content: "Active",
+        onAction: () => submitBulkStatus("bulkActivate"),
+        disabled: listMutationPending,
+      },
+      {
+        content: "Draft",
+        onAction: () => submitBulkStatus("bulkDeactivate"),
+        disabled: listMutationPending,
+      },
+      {
+        content: "Delete",
+        onAction: () => setPendingDeleteIds([...selectedResources]),
+        destructive: true,
+        disabled: listMutationPending,
+      },
+    ],
+    [listMutationPending, selectedResources],
+  );
+
   const csvImportAction = adminEmbeddedPath("/app/offers/import", search);
   const csvImportPending = csvImportFetcher.state !== "idle";
   const csvExportPending = csvExportFetcher.state !== "idle";
@@ -690,7 +586,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     fd.set("_action", "exportCsv");
     fd.set("listTab", offerTab);
     fd.set("listQ", exportSearchQuery);
-    fd.set("listSort", sortSelected[0] ?? "created desc");
+    fd.set("listSort", sortSelected[0] ?? "modified desc");
     csvExportFetcher.submit(fd, { method: "post", action: listIndexAction });
   }, [
     canExportOffers,
@@ -813,39 +709,6 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     ],
   );
 
-  const bulkSelectionCount = selectedResources.length;
-  const showBulkBar =
-    bulkSelectionCount > 0 && campaigns.length > 0 && filteredCampaigns.length > 0;
-
-  useLayoutEffect(() => {
-    if (!bulkBarPortalReady || !showBulkBar) return;
-    const el = bulkBarRef.current;
-    if (!el || typeof window === "undefined") return;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const rect = el.getBoundingClientRect();
-    const { dx, dy } = computeBulkBarViewportDelta(
-      rect,
-      vw,
-      vh,
-      BULK_BAR_VIEWPORT_PAD,
-    );
-    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
-    setBulkBarOffset((o) => {
-      const next = {
-        x: Math.round(o.x + dx),
-        y: Math.round(o.y + dy),
-      };
-      bulkBarOffsetRef.current = next;
-      return next;
-    });
-  }, [
-    bulkBarOffset,
-    bulkBarPortalReady,
-    showBulkBar,
-    bulkBarViewportTick,
-  ]);
-
   const emptyStateCard = (
     <Card>
       <BlockStack gap="400" inlineAlign="center">
@@ -912,17 +775,26 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
               itemCount={filteredCampaigns.length}
               hasMoreItems={false}
               selectedItemsCount={selectedItemsCountForTable}
-              promotedBulkActions={offersTablePromotedBulkActions ?? []}
+              bulkActions={offersTableBulkActions}
               onSelectionChange={handleOffersSelectionChange}
               selectable
               headings={[
-                { title: "Campaign name" },
+                {
+                  id: "campaign-name",
+                  title: (
+                    <CampaignNameSortHeader
+                      sortSelected={sortSelected}
+                      onSort={setSortSelected}
+                    />
+                  ),
+                },
                 { title: "Discount type" },
                 { title: "Campaign type" },
                 { title: "Apply to" },
                 { title: "Impression" },
                 { title: "CR" },
                 { title: "Order applied" },
+                { title: "Last modified" },
                 { title: "Created at" },
                 { title: "Status" },
                 { title: "Actions", id: "offers-actions-col" },
@@ -979,6 +851,9 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                     <Text tone="subdued" as="span">
                       —
                     </Text>
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <Text as="span">{formatCreatedAt(c.updatedAt)}</Text>
                   </IndexTable.Cell>
                   <IndexTable.Cell>
                     <Text as="span">{formatCreatedAt(c.createdAt)}</Text>
@@ -1182,87 +1057,6 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
           </BlockStack>
         </Modal.Section>
       </Modal>
-
-      {bulkBarPortalReady && showBulkBar
-        ? createPortal(
-            <div
-              ref={bulkBarRef}
-              className={styles.bulkActionBar}
-              role="region"
-              aria-label="Bulk actions for selected offers. Drag the bar to move it."
-              style={{
-                transform: `translate(calc(-50% + ${bulkBarOffset.x}px), ${bulkBarOffset.y}px)`,
-              }}
-              onPointerDown={onBulkBarPointerDown}
-              onPointerMove={onBulkBarPointerMove}
-              onPointerUp={onBulkBarPointerUp}
-              onPointerCancel={onBulkBarPointerUp}
-            >
-              <div className={styles.bulkActionBarPanel}>
-                <Box
-                  padding="500"
-                  paddingInline="600"
-                  background="bg-surface"
-                  borderWidth="025"
-                  borderColor="border"
-                  borderRadius="500"
-                  shadow="600"
-                >
-                  <InlineStack
-                    gap="400"
-                    align="space-between"
-                    blockAlign="center"
-                    wrap
-                  >
-                    <InlineStack gap="300" blockAlign="center" wrap={false}>
-                      <div
-                        className={styles.bulkBarDragHandle}
-                        aria-hidden
-                      >
-                        <Icon source={DragHandleIcon} tone="subdued" />
-                      </div>
-                      <Text as="span" variant="bodyMd" fontWeight="semibold">
-                        {bulkSelectionCount} selected
-                      </Text>
-                    </InlineStack>
-                    <InlineStack gap="300" blockAlign="center" wrap>
-                      <Button
-                        variant="secondary"
-                        tone="critical"
-                        size="medium"
-                        disabled={listMutationPending}
-                        onClick={() =>
-                          setPendingDeleteIds([...selectedResources])
-                        }
-                      >
-                        Delete
-                      </Button>
-                      <span className={styles.bulkBarActivate}>
-                        <Button
-                          variant="tertiary"
-                          size="medium"
-                          disabled={listMutationPending}
-                          onClick={() => submitBulkStatus("bulkActivate")}
-                        >
-                          Activate
-                        </Button>
-                      </span>
-                      <Button
-                        variant="secondary"
-                        size="medium"
-                        disabled={listMutationPending}
-                        onClick={() => submitBulkStatus("bulkDeactivate")}
-                      >
-                        Deactivate
-                      </Button>
-                    </InlineStack>
-                  </InlineStack>
-                </Box>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
     </>
   );
 });

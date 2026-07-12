@@ -110,14 +110,14 @@ export default function VolumeDiscountNewRoute() {
     navState?.defaultCampaignName?.trim() || "Offer";
   const onSuccess = useCallback(() => {
     shopify.toast.show("Offer saved — syncing to Shopify");
-    navigate(adminEmbeddedPath("/app", search));
+    navigate(adminEmbeddedPath("/app/offers", search));
   }, [navigate, search, shopify]);
 
   return (
     <Suspense fallback={<IndeterminateLinearProgress fixed />}>
       <VolumeDiscountCreateView
         key={`${location.pathname}${location.search}`}
-        onBack={() => navigate(adminEmbeddedPath("/app", search))}
+        onBack={() => navigate(adminEmbeddedPath("/app/offers", search))}
         onSuccess={onSuccess}
         defaultCampaignName={defaultCampaignName}
         newOfferPreset={newOfferPreset}

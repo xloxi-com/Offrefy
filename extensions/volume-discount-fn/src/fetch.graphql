@@ -2,6 +2,9 @@
 # Requires network_access capability (Shopify Plus / approved custom apps).
 query FetchInput {
   cart {
+    vdLockedProductsAttr: attribute(key: "vd_locked_products") {
+      value
+    }
     lines {
       merchandise {
         ... on ProductVariant {

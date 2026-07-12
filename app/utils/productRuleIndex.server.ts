@@ -1,4 +1,5 @@
 import type { FunctionTierConfig } from "./volumeDiscountFunctionConfig.server";
+import type { DiscountFunctionCartTranslations } from "./storefrontTranslations";
 import {
   VOLUME_DISCOUNT_CAMPAIGN_METAFIELD_KEYS,
   VOLUME_DISCOUNT_CAMPAIGN_METAFIELD_MAX_CHARS,
@@ -176,7 +177,18 @@ export type ProductRuleMetafieldBuild = {
  */
 export function splitProductRuleIndexIntoMetafieldChunks(
   rules: ProductRuleIndex,
+  storefrontTranslations?: DiscountFunctionCartTranslations,
 ): ProductRuleMetafieldBuild {
+  const attachTranslations = (payload: Record<string, unknown>) => {
+    if (
+      storefrontTranslations &&
+      Object.keys(storefrontTranslations).length > 0
+    ) {
+      payload.storefrontTranslations = storefrontTranslations;
+    }
+    return payload;
+  };
+
   const productCount = Object.keys(rules).length;
   if (productCount === 0) {
     return {
@@ -184,7 +196,7 @@ export function splitProductRuleIndexIntoMetafieldChunks(
         key,
         value:
           i === 0
-            ? JSON.stringify({ version: 4, rules: {} })
+            ? JSON.stringify(attachTranslations({ version: 4, rules: {} }))
             : VOLUME_DISCOUNT_EMPTY_FRAGMENT_JSON,
       })),
       productCount: 0,
@@ -192,7 +204,7 @@ export function splitProductRuleIndexIntoMetafieldChunks(
     };
   }
 
-  const single = JSON.stringify({ version: 4, rules });
+  const single = JSON.stringify(attachTranslations({ version: 4, rules }));
   if (single.length <= VOLUME_DISCOUNT_CAMPAIGN_METAFIELD_MAX_CHARS) {
     return {
       chunks: VOLUME_DISCOUNT_CAMPAIGN_METAFIELD_KEYS.map((key, i) => ({
@@ -239,12 +251,14 @@ export function splitProductRuleIndexIntoMetafieldChunks(
     }
     return {
       key,
-      value: JSON.stringify({
-        version: 4,
-        fragmentTotal: total,
-        fragmentIndex: i,
-        rules: parts[i],
-      }),
+      value: JSON.stringify(
+        attachTranslations({
+          version: 4,
+          fragmentTotal: total,
+          fragmentIndex: i,
+          rules: parts[i],
+        }),
+      ),
     };
   });
 

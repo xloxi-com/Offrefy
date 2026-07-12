@@ -67,70 +67,22 @@
   opacity: var(--p-opacity-disabled);
 }
 
-/* Floating bulk actions — sits a bit above the bottom; position offset via inline transform when dragging */
-.bulkActionBar {
-  position: fixed;
-  /* Above IndexTable / scroll regions; below Polaris Modal (typically higher) */
-  z-index: 520;
-  bottom: max(4.5rem, calc(env(safe-area-inset-bottom, 0px) + 3.5rem));
-  left: 50%;
-  max-width: calc(100vw - 2rem);
-  width: max-content;
-  box-sizing: border-box;
-  pointer-events: auto;
-  cursor: grab;
-}
-
-.bulkActionBar:active {
-  cursor: grabbing;
-}
-
-.bulkActionBar :global(button),
-.bulkActionBar :global(a) {
-  cursor: pointer;
-}
-
-/* Compact hit target — sits left of “N selected” in the same row */
-.bulkBarDragHandle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  margin-inline: calc(var(--p-space-100) * -1);
-  padding: var(--p-space-100);
-  cursor: grab;
-  user-select: none;
-  touch-action: none;
-  color: var(--p-color-text-secondary);
-  border-radius: var(--p-border-radius-200);
-}
-
-.bulkBarDragHandle:active {
-  cursor: grabbing;
-}
-
-.bulkActionBarPanel {
-  min-width: min(100%, 26rem);
-  /* Crisper text while parent uses transform (avoids subpixel blur) */
-  -webkit-font-smoothing: subpixel-antialiased;
-}
-
 /*
- * Activate: Shopify-style black / inverse fill (same token pattern as Polaris
- * ContextualSaveBar tertiary actions).
+ * Polaris BulkActions grows an empty flex spacer (OuterLayout) to full width and
+ * right-aligns the menu — keep the Actions dropdown beside "N selected".
  */
-.bulkBarActivate :global(.Polaris-Button.Polaris-Button--variantTertiary) {
-  --pc-button-bg: var(--p-color-bg-fill-inverse);
-  --pc-button-bg_hover: var(--p-color-bg-fill-inverse-hover);
-  --pc-button-bg_active: var(--p-color-bg-fill-inverse-active);
-  --pc-button-bg_pressed: var(--p-color-bg-fill-inverse-active);
-  --pc-button-bg_disabled: var(--p-color-bg-fill-inverse);
-  --pc-button-color: var(--p-color-text-inverse);
-  --pc-button-color_hover: var(--p-color-text-inverse);
-  --pc-button-color_active: var(--p-color-text-inverse);
-  --pc-button-color_disabled: var(--p-color-text-secondary);
-  --pc-button-icon-fill: currentColor;
-  box-shadow: none;
+.tableWrap :global(.Polaris-BulkActions__BulkActionsPromotedActionsWrapper) {
+  flex: 0 1 auto;
+}
+
+.tableWrap :global(.Polaris-BulkActions__BulkActionsOuterLayout) {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.tableWrap :global(.Polaris-BulkActions__BulkActionsLayout) {
+  justify-content: flex-start;
 }
 
 /* RR <Link> for edit icon — tertiary icon button hit area */
@@ -152,4 +104,23 @@
 .editIconLink:focus-visible {
   outline: var(--p-border-width-050) solid var(--p-color-border-focus);
   outline-offset: var(--p-space-050);
+}
+
+.nameSortArrowWrap {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: var(--p-space-050);
+}
+
+.nameSortArrowWrap :global(.Polaris-Button) {
+  min-block-size: 18px;
+  min-inline-size: 18px;
+  block-size: 18px;
+  inline-size: 18px;
+  padding: 0;
+}
+
+.nameSortArrowWrap :global(.Polaris-Icon) {
+  width: 12px;
+  height: 12px;
 }

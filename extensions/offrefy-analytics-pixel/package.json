@@ -1,0 +1,9 @@
+{
+  "name": "offrefy-analytics-pixel",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@shopify/web-pixels-extension": "^2.0.0"
+  }
+}

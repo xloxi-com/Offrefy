@@ -18,6 +18,7 @@ export const volumeDiscountCampaignSyncSelect = {
   countdownEndsAt: true,
   createdAt: true,
   updatedAt: true,
+  shop: true,
 } satisfies Prisma.VolumeDiscountCampaignSelect;
 
 export type VolumeDiscountCampaignSyncRow = Prisma.VolumeDiscountCampaignGetPayload<{

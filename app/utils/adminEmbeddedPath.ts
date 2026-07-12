@@ -24,15 +24,15 @@ export function adminEmbeddedPathWithQuery(
   return serialized ? `${path}?${serialized}` : path;
 }
 
-/** POST target for the `app._index` route action; keeps OAuth params on the URL. */
+/** POST target for the offers list route action; keeps OAuth params on the URL. */
 export function adminEmbeddedIndexActionPath(search: string): string {
   const trimmed = search.startsWith("?") ? search.slice(1) : search;
   if (!trimmed) {
-    return "/app?index";
+    return "/app/offers?index";
   }
   const params = new URLSearchParams(trimmed);
   if (!params.has("index")) {
     params.set("index", "");
   }
-  return `/app?${params.toString()}`;
+  return `/app/offers?${params.toString()}`;
 }

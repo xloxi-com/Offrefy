@@ -1,57 +1,23 @@
 import type { LoaderFunctionArgs } from "react-router";
-import { redirect, Form, useLoaderData } from "react-router";
-
-import { login } from "../../shopify.server";
-
-import styles from "./styles.module.css";
+import { redirect, useLocation } from "react-router";
+import { NotFoundPolarisPage } from "../../components/NotFoundPolarisPage";
+import { adminEmbeddedPath } from "../../utils/adminEmbeddedPath";
+import { withShopFromEmbeddedHost } from "../../utils/embeddedShop.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const url = new URL(request.url);
+  const url = withShopFromEmbeddedHost(new URL(request.url));
+  const params = url.searchParams;
 
-  if (url.searchParams.get("shop")) {
-    throw redirect(`/app?${url.searchParams.toString()}`);
+  if (params.get("shop") || params.get("host")) {
+    throw redirect(`/app?${params.toString()}`);
   }
 
-  return { showForm: Boolean(login) };
+  return null;
 };
 
-export default function App() {
-  const { showForm } = useLoaderData<typeof loader>();
+export default function IndexRoute() {
+  const { search } = useLocation();
+  const homeHref = adminEmbeddedPath("/app", search);
 
-  return (
-    <div className={styles.index}>
-      <div className={styles.content}>
-        <h1 className={styles.heading}>A short heading about [your app]</h1>
-        <p className={styles.text}>
-          A tagline about [your app] that describes your value proposition.
-        </p>
-        {showForm && (
-          <Form className={styles.form} method="post" action="/auth/login">
-            <label className={styles.label}>
-              <span>Shop domain</span>
-              <input className={styles.input} type="text" name="shop" />
-              <span>e.g: my-shop-domain.myshopify.com</span>
-            </label>
-            <button className={styles.button} type="submit">
-              Log in
-            </button>
-          </Form>
-        )}
-        <ul className={styles.list}>
-          <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
-          </li>
-          <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
-          </li>
-          <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
-          </li>
-        </ul>
-      </div>
-    </div>
-  );
+  return <NotFoundPolarisPage homeHref={homeHref} />;
 }

@@ -250,7 +250,7 @@ export default function VolumeDiscountEditRoute() {
     <Suspense fallback={<IndeterminateLinearProgress fixed />}>
       <VolumeDiscountCreateView
         key={campaign.id}
-        onBack={() => navigate(adminEmbeddedPath("/app", search))}
+        onBack={() => navigate(adminEmbeddedPath("/app/offers", search))}
         onSuccess={onSuccess}
         initialCampaign={{
           id: campaign.id,

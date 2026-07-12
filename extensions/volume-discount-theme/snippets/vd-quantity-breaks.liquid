@@ -14,12 +14,36 @@
     endif
     assign vd_id_suffix = block.id
   endif
+
+  assign locale_base = request.locale.iso_code | split: '-' | first | downcase
+  assign vd_trans_buy = 'Buy'
+  assign vd_trans_you_save = 'You save'
+  assign vd_trans_add = 'Add'
+
+  if vd_widget and vd_widget.translations
+    assign locale_trans = vd_widget.translations[locale_base]
+    if locale_trans
+      if locale_trans.transBuy != blank
+        assign vd_trans_buy = locale_trans.transBuy
+      endif
+      if locale_trans.transYouSave != blank
+        assign vd_trans_you_save = locale_trans.transYouSave
+      endif
+      if locale_trans.transAdd != blank
+        assign vd_trans_add = locale_trans.transAdd
+      endif
+    endif
+  endif
 %}
 {% render 'vd-storefront-assets' %}
 <div
   class="vd-storefront-root volume-discount-embed"
   id="vd-shopify-{{ vd_id_suffix }}"
   data-config-id="vd-json-{{ vd_id_suffix }}"
+  data-storefront-locale="{{ request.locale.iso_code }}"
+  data-vd-trans-buy="{{ vd_trans_buy | escape }}"
+  data-vd-trans-you-save="{{ vd_trans_you_save | escape }}"
+  data-vd-trans-add="{{ vd_trans_add | escape }}"
   {% if vd_from_embed %}
     data-vd-embed-fallback="true"
   {% endif %}

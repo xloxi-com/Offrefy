@@ -6,6 +6,8 @@ import {
   getMemoryCachedJson,
   setMemoryCachedJson,
 } from "../utils/memoryCache.server";
+import { compactTranslationsForDiscountFunction } from "../utils/storefrontTranslations";
+import { loadStorefrontTranslationsForShop } from "../utils/storefrontTranslations.server";
 
 /**
  * App proxy: POST /apps/volume-discount/cart-rules
@@ -89,7 +91,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   const rules = await lookupDiscountRulesForProducts(shop, productIds, { maxProducts: 25 });
-  const responseJson = JSON.stringify({ ok: true, rules });
+  let storefrontTranslations = {};
+  try {
+    const translations = await loadStorefrontTranslationsForShop(shop);
+    storefrontTranslations = compactTranslationsForDiscountFunction(translations);
+  } catch (e) {
+    console.warn("[volume-discount] cart-rules translations load failed", e);
+  }
+  const responseJson = JSON.stringify({ ok: true, rules, storefrontTranslations });
 
   setMemoryCachedJson(memKey, responseJson, 30_000);
 

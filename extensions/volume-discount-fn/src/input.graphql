@@ -13,6 +13,12 @@
 # rules on the discount owner (as below).
 query CartInput($customerSegmentTags: [String!]!) {
   cart {
+    vdLocaleAttr: attribute(key: "vd_locale") {
+      value
+    }
+    vdLockedProductsAttr: attribute(key: "vd_locked_products") {
+      value
+    }
     buyerIdentity {
       isAuthenticated
       customer {
@@ -48,7 +54,15 @@ query CartInput($customerSegmentTags: [String!]!) {
     status
     body
   }
+  localization {
+    language {
+      isoCode
+    }
+  }
   discount {
     discountClasses
+    campaignsFrag0: metafield(namespace: "volume_discount", key: "campaigns") {
+      jsonValue
+    }
   }
 }

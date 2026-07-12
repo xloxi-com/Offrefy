@@ -6,12 +6,22 @@ import {
 } from "@shopify/shopify-app-react-router/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import { prisma } from "./db.server";
+import { ensureOffrefyAnalyticsPixel } from "./services/ensureOffrefyAnalyticsPixel.server";
+import { SHOPIFY_APP_SCOPES } from "./shopifyAppScopes";
+
+function resolveAppScopes(): string[] {
+  const fromEnv = (process.env.SCOPES ?? "")
+    .split(",")
+    .map((scope) => scope.trim())
+    .filter(Boolean);
+  return fromEnv.length > 0 ? fromEnv : [...SHOPIFY_APP_SCOPES];
+}
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
   apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
   apiVersion: ApiVersion.October25,
-  scopes: process.env.SCOPES?.split(","),
+  scopes: resolveAppScopes(),
   appUrl: process.env.SHOPIFY_APP_URL || "",
   authPathPrefix: "/auth",
   // Hoisted @shopify/shopify-api vs nested copy under shopify-app-react-router — types differ; runtime is fine.
@@ -20,6 +30,14 @@ const shopify = shopifyApp({
   distribution: AppDistribution.AppStore,
   future: {
     expiringOfflineAccessTokens: true,
+  },
+  hooks: {
+    afterAuth: async ({ session, admin }) => {
+      await shopify.registerWebhooks({ session });
+      await ensureOffrefyAnalyticsPixel(admin).catch((error) => {
+        console.warn("[Offrefy] afterAuth pixel setup", error);
+      });
+    },
   },
   ...(process.env.SHOP_CUSTOM_DOMAIN
     ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }

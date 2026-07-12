@@ -12,6 +12,26 @@ function numericTailFromGid(gid) {
   return m ? m[1] : "";
 }
 
+const MAX_CART_DISCOUNT_PRODUCTS = 25;
+
+/** @param {unknown} raw */
+function parseLockedProductIds(raw) {
+  const s = String(raw ?? "").trim();
+  if (!s) return [];
+  /** @type {string[]} */
+  const out = [];
+  const seen = new Set();
+  for (const part of s.split(",")) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const n = numericTailFromGid(trimmed) || trimmed;
+    if (!n || seen.has(n)) continue;
+    seen.add(n);
+    out.push(n);
+  }
+  return out.slice(0, MAX_CART_DISCOUNT_PRODUCTS);
+}
+
 /**
  * @param {FetchInput} input
  * @returns {CartLinesDiscountsGenerateFetchResult}
@@ -36,19 +56,28 @@ export function cartLinesDiscountsGenerateFetch(input) {
     return { request: undefined };
   }
 
-  const MAX_CART_DISCOUNT_PRODUCTS = 25;
+  const lockedIds = parseLockedProductIds(
+    input.cart?.vdLockedProductsAttr?.value,
+  );
   /** @type {string[]} */
   const productIds = [];
   const seen = new Set();
+
+  for (const n of lockedIds) {
+    if (productIds.length >= MAX_CART_DISCOUNT_PRODUCTS) break;
+    if (!n || seen.has(n)) continue;
+    seen.add(n);
+    productIds.push(n);
+  }
+
   for (const line of input.cart?.lines ?? []) {
+    if (productIds.length >= MAX_CART_DISCOUNT_PRODUCTS) break;
     const m = line.merchandise;
     if (!m?.product?.id) continue;
     const n = numericTailFromGid(m.product.id);
     if (!n || seen.has(n)) continue;
     seen.add(n);
-    if (productIds.length < MAX_CART_DISCOUNT_PRODUCTS) {
-      productIds.push(n);
-    }
+    productIds.push(n);
   }
 
   if (!productIds.length) {

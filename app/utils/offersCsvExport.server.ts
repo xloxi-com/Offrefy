@@ -35,6 +35,7 @@ export async function buildVolumeDiscountOffersCsvExport(
       countdownStartsAt: true,
       countdownEndsAt: true,
       createdAt: true,
+      updatedAt: true,
     },
   });
   const rows = filterSortOffersForListView(allRows, listView);

@@ -32,6 +32,8 @@ import {
   readDiscountVolumeMetafieldNodes,
 } from "../utils/discountMetafieldRead.server";
 import { rowSyncFingerprint } from "../utils/syncRowFingerprint.server";
+import { compactTranslationsForDiscountFunction } from "../utils/storefrontTranslations";
+import { loadStorefrontTranslationsForShop } from "../utils/storefrontTranslations.server";
 
 export type SyncShopOptions = {
   recursionDepth?: number;
@@ -39,6 +41,8 @@ export type SyncShopOptions = {
   changedCampaignIds?: string[];
   /** Sync all: scan/delete legacy automatic discounts. */
   purgeLegacy?: boolean;
+  /** Manual sync: skip fingerprint short-circuits and verify the live Shopify discount. */
+  force?: boolean;
 };
 
 type AdminGraphql = {
@@ -93,13 +97,10 @@ function collectCustomerSegmentTags(
 const READ_APP_DISCOUNT_METAFIELDS = `#graphql
   query VolumeDiscountReadAppDiscountMetafields($id: ID!) {
     discountNode(id: $id) {
-      __typename
-      ... on DiscountAutomaticApp {
-        metafields(first: 50, namespace: "volume_discount") {
-          nodes {
-            key
-            value
-          }
+      metafields(first: 50, namespace: "volume_discount") {
+        nodes {
+          key
+          value
         }
       }
     }
@@ -125,15 +126,12 @@ async function tryConfigByFilteringExistingMetafield(
       errors?: { message: string }[];
       data?: {
         discountNode?: {
-          __typename?: string;
           metafields?: { nodes?: { key: string; value: string }[] };
         } | null;
       };
     };
     if (parsed.errors?.length) return null;
-    const node = parsed.data?.discountNode;
-    if (node?.__typename !== "DiscountAutomaticApp") return null;
-    const nodes = node.metafields?.nodes ?? [];
+    const nodes = parsed.data?.discountNode?.metafields?.nodes ?? [];
     const merged = mergeCampaignConfigFromMetafieldNodes(nodes);
     if (!merged) return null;
     if (Number(merged.version) >= 4) return null;
@@ -164,6 +162,44 @@ async function tryConfigByFilteringExistingMetafield(
     return null;
   }
 }
+
+const VERIFY_DISCOUNT_NODE = `#graphql
+  query VolumeDiscountVerifyDiscountNode($id: ID!) {
+    discountNode(id: $id) {
+      id
+      discount {
+        __typename
+        ... on DiscountAutomaticApp {
+          title
+          status
+        }
+      }
+    }
+  }
+`;
+
+const FIND_SHARED_APP_DISCOUNT = `#graphql
+  query VolumeDiscountFindSharedAppDiscount($after: String) {
+    automaticDiscountNodes(first: 50, after: $after) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        id
+        automaticDiscount {
+          __typename
+          ... on DiscountAutomaticApp {
+            title
+            appDiscountType {
+              functionId
+            }
+          }
+        }
+      }
+    }
+  }
+`;
 
 const CREATE_APP_DISCOUNT = `#graphql
   mutation VolumeDiscountAppCreate($d: DiscountAutomaticAppInput!) {
@@ -200,6 +236,94 @@ function functionHandle(): string {
   );
 }
 
+const SHARED_DISCOUNT_TITLE = "Offrefy — Quantity breaks";
+
+async function discountNodeExistsInShopify(
+  admin: AdminGraphql,
+  discountNodeId: string,
+): Promise<boolean> {
+  try {
+    const res = await admin.graphql(VERIFY_DISCOUNT_NODE, {
+      variables: { id: discountNodeId },
+    });
+    const parsed = (await res.json()) as {
+      errors?: { message: string }[];
+      data?: {
+        discountNode?: {
+          id?: string;
+          discount?: { __typename?: string } | null;
+        } | null;
+      };
+    };
+    if (parsed.errors?.length) return false;
+    const node = parsed.data?.discountNode;
+    return Boolean(
+      node?.id &&
+        node.discount?.__typename === "DiscountAutomaticApp",
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Re-link DB state when the stored discount id was removed in Shopify admin. */
+async function clearStaleFunctionDiscountState(shop: string): Promise<void> {
+  await prisma.volumeDiscountShopState.deleteMany({ where: { shop } });
+  await prisma.volumeDiscountCampaign.updateMany({
+    where: { shop },
+    data: { shopifyDiscountIds: [] },
+  });
+}
+
+/**
+ * When shop state lost the discount id, adopt the shared automatic app discount
+ * if it already exists in Shopify (e.g. after DB reset).
+ */
+async function findSharedAppDiscountNodeId(
+  admin: AdminGraphql,
+): Promise<string | null> {
+  let after: string | null = null;
+  for (let page = 0; page < 20; page++) {
+    const res = await admin.graphql(FIND_SHARED_APP_DISCOUNT, {
+      variables: { after },
+    });
+    const parsed = (await res.json()) as {
+      errors?: { message: string }[];
+      data?: {
+        automaticDiscountNodes?: {
+          pageInfo?: { hasNextPage?: boolean; endCursor?: string | null };
+          nodes?: {
+            id: string;
+            automaticDiscount?: {
+              __typename?: string;
+              title?: string | null;
+            } | null;
+          }[];
+        };
+      };
+    };
+    if (parsed.errors?.length) return null;
+
+    const connection = parsed.data?.automaticDiscountNodes;
+    for (const node of connection?.nodes ?? []) {
+      if (!node?.id) continue;
+      const title = String(node.automaticDiscount?.title ?? "").trim();
+      if (
+        node.automaticDiscount?.__typename === "DiscountAutomaticApp" &&
+        (title === SHARED_DISCOUNT_TITLE ||
+          title.toLowerCase().includes("offrefy"))
+      ) {
+        return node.id;
+      }
+    }
+
+    const pi = connection?.pageInfo;
+    if (!pi?.hasNextPage || !pi.endCursor) break;
+    after = pi.endCursor;
+  }
+  return null;
+}
+
 /** Shopify returns this when the stored discount id was deleted in admin but our DB still references it. */
 function isStaleDiscountError(messages: string[]): boolean {
   const t = messages.join(" ").toLowerCase();
@@ -233,13 +357,21 @@ export async function ensureVolumeDiscountFunctionDiscount(
     }),
     prisma.volumeDiscountShopState.findUnique({ where: { shop } }),
   ]);
-  if (activeCount === 0 || state?.functionDiscountId) {
-    if (state?.functionDiscountId) {
-      verifiedShops.add(shop);
-    }
+  if (activeCount === 0) {
     return;
   }
-  await syncVolumeDiscountShop(admin, shop);
+  if (state?.functionDiscountId) {
+    const exists = await discountNodeExistsInShopify(
+      admin,
+      state.functionDiscountId,
+    );
+    if (exists) {
+      verifiedShops.add(shop);
+      return;
+    }
+    await clearStaleFunctionDiscountState(shop);
+  }
+  await syncVolumeDiscountShop(admin, shop, { force: true });
   verifiedShops.add(shop);
 }
 
@@ -254,8 +386,9 @@ export async function syncVolumeDiscountShop(
 ): Promise<{ discountIds: string[]; errors: string[] }> {
   const recursionDepth = options.recursionDepth ?? 0;
   const incrementalIds = options.changedCampaignIds;
+  const force = options.force === true;
 
-  const [activeRows, state] = await Promise.all([
+  const [activeRows, stateRow] = await Promise.all([
     prisma.volumeDiscountCampaign.findMany({
       where: { shop, status: "active" },
       orderBy: { createdAt: "asc" },
@@ -265,6 +398,8 @@ export async function syncVolumeDiscountShop(
       where: { shop },
     }),
   ]);
+
+  let state = stateRow;
 
   if (activeRows.length === 0) {
     if (state?.functionDiscountId) {
@@ -296,7 +431,7 @@ export async function syncVolumeDiscountShop(
 
   const rowFp = rowSyncFingerprint(activeRows);
 
-  if (!incrementalIds?.length && recursionDepth === 0) {
+  if (!force && !incrementalIds?.length && recursionDepth === 0) {
     try {
       const cached = await prisma.volumeDiscountStorefrontPayload.findUnique({
         where: { shop },
@@ -306,10 +441,49 @@ export async function syncVolumeDiscountShop(
         cached?.syncRowFingerprint === rowFp &&
         state?.functionDiscountId
       ) {
-        return { discountIds: [state.functionDiscountId], errors: [] };
+        const exists = await discountNodeExistsInShopify(
+          admin,
+          state.functionDiscountId,
+        );
+        if (exists) {
+          return { discountIds: [state.functionDiscountId], errors: [] };
+        }
+        await clearStaleFunctionDiscountState(shop);
+        state = null;
       }
     } catch {
       /* column may be missing until migration — continue full sync */
+    }
+  }
+
+  if (!state?.functionDiscountId) {
+    const adoptedId = await findSharedAppDiscountNodeId(admin);
+    if (adoptedId) {
+      await prisma.volumeDiscountShopState.upsert({
+        where: { shop },
+        create: { shop, functionDiscountId: adoptedId },
+        update: { functionDiscountId: adoptedId },
+      });
+      state = { shop, functionDiscountId: adoptedId };
+    }
+  } else if (force || recursionDepth > 0) {
+    const exists = await discountNodeExistsInShopify(
+      admin,
+      state.functionDiscountId,
+    );
+    if (!exists) {
+      await clearStaleFunctionDiscountState(shop);
+      const adoptedId = await findSharedAppDiscountNodeId(admin);
+      if (adoptedId) {
+        await prisma.volumeDiscountShopState.upsert({
+          where: { shop },
+          create: { shop, functionDiscountId: adoptedId },
+          update: { functionDiscountId: adoptedId },
+        });
+        state = { shop, functionDiscountId: adoptedId };
+      } else {
+        state = null;
+      }
     }
   }
 
@@ -395,6 +569,10 @@ export async function syncVolumeDiscountShop(
       productIds: c.productIds,
       tiers: c.tiers,
     }));
+
+    const discountFunctionTranslations = compactTranslationsForDiscountFunction(
+      await loadStorefrontTranslationsForShop(shop),
+    );
 
     const [{ errors: purgeErrors }, built, widgetJsonBuilt] = await Promise.all([
       options.purgeLegacy
@@ -502,13 +680,14 @@ export async function syncVolumeDiscountShop(
         const productIndex = buildProductRuleIndex({
           campaigns: campaignsForRules,
         });
-        return splitProductRuleIndexIntoMetafieldChunks(productIndex);
+        return splitProductRuleIndexIntoMetafieldChunks(
+          productIndex,
+          discountFunctionTranslations,
+        );
       }),
-      Promise.resolve().then(() =>
-        buildStorefrontWidgetJsonString(
-          activeRows,
-          config.campaigns as unknown[],
-        ),
+      buildStorefrontWidgetJsonString(
+        activeRows,
+        config.campaigns as unknown[],
       ),
     ]);
     widgetJsonFull = widgetJsonBuilt;
@@ -562,7 +741,7 @@ export async function syncVolumeDiscountShop(
   );
 
   const discountIdExisting = state?.functionDiscountId;
-  if (discountIdExisting && liveMetafieldNodes) {
+  if (!force && discountIdExisting && liveMetafieldNodes) {
     const liveFp = fingerprintMetafieldEntries(liveMetafieldNodes);
     if (liveFp === metafieldFingerprint) {
       const cachedPayload = await getVolumeDiscountStorefrontPayload(shop);
@@ -583,7 +762,7 @@ export async function syncVolumeDiscountShop(
         return { discountIds: [discountIdExisting], errors: [] };
       }
     }
-  } else if (discountIdExisting) {
+  } else if (!force && discountIdExisting) {
     const [liveFp, cachedPayload] = await Promise.all([
       readLiveDiscountMetafieldFingerprint(admin, discountIdExisting),
       getVolumeDiscountStorefrontPayload(shop),
@@ -597,7 +776,7 @@ export async function syncVolumeDiscountShop(
   }
 
   const baseInput = {
-    title: "Offrefy — Quantity breaks",
+    title: SHARED_DISCOUNT_TITLE,
     functionHandle: functionHandle(),
     discountClasses: ["PRODUCT"],
     combinesWith: {

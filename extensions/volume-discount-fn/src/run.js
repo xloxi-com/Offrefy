@@ -165,10 +165,153 @@ function interpolateDisplayTemplate(template, cart, line, tier) {
     .replace(/\{\{\s*amount\s*\}\}/gi, amountRepl);
 }
 
+/** Fast badge text for percentage tiers (avoids money/regex work in hot loops). */
+function percentDiscountMessage(label, pct, suffix) {
+  const p = formatPercentValue(pct);
+  const core =
+    label.indexOf("{{") >= 0
+      ? label.replace(/\{\{\s*discount\s*\}\}/gi, `${p}%`)
+      : label;
+  return suffix ? `${core}${suffix}` : core;
+}
+
 /** @param {string} label @param {unknown} cart @param {unknown} line @param {unknown} tier @param {string} [suffix] */
 function discountMessage(label, cart, line, tier, suffix) {
+  if (tier?.percent != null && label.indexOf("{{") >= 0) {
+    return percentDiscountMessage(label, Number(tier.percent), suffix);
+  }
   const core = interpolateDisplayTemplate(label, cart, line, tier);
   return suffix ? `${core}${suffix}` : core;
+}
+
+/** Built-in cart-badge copy when metafield translations are missing (mirrors app presets). */
+const CART_BADGE_LANG_FALLBACKS = {
+  en: {
+    cartDiscount: "{{ discount }} OFF",
+    cartDiscountQty: "(qty {{ qty }})",
+  },
+  es: {
+    cartDiscount: "{{ discount }} DE DESCUENTO",
+    cartDiscountQty: "(cant. {{ qty }})",
+  },
+  fr: {
+    cartDiscount: "{{ discount }} DE RÉDUCTION",
+    cartDiscountQty: "(qté {{ qty }})",
+  },
+  de: {
+    cartDiscount: "{{ discount }} RABATT",
+    cartDiscountQty: "(Menge {{ qty }})",
+  },
+  ta: {
+    cartDiscount: "{{ discount }} தள்ளுபடி",
+    cartDiscountQty: "(அளவு {{ qty }})",
+  },
+  nl: {
+    cartDiscount: "{{ discount }} KORTING",
+    cartDiscountQty: "(aantal {{ qty }})",
+  },
+};
+
+/** @param {unknown} locale */
+function localeBase(locale) {
+  return String(locale || "en")
+    .toLowerCase()
+    .split(/[-_]/)[0];
+}
+
+/** @param {unknown} input */
+function buyerLocale(input) {
+  const fromCart = input?.cart?.vdLocaleAttr?.value;
+  if (fromCart != null) {
+    const trimmed = String(fromCart).trim();
+    if (trimmed) return localeBase(trimmed);
+  }
+  const code = input?.localization?.language?.isoCode;
+  if (!code) return "en";
+  return localeBase(code);
+}
+
+/** @param {unknown} value */
+function normalizeCartTranslationsMap(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value;
+}
+
+/** @param {unknown} head0 @param {unknown} [extra] */
+function loadStorefrontTranslations(head0, extra) {
+  const fromHead = normalizeCartTranslationsMap(head0?.storefrontTranslations);
+  const fromExtra = normalizeCartTranslationsMap(extra);
+  return { ...fromExtra, ...fromHead };
+}
+
+/** @param {string} base @param {Record<string, unknown>} translations */
+function cartTranslationEntry(base, translations) {
+  const entry = translations[base] || translations[localeBase(base)];
+  if (entry && typeof entry === "object") return entry;
+  return CART_BADGE_LANG_FALLBACKS[base] ?? null;
+}
+
+/** @param {string} template */
+function isEnglishCartDiscountTemplate(template) {
+  const t = String(template ?? "").trim().toLowerCase();
+  return (
+    t === "{{ discount }} off" ||
+    t === "{{discount}} off" ||
+    t.includes(" off") ||
+    t.includes("(qty ")
+  );
+}
+
+/** @param {string} template */
+function isEnglishQtyTemplate(template) {
+  const t = String(template ?? "").trim().toLowerCase();
+  return t === "(qty {{ qty }})" || t.includes("(qty ");
+}
+
+/** @param {string} locale @param {Record<string, unknown>} translations @param {string} fallback */
+function resolveCartDiscountTemplate(locale, translations, fallback) {
+  const base = localeBase(locale);
+  const entry = cartTranslationEntry(base, translations);
+  if (entry) {
+    const raw =
+      entry.cartDiscount != null
+        ? entry.cartDiscount
+        : entry.transCartDiscount;
+    const text = String(raw ?? "").trim();
+    if (text && (base === "en" || !isEnglishCartDiscountTemplate(text))) {
+      return text;
+    }
+  }
+  const fb = String(fallback ?? "").trim();
+  if (base !== "en" && isEnglishCartDiscountTemplate(fb)) {
+    const preset = CART_BADGE_LANG_FALLBACKS[base];
+    if (preset?.cartDiscount) return preset.cartDiscount;
+  }
+  return fb || "{{ discount }} OFF";
+}
+
+/** @param {string} locale @param {Record<string, unknown>} translations @param {number} qty */
+function buildQtySuffix(locale, translations, qty) {
+  const n = Math.max(0, Math.floor(Number(qty)));
+  if (n <= 0) return "";
+  const base = localeBase(locale);
+  const entry = cartTranslationEntry(base, translations);
+  let template = "(qty {{ qty }})";
+  if (entry) {
+    const raw =
+      entry.cartDiscountQty != null
+        ? entry.cartDiscountQty
+        : entry.transCartDiscountQty;
+    const text = String(raw ?? "").trim();
+    if (text && (base === "en" || !isEnglishQtyTemplate(text))) {
+      template = text;
+    }
+  } else if (base !== "en") {
+    const preset = CART_BADGE_LANG_FALLBACKS[base];
+    if (preset?.cartDiscountQty) template = preset.cartDiscountQty;
+  }
+  const body = template.replace(/\{\{\s*qty\s*\}\}/gi, String(n));
+  return ` ${body}`;
 }
 
 /**
@@ -214,15 +357,21 @@ function loadCampaignsFromDiscount(discount) {
  * @param {unknown} discount
  * @param {unknown} fetchResult
  * @param {unknown[]} lines
- * @returns {Record<string, unknown>}
+ * @returns {{ rules: Record<string, unknown>, fetchTranslations: Record<string, unknown> }}
  */
 function loadProductRulesMap(discount, fetchResult, lines) {
   /** @type {Record<string, unknown>} */
   const rules = {};
+  /** @type {Record<string, unknown>} */
+  let fetchTranslations = {};
 
   const frags = CAMPAIGN_FRAG_KEYS.map((k) => discount?.[k]?.jsonValue);
   const head = frags[0];
   if (head && typeof head === "object") {
+    fetchTranslations = {
+      ...fetchTranslations,
+      ...normalizeCartTranslationsMap(head.storefrontTranslations),
+    };
     const ver = Number(head.version);
     if (ver === 4) {
       const total = Number(head.fragmentTotal) || 1;
@@ -255,6 +404,9 @@ function loadProductRulesMap(discount, fetchResult, lines) {
           if (compact) rules[pid] = compact;
         }
       }
+      fetchTranslations = normalizeCartTranslationsMap(
+        parsed?.storefrontTranslations,
+      );
     } catch {
       void 0;
     }
@@ -269,7 +421,7 @@ function loadProductRulesMap(discount, fetchResult, lines) {
     }
   }
 
-  return rules;
+  return { rules, fetchTranslations };
 }
 
 /** @param {unknown} rule */
@@ -352,6 +504,145 @@ function numericTailFromGid(gid) {
   return m ? m[1] : "";
 }
 
+/** Shopify caps automatic product discount candidates (~25 cart lines). */
+const MAX_DISCOUNT_CART_LINES = 25;
+const MAX_LOCKED_CART_PRODUCTS = 25;
+
+/** @param {unknown} raw */
+function parseLockedProductIds(raw) {
+  const s = String(raw ?? "").trim();
+  if (!s) return [];
+  /** @type {string[]} */
+  const out = [];
+  const seen = new Set();
+  for (const part of s.split(",")) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const n = numericTailFromGid(trimmed) || trimmed;
+    if (!n || seen.has(n)) continue;
+    seen.add(n);
+    out.push(n);
+  }
+  return out.slice(0, MAX_LOCKED_CART_PRODUCTS);
+}
+
+/**
+ * Pick up to 25 product IDs that may receive discounts (locked cart products first).
+ * Locked slots come from the `vd_locked_products` cart attribute (storefront sync).
+ * @param {unknown[]} lines
+ * @param {string[]} lockedProductIds
+ */
+function selectEligibleProductIds(lines, lockedProductIds) {
+  /** @type {Map<string, number>} */
+  const lockedRank = new Map();
+  lockedProductIds.forEach((id, i) => lockedRank.set(id, i));
+
+  /** @type {{ prodNum: string, sortKey: number, lineIndex: number }[]} */
+  const ranked = [];
+  /** @type {Set<string>} */
+  const seen = new Set();
+
+  for (let i = 0; i < lines.length; i++) {
+    const prodNum = numericTailFromGid(lines[i]?.merchandise?.product?.id);
+    if (!prodNum || seen.has(prodNum)) continue;
+    seen.add(prodNum);
+    ranked.push({
+      prodNum,
+      sortKey: lockedRank.has(prodNum)
+        ? lockedRank.get(prodNum)
+        : MAX_LOCKED_CART_PRODUCTS + i,
+      lineIndex: i,
+    });
+  }
+
+  ranked.sort((a, b) => a.sortKey - b.sortKey || a.lineIndex - b.lineIndex);
+
+  /** @type {Set<string>} */
+  const eligible = new Set();
+  for (const row of ranked) {
+    if (eligible.size >= MAX_LOCKED_CART_PRODUCTS) break;
+    eligible.add(row.prodNum);
+  }
+  return eligible;
+}
+
+/**
+ * Cap discounted cart lines while keeping locked products prioritized.
+ * Shopify rejects the entire automatic discount when >25 targets are returned.
+ * @param {unknown[]} lines
+ * @param {Map<string, { message: string, value: object, score: number }>} bestByLine
+ * @param {string[]} lockedProductIds
+ */
+function capDiscountCandidates(lines, bestByLine, lockedProductIds) {
+  /** @type {Map<string, number>} */
+  const lockedRank = new Map();
+  lockedProductIds.forEach((id, i) => lockedRank.set(id, i));
+
+  /** @type {{ lineId: string, cand: { message: string, value: object, score: number }, sortKey: number, lineIndex: number, prodNum: string }[]} */
+  const ranked = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const cand = bestByLine.get(line.id);
+    if (!cand) continue;
+    const prodNum = numericTailFromGid(line?.merchandise?.product?.id);
+    if (!prodNum) continue;
+
+    ranked.push({
+      lineId: line.id,
+      cand,
+      prodNum,
+      sortKey: lockedRank.has(prodNum)
+        ? lockedRank.get(prodNum)
+        : MAX_LOCKED_CART_PRODUCTS + i,
+      lineIndex: i,
+    });
+  }
+
+  ranked.sort((a, b) => a.sortKey - b.sortKey || a.lineIndex - b.lineIndex);
+
+  /** @type {Map<string, { message: string, value: object, score: number }>} */
+  const cappedBestByLine = new Map();
+  /** @type {Set<string>} */
+  const discountedProducts = new Set();
+
+  for (const row of ranked) {
+    if (cappedBestByLine.size >= MAX_DISCOUNT_CART_LINES) break;
+    const isNewProduct = !discountedProducts.has(row.prodNum);
+    if (isNewProduct && discountedProducts.size >= MAX_LOCKED_CART_PRODUCTS) {
+      continue;
+    }
+    cappedBestByLine.set(row.lineId, row.cand);
+    discountedProducts.add(row.prodNum);
+  }
+  return cappedBestByLine;
+}
+
+/**
+ * Hard cap grouped candidates — Shopify drops all discounts if limits are exceeded.
+ * @param {import("../generated/api").ProductDiscountCandidate[]} candidates
+ */
+function capGroupedCandidates(candidates) {
+  /** @type {typeof candidates} */
+  const out = [];
+  let targetCount = 0;
+
+  for (const cand of candidates) {
+    if (out.length >= MAX_DISCOUNT_CART_LINES) break;
+    const targets = [];
+    for (const t of cand.targets ?? []) {
+      if (targetCount >= MAX_DISCOUNT_CART_LINES) break;
+      targets.push(t);
+      targetCount++;
+    }
+    if (targets.length) {
+      out.push({ message: cand.message, value: cand.value, targets });
+    }
+  }
+
+  return out;
+}
+
 /**
  * Build O(1) lookup set from product/variant GIDs (includes numeric tails).
  * @param {unknown} rawIds
@@ -405,6 +696,134 @@ function lineMatchesProductIds(productId, variantId, rawIds) {
     variantId,
     buildProductIdMatchSet(rawIds),
   );
+}
+
+/** Pick highest compact tier ({m,p}) for qty without sorting/copying. */
+function pickCompactTier(tiers, qty) {
+  let best = null;
+  let bestM = 0;
+  for (const t of tiers) {
+    if (!t || typeof t !== "object") continue;
+    const m = Math.max(1, Math.floor(Number(t.m ?? 1)));
+    if (qty >= m && m >= bestM) {
+      best = t;
+      bestM = m;
+    }
+  }
+  return best;
+}
+
+/** @param {number} p */
+function formatPct(p) {
+  const n = Math.round(Number(p) * 100) / 100;
+  return Number.isInteger(n) ? String(n) : String(n);
+}
+
+/** Lean badge for percentage tiers (no regex / Intl). */
+function pctBadge(pct, qty) {
+  const q = Math.max(0, Math.floor(Number(qty)));
+  return q > 0 ? `${formatPct(pct)}% OFF (qty ${q})` : `${formatPct(pct)}% OFF`;
+}
+
+/**
+ * Fast path: per-product metafield rules only, eligible lines only, ≤25 targets.
+ * @param {unknown[]} eligibleLines
+ * @param {Record<string, unknown>} productRules
+ * @param {boolean} authenticated
+ * @param {Map<string, boolean>} customerTagMap
+ */
+function applyProductRulesLean(
+  eligibleLines,
+  productRules,
+  authenticated,
+  customerTagMap,
+) {
+  /** @type {Map<string, unknown[]>} */
+  const byProduct = new Map();
+  for (const line of eligibleLines) {
+    const m = line?.merchandise;
+    if (!m?.product?.id) continue;
+    const pid = numericTailFromGid(m.product.id);
+    if (!pid) continue;
+    const list = byProduct.get(pid);
+    if (list) list.push(line);
+    else byProduct.set(pid, [line]);
+  }
+
+  /** @type {Map<string, { message: string, value: object }>} */
+  const bestByLine = new Map();
+  let targetBudget = MAX_DISCOUNT_CART_LINES;
+
+  for (const [pid, productLines] of byProduct) {
+    if (targetBudget <= 0) break;
+    const compact = productRules[pid] ?? productRules["*"];
+    if (!compact || typeof compact !== "object") continue;
+    if (!compactCustomerMatches(compact, authenticated, customerTagMap)) continue;
+
+    const tiers = compact.t;
+    if (!Array.isArray(tiers) || !tiers.length) continue;
+
+    const qtyMode = String(compact.q ?? "v");
+
+    if (qtyMode === "v") {
+      for (const line of productLines) {
+        if (targetBudget <= 0) break;
+        const tier = pickCompactTier(tiers, line.quantity);
+        if (!tier || tier.p == null) continue;
+        const pct = Number(tier.p);
+        if (!Number.isFinite(pct) || pct <= 0 || pct > 100) continue;
+        bestByLine.set(line.id, {
+          message: pctBadge(pct, line.quantity),
+          value: { percentage: { value: pct } },
+        });
+        targetBudget--;
+      }
+      continue;
+    }
+
+    let qty = 0;
+    if (qtyMode === "p") {
+      for (const line of productLines) qty += line.quantity || 0;
+    } else {
+      for (const line of productLines) qty += line.quantity || 0;
+    }
+
+    const tier = pickCompactTier(tiers, qty);
+    if (!tier || tier.p == null) continue;
+    const pct = Number(tier.p);
+    if (!Number.isFinite(pct) || pct <= 0 || pct > 100) continue;
+    const msg = pctBadge(pct, qty);
+    const value = { percentage: { value: pct } };
+
+    for (const line of productLines) {
+      if (targetBudget <= 0) break;
+      bestByLine.set(line.id, { message: msg, value });
+      targetBudget--;
+    }
+  }
+
+  return bestByLine;
+}
+
+/**
+ * Load rules from line metafields only (skips shard merge + fetch JSON when possible).
+ * @param {unknown[]} eligibleLines
+ * @param {unknown} discount
+ * @param {unknown} fetchResult
+ */
+function loadProductRulesLean(eligibleLines, discount, fetchResult) {
+  /** @type {Record<string, unknown>} */
+  const rules = {};
+  for (const line of eligibleLines) {
+    const pid = numericTailFromGid(line?.merchandise?.product?.id);
+    const mf = line?.merchandise?.product?.tiersMetafield?.jsonValue;
+    if (pid && mf && typeof mf === "object") rules[pid] = mf;
+  }
+  if (Object.keys(rules).length > 0) {
+    return { rules, fromMetafields: true };
+  }
+  const full = loadProductRulesMap(discount, fetchResult, eligibleLines);
+  return { rules: full.rules, fromMetafields: false, fetchTranslations: full.fetchTranslations };
 }
 
 /** @param {unknown[]} tiers */
@@ -492,22 +911,83 @@ export function cartLinesDiscountsGenerateRun(input) {
 
   const classes = input.discount?.discountClasses ?? [];
   const hasProductClass = classes.includes(DiscountClass.Product);
+  if (!hasProductClass) return { operations: [] };
 
-  const productRules = loadProductRulesMap(
+  const lockedProductIds = parseLockedProductIds(
+    input?.cart?.vdLockedProductsAttr?.value,
+  );
+  const eligibleProductIds = selectEligibleProductIds(lines, lockedProductIds);
+
+  /** @type {typeof lines} */
+  const eligibleLines = [];
+  for (const line of lines) {
+    const pid = numericTailFromGid(line?.merchandise?.product?.id);
+    if (pid && eligibleProductIds.has(pid)) eligibleLines.push(line);
+  }
+  if (!eligibleLines.length) return { operations: [] };
+
+  const leanRules = loadProductRulesLean(
+    eligibleLines,
     input.discount,
     input.fetchResult,
-    lines,
   );
+  const productRules = leanRules.rules;
   const hasProductRules = Object.keys(productRules).length > 0;
 
-  const campaigns = hasProductRules
+  if (hasProductRules && leanRules.fromMetafields) {
+    const authenticated = Boolean(input.cart.buyerIdentity?.isAuthenticated);
+    /** @type {Map<string, boolean>} */
+    const customerTagMap = new Map();
+    const tagRows = input.cart.buyerIdentity?.customer?.hasTags ?? [];
+    if (Array.isArray(tagRows)) {
+      for (const row of tagRows) {
+        if (row && typeof row.tag === "string") {
+          customerTagMap.set(row.tag, Boolean(row.hasTag));
+        }
+      }
+    }
+
+    const bestByLine = applyProductRulesLean(
+      eligibleLines,
+      productRules,
+      authenticated,
+      customerTagMap,
+    );
+
+    if (!bestByLine.size) return { operations: [] };
+
+    /** @type {import("../generated/api").ProductDiscountCandidate[]} */
+    const candidates = [];
+    for (const [lineId, cand] of bestByLine) {
+      candidates.push({
+        message: cand.message,
+        value: cand.value,
+        targets: [{ cartLine: { id: lineId } }],
+      });
+    }
+
+    return {
+      operations: [
+        {
+          productDiscountsAdd: {
+            candidates: capGroupedCandidates(candidates),
+            selectionStrategy: ProductDiscountSelectionStrategy.All,
+          },
+        },
+      ],
+    };
+  }
+
+  const { rules: fullRules, fetchTranslations } = hasProductRules
+    ? { rules: productRules, fetchTranslations: leanRules.fetchTranslations ?? {} }
+    : loadProductRulesMap(input.discount, input.fetchResult, eligibleLines);
+  const hasRules = Object.keys(fullRules).length > 0;
+
+  const campaigns = hasRules
     ? []
     : loadCampaignsFromDiscount(input.discount);
 
-  if (!hasProductClass && !hasProductRules && !campaigns.length) {
-    return { operations: [] };
-  }
-  if (!hasProductRules && !campaigns.length) {
+  if (!hasRules && !campaigns.length) {
     return { operations: [] };
   }
 
@@ -517,6 +997,11 @@ export function cartLinesDiscountsGenerateRun(input) {
       ? input.discount.campaignsFrag0.jsonValue
       : null;
   const cfgVersion = Number(head0?.version) || 1;
+  const locale = buyerLocale(input);
+  const storefrontTranslations = loadStorefrontTranslations(
+    head0,
+    fetchTranslations,
+  );
 
   const authenticated = Boolean(input.cart.buyerIdentity?.isAuthenticated);
   /** @type {Map<string, boolean>} */
@@ -530,15 +1015,15 @@ export function cartLinesDiscountsGenerateRun(input) {
     }
   }
 
-  const cartTotalQty = lines.reduce((s, l) => s + (l.quantity || 0), 0);
+  const cartTotalQty = eligibleLines.reduce((s, l) => s + (l.quantity || 0), 0);
 
   /** @type {Map<string, { message: string, value: object, score: number }>} */
   const bestByLine = new Map();
 
-  if (hasProductRules) {
+  if (hasRules) {
     /** @type {Map<string, { line: typeof lines[0], productKey: string }[]>} */
     const linesByProduct = new Map();
-    for (const line of lines) {
+    for (const line of eligibleLines) {
       const m = line.merchandise;
       if (
         !m ||
@@ -557,8 +1042,8 @@ export function cartLinesDiscountsGenerateRun(input) {
 
     for (const [productKey, entries] of linesByProduct) {
       const compact =
-        productRules[productKey] ??
-        productRules["*"];
+        fullRules[productKey] ??
+        fullRules["*"];
       if (!compact || typeof compact !== "object") continue;
       if (!compactCustomerMatches(compact, authenticated, customerTagMap)) {
         continue;
@@ -567,7 +1052,11 @@ export function cartLinesDiscountsGenerateRun(input) {
       const sortedTiers = sortTiersByMinQty(expandCompactTiers(compact));
       if (!sortedTiers.length) continue;
 
-      const label = String(compact.m ?? "Volume discount");
+      const label = resolveCartDiscountTemplate(
+        locale,
+        storefrontTranslations,
+        String(compact.m ?? "Volume discount"),
+      );
       const qtyMode = Q_REVERSE[String(compact.q ?? "v")] ?? "per-variant";
 
       if (qtyMode === "total-all") {
@@ -582,7 +1071,7 @@ export function cartLinesDiscountsGenerateRun(input) {
             input.cart,
             line,
             tier,
-            ` (qty ${cartTotalQty})`,
+            buildQtySuffix(locale, storefrontTranslations, cartTotalQty),
           );
           const prev = bestByLine.get(line.id);
           if (!prev || sc > prev.score) {
@@ -602,7 +1091,7 @@ export function cartLinesDiscountsGenerateRun(input) {
             input.cart,
             line,
             tier,
-            ` (qty ${totalQty})`,
+            buildQtySuffix(locale, storefrontTranslations, totalQty),
           );
           const prev = bestByLine.get(line.id);
           if (!prev || sc > prev.score) {
@@ -644,11 +1133,11 @@ export function cartLinesDiscountsGenerateRun(input) {
   /** @type {Map<string, { message: string, value: object, score: number }>} */
   const bestByLineCampaign = bestByLine;
 
-  if (!hasProductRules) {
+  if (!hasRules) {
     /** Pre-parse cart lines once for campaign matching (avoids re-walking per campaign). */
     /** @type {{ line: typeof lines[0], variantId: string, productId: string }[]} */
     const parsedLines = [];
-    for (const line of lines) {
+    for (const line of eligibleLines) {
       const m = line.merchandise;
       if (
         !m ||
@@ -679,8 +1168,11 @@ export function cartLinesDiscountsGenerateRun(input) {
 
     const displayRaw =
       campaign.displayName != null ? String(campaign.displayName).trim() : "";
-    const label =
-      displayRaw || String(campaign.campaignName ?? "Volume discount");
+    const label = resolveCartDiscountTemplate(
+      locale,
+      storefrontTranslations,
+      displayRaw || String(campaign.campaignName ?? "Volume discount"),
+    );
 
     const scopeAll = scope === "all";
     const productIdSet =
@@ -691,6 +1183,8 @@ export function cartLinesDiscountsGenerateRun(input) {
     /** @type {{ line: typeof lines[0], variantId: string, productId: string }[]} */
     const inScope = [];
     for (const entry of parsedLines) {
+      const prodNum = numericTailFromGid(entry.productId);
+      if (prodNum && !eligibleProductIds.has(prodNum)) continue;
       let ok = scopeAll;
       if (
         !ok &&
@@ -725,14 +1219,22 @@ export function cartLinesDiscountsGenerateRun(input) {
     };
 
     if (qtyMode === "total-all") {
-      applyTier(inScope, pickTierFromSorted(sortedTiers, cartTotalQty), ` (qty ${cartTotalQty})`);
+      applyTier(
+        inScope,
+        pickTierFromSorted(sortedTiers, cartTotalQty),
+        buildQtySuffix(locale, storefrontTranslations, cartTotalQty),
+      );
     } else if (qtyMode === "per-collection") {
       const groups = Array.isArray(campaign.collectionGroups)
         ? campaign.collectionGroups
         : [];
       if (!groups.length && scope === "collections") {
         const totalQty = inScope.reduce((s, x) => s + x.line.quantity, 0);
-        applyTier(inScope, pickTierFromSorted(sortedTiers, totalQty), ` (qty ${totalQty})`);
+        applyTier(
+          inScope,
+          pickTierFromSorted(sortedTiers, totalQty),
+          buildQtySuffix(locale, storefrontTranslations, totalQty),
+        );
       } else {
         for (const g of groups) {
           if (!g || typeof g !== "object") continue;
@@ -746,7 +1248,11 @@ export function cartLinesDiscountsGenerateRun(input) {
           }
           if (!grp.length) continue;
           const totalQty = grp.reduce((s, x) => s + x.line.quantity, 0);
-          applyTier(grp, pickTierFromSorted(sortedTiers, totalQty), ` (qty ${totalQty})`);
+          applyTier(
+            grp,
+            pickTierFromSorted(sortedTiers, totalQty),
+            buildQtySuffix(locale, storefrontTranslations, totalQty),
+          );
         }
       }
     } else if (qtyMode === "per-product") {
@@ -758,7 +1264,11 @@ export function cartLinesDiscountsGenerateRun(input) {
       }
       for (const [, grp] of byProduct) {
         const totalQty = grp.reduce((s, x) => s + x.line.quantity, 0);
-        applyTier(grp, pickTierFromSorted(sortedTiers, totalQty), ` (qty ${totalQty})`);
+        applyTier(
+          grp,
+          pickTierFromSorted(sortedTiers, totalQty),
+          buildQtySuffix(locale, storefrontTranslations, totalQty),
+        );
       }
     } else {
       for (const entry of inScope) {
@@ -768,24 +1278,11 @@ export function cartLinesDiscountsGenerateRun(input) {
   }
   }
 
-  const MAX_DISCOUNT_CART_PRODUCTS = 25;
-  const discountedProductIds = new Set();
-  const cappedBestByLine = new Map();
-
-  for (const line of lines) {
-    const cand = bestByLine.get(line.id);
-    if (!cand) continue;
-    const prodId = line?.merchandise?.product?.id ?? "";
-    if (!prodId) continue;
-
-    if (
-      discountedProductIds.has(prodId) ||
-      discountedProductIds.size < MAX_DISCOUNT_CART_PRODUCTS
-    ) {
-      discountedProductIds.add(prodId);
-      cappedBestByLine.set(line.id, cand);
-    }
-  }
+  const cappedBestByLine = capDiscountCandidates(
+    eligibleLines,
+    bestByLine,
+    lockedProductIds,
+  );
 
   const grouped = new Map();
   for (const [lineId, cand] of cappedBestByLine) {
@@ -799,7 +1296,7 @@ export function cartLinesDiscountsGenerateRun(input) {
     group.targets.push({ cartLine: { id: lineId } });
   }
 
-  const candidates = Array.from(grouped.values());
+  const candidates = capGroupedCandidates(Array.from(grouped.values()));
   if (!candidates.length) return { operations: [] };
 
   return {
