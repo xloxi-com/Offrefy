@@ -1,9 +1,3 @@
 {
-  "regions": ["sin1"],
-  "crons": [
-    {
-      "path": "/api/cron/scheduled-sync",
-      "schedule": "* * * * *"
-    }
-  ]
+  "regions": ["sin1"]
 }
