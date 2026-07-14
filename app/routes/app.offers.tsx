@@ -28,6 +28,7 @@ import {
   runAfterResponse,
   scheduleVolumeDiscountShopSync,
 } from "../services/deferredShopSync.server";
+import { flushStorefrontWidgetPayloadNow } from "../services/refreshStorefrontWidget.server";
 import { syncVolumeDiscountShop } from "../services/volumeDiscountFunctionSync.server";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -187,6 +188,7 @@ export async function action({ request }: ActionFunctionArgs) {
       };
     }
     scheduleVolumeDiscountShopSync(admin, session.shop);
+    await flushStorefrontWidgetPayloadNow(admin, session.shop);
     return {
       ok: true as const,
       intent: "delete" as const,
@@ -263,6 +265,7 @@ export async function action({ request }: ActionFunctionArgs) {
       data: { status },
     });
     scheduleVolumeDiscountShopSync(admin, session.shop);
+    await flushStorefrontWidgetPayloadNow(admin, session.shop);
     return {
       ok: true as const,
       intent: intent === "bulkActivate" ? ("bulkActivate" as const) : ("bulkDeactivate" as const),

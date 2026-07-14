@@ -13,6 +13,7 @@ import type { Prisma } from "@prisma/client";
 import { IndeterminateLinearProgress } from "../components/IndeterminateLinearProgress";
 import { prisma } from "../db.server";
 import { scheduleVolumeDiscountShopSync } from "../services/deferredShopSync.server";
+import { flushStorefrontWidgetPayloadNow } from "../services/refreshStorefrontWidget.server";
 import { authenticate } from "../shopify.server";
 import { parseVolumeDiscountForm } from "../utils/volumeDiscountForm.server";
 import type { VolumeDiscountNewOfferPreset } from "../types/volumeDiscount";
@@ -91,6 +92,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   /* Draft offers are not in the aggregate discount — skip slow GraphQL (collection expansion, metafields). */
   if (d.campaignStatus === "active") {
+    await flushStorefrontWidgetPayloadNow(admin, session.shop);
     scheduleVolumeDiscountShopSync(admin, session.shop, {
       changedCampaignIds: [record.id],
     });

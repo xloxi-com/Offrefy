@@ -10,12 +10,11 @@ import {
   upsertEmptyStorefrontPayload,
 } from "../services/volumeDiscountStorefrontCache.server";
 import { cachedJsonResponse } from "../utils/httpCache.server";
-import {
-  getMemoryCachedJson,
-  setMemoryCachedJson,
-} from "../utils/memoryCache.server";
 import { volumeDiscountCampaignSyncSelect } from "../utils/volumeDiscountCampaignSelect.server";
-import { buildStorefrontWidgetForProduct } from "../utils/storefrontWidgetConfig.server";
+import {
+  buildStorefrontWidgetForProduct,
+  stampStorefrontWidgetRev,
+} from "../utils/storefrontWidgetConfig.server";
 
 /**
  * App Proxy: GET /apps/volume-discount/widget-config
@@ -25,14 +24,34 @@ import { buildStorefrontWidgetForProduct } from "../utils/storefrontWidgetConfig
 const STOREFRONT_CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Allow-Headers": "Accept, Content-Type",
+  "Access-Control-Allow-Headers": "Accept, Content-Type, If-None-Match",
 };
+
+/** Freshness first: browsers revalidate every time; ETag keeps unchanged offers fast (304). */
+const FRESH_JSON = {
+  maxAge: 0,
+  mustRevalidate: true,
+  publicCache: true,
+  staleWhileRevalidate: 0,
+} as const;
 
 function emptyJson(request: Request) {
   return cachedJsonResponse(STOREFRONT_EMPTY_PAYLOAD, {
     request,
-    maxAge: 60,
-    staleWhileRevalidate: 300,
+    ...FRESH_JSON,
+    extraHeaders: STOREFRONT_CORS_HEADERS,
+  });
+}
+
+function jsonBody(
+  request: Request,
+  body: string,
+  revHint?: string | number | null,
+) {
+  const stamped = stampStorefrontWidgetRev(body, revHint);
+  return cachedJsonResponse(stamped, {
+    request,
+    ...FRESH_JSON,
     extraHeaders: STOREFRONT_CORS_HEADERS,
   });
 }
@@ -68,17 +87,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const variantId = url.searchParams.get("variant_id")?.trim() ?? "";
 
   if (productId) {
-    const memKey = `widget:${shop}:${productId}:${variantId || ""}`;
-    const memHit = getMemoryCachedJson(memKey);
-    if (memHit) {
-      return cachedJsonResponse(memHit, {
-        request,
-        maxAge: 300,
-        staleWhileRevalidate: 3600,
-        publicCache: true,
-        extraHeaders: STOREFRONT_CORS_HEADERS,
-      });
-    }
     try {
       const value = await buildStorefrontWidgetForProduct(
         shop,
@@ -86,14 +94,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         variantId || null,
         admin ?? null,
       );
-      setMemoryCachedJson(memKey, value, 180_000);
-      return cachedJsonResponse(value, {
-        request,
-        maxAge: 300,
-        staleWhileRevalidate: 3600,
-        publicCache: true,
-        extraHeaders: STOREFRONT_CORS_HEADERS,
-      });
+      return jsonBody(request, value);
     } catch (e) {
       console.error("[volume-discount] widget-config product", e);
       return emptyJson(request);
@@ -101,31 +102,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   /* Cache-first: sync writes VolumeDiscountStorefrontPayload on every save — avoid DB + Admin on hot path. */
-  const fullMemKey = `widget:${shop}:full`;
-  const fullMemHit = getMemoryCachedJson(fullMemKey);
-  if (fullMemHit) {
-    return cachedJsonResponse(fullMemHit, {
-      request,
-      maxAge: 120,
-      staleWhileRevalidate: 900,
-      publicCache: true,
-      extraHeaders: STOREFRONT_CORS_HEADERS,
-    });
-  }
-
   const cached = await readStorefrontPayloadForServe(shop);
   if (cached) {
     if (cached.stale && admin) {
       scheduleStorefrontPayloadRevalidation(shop, admin);
     }
-    setMemoryCachedJson(fullMemKey, cached.body, 120_000);
-    return cachedJsonResponse(cached.body, {
+    return jsonBody(
       request,
-      maxAge: 120,
-      staleWhileRevalidate: 900,
-      publicCache: true,
-      extraHeaders: STOREFRONT_CORS_HEADERS,
-    });
+      cached.body,
+      cached.updatedAt ? cached.updatedAt.getTime() : null,
+    );
   }
 
   if (!admin) {
@@ -146,18 +132,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 
     const value = await rebuildAndPersistStorefrontPayload(shop, rows, admin);
-    return cachedJsonResponse(value, {
-      request,
-      maxAge: 60,
-      staleWhileRevalidate: 300,
-      extraHeaders: STOREFRONT_CORS_HEADERS,
-    });
+    return jsonBody(request, value);
   } catch (e) {
     console.error("[volume-discount] widget-config", e);
     return cachedJsonResponse(STOREFRONT_EMPTY_PAYLOAD, {
       request,
-      maxAge: 10,
-      staleWhileRevalidate: 0,
+      ...FRESH_JSON,
       extraHeaders: STOREFRONT_CORS_HEADERS,
     });
   }

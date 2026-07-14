@@ -191,22 +191,44 @@ export async function buildStorefrontWidgetJsonString(
 /** Max shop metafield JSON embedded in Liquid before switching to per-product API mode. */
 export const STOREFRONT_WIDGET_INLINE_MAX_CHARS = 180_000;
 
+/** Stamp / refresh `rev` so storefront clients can bust session + CDN caches on offer edits. */
+export function stampStorefrontWidgetRev(
+  fullWidgetJson: string,
+  rev?: string | number | null,
+): string {
+  const next = String(rev ?? Date.now());
+  try {
+    const parsed = JSON.parse(fullWidgetJson) as Record<string, unknown>;
+    parsed.rev = next;
+    return JSON.stringify(parsed);
+  } catch {
+    return fullWidgetJson;
+  }
+}
+
 export function compactStorefrontShopMetafieldPayload(fullWidgetJson: string): string {
   if (fullWidgetJson.length <= STOREFRONT_WIDGET_INLINE_MAX_CHARS) {
-    return fullWidgetJson;
+    return stampStorefrontWidgetRev(fullWidgetJson);
   }
   try {
     const parsed = JSON.parse(fullWidgetJson) as {
       translations?: StorefrontTranslationsMap;
+      rev?: string | number;
     };
     return JSON.stringify({
       version: 1,
       mode: "per_product",
       campaigns: [],
       translations: parsed.translations ?? {},
+      rev: parsed.rev ?? Date.now(),
     });
   } catch {
-    return JSON.stringify({ version: 1, mode: "per_product", campaigns: [] });
+    return JSON.stringify({
+      version: 1,
+      mode: "per_product",
+      campaigns: [],
+      rev: Date.now(),
+    });
   }
 }
 
@@ -251,11 +273,13 @@ function pickStorefrontCampaignFromPayload(
 function buildSingleCampaignWidgetPayload(
   campaign: StorefrontWidgetCampaign,
   translations: StorefrontTranslationsMap,
+  rev?: string | number | null,
 ): string {
   return JSON.stringify({
     version: 1,
     campaigns: [campaign],
     translations,
+    rev: rev ?? Date.now(),
   });
 }
 
@@ -299,8 +323,8 @@ export async function buildStorefrontWidgetForProduct(
     cachedDbReadDone = true;
     if (cachedRow?.payload) {
       fullPayload = cachedRow.payload;
-      // Cache the full storefront payload in memory to make future product page loads instant
-      setMemoryCachedJson(fullMemKey, fullPayload, 45_000);
+      // Short TTL — admin edits must show quickly across serverless instances.
+      setMemoryCachedJson(fullMemKey, fullPayload, 15_000);
     }
   }
 
@@ -315,7 +339,14 @@ export async function buildStorefrontWidgetForProduct(
         shop,
         fullPayload,
       );
-      return buildSingleCampaignWidgetPayload(camp, translations);
+      let rev: string | number | null = null;
+      try {
+        const parsed = JSON.parse(fullPayload) as { rev?: string | number };
+        rev = parsed.rev ?? null;
+      } catch {
+        void 0;
+      }
+      return buildSingleCampaignWidgetPayload(camp, translations, rev);
     }
   }
 

@@ -13,9 +13,9 @@ import { IndeterminateLinearProgress } from "../components/IndeterminateLinearPr
 import { prisma } from "../db.server";
 import { planCampaignSaveSync } from "../utils/campaignSyncDelta.server";
 import {
-  scheduleStorefrontWidgetRefresh,
   scheduleVolumeDiscountShopSync,
 } from "../services/deferredShopSync.server";
+import { flushStorefrontWidgetPayloadNow } from "../services/refreshStorefrontWidget.server";
 import { deleteAutomaticDiscounts } from "../services/volumeDiscountShopify.server";
 import { authenticate } from "../shopify.server";
 import {
@@ -208,11 +208,13 @@ export const action = async ({
   );
 
   if (syncPlan.kind === "full") {
+    /* Storefront JSON must be fresh immediately; Function sync can finish in background. */
+    await flushStorefrontWidgetPayloadNow(admin, session.shop);
     scheduleVolumeDiscountShopSync(admin, session.shop, {
       changedCampaignIds: [id],
     });
   } else if (syncPlan.kind === "storefront_only") {
-    scheduleStorefrontWidgetRefresh(admin, session.shop);
+    await flushStorefrontWidgetPayloadNow(admin, session.shop);
   }
 
   return { ok: true as const, campaignId: id, syncPending: true as const };

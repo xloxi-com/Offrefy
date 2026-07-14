@@ -20,38 +20,11 @@
   var VD_MAX_LINE_QTY = 9999;
 
   function fetchConfigKey(productId, variantId) {
-    return String(productId || "") + "|" + String(variantId || "");
-  }
-
-  var VD_CFG_CACHE_TTL_MS = 5 * 60 * 1000;
-
-  function readSessionConfigCache(key) {
-    try {
-      var raw = sessionStorage.getItem("vd_cfg_" + key);
-      if (!raw) return null;
-      var parsed = JSON.parse(raw);
-      if (!parsed || !parsed.t || Date.now() - parsed.t > VD_CFG_CACHE_TTL_MS) {
-        return null;
-      }
-      if (!parsed.v || !Array.isArray(parsed.v.campaigns) || !parsed.v.campaigns.length) {
-        return null;
-      }
-      return parsed.v;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  function writeSessionConfigCache(key, value) {
-    if (!value || !Array.isArray(value.campaigns) || !value.campaigns.length) return;
-    try {
-      sessionStorage.setItem(
-        "vd_cfg_" + key,
-        JSON.stringify({ t: Date.now(), v: value }),
-      );
-    } catch (e) {
-      void e;
-    }
+    var rev =
+      typeof window.__vdConfigRev !== "undefined" && window.__vdConfigRev != null
+        ? String(window.__vdConfigRev)
+        : "";
+    return rev + "|" + String(productId || "") + "|" + String(variantId || "");
   }
 
   function withShopQuery(url) {
@@ -64,6 +37,22 @@
       "shop=" +
       encodeURIComponent(shopDomain)
     );
+  }
+
+  function withRevQuery(url) {
+    var rev =
+      typeof window.__vdConfigRev !== "undefined" && window.__vdConfigRev != null
+        ? String(window.__vdConfigRev)
+        : "";
+    /* Always bust HTTP caches with a coarse bucket so admin edits show on next page load. */
+    var bucket = String(Math.floor(Date.now() / 5000));
+    var out =
+      url +
+      (url.indexOf("?") === -1 ? "?" : "&") +
+      "_=" +
+      encodeURIComponent(bucket);
+    if (!rev) return out;
+    return out + "&rev=" + encodeURIComponent(rev);
   }
 
   function widgetConfigQuery(productId, variantId) {
@@ -99,11 +88,15 @@
         ? String(window.__vdAppOrigin).replace(/\/$/, "")
         : "";
     if (abs) {
-      urls.push(withShopQuery(abs + "/widget-config" + q));
+      urls.push(withRevQuery(withShopQuery(abs + "/widget-config" + q)));
     }
-    urls.push(withShopQuery(root + "apps/volume-discount/widget-config" + q));
+    urls.push(
+      withRevQuery(
+        withShopQuery(root + "apps/volume-discount/widget-config" + q),
+      ),
+    );
     if (root !== "/") {
-      urls.push(withShopQuery(PROXY + q));
+      urls.push(withRevQuery(withShopQuery(PROXY + q)));
     }
     return urls;
   }
@@ -166,14 +159,6 @@
     var existing = fetchPromiseByKey.get(key);
     if (existing) return existing;
 
-    var cached = readSessionConfigCache(key);
-    if (cached) {
-      var hit = Promise.resolve(cached);
-      fetchPromiseByKey.set(key, hit);
-      if (pid) fetchPromiseByProductId.set(pid, hit);
-      return hit;
-    }
-
     var prefetchKey = window.__vdConfigPrefetchKey;
     var prefetchPromise =
       prefetchKey &&
@@ -190,6 +175,7 @@
       var cross = String(url).indexOf("://") !== -1;
       return fetch(url, {
         credentials: cross ? "omit" : "same-origin",
+        cache: "no-store",
         headers: { Accept: "application/json" },
       }).then(parseWidgetConfigResponse);
     });
@@ -198,7 +184,6 @@
       [prefetchPromise].concat(networkPromises),
     ).then(function (body) {
       if (isUsableWidgetConfig(body)) {
-        writeSessionConfigCache(key, body);
         return body;
       }
       fetchPromiseByKey.delete(key);
@@ -3814,7 +3799,7 @@
     trackImpression(campaign, root.getAttribute("data-product-id"));
     window.VolumeDiscount = window.VolumeDiscount || {};
     window.VolumeDiscount.embed = window.VolumeDiscount.embed || {};
-    window.VolumeDiscount.embed.version = "1.21.0";
+    window.VolumeDiscount.embed.version = "1.22.0";
 
     /**
      * Remove the body app-embed fallback only after a section "Quantity breaks" widget

@@ -16,6 +16,8 @@ export type CachedJsonResponseOptions = {
   extraHeaders?: Record<string, string>;
   /** When true, browsers/CDNs may cache (safe for shop+product URL keys). */
   publicCache?: boolean;
+  /** Force revalidation every request (pair with ETag for fast 304s). */
+  mustRevalidate?: boolean;
 };
 
 /**
@@ -31,17 +33,19 @@ export function cachedJsonResponse(
     request,
     extraHeaders,
     publicCache = false,
+    mustRevalidate = false,
   }: CachedJsonResponseOptions = {},
 ): Response {
   const tag = etag ?? weakEtagFromBody(body);
   const swr =
-    staleWhileRevalidate > 0
+    !mustRevalidate && staleWhileRevalidate > 0
       ? `, stale-while-revalidate=${staleWhileRevalidate}`
       : "";
   const scope = publicCache ? "public" : "private";
+  const revalidate = mustRevalidate || maxAge === 0 ? ", must-revalidate" : "";
   const headers = new Headers({
     "Content-Type": JSON_UTF8,
-    "Cache-Control": `${scope}, max-age=${maxAge}${swr}`,
+    "Cache-Control": `${scope}, max-age=${maxAge}${revalidate}${swr}`,
     ETag: tag,
     Vary: "Accept-Encoding",
     ...extraHeaders,

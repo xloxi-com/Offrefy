@@ -29,11 +29,16 @@
 %}
 <script>
 (function () {
-  var VD_ASSET_VERSION = "1.21.0";
+  var VD_ASSET_VERSION = "1.22.0";
   var APP_ORIGIN = "https://offrey.xloxi.com";
   window.__vdStorefrontLocale = {{ request.locale.iso_code | json }};
   window.__vdAssetVersion = VD_ASSET_VERSION;
   window.__vdAppOrigin = APP_ORIGIN;
+  {% if vd_widget and vd_widget.rev %}
+  window.__vdConfigRev = {{ vd_widget.rev | json }};
+  {% else %}
+  window.__vdConfigRev = "";
+  {% endif %}
   window.__vdCartBadgeTemplates = {
     locale: {{ locale_base | json }},
     discount: {{ vd_cart_discount | json }},
@@ -50,7 +55,8 @@
     var pid = {{ product.id | json }};
     var vid = {{ product.selected_or_first_available_variant.id | json }};
     if (!shop || !pid) return;
-    var key = String(pid) + "|" + String(vid || "");
+    var rev = window.__vdConfigRev ? String(window.__vdConfigRev) : "";
+    var key = rev + "|" + String(pid) + "|" + String(vid || "");
     window.__vdConfigPrefetchKey = key;
     var u =
       APP_ORIGIN +
@@ -58,9 +64,13 @@
       encodeURIComponent(shop) +
       "&product_id=" +
       encodeURIComponent(String(pid)) +
-      (vid ? "&variant_id=" + encodeURIComponent(String(vid)) : "");
+      (vid ? "&variant_id=" + encodeURIComponent(String(vid)) : "") +
+      (rev ? "&rev=" + encodeURIComponent(rev) : "") +
+      "&_=" +
+      encodeURIComponent(String(Math.floor(Date.now() / 5000)));
     window.__vdConfigPrefetch = fetch(u, {
       credentials: "omit",
+      cache: "no-store",
       headers: { Accept: "application/json" },
       priority: "high",
     })

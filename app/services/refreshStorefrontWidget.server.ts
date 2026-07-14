@@ -6,6 +6,7 @@ import {
   buildStorefrontWidgetJsonString,
   buildStorefrontWidgetValue,
   compactStorefrontShopMetafieldPayload,
+  stampStorefrontWidgetRev,
 } from "../utils/storefrontWidgetConfig.server";
 import { loadStorefrontTranslationsForShop } from "../utils/storefrontTranslations.server";
 import { patchDiscountMetafieldStorefrontTranslations } from "../utils/patchDiscountMetafieldTranslations.server";
@@ -22,6 +23,20 @@ type AdminGraphql = {
   ) => Promise<Response>;
 };
 
+function runAfterResponse(promise: Promise<unknown>): void {
+  void import("@vercel/functions")
+    .then((mod) => {
+      if (typeof mod.waitUntil === "function") {
+        mod.waitUntil(promise);
+        return;
+      }
+      void promise;
+    })
+    .catch(() => {
+      void promise;
+    });
+}
+
 const READ_DISCOUNT_MF = `#graphql
   query VolumeDiscountReadDiscountCampaigns($id: ID!) {
     discountNode(id: $id) {
@@ -34,6 +49,75 @@ const READ_DISCOUNT_MF = `#graphql
     }
   }
 `;
+
+/**
+ * Rebuild storefront widget JSON from DB and persist immediately.
+ * Call this on campaign save (awaited) so `/widget-config` is fresh before the admin toast.
+ * Shopify shop metafield push is deferred so saves stay fast.
+ */
+export async function flushStorefrontWidgetPayloadNow(
+  admin: AdminGraphql,
+  shop: string,
+): Promise<{ errors: string[] }> {
+  invalidateMemoryCachePrefix(`widget:${shop}:`);
+
+  const rows = await prisma.volumeDiscountCampaign.findMany({
+    where: { shop, status: "active" },
+    orderBy: { createdAt: "asc" },
+    select: volumeDiscountCampaignSyncSelect,
+  });
+
+  const rev = Date.now();
+  let widgetJsonFull: string;
+  try {
+    if (rows.length === 0) {
+      widgetJsonFull = stampStorefrontWidgetRev(
+        JSON.stringify({ version: 1, campaigns: [] }),
+        rev,
+      );
+    } else {
+      widgetJsonFull = stampStorefrontWidgetRev(
+        await buildStorefrontWidgetValue(rows, admin, shop),
+        rev,
+      );
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { errors: [msg] };
+  }
+
+  await prisma.volumeDiscountStorefrontPayload.upsert({
+    where: { shop },
+    create: { shop, payload: widgetJsonFull },
+    update: { payload: widgetJsonFull },
+  });
+
+  /* Liquid metafield is secondary — do not block save response. */
+  const widgetJson = compactStorefrontShopMetafieldPayload(widgetJsonFull);
+  runAfterResponse(
+    (async () => {
+      try {
+        const gid = await resolveStorefrontWidgetShopGid(admin, shop);
+        await syncShopStorefrontWidgetMetafield(
+          admin,
+          rows,
+          shop,
+          widgetJsonFull,
+          gid ?? undefined,
+          widgetJson,
+        );
+      } catch (e) {
+        console.warn(
+          "[volume-discount] deferred shop metafield push after flush",
+          shop,
+          e,
+        );
+      }
+    })(),
+  );
+
+  return { errors: [] };
+}
 
 /**
  * Updates storefront widget JSON (DB cache + shop metafield) without re-running

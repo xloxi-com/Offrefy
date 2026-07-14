@@ -1,7 +1,10 @@
 import type { VolumeDiscountCampaignStorefrontRow } from "../utils/storefrontWidgetConfig.server";
 import { volumeDiscountCampaignSyncSelect } from "../utils/volumeDiscountCampaignSelect.server";
 import { prisma } from "../db.server";
-import { buildStorefrontWidgetValue } from "../utils/storefrontWidgetConfig.server";
+import {
+  buildStorefrontWidgetValue,
+  stampStorefrontWidgetRev,
+} from "../utils/storefrontWidgetConfig.server";
 
 type StorefrontPayloadDelegate = {
   findUnique(args: {
@@ -113,10 +116,11 @@ export async function rebuildAndPersistStorefrontPayload(
   rows: VolumeDiscountCampaignStorefrontRow[],
   admin: AdminGraphql,
 ): Promise<string> {
-  const payload =
+  const raw =
     rows.length === 0
       ? EMPTY_PAYLOAD
       : await buildStorefrontWidgetValue(rows, admin, shop);
+  const payload = stampStorefrontWidgetRev(raw, Date.now());
   await prisma.volumeDiscountStorefrontPayload.upsert({
     where: { shop },
     create: { shop, payload },
