@@ -38,6 +38,7 @@ import {
 } from "react";
 import { useFetcher } from "react-router";
 
+import { CountdownTimerSettingsCard } from "./CountdownTimerSettingsCard";
 import { WidgetDisplayColorField } from "./WidgetDisplayColorField";
 import createStyles from "../styles/volume-discount-create.module.css";
 import { buyLabelsForQuantityTiers } from "../utils/buyLabelsForQuantityTiers";
@@ -52,10 +53,8 @@ import {
   BADGE_SIZE_SCALE_PERCENT_MIN,
   clampBadgeSizeScalePercent,
   isVolumeDiscountBadgePosition,
-  isVolumeDiscountCountdownTimeUnit,
   isVolumeDiscountWidgetHeaderLayout,
   isVolumeDiscountWidgetHeaderTextAlign,
-  WIDGET_HEADER_LAYOUT_OPTIONS,
   WIDGET_HEADER_LAYOUT_OPTIONS_VOLUME_TABLE,
   WIDGET_HEADER_TEXT_ALIGN_OPTIONS,
   clampFontSizeScalePercent,
@@ -65,7 +64,6 @@ import {
   clampWidgetBorderRadiusPx,
   clampWidgetFontPx,
   clampWidgetFontWeight,
-  COUNTDOWN_TIME_UNIT_OPTIONS,
   CTA_BUTTON_ACTION_OPTIONS,
   applyVolumeDiscountAppearancePreset,
   applyVolumeTableAppearancePreset,
@@ -2077,155 +2075,12 @@ export function VolumeDiscountCreateView({
                           </BlockStack>
                         </Card>
 
-                        <Card padding="400">
-                          <BlockStack gap="300">
-                            <Text as="h2" variant="headingSm">
-                              Countdown timer
-                            </Text>
-                            <Text as="p" variant="bodySm" tone="subdued">
-                              Timer label and how long it runs. End = now + duration, stored in UTC. Pill colors: Appearance.
-                            </Text>
-                            <Checkbox
-                              label="Show countdown"
-                              checked={widgetDisplay.showCountdown}
-                              onChange={(checked) =>
-                                patchWidgetDisplay({
-                                  showCountdown: checked,
-                                })
-                              }
-                            />
-                            <TextField
-                              label="Timer label"
-                              name="countdownLabel"
-                              value={widgetDisplay.countdownLabel}
-                              onChange={(v) =>
-                                patchWidgetDisplay({ countdownLabel: v })
-                              }
-                              autoComplete="off"
-                              multiline={2}
-                              placeholder="Sale end in"
-                              helpText="Beside the pill. Time rolls into days when ≥24h (e.g. 72h → 3d). Hides 0d, 0h, 0m. Minutes unit uses h/m/s under 24h."
-                            />
-                            <InlineStack gap="300" blockAlign="end" wrap>
-                              <div
-                                style={{
-                                  flex: "1 1 5.5rem",
-                                  minWidth: "4.5rem",
-                                }}
-                              >
-                                <TextField
-                                  label="Duration"
-                                  type="number"
-                                  name="countdownTimeAmount"
-                                  min={1}
-                                  autoComplete="off"
-                                  value={String(widgetDisplay.countdownTimeAmount)}
-                                  onChange={(v) => {
-                                    const n = parseInt(
-                                      String(v).replace(/\D/g, ""),
-                                      10,
-                                    );
-                                    patchWidgetDisplay({
-                                      countdownTimeAmount:
-                                        Number.isFinite(n) && n >= 1
-                                          ? Math.min(9999, n)
-                                          : 1,
-                                    });
-                                  }}
-                                />
-                              </div>
-                              <div
-                                style={{
-                                  flex: "1 1 10rem",
-                                  minWidth: "8rem",
-                                }}
-                              >
-                                <Select
-                                  label="Unit"
-                                  options={[...COUNTDOWN_TIME_UNIT_OPTIONS]}
-                                  value={widgetDisplay.countdownTimeUnit}
-                                  onChange={(v) => {
-                                    if (
-                                      isVolumeDiscountCountdownTimeUnit(v)
-                                    ) {
-                                      patchWidgetDisplay({
-                                        countdownTimeUnit: v,
-                                      });
-                                    }
-                                  }}
-                                />
-                              </div>
-                            </InlineStack>
-                            <InlineStack gap="300" blockAlign="center" wrap>
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                Changing duration or unit resets end from now.
-                                Saved in UTC with the offer.
-                              </Text>
-                              {widgetDisplay.showCountdown ? (
-                                <Button
-                                  variant="plain"
-                                  size="slim"
-                                  onClick={handleResetCountdownTimer}
-                                >
-                                  Reset timer
-                                </Button>
-                              ) : null}
-                            </InlineStack>
-                            {!isVolumeTableOffer ? (
-                              <>
-                                <Select
-                                  id="vd-widget-header-layout"
-                                  label="Heading and timer layout"
-                                  options={[...WIDGET_HEADER_LAYOUT_OPTIONS]}
-                                  value={widgetDisplay.widgetHeaderLayout}
-                                  onChange={(v) => {
-                                    if (
-                                      isVolumeDiscountWidgetHeaderLayout(v)
-                                    ) {
-                                      patchWidgetDisplay({
-                                        widgetHeaderLayout: v,
-                                      });
-                                    }
-                                  }}
-                                />
-                                <Checkbox
-                                  label="Stack heading and timer on small screens"
-                                  helpText="On: narrow phones show title and countdown stacked and centered. Off: keeps the same row layout as desktop (may wrap)."
-                                  checked={widgetDisplay.widgetHeaderMobileStack}
-                                  onChange={(checked) =>
-                                    patchWidgetDisplay({
-                                      widgetHeaderMobileStack: checked,
-                                    })
-                                  }
-                                />
-                                <Select
-                                  id="vd-widget-countdown-align"
-                                  label="Timer alignment"
-                                  helpText="Label and pill move together."
-                                  options={[...WIDGET_HEADER_TEXT_ALIGN_OPTIONS]}
-                                  value={widgetDisplay.countdownAlign}
-                                  onChange={(v) => {
-                                    if (
-                                      isVolumeDiscountWidgetHeaderTextAlign(v)
-                                    ) {
-                                      patchWidgetDisplay({ countdownAlign: v });
-                                    }
-                                  }}
-                                />
-                                <Checkbox
-                                  label="Timer before heading"
-                                  helpText="Row: timer left. Stacked: timer on top."
-                                  checked={widgetDisplay.widgetHeaderSwapOrder}
-                                  onChange={(checked) =>
-                                    patchWidgetDisplay({
-                                      widgetHeaderSwapOrder: checked,
-                                    })
-                                  }
-                                />
-                              </>
-                            ) : null}
-                          </BlockStack>
-                        </Card>
+                        <CountdownTimerSettingsCard
+                          widgetDisplay={widgetDisplay}
+                          patchWidgetDisplay={patchWidgetDisplay}
+                          onResetTimer={handleResetCountdownTimer}
+                          showLayoutControls={!isVolumeTableOffer}
+                        />
 
                         <Card padding="400">
                           <BlockStack gap="200">

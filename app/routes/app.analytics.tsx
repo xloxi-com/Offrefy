@@ -368,14 +368,15 @@ export default function AnalyticsPage() {
   const dayOfWeekMax = useMemo(
     () =>
       Math.max(
-        ...analytics.dayOfWeek.map((d) => Math.max(d.impressions, d.addToCart)),
         1,
+        ...analytics.dayOfWeek.map((d) => d.impressions + d.addToCart),
       ),
     [analytics.dayOfWeek],
   );
 
   return (
     <Page
+      fullWidth
       title="Analytics Dashboard"
       subtitle="Widget views, add-to-cart clicks, and completed Offrefy discount sales."
       compactTitle
@@ -683,9 +684,9 @@ export default function AnalyticsPage() {
                   <InlineGrid columns={7} gap="200">
                     {analytics.dayOfWeek.map((day) => {
                       const total = day.impressions + day.addToCart;
-                      const height = Math.max(
-                        8,
-                        Math.round((total / dayOfWeekMax) * 72),
+                      const height = Math.min(
+                        72,
+                        Math.max(8, Math.round((total / dayOfWeekMax) * 72)),
                       );
                       return (
                         <BlockStack key={day.label} gap="150" inlineAlign="center">
@@ -696,6 +697,7 @@ export default function AnalyticsPage() {
                               display: "flex",
                               alignItems: "flex-end",
                               justifyContent: "center",
+                              overflow: "hidden",
                             }}
                           >
                             <div

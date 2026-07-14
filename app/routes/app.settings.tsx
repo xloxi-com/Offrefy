@@ -8,7 +8,6 @@ import {
   Text,
   BlockStack,
   FormLayout,
-  Select,
   TextField,
   Divider,
   Button,
@@ -29,6 +28,7 @@ import { syncVolumeDiscountShop } from "../services/volumeDiscountFunctionSync.s
 import { refreshStorefrontWidgetForShop, pushStorefrontWidgetToShop } from "../services/refreshStorefrontWidget.server";
 import { scheduleDueSyncForShopIfNeeded } from "../services/scheduledVolumeDiscountSync.server";
 import { reconcileOrderAnalyticsForShop } from "../services/orderAnalyticsReconcile.server";
+import { runAfterResponse } from "../services/deferredShopSync.server";
 import { invalidateMemoryCachePrefix } from "../utils/memoryCache.server";
 import {
   readShopLastSyncedAt,
@@ -82,7 +82,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   );
 
   const { languages: shopLanguages, errors: shopLanguageErrors } =
-    await fetchShopPublishedLocales(admin);
+    await fetchShopPublishedLocales(admin, session.shop);
 
   const translationSync = await syncStorefrontTranslationsWithShopLanguages(
     session.shop,
@@ -98,14 +98,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (translationSync.persisted) {
     invalidateMemoryCachePrefix(`widget:${session.shop}:`);
     invalidateMemoryCachePrefix(`cart-rules:${session.shop}:`);
-    try {
-      await pushStorefrontWidgetToShop(admin, session.shop);
-    } catch (e) {
-      console.error(
-        "[volume-discount-settings] Failed refreshing storefront after translation sync",
-        e,
-      );
-    }
+    invalidateMemoryCachePrefix(`sf-translations:${session.shop}`);
+    runAfterResponse(
+      pushStorefrontWidgetToShop(admin, session.shop).catch((e) => {
+        console.error(
+          "[volume-discount-settings] Failed refreshing storefront after translation sync",
+          e,
+        );
+      }),
+    );
   }
 
   const lastSyncedAt = await resolveShopLastSyncedAt(session.shop);
@@ -442,8 +443,6 @@ export default function SettingsPage() {
     setIsLangSearchActive(true);
   }, []);
 
-  const handleSyncIntervalChange = useCallback((value: string) => setSyncInterval(value), []);
-
   // Update translation field for the active language
   const handleFieldChange = useCallback((field: keyof TranslationFields, value: string) => {
     setTranslations((prev) => {
@@ -548,17 +547,6 @@ export default function SettingsPage() {
       }
     }
   }, [translateFetcher.data, translateFetcher.state, shopify]);
-
-  const syncIntervalOptions = [
-    { label: "Disabled (Manual Sync Only)", value: "disabled" },
-    { label: "Every 5 Minutes", value: "5m" },
-    { label: "Every 15 Minutes", value: "15m" },
-    { label: "Every 30 Minutes", value: "30m" },
-    { label: "Every 1 Hour", value: "1h" },
-    { label: "Every 6 Hours", value: "6h" },
-    { label: "Every 12 Hours", value: "12h" },
-    { label: "Every 24 Hours", value: "24h" },
-  ];
 
   const isSaving = settingsFetcher.state === "submitting";
   const isSyncing = syncFetcher.state === "submitting";
@@ -780,11 +768,9 @@ export default function SettingsPage() {
             </Card>
           </Layout.Section>
 
-          {/* Right Side: Shopify Sync Schedule & Manual Actions */}
+          {/* Right Side: Manual Actions */}
           <Layout.Section variant="oneThird">
             <BlockStack gap="500">
-              
-              {/* Manual Actions Card */}
               <Card>
                 <BlockStack gap="400">
                   <Text as="h2" variant="headingMd">
@@ -812,27 +798,6 @@ export default function SettingsPage() {
                       </Text>
                     </BlockStack>
                   </InlineStack>
-                </BlockStack>
-              </Card>
-
-              {/* Sync Schedule Card */}
-              <Card>
-                <BlockStack gap="400">
-                  <Text as="h2" variant="headingMd">
-                    Shopify Sync Schedule
-                  </Text>
-                  <Text as="p" tone="subdued">
-                    Set automated background sync intervals.
-                  </Text>
-                  <Divider />
-                  <FormLayout>
-                    <Select
-                      label="Sync Interval"
-                      options={syncIntervalOptions}
-                      onChange={handleSyncIntervalChange}
-                      value={syncInterval}
-                    />
-                  </FormLayout>
                 </BlockStack>
               </Card>
 

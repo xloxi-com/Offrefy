@@ -79,13 +79,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         .catch(() => null),
     ]);
 
-  const lastSyncedAt = (await resolveShopLastSyncedAt(session.shop))?.toISOString() ?? null;
   const mainThemeId = mainThemeIdFromGid(mainThemeGid);
 
-  const productPreviewUrl = await storefrontProductPreviewUrl(
-    admin,
-    session.shop,
-  );
+  const [lastSyncedAt, productPreviewUrl, productSectionId] = await Promise.all([
+    resolveShopLastSyncedAt(session.shop).then(
+      (d) => d?.toISOString() ?? null,
+    ),
+    storefrontProductPreviewUrl(admin, session.shop),
+    fetchLiveThemeProductSectionId(admin, mainThemeGid),
+  ]);
+
   let productPreviewPath: string | null = null;
   if (productPreviewUrl) {
     try {
@@ -94,11 +97,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       productPreviewPath = null;
     }
   }
-
-  const productSectionId = await fetchLiveThemeProductSectionId(
-    admin,
-    mainThemeGid,
-  );
 
   return {
     status: {

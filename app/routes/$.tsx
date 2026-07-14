@@ -7,7 +7,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const params = url.searchParams;
 
-  if (params.get("shop") || params.get("host")) {
+  if (params.get("shop") || params.get("host") || params.get("embedded")) {
     throw redirect(`/app?${params.toString()}`);
   }
 

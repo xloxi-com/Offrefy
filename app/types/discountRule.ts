@@ -31,7 +31,12 @@ export type DiscountRuleCreateInput = {
 };
 
 export type DiscountRuleDelegate = {
-  deleteMany: (args: { where: { shop: string } }) => Promise<{ count: number }>;
+  deleteMany: (args: {
+    where:
+      | { shop: string }
+      | { shop: string; id: { in: string[] } }
+      | { shop: string; productId: { in: string[] } };
+  }) => Promise<{ count: number }>;
   createMany: (args: { data: DiscountRuleCreateInput[] }) => Promise<{ count: number }>;
   findMany: (args: {
     where: {
@@ -40,8 +45,10 @@ export type DiscountRuleDelegate = {
       productId?: { in: string[] };
     };
     select?: {
+      id?: true;
       productId?: true;
       campaignId?: true;
+      status?: true;
       tiers?: true;
       quantityCondition?: true;
       customerType?: true;
@@ -49,5 +56,22 @@ export type DiscountRuleDelegate = {
       displayName?: true;
       campaignName?: true;
     };
-  }) => Promise<DiscountRuleRecord[]>;
+  }) => Promise<
+    Array<
+      Pick<
+        DiscountRuleRecord,
+        | "id"
+        | "productId"
+        | "campaignId"
+        | "status"
+        | "tiers"
+        | "quantityCondition"
+        | "customerType"
+        | "customerTags"
+        | "displayName"
+        | "campaignName"
+      > &
+        Partial<DiscountRuleRecord>
+    >
+  >;
 };

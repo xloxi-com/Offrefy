@@ -87,6 +87,7 @@ type CampaignForRules = {
 /**
  * Expand campaigns into per-product rows and upsert `DiscountRule`.
  * Duplicate product ids across campaigns: keep the campaign with the better tier at qty 1.
+ * Diffs against existing rows so unchanged catalogs skip delete+rewrite.
  */
 export async function rebuildDiscountRulesForShop(
   shop: string,
@@ -122,11 +123,11 @@ export async function rebuildDiscountRulesForShop(
     }
   }
 
-  await discountRuleDb().deleteMany({ where: { shop } });
-
-  const rows: import("../types/discountRule").DiscountRuleCreateInput[] = [];
+  const desiredRows: import("../types/discountRule").DiscountRuleCreateInput[] =
+    [];
+  const desiredFingerprint = new Map<string, string>();
   for (const [productId, campaign] of winner) {
-    rows.push({
+    const row = {
       shop,
       campaignId: campaign.id,
       productId,
@@ -137,15 +138,85 @@ export async function rebuildDiscountRulesForShop(
       customerTags: campaign.customerTags as Prisma.InputJsonValue,
       displayName: campaign.displayName ?? null,
       campaignName: campaign.campaignName,
+    };
+    desiredRows.push(row);
+    desiredFingerprint.set(productId, discountRuleFingerprint(row));
+  }
+
+  const existing = await discountRuleDb().findMany({
+    where: { shop },
+    select: {
+      id: true,
+      productId: true,
+      campaignId: true,
+      status: true,
+      tiers: true,
+      quantityCondition: true,
+      customerType: true,
+      customerTags: true,
+      displayName: true,
+      campaignName: true,
+    },
+  });
+
+  const existingByProduct = new Map(
+    existing.map((row) => [row.productId, row]),
+  );
+  const idsToDelete: string[] = [];
+  const rowsToCreate: import("../types/discountRule").DiscountRuleCreateInput[] =
+    [];
+
+  for (const row of desiredRows) {
+    const prev = existingByProduct.get(row.productId);
+    existingByProduct.delete(row.productId);
+    if (prev && discountRuleFingerprint(prev) === desiredFingerprint.get(row.productId)) {
+      continue;
+    }
+    if (prev?.id) idsToDelete.push(prev.id);
+    rowsToCreate.push(row);
+  }
+
+  for (const leftover of existingByProduct.values()) {
+    if (leftover.id) idsToDelete.push(leftover.id);
+  }
+
+  const DELETE_BATCH = 500;
+  for (let i = 0; i < idsToDelete.length; i += DELETE_BATCH) {
+    await discountRuleDb().deleteMany({
+      where: { shop, id: { in: idsToDelete.slice(i, i + DELETE_BATCH) } },
     });
   }
 
-  const BATCH = 500;
-  for (let i = 0; i < rows.length; i += BATCH) {
-    await discountRuleDb().createMany({ data: rows.slice(i, i + BATCH) });
+  const CREATE_BATCH = 500;
+  for (let i = 0; i < rowsToCreate.length; i += CREATE_BATCH) {
+    await discountRuleDb().createMany({
+      data: rowsToCreate.slice(i, i + CREATE_BATCH),
+    });
   }
 
-  return { ruleCount: rows.length };
+  return { ruleCount: desiredRows.length };
+}
+
+function discountRuleFingerprint(row: {
+  campaignId: string;
+  status?: string;
+  tiers: unknown;
+  quantityCondition: string;
+  customerType: string;
+  customerTags: unknown;
+  displayName?: string | null;
+  campaignName?: string | null;
+}): string {
+  return JSON.stringify({
+    campaignId: row.campaignId,
+    status: row.status ?? "active",
+    tiers: row.tiers,
+    quantityCondition: row.quantityCondition,
+    customerType: row.customerType,
+    customerTags: row.customerTags,
+    displayName: row.displayName ?? null,
+    campaignName: row.campaignName ?? null,
+  });
 }
 
 /** Lookup active rules for cart product ids (used by app-proxy / network-access fetch). */

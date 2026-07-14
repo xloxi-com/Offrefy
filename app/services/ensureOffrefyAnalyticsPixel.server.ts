@@ -19,6 +19,10 @@ const WEB_PIXEL_CREATE = `#graphql
     }
   }`;
 
+/** Avoid re-hitting Admin GraphQL on every analytics visit within a warm instance. */
+const ensuredUntil = new Map<string, number>();
+const ENSURE_TTL_MS = 30 * 60 * 1000;
+
 export async function ensureOffrefyAnalyticsPixel(
   admin: AdminGraphql,
 ): Promise<void> {
@@ -27,6 +31,10 @@ export async function ensureOffrefyAnalyticsPixel(
     console.warn("[Offrefy] ensureOffrefyAnalyticsPixel: missing SHOPIFY_APP_URL");
     return;
   }
+
+  const now = Date.now();
+  const until = ensuredUntil.get(appUrl) ?? 0;
+  if (until > now) return;
 
   try {
     const res = await admin.graphql(WEB_PIXEL_CREATE, {
@@ -50,14 +58,16 @@ export async function ensureOffrefyAnalyticsPixel(
       ...userErrors.map((error) => error.message).filter(Boolean),
     ];
 
-    if (
-      messages.length &&
-      !messages.some((message) =>
-        /already|taken|exists/i.test(String(message)),
-      )
-    ) {
+    const alreadyExists = messages.some((message) =>
+      /already|taken|exists/i.test(String(message)),
+    );
+
+    if (messages.length && !alreadyExists) {
       console.warn("[Offrefy] ensureOffrefyAnalyticsPixel", messages.join("; "));
+      return;
     }
+
+    ensuredUntil.set(appUrl, now + ENSURE_TTL_MS);
   } catch (error) {
     console.warn("[Offrefy] ensureOffrefyAnalyticsPixel", error);
   }

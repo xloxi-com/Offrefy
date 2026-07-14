@@ -5,10 +5,10 @@ import { normalizeCatalogIdKey } from "./discountRules.server";
 import { discountRuleDb } from "./discountRuleDb.server";
 import { getVolumeDiscountStorefrontPayload } from "../services/volumeDiscountStorefrontCache.server";
 import { volumeDiscountCampaignSyncSelect } from "./volumeDiscountCampaignSelect.server";
-import type { DiscountRuleRecord } from "../types/discountRule";
-import { getMemoryCachedJson, setMemoryCachedJson, invalidateMemoryCachePrefix } from "./memoryCache.server";
+import { getMemoryCachedJson, setMemoryCachedJson } from "./memoryCache.server";
 import {
   loadStorefrontTranslationsForShop,
+  parseTranslationsFromWidgetPayload,
 } from "./storefrontTranslations.server";
 import type { StorefrontTranslationsMap } from "./storefrontTranslations";
 
@@ -261,7 +261,12 @@ function buildSingleCampaignWidgetPayload(
 
 async function resolveStorefrontTranslationsForWidget(
   shop: string,
+  widgetPayload?: string | null,
 ): Promise<StorefrontTranslationsMap> {
+  if (widgetPayload) {
+    const fromPayload = parseTranslationsFromWidgetPayload(widgetPayload);
+    if (Object.keys(fromPayload).length > 0) return fromPayload;
+  }
   return loadStorefrontTranslationsForShop(shop);
 }
 
@@ -306,7 +311,10 @@ export async function buildStorefrontWidgetForProduct(
       variantKey || null,
     );
     if (camp) {
-      const translations = await resolveStorefrontTranslationsForWidget(shop);
+      const translations = await resolveStorefrontTranslationsForWidget(
+        shop,
+        fullPayload,
+      );
       return buildSingleCampaignWidgetPayload(camp, translations);
     }
   }
@@ -326,7 +334,7 @@ export async function buildStorefrontWidgetForProduct(
   });
 
   const ruleByProductId = new Map(
-    rules.map((r: DiscountRuleRecord) => [r.productId, r.campaignId]),
+    rules.map((r) => [r.productId, r.campaignId] as const),
   );
 
   let campaignId =
@@ -383,7 +391,10 @@ export async function buildStorefrontWidgetForProduct(
         variantKey || null,
       );
       if (camp) {
-        const translations = await resolveStorefrontTranslationsForWidget(shop);
+        const translations = await resolveStorefrontTranslationsForWidget(
+          shop,
+          fallbackPayload,
+        );
         return buildSingleCampaignWidgetPayload(camp, translations);
       }
     }

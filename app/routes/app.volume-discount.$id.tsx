@@ -1,5 +1,5 @@
 import { useAppBridge } from "@shopify/app-bridge-react";
-import { Suspense, useCallback } from "react";
+import { lazy, Suspense, useCallback } from "react";
 import type {
   ActionFunctionArgs,
   HeadersFunction,
@@ -9,7 +9,6 @@ import { useLoaderData, useLocation, useNavigate } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import type { Prisma } from "@prisma/client";
 
-import { VolumeDiscountCreateView } from "../components/VolumeDiscountCreateView";
 import { IndeterminateLinearProgress } from "../components/IndeterminateLinearProgress";
 import { prisma } from "../db.server";
 import { planCampaignSaveSync } from "../utils/campaignSyncDelta.server";
@@ -34,6 +33,12 @@ import {
   type VolumeDiscountWidgetDisplay,
 } from "../utils/widgetDisplay";
 import { adminEmbeddedPath } from "../utils/adminEmbeddedPath";
+
+const VolumeDiscountCreateView = lazy(() =>
+  import("../components/VolumeDiscountCreateView").then((m) => ({
+    default: m.VolumeDiscountCreateView,
+  })),
+);
 
 export type VolumeDiscountEditLoaderData = {
   campaign: {

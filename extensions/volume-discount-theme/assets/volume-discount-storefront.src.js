@@ -536,53 +536,65 @@
     });
   }
 
+  var vdLockedSyncFromEventsTimer = 0;
+  function scheduleLockedProductsSyncFromCartEvent() {
+    /* Interceptor already owns locked sync after fetch mutations — avoid triple cart.js. */
+    if (vdCartAttrSyncBusy || vdLockedSyncInFlight) return;
+    if (vdLockedSyncFromEventsTimer) return;
+    vdLockedSyncFromEventsTimer = setTimeout(function () {
+      vdLockedSyncFromEventsTimer = 0;
+      if (vdCartAttrSyncBusy || vdLockedSyncInFlight) return;
+      syncCartLockedProductsAttribute(null);
+    }, 120);
+  }
+
   function bindCartDrawerDiscountLabelPatching() {
     if (window.__vdCartBadgePatchBound) return;
     window.__vdCartBadgePatchBound = true;
     ["cart:updated", "cart:change", "cart:refresh"].forEach(function (evt) {
       document.documentElement.addEventListener(evt, scheduleCartDrawerDiscountLabelPatch);
-      document.documentElement.addEventListener(evt, function () {
-        var prevLocked = vdLastSyncedLockedProducts;
-        syncCartLockedProductsAttribute(null).then(function (cart) {
-          if (!cart) return;
-          if (vdLastSyncedLockedProducts !== prevLocked) {
-            dispatchCartRefresh(cart);
-          }
-        });
-      });
     });
+    /* One debounced locked sync fallback — never re-dispatch cart events (avoids feedback loops). */
+    document.documentElement.addEventListener(
+      "cart:updated",
+      scheduleLockedProductsSyncFromCartEvent,
+    );
     if (typeof MutationObserver !== "undefined") {
-      var observer = new MutationObserver(function (mutations) {
-        for (var i = 0; i < mutations.length; i++) {
-          var t = mutations[i].target;
-          if (
-            t &&
-            t.closest &&
-            (t.closest("cart-drawer") || t.closest("#CartDrawer"))
-          ) {
-            scheduleCartDrawerDiscountLabelPatch();
-            return;
-          }
-        }
-      });
+      var drawerObserver = null;
+      var openWatchObserver = null;
       var observeDrawer = function () {
         var drawer = document.querySelector("cart-drawer");
         if (!drawer) return;
-        observer.observe(drawer, { childList: true, subtree: true });
+        if (drawerObserver) {
+          try {
+            drawerObserver.disconnect();
+          } catch (e) {
+            void e;
+          }
+        }
+        drawerObserver = new MutationObserver(function () {
+          scheduleCartDrawerDiscountLabelPatch();
+        });
+        drawerObserver.observe(drawer, { childList: true, subtree: true });
         if (drawer.getAttribute("data-vd-open-watch") === "1") return;
         drawer.setAttribute("data-vd-open-watch", "1");
-        new MutationObserver(function () {
+        if (openWatchObserver) {
+          try {
+            openWatchObserver.disconnect();
+          } catch (e2) {
+            void e2;
+          }
+        }
+        openWatchObserver = new MutationObserver(function () {
           var isOpen =
             drawer.hasAttribute("open") ||
             drawer.classList.contains("is-open") ||
             drawer.classList.contains("active");
           if (!isOpen) return;
-          handleStorefrontLocaleChange();
-          refreshCartDrawerForLocaleChange();
           scheduleCartDrawerDiscountLabelPatch();
           setTimeout(scheduleCartDrawerDiscountLabelPatch, 120);
-          setTimeout(scheduleCartDrawerDiscountLabelPatch, 450);
-        }).observe(drawer, {
+        });
+        openWatchObserver.observe(drawer, {
           attributes: true,
           attributeFilter: ["open", "class"],
         });
@@ -597,7 +609,6 @@
   function handleStorefrontLocaleChange() {
     var next = resolveStorefrontLocale(null) || "en";
     if (next === vdLastKnownStorefrontLocale) {
-      scheduleCartDrawerDiscountLabelPatch();
       return;
     }
     vdLastKnownStorefrontLocale = next;
@@ -689,8 +700,6 @@
       },
       true,
     );
-
-    setInterval(handleStorefrontLocaleChange, 800);
   }
 
   function tierStringsFromRoot(root) {
@@ -929,7 +938,10 @@
   }
 
   /** Keep discount slots stable: already-locked products stay; only new products fill open slots. */
+  var vdLockedSyncInFlight = null;
   function syncCartLockedProductsAttribute(cart) {
+    if (!cart && vdLockedSyncInFlight) return vdLockedSyncInFlight;
+
     var work = cart
       ? Promise.resolve(cart)
       : fetch(cartJsUrl(), {
@@ -939,7 +951,7 @@
           return r.ok ? r.json() : null;
         });
 
-    return work.then(function (c) {
+    var promise = work.then(function (c) {
       if (!c) return null;
       var next = computeLockedProductIds(c);
       var nextStr = next.join(",");
@@ -964,6 +976,14 @@
           return c;
         });
     });
+
+    function clearLockedInFlight() {
+      if (vdLockedSyncInFlight === promise) vdLockedSyncInFlight = null;
+    }
+    promise.then(clearLockedInFlight, clearLockedInFlight);
+
+    if (!cart) vdLockedSyncInFlight = promise;
+    return promise;
   }
 
   var vdCartAttrSyncBusy = false;
@@ -978,7 +998,7 @@
     );
   }
 
-  function isVdLockedProductsOnlyUpdate(init) {
+  function isVdAttributeOnlyCartUpdate(init, attrName) {
     try {
       var body = init && init.body;
       if (!body || typeof body !== "string") return false;
@@ -986,11 +1006,19 @@
       var attrs = parsed && parsed.attributes;
       if (!attrs || typeof attrs !== "object") return false;
       var keys = Object.keys(attrs);
-      return keys.length === 1 && keys[0] === VD_LOCKED_PRODUCTS_ATTR;
+      return keys.length === 1 && keys[0] === attrName;
     } catch (e) {
       void e;
       return false;
     }
+  }
+
+  function isVdLockedProductsOnlyUpdate(init) {
+    return isVdAttributeOnlyCartUpdate(init, VD_LOCKED_PRODUCTS_ATTR);
+  }
+
+  function isVdLocaleOnlyUpdate(init) {
+    return isVdAttributeOnlyCartUpdate(init, VD_CART_LOCALE_ATTR);
   }
 
   /** Sync locked discount slots immediately after any cart mutation (theme /cart/add.js, etc.). */
@@ -1008,7 +1036,9 @@
             ? input.url
             : "";
       var isMutation =
-        isCartMutationUrl(url) && !isVdLockedProductsOnlyUpdate(init);
+        isCartMutationUrl(url) &&
+        !isVdLockedProductsOnlyUpdate(init) &&
+        !isVdLocaleOnlyUpdate(init);
       var promise = nativeFetch.apply(this, arguments);
       if (!isMutation) return promise;
 
@@ -1038,6 +1068,11 @@
       return Promise.resolve();
     }
     vdLastSyncedCartLocale = locale;
+    try {
+      sessionStorage.setItem("vd_locale_attr", locale);
+    } catch (e) {
+      void e;
+    }
     var attrs = {};
     attrs[VD_CART_LOCALE_ATTR] = locale;
     return fetch(shopifyRoutesRoot() + "cart/update.js", {
@@ -1066,14 +1101,9 @@
   function dispatchCartRefresh(cart) {
     try {
       var detail = { cart: cart };
+      /* One primary event — themes listen to cart:updated; avoid triple fan-out storms. */
       document.documentElement.dispatchEvent(
         new CustomEvent("cart:updated", { bubbles: true, detail: detail }),
-      );
-      document.documentElement.dispatchEvent(
-        new CustomEvent("cart:change", { bubbles: true, detail: detail }),
-      );
-      document.documentElement.dispatchEvent(
-        new CustomEvent("cart:refresh", { bubbles: true, detail: detail }),
       );
       window.dispatchEvent(new CustomEvent("cart:updated", { detail: cart }));
     } catch (e) {
@@ -1083,7 +1113,7 @@
   }
 
   function fetchCartAndRefresh() {
-    return syncCartLocaleAttribute(true).then(function () {
+    return syncCartLocaleAttribute(false).then(function () {
       return fetch(cartJsUrl(), {
         credentials: "same-origin",
         headers: { Accept: "application/json" },
@@ -1709,9 +1739,32 @@
     hideThemeNativeQuantitySelectors();
   }
 
+  var vdHidePurchaseUiScheduled = false;
   function ensureThemePurchaseUiHideObserver() {
     if (vdHidePurchaseUiObserver || typeof MutationObserver === "undefined") return;
-    vdHidePurchaseUiObserver = new MutationObserver(applyThemePurchaseUiHides);
+    vdHidePurchaseUiObserver = new MutationObserver(function (mutations) {
+      for (var i = 0; i < mutations.length; i++) {
+        var t = mutations[i].target;
+        if (
+          t &&
+          t.closest &&
+          (t.closest(".vd-storefront-root") ||
+            t.closest("cart-drawer") ||
+            t.closest("#CartDrawer") ||
+            t.closest("cart-notification") ||
+            t.closest("#cart-notification"))
+        ) {
+          continue;
+        }
+        if (vdHidePurchaseUiScheduled) return;
+        vdHidePurchaseUiScheduled = true;
+        requestAnimationFrame(function () {
+          vdHidePurchaseUiScheduled = false;
+          applyThemePurchaseUiHides();
+        });
+        return;
+      }
+    });
     vdHidePurchaseUiObserver.observe(document.body, { childList: true, subtree: true });
   }
 
@@ -3783,26 +3836,47 @@
     fetchConfig(productId, variantId).then(finishFetch);
   }
 
-  function scan() {
+  function scan(options) {
+    var opts = options || {};
+    var syncCartSideEffects = opts.syncCart !== false;
     installCartMutationInterceptor();
     bindCartDrawerDiscountLabelPatching();
     bindStorefrontLocaleWatcher();
     vdLastKnownStorefrontLocale = resolveStorefrontLocale(null) || "en";
     refreshCartBadgeTemplatesForLocale();
-    syncCartLocaleAttribute(true).then(function () {
-      return syncCartLockedProductsAttribute(null);
-    }).then(function () {
+    try {
+      var storedLocale = sessionStorage.getItem("vd_locale_attr");
+      if (storedLocale && !vdLastSyncedCartLocale) {
+        vdLastSyncedCartLocale = storedLocale;
+      }
+    } catch (e) {
+      void e;
+    }
+    if (syncCartSideEffects) {
+      syncCartLocaleAttribute(false)
+        .then(function () {
+          return syncCartLockedProductsAttribute(null);
+        })
+        .then(function () {
+          scheduleCartDrawerDiscountLabelPatch();
+        });
+    } else {
       scheduleCartDrawerDiscountLabelPatch();
-    });
+    }
     document.querySelectorAll(".vd-storefront-root").forEach(function (el) {
       runWidget(el);
     });
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", scan);
+    document.addEventListener("DOMContentLoaded", function () {
+      scan({ syncCart: true });
+    });
   } else {
-    scan();
+    scan({ syncCart: true });
   }
-  document.addEventListener("shopify:section:load", scan);
+  /* Section remounts only need widget roots — avoid cart/update storm on every variant section swap. */
+  document.addEventListener("shopify:section:load", function () {
+    scan({ syncCart: false });
+  });
 })();

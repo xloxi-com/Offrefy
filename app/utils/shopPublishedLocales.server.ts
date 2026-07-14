@@ -54,9 +54,21 @@ function formatShopLanguageOption(sl: ShopLocaleNode): ShopLanguageOption {
  * Returns languages enabled on the merchant's Shopify store.
  * Requires `read_locales` (or `read_markets_home`) Admin API scope.
  */
+const localesCache = new Map<
+  string,
+  { languages: ShopLanguageOption[]; errors: string[]; expiresAt: number }
+>();
+const LOCALES_TTL_MS = 10 * 60 * 1000;
+
 export async function fetchShopPublishedLocales(
   admin: AdminGraphql,
+  cacheKey = "default",
 ): Promise<{ languages: ShopLanguageOption[]; errors: string[] }> {
+  const cached = localesCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return { languages: cached.languages, errors: cached.errors };
+  }
+
   const errors: string[] = [];
 
   try {
@@ -94,6 +106,12 @@ export async function fetchShopPublishedLocales(
     languages.sort((a, b) => {
       if (a.primary !== b.primary) return a.primary ? -1 : 1;
       return a.label.localeCompare(b.label);
+    });
+
+    localesCache.set(cacheKey, {
+      languages,
+      errors,
+      expiresAt: Date.now() + LOCALES_TTL_MS,
     });
 
     return { languages, errors };

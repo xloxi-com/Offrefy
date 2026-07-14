@@ -13,16 +13,14 @@ export async function readShopLastSyncedAt(shop: string): Promise<Date | null> {
 
 /** Resolve the timestamp shown in Settings / setup (settings row, then payload cache). */
 export async function resolveShopLastSyncedAt(shop: string): Promise<Date | null> {
-  const fromSettings = await readShopLastSyncedAt(shop);
-  if (fromSettings) return fromSettings;
-
-  const payloadRows = await prisma.$queryRaw<Array<{ updatedAt: Date }>>`
-    SELECT "updatedAt"
-    FROM "VolumeDiscountStorefrontPayload"
-    WHERE "shop" = ${shop}
+  const rows = await prisma.$queryRaw<Array<{ lastSyncedAt: Date | null }>>`
+    SELECT COALESCE(s."lastSyncedAt", p."updatedAt") AS "lastSyncedAt"
+    FROM (SELECT ${shop}::text AS shop) q
+    LEFT JOIN "VolumeDiscountSettings" s ON s."shop" = q.shop
+    LEFT JOIN "VolumeDiscountStorefrontPayload" p ON p."shop" = q.shop
     LIMIT 1
   `;
-  return payloadRows[0]?.updatedAt ?? null;
+  return rows[0]?.lastSyncedAt ?? null;
 }
 
 /** Mark that a sync attempt completed for this shop. */

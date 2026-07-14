@@ -25,7 +25,7 @@
 %}
 <script>
 (function () {
-  var VD_ASSET_VERSION = "1.19.9";
+  var VD_ASSET_VERSION = "1.20.0";
   window.__vdStorefrontLocale = {{ request.locale.iso_code | json }};
   window.__vdAssetVersion = VD_ASSET_VERSION;
   window.__vdCartBadgeTemplates = {
@@ -49,6 +49,9 @@
     }
     if (!loc) loc = "en";
     loc = String(loc).toLowerCase().split("-")[0];
+    try {
+      if (sessionStorage.getItem("vd_locale_attr") === loc) return;
+    } catch (e) {}
     var root = "/";
     try {
       if (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) {
@@ -61,7 +64,13 @@
       credentials: "same-origin",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ attributes: { vd_locale: loc } }),
-    }).catch(function () {});
+    })
+      .then(function () {
+        try {
+          sessionStorage.setItem("vd_locale_attr", loc);
+        } catch (e) {}
+      })
+      .catch(function () {});
   })();
 
   var scriptSrc = {{ 'volume-discount-storefront.js' | asset_url | json }};

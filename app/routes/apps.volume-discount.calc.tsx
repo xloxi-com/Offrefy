@@ -129,11 +129,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   }
 
-  console.log("[CALC REQUEST]:", {
-    shop,
-    body,
-  });
-
   const campaigns = await loadCampaignsForCalc(shop, body);
 
   try {

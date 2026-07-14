@@ -62,13 +62,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   }
 
-  console.log("[CART-RULES REQUEST]:", {
-    shop,
-    body,
-  });
-
   const productIds = Array.isArray(body.product_ids)
-    ? [...new Set(body.product_ids.map(String).filter(Boolean))].slice(0, 25)
+    ? [...new Set(body.product_ids.map(String).filter(Boolean))].slice(0, 24)
     : [];
 
   if (productIds.length === 0) {
@@ -90,14 +85,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   }
 
-  const rules = await lookupDiscountRulesForProducts(shop, productIds, { maxProducts: 25 });
-  let storefrontTranslations = {};
-  try {
-    const translations = await loadStorefrontTranslationsForShop(shop);
-    storefrontTranslations = compactTranslationsForDiscountFunction(translations);
-  } catch (e) {
-    console.warn("[volume-discount] cart-rules translations load failed", e);
-  }
+  const [rules, storefrontTranslations] = await Promise.all([
+    lookupDiscountRulesForProducts(shop, productIds, { maxProducts: 24 }),
+    loadStorefrontTranslationsForShop(shop)
+      .then((translations) =>
+        compactTranslationsForDiscountFunction(translations),
+      )
+      .catch((e) => {
+        console.warn("[volume-discount] cart-rules translations load failed", e);
+        return {};
+      }),
+  ]);
   const responseJson = JSON.stringify({ ok: true, rules, storefrontTranslations });
 
   setMemoryCachedJson(memKey, responseJson, 30_000);

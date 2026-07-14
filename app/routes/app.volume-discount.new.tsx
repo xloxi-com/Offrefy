@@ -1,5 +1,5 @@
 import { useAppBridge } from "@shopify/app-bridge-react";
-import { Suspense, useCallback } from "react";
+import { lazy, Suspense, useCallback } from "react";
 import type {
   ActionFunctionArgs,
   HeadersFunction,
@@ -10,7 +10,6 @@ import { useLoaderData, useLocation, useNavigate, useSearchParams } from "react-
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import type { Prisma } from "@prisma/client";
 
-import { VolumeDiscountCreateView } from "../components/VolumeDiscountCreateView";
 import { IndeterminateLinearProgress } from "../components/IndeterminateLinearProgress";
 import { prisma } from "../db.server";
 import { scheduleVolumeDiscountShopSync } from "../services/deferredShopSync.server";
@@ -18,6 +17,12 @@ import { authenticate } from "../shopify.server";
 import { parseVolumeDiscountForm } from "../utils/volumeDiscountForm.server";
 import type { VolumeDiscountNewOfferPreset } from "../types/volumeDiscount";
 import { adminEmbeddedPath } from "../utils/adminEmbeddedPath";
+
+const VolumeDiscountCreateView = lazy(() =>
+  import("../components/VolumeDiscountCreateView").then((m) => ({
+    default: m.VolumeDiscountCreateView,
+  })),
+);
 
 type NewOfferNavigationState = {
   defaultCampaignName?: string;

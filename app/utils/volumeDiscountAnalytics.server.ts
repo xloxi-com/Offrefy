@@ -1670,23 +1670,35 @@ export async function loadAnalyticsDashboard(
   options?: { grantedScopes?: string[] },
 ): Promise<AnalyticsDashboardData> {
   const needsReadOrdersScope = !sessionHasReadOrdersScope(options?.grantedScopes);
-  let ordersSyncError: string | null = needsReadOrdersScope
+  const ordersSyncError: string | null = needsReadOrdersScope
     ? "Missing read_orders permission. Re-open the app from Shopify Admin to approve order access."
     : null;
 
+  /* Pixel + order reconcile are Shopify-heavy — never block the dashboard SQL path. */
   if (admin) {
-    await ensureOffrefyAnalyticsPixel(admin).catch((error) => {
-      console.warn("[Offrefy] loadAnalyticsDashboard pixel setup", error);
-    });
-
+    const { runAfterResponse } = await import(
+      "../services/deferredShopSync.server"
+    );
+    runAfterResponse(
+      ensureOffrefyAnalyticsPixel(admin).catch((error) => {
+        console.warn("[Offrefy] loadAnalyticsDashboard pixel setup", error);
+      }),
+    );
     if (!needsReadOrdersScope) {
-      const reconcileResult = await reconcileRecentPaidOrders(shop, admin);
-      if (
-        reconcileResult.syncError &&
-        !isOrdersAccessError(reconcileResult.syncError)
-      ) {
-        ordersSyncError = reconcileResult.syncError;
-      }
+      runAfterResponse(
+        reconcileRecentPaidOrders(shop, admin).then((result) => {
+          if (
+            result.syncError &&
+            !isOrdersAccessError(result.syncError)
+          ) {
+            console.warn(
+              "[Offrefy] deferred order reconcile",
+              shop,
+              result.syncError,
+            );
+          }
+        }),
+      );
     }
   }
 
@@ -1702,7 +1714,8 @@ export async function loadAnalyticsDashboard(
   };
 
   const [
-    campaigns,
+    activeCount,
+    campaignCount,
     current,
     previous,
     chartData,
@@ -1711,10 +1724,10 @@ export async function loadAnalyticsDashboard(
     topProductStats,
     dayOfWeek,
   ] = await Promise.all([
-    prisma.volumeDiscountCampaign.findMany({
-      where: { shop },
-      select: { status: true },
+    prisma.volumeDiscountCampaign.count({
+      where: { shop, status: "active" },
     }),
+    prisma.volumeDiscountCampaign.count({ where: { shop } }),
     totalsForPeriod(shop, start, end),
     comparePrevious
       ? totalsForPeriod(shop, prevStart, prevEnd)
@@ -1751,10 +1764,6 @@ export async function loadAnalyticsDashboard(
         revenueCents: bestCampaignRow.revenueCents,
       }
     : null;
-
-  const activeCount = campaigns.filter(
-    (campaign) => campaign.status.toLowerCase() === "active",
-  ).length;
 
   const currentAvgCart = avgCartValueCents(
     current.revenueCents,
@@ -1804,7 +1813,7 @@ export async function loadAnalyticsDashboard(
         current.revenueCents,
         current.impressions,
       ),
-      activeCampaigns: `${activeCount} / ${campaigns.length}`,
+      activeCampaigns: `${activeCount} / ${campaignCount}`,
       conversionRate: formatConversionRate(
         current.addToCart,
         current.impressions,

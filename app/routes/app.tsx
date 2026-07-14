@@ -21,7 +21,6 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
 import { APP_DISPLAY_NAME } from "../branding";
-import { authenticate } from "../shopify.server";
 import { adminEmbeddedPath } from "../utils/adminEmbeddedPath";
 import { withShopFromEmbeddedHost } from "../utils/embeddedShop.server";
 
@@ -47,7 +46,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (url.toString() !== request.url) {
     throw redirect(`${url.pathname}?${url.searchParams.toString()}`);
   }
-  await authenticate.admin(request);
+  /* Child routes call authenticate.admin — skip a second Prisma session round-trip here. */
   // eslint-disable-next-line no-undef
   return { apiKey: process.env.SHOPIFY_API_KEY || "" };
 };
@@ -74,6 +73,7 @@ export function shouldRevalidate({
 export default function App() {
   const { apiKey } = useLoaderData<typeof loader>();
   const { search } = useLocation();
+  const homeHref = adminEmbeddedPath("/app", search);
   const offersHref = adminEmbeddedPath("/app/offers", search);
   const analyticsHref = adminEmbeddedPath("/app/analytics", search);
   const settingsHref = adminEmbeddedPath("/app/settings", search);
@@ -82,6 +82,9 @@ export default function App() {
     <PolarisAppProvider i18n={en}>
       <AppProvider embedded apiKey={apiKey}>
         <s-app-nav>
+          <s-link href={homeHref} rel="home">
+            Home
+          </s-link>
           <s-link href={analyticsHref}>Analytics</s-link>
           <s-link href={offersHref}>Offers</s-link>
           <s-link href={settingsHref}>Settings</s-link>

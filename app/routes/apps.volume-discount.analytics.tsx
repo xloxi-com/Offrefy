@@ -128,12 +128,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       recorded += await recordCheckoutCompletedFromPixel(shop, {
         checkout: body.checkout,
       });
-      if (recorded > 0) {
-        console.log("[volume-discount] checkout pixel analytics", {
-          shop,
-          recorded,
-        });
-      }
     } catch (e) {
       console.error("[volume-discount] checkout pixel analytics", e);
       return new Response(
@@ -153,11 +147,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   try {
     recorded += await recordStorefrontAnalyticsEvents(shop, events);
-    console.log("[volume-discount] analytics recorded", {
-      shop,
-      recorded,
-      types: events.map((e) => e.type),
-    });
     return new Response(JSON.stringify({ ok: true, recorded }), {
       status: 200,
       headers: withCors(),

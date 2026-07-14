@@ -15,6 +15,11 @@ import {
   hasUntranslatedTierStrings,
   resolveEnglishSourceForAutoTranslate,
 } from "./storefrontAutoTranslate.server";
+import {
+  getMemoryCachedJson,
+  setMemoryCachedJson,
+  invalidateMemoryCachePrefix,
+} from "./memoryCache.server";
 
 type AdminGraphql = {
   graphql: (
@@ -73,11 +78,26 @@ export async function readStorefrontSettingsRow(shop: string): Promise<{
 export async function loadStorefrontTranslationsForShop(
   shop: string,
 ): Promise<StorefrontTranslationsMap> {
+  const memKey = `sf-translations:${shop}`;
+  const cached = getMemoryCachedJson(memKey);
+  if (cached) {
+    try {
+      return JSON.parse(cached) as StorefrontTranslationsMap;
+    } catch {
+      /* fall through */
+    }
+  }
+
   const row = await readStorefrontSettingsRow(shop);
   const stored = parseStoredStorefrontTranslations(row.translationsString);
   const languageKeys = Object.keys(stored);
-  if (languageKeys.length === 0) return {};
-  return buildStorefrontTranslationsForLanguages(languageKeys, stored);
+  if (languageKeys.length === 0) {
+    setMemoryCachedJson(memKey, "{}", 60_000);
+    return {};
+  }
+  const built = buildStorefrontTranslationsForLanguages(languageKeys, stored);
+  setMemoryCachedJson(memKey, JSON.stringify(built), 60_000);
+  return built;
 }
 
 export function parseTranslationsFromWidgetPayload(
@@ -132,6 +152,7 @@ export async function persistStorefrontTranslations(
       "translationsString" = ${translationsString},
       "updatedAt" = NOW()
   `;
+  invalidateMemoryCachePrefix(`sf-translations:${shop}`);
 }
 
 /**
@@ -145,12 +166,15 @@ export async function syncStorefrontTranslationsWithShopLanguages(
     existingTranslations?: StorefrontTranslationsMap;
     syncInterval?: string;
     shopLanguages?: ShopLanguageOption[];
+    /** Skip MyMemory calls — use for fast GET loaders; backfill after response. */
+    skipAutoTranslate?: boolean;
   } = {},
 ): Promise<{
   translations: StorefrontTranslationsMap;
   shopLanguages: ShopLanguageOption[];
   persisted: boolean;
   addedLanguages: string[];
+  needsAutoTranslate: boolean;
 }> {
   const shopLanguages =
     options.shopLanguages ??
@@ -167,11 +191,23 @@ export async function syncStorefrontTranslationsWithShopLanguages(
   const englishSource = resolveEnglishSourceForAutoTranslate(translations);
   let tierStringsBackfilled = false;
   let cartBadgeStringsBackfilled = false;
+  let needsAutoTranslate = false;
+
   for (const key of languageKeys) {
     const fields = translations[key];
     if (!fields) continue;
 
-    if (hasUntranslatedTierStrings(key, fields)) {
+    const needsTier = hasUntranslatedTierStrings(key, fields);
+    const needsCartBadge = hasUntranslatedCartBadgeStrings(key, fields);
+    if (needsTier || needsCartBadge) {
+      needsAutoTranslate = true;
+    }
+
+    if (options.skipAutoTranslate) {
+      continue;
+    }
+
+    if (needsTier) {
       try {
         const tierStrings = await autoTranslateTierStrings(englishSource, key);
         translations[key] = {
@@ -188,7 +224,10 @@ export async function syncStorefrontTranslationsWithShopLanguages(
     }
 
     const current = translations[key];
-    if (current && hasUntranslatedCartBadgeStrings(key, current)) {
+    if (
+      current &&
+      hasUntranslatedCartBadgeStrings(key, current)
+    ) {
       try {
         const cartBadgeStrings = await autoTranslateCartBadgeStrings(
           englishSource,
@@ -238,5 +277,6 @@ export async function syncStorefrontTranslationsWithShopLanguages(
     shopLanguages: resolvedShopLanguages,
     persisted: shouldPersist,
     addedLanguages,
+    needsAutoTranslate,
   };
 }

@@ -45,11 +45,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   const url = new URL(request.url);
-  console.log("[WIDGET-CONFIG REQUEST]:", {
-    url: request.url,
-    headers: Object.fromEntries(request.headers.entries()),
-    searchParams: Object.fromEntries(url.searchParams.entries()),
-  });
   const shop =
     session?.shop ??
     url.searchParams.get("shop") ??
