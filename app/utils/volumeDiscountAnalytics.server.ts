@@ -1739,10 +1739,19 @@ export async function loadAnalyticsDashboard(
     dayOfWeekForRange(shop, start, end),
   ]);
 
-  const productTitles = await fetchProductTitles(
-    admin,
-    topProductStats.map((row) => row.productId),
-  );
+  /* Titles are nice-to-have; don't block analytics paint on Admin GraphQL. */
+  const productTitles =
+    topProductStats.length > 0
+      ? await Promise.race([
+          fetchProductTitles(
+            admin,
+            topProductStats.map((row) => row.productId),
+          ),
+          new Promise<Map<string, string>>((resolve) =>
+            setTimeout(() => resolve(new Map()), 250),
+          ),
+        ])
+      : new Map<string, string>();
 
   const topProducts: TopProductRow[] = topProductStats.map((row) => ({
     productId: row.productId,
