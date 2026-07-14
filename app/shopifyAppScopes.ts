@@ -6,6 +6,7 @@ export const SHOPIFY_APP_SCOPES = [
   "write_products",
   "read_locales",
   "read_themes",
+  "write_themes",
   "read_orders",
   "write_pixels",
   "read_customer_events",

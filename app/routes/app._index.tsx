@@ -1,5 +1,5 @@
-import type { LoaderFunctionArgs, MetaFunction } from "react-router";
-import { useLoaderData, useLocation } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
+import { useFetcher, useLoaderData, useLocation } from "react-router";
 import type { ReactNode } from "react";
 import { Prisma } from "@prisma/client";
 import {
@@ -30,8 +30,14 @@ import { adminEmbeddedPath } from "../utils/adminEmbeddedPath";
 import {
   themeAppBlockEditorUrl,
   themeAppEmbedEditorUrl,
+  mainThemeIdFromGid,
 } from "../utils/themeEditorDeepLinks";
 import { ApprovefyPromoCard } from "../components/ApprovefyPromoCard";
+import {
+  ensureThemeAppEmbedEnabled,
+  getMainThemeAppEmbedStatus,
+} from "../services/themeAppEmbed.server";
+import { parseSessionScopes } from "../utils/shopPublishedLocales.server";
 
 export const meta: MetaFunction = () => [{ title: APP_DISPLAY_NAME }];
 
@@ -46,14 +52,18 @@ type SetupStatus = {
   apiKey: string;
   campaignCount: number;
   activeCount: number;
+  appEmbedEnabled: boolean;
+  appEmbedErrors: string[];
+  needsWriteThemes: boolean;
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
 
-  /* Fast first paint: counts + sync time only. Theme deep-links use "current"
-   * / mainSection defaults — live theme GraphQL is not required to open Home. */
-  const [counts, lastSyncedAt] = await Promise.all([
+  const grantedScopes = parseSessionScopes(session.scope);
+  const hasWriteThemes = grantedScopes.includes("write_themes");
+
+  const [counts, lastSyncedAt, embedBefore] = await Promise.all([
     prisma.$queryRaw<Array<{ campaignCount: bigint; activeCount: bigint }>>(
       Prisma.sql`
         SELECT
@@ -64,7 +74,29 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       `,
     ),
     resolveShopLastSyncedAt(session.shop),
+    getMainThemeAppEmbedStatus(admin),
   ]);
+
+  let appEmbedEnabled = embedBefore.enabled;
+  let appEmbedErrors = embedBefore.errors;
+  let mainThemeId = mainThemeIdFromGid(embedBefore.themeId);
+
+  // Auto-enable when we already have write_themes (e.g. after merchant re-approved).
+  if (!appEmbedEnabled && hasWriteThemes) {
+    const enabled = await ensureThemeAppEmbedEnabled(admin);
+    if (enabled.ok) {
+      appEmbedEnabled = true;
+      appEmbedErrors = [];
+    } else {
+      appEmbedErrors = enabled.errors;
+    }
+    const embedAfter = await getMainThemeAppEmbedStatus(admin);
+    appEmbedEnabled = embedAfter.enabled || appEmbedEnabled;
+    mainThemeId = mainThemeIdFromGid(embedAfter.themeId) ?? mainThemeId;
+    if (embedAfter.errors.length && !appEmbedEnabled) {
+      appEmbedErrors = [...new Set([...appEmbedErrors, ...embedAfter.errors])];
+    }
+  }
 
   const campaignCount = Number(counts[0]?.campaignCount ?? 0);
   const activeCount = Number(counts[0]?.activeCount ?? 0);
@@ -75,15 +107,39 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       hasActiveOffers: activeCount > 0,
       lastSyncedAt: lastSyncedAt?.toISOString() ?? null,
       shop: session.shop,
-      mainThemeId: null,
+      mainThemeId,
       productPreviewPath: null,
       productSectionId: null,
       // eslint-disable-next-line no-undef
       apiKey: process.env.SHOPIFY_API_KEY || "",
       campaignCount,
       activeCount,
+      appEmbedEnabled,
+      appEmbedErrors,
+      needsWriteThemes: !hasWriteThemes,
     } satisfies SetupStatus,
   };
+};
+
+export const action = async ({ request }: ActionFunctionArgs) => {
+  const { admin, scopes, session } = await authenticate.admin(request);
+  const formData = await request.formData();
+  const intent = String(formData.get("intent") ?? "");
+
+  if (intent === "enableAppEmbed") {
+    const grantedScopes = parseSessionScopes(session.scope);
+    if (!grantedScopes.includes("write_themes")) {
+      await scopes.request(["write_themes"]);
+    }
+    const result = await ensureThemeAppEmbedEnabled(admin);
+    return {
+      ok: result.ok,
+      alreadyEnabled: result.alreadyEnabled,
+      error: result.errors.join("; ") || null,
+    };
+  }
+
+  return { ok: false, error: "Unknown action" };
 };
 
 function formatSyncedAt(iso: string | null): string {
@@ -151,6 +207,7 @@ function StepRow({
 export default function AppHomePage() {
   const { status } = useLoaderData<typeof loader>();
   const { search } = useLocation();
+  const fetcher = useFetcher<typeof action>();
 
   const offersHref = adminEmbeddedPath("/app/offers", search);
   const newOfferHref = adminEmbeddedPath("/app/volume-discount/new", search);
@@ -167,8 +224,11 @@ export default function AppHomePage() {
     productSectionId: status.productSectionId,
   });
 
-  const themeReady = status.hasActiveOffers && Boolean(status.lastSyncedAt);
+  const themeReady = status.appEmbedEnabled;
   const setupComplete = status.hasActiveOffers && themeReady;
+  const enabling =
+    fetcher.state !== "idle" &&
+    String(fetcher.formData?.get("intent") ?? "") === "enableAppEmbed";
 
   return (
     <Page
@@ -194,11 +254,59 @@ export default function AppHomePage() {
       ]}
     >
       <BlockStack gap="500">
-        {!setupComplete ? (
+        {!status.appEmbedEnabled ? (
+          <Banner
+            tone="warning"
+            title="Product page widget is off"
+            action={{
+              content: enabling ? "Enabling…" : "Enable widget now",
+              onAction: () => {
+                const fd = new FormData();
+                fd.set("intent", "enableAppEmbed");
+                fetcher.submit(fd, { method: "post" });
+              },
+              loading: enabling,
+            }}
+            secondaryAction={{
+              content: "Open theme editor",
+              url: themeEmbedHref,
+            }}
+          >
+            <p>
+              Cart discounts can work without the storefront widget. Turn on{" "}
+              <Text as="span" fontWeight="semibold">
+                Offrefy (global)
+              </Text>{" "}
+              under Theme settings → App embeds, then Save — or use Enable
+              widget now.
+              {status.appEmbedErrors.length > 0
+                ? ` (${status.appEmbedErrors[0]})`
+                : ""}
+            </p>
+          </Banner>
+        ) : !setupComplete ? (
           <Banner tone="info" title="Complete setup">
             <p>
               Finish the steps below to show quantity breaks on product pages and
               apply discounts at checkout.
+            </p>
+          </Banner>
+        ) : null}
+
+        {fetcher.data && "ok" in fetcher.data && fetcher.data.ok ? (
+          <Banner tone="success" title="Widget enabled">
+            <p>
+              App embed is on. Hard-refresh a product page (Ctrl+Shift+R) to see
+              quantity breaks.
+            </p>
+          </Banner>
+        ) : null}
+
+        {fetcher.data && "ok" in fetcher.data && !fetcher.data.ok ? (
+          <Banner tone="critical" title="Could not enable widget automatically">
+            <p>
+              {fetcher.data.error || "Unknown error"}. Use Theme editor → App
+              embeds → turn on Offrefy (global) → Save.
             </p>
           </Banner>
         ) : null}
@@ -233,6 +341,20 @@ export default function AppHomePage() {
                       >
                         Theme editor
                       </Button>
+                      {!themeReady ? (
+                        <Button
+                          size="slim"
+                          variant="primary"
+                          loading={enabling}
+                          onClick={() => {
+                            const fd = new FormData();
+                            fd.set("intent", "enableAppEmbed");
+                            fetcher.submit(fd, { method: "post" });
+                          }}
+                        >
+                          Enable widget now
+                        </Button>
+                      ) : null}
                     </InlineStack>
                   </StepRow>
 
@@ -240,12 +362,12 @@ export default function AppHomePage() {
 
                   <StepRow done={themeReady} title="2. Add widget on product page">
                     <Text as="p" variant="bodySm" tone="subdued">
-                      Opens Product template → Product information → Add block →
-                      Apps →{" "}
+                      Optional: Product template → Add block →{" "}
                       <Text as="span" fontWeight="semibold">
                         Quantity breaks
-                      </Text>{" "}
-                      (below the product title).
+                      </Text>
+                      . The global embed already places the widget near Add to
+                      cart.
                     </Text>
                     <InlineStack gap="200" align="start">
                       <Button
@@ -339,6 +461,9 @@ export default function AppHomePage() {
                   </Text>
                   <BlockStack gap="300">
                     <DetailRow label="Shop">{status.shop}</DetailRow>
+                    <DetailRow label="App embed">
+                      {status.appEmbedEnabled ? "On" : "Off"}
+                    </DetailRow>
                     <DetailRow label="Extension">Offrefy — Storefront</DetailRow>
                     <DetailRow label="Blocks">
                       Quantity breaks · Offrefy (global)
@@ -350,7 +475,7 @@ export default function AppHomePage() {
                   </DetailRow>
                   <Divider />
                   <DetailRow label="Access">
-                    Discounts · Products · Locales
+                    Discounts · Products · Themes · Locales
                   </DetailRow>
                 </BlockStack>
               </Card>

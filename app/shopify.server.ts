@@ -37,6 +37,12 @@ const shopify = shopifyApp({
       await ensureOffrefyAnalyticsPixel(admin).catch((error) => {
         console.warn("[Offrefy] afterAuth pixel setup", error);
       });
+      const { ensureThemeAppEmbedEnabled } = await import(
+        "./services/themeAppEmbed.server"
+      );
+      await ensureThemeAppEmbedEnabled(admin).catch((error) => {
+        console.warn("[Offrefy] afterAuth theme embed enable", error);
+      });
     },
   },
   ...(process.env.SHOP_CUSTOM_DOMAIN
