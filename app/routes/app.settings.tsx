@@ -38,6 +38,7 @@ import {
 import {
   FALLBACK_SHOP_LANGUAGES,
   fetchShopPublishedLocales,
+  parseSessionScopes,
 } from "../utils/shopPublishedLocales.server";
 import {
   ENGLISH_STOREFRONT_TRANSLATION,
@@ -67,14 +68,17 @@ type SettingsData = {
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session, admin } = await authenticate.admin(request);
-  const grantedScopes = (session.scope ?? "")
-    .split(",")
-    .map((scope) => scope.trim())
-    .filter(Boolean);
-  const hasLocaleScope =
+  const { session, admin, scopes } = await authenticate.admin(request);
+  const grantedScopes = parseSessionScopes(session.scope);
+  let hasLocaleScope =
     grantedScopes.includes("read_locales") ||
     grantedScopes.includes("read_markets_home");
+
+  // Session scopes can lag after install; force Shopify scope approval when missing.
+  if (!hasLocaleScope) {
+    await scopes.request(["read_locales"]);
+    hasLocaleScope = true;
+  }
 
   const [dbSettings, localesResult, lastSyncedAt] = await Promise.all([
     readStorefrontSettingsRow(session.shop),
@@ -82,8 +86,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     resolveShopLastSyncedAt(session.shop),
   ]);
 
-  const { languages: shopLanguages, errors: shopLanguageErrors } =
+  let { languages: shopLanguages, errors: shopLanguageErrors, missingLocaleScope } =
     localesResult;
+
+  // Token/session said scopes were granted, but Admin API still denied shopLocales.
+  if (missingLocaleScope) {
+    await scopes.request(["read_locales"]);
+    const retry = await fetchShopPublishedLocales(
+      admin,
+      `${session.shop}:${Date.now()}`,
+    );
+    shopLanguages = retry.languages;
+    shopLanguageErrors = retry.errors;
+    missingLocaleScope = retry.missingLocaleScope;
+  }
+
   const storedTranslations = parseStoredStorefrontTranslations(
     dbSettings.translationsString,
   );
@@ -141,10 +158,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     translations: translationSync.translations,
   };
 
-  if (!hasLocaleScope) {
-    shopLanguageErrors.unshift(
-      "Missing read_locales permission. Re-open the app from Shopify Admin to approve the new permission.",
-    );
+  const needsLocaleScope = missingLocaleScope || !hasLocaleScope;
+  if (needsLocaleScope) {
+    shopLanguageErrors = [
+      "Missing read_locales permission. Approve the permission prompt (or re-open the app from Shopify Admin).",
+    ];
+  } else {
+    // English fallback already applied — don't block the Settings form with a hard error.
+    shopLanguageErrors = [];
   }
 
   if (shopLanguageErrors.length > 0) {
@@ -169,7 +190,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     settings,
     shopLanguages: translationSync.shopLanguages,
     shopLanguageErrors,
-    needsLocaleScope: !hasLocaleScope,
+    needsLocaleScope,
     translationsInitialized: translationSync.persisted,
     addedLanguages: translationSync.addedLanguages,
   };
