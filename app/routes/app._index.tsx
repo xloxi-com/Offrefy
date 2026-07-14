@@ -37,6 +37,7 @@ import {
   ensureThemeAppEmbedEnabled,
   getMainThemeAppEmbedStatus,
 } from "../services/themeAppEmbed.server";
+import { ensureOffrefyStorefrontScriptTag } from "../services/ensureOffrefyStorefrontScriptTag.server";
 import { parseSessionScopes } from "../utils/shopPublishedLocales.server";
 
 export const meta: MetaFunction = () => [{ title: APP_DISPLAY_NAME }];
@@ -53,6 +54,8 @@ type SetupStatus = {
   campaignCount: number;
   activeCount: number;
   appEmbedEnabled: boolean;
+  scriptTagOk: boolean;
+  storefrontReady: boolean;
   appEmbedErrors: string[];
   needsWriteThemes: boolean;
 };
@@ -62,6 +65,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const grantedScopes = parseSessionScopes(session.scope);
   const hasWriteThemes = grantedScopes.includes("write_themes");
+  const hasWriteScriptTags = grantedScopes.includes("write_script_tags");
 
   const [counts, lastSyncedAt, embedBefore] = await Promise.all([
     prisma.$queryRaw<Array<{ campaignCount: bigint; activeCount: bigint }>>(
@@ -80,6 +84,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   let appEmbedEnabled = embedBefore.enabled;
   let appEmbedErrors = embedBefore.errors;
   let mainThemeId = mainThemeIdFromGid(embedBefore.themeId);
+  let scriptTagOk = false;
 
   // Auto-enable when we already have write_themes (e.g. after merchant re-approved).
   if (!appEmbedEnabled && hasWriteThemes) {
@@ -98,8 +103,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
   }
 
+  if (hasWriteScriptTags) {
+    const tag = await ensureOffrefyStorefrontScriptTag(admin, session.shop);
+    scriptTagOk = tag.ok;
+    if (!tag.ok) {
+      appEmbedErrors = [...new Set([...appEmbedErrors, ...tag.errors])];
+    }
+  }
+
   const campaignCount = Number(counts[0]?.campaignCount ?? 0);
   const activeCount = Number(counts[0]?.activeCount ?? 0);
+
+  // ScriptTag alone is enough for the widget to show without App Embed.
+  const storefrontReady = appEmbedEnabled || scriptTagOk;
 
   return {
     status: {
@@ -115,6 +131,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       campaignCount,
       activeCount,
       appEmbedEnabled,
+      scriptTagOk,
+      storefrontReady,
       appEmbedErrors,
       needsWriteThemes: !hasWriteThemes,
     } satisfies SetupStatus,
@@ -129,13 +147,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (intent === "enableAppEmbed") {
     const grantedScopes = parseSessionScopes(session.scope);
     if (!grantedScopes.includes("write_themes")) {
-      await scopes.request(["write_themes"]);
+      await scopes.request(["write_themes", "write_script_tags", "read_script_tags"]);
+    } else if (!grantedScopes.includes("write_script_tags")) {
+      await scopes.request(["write_script_tags", "read_script_tags"]);
     }
     const result = await ensureThemeAppEmbedEnabled(admin);
+    const tag = await ensureOffrefyStorefrontScriptTag(admin, session.shop);
     return {
-      ok: result.ok,
+      ok: result.ok || tag.ok,
       alreadyEnabled: result.alreadyEnabled,
-      error: result.errors.join("; ") || null,
+      error:
+        [...result.errors, ...tag.errors].filter(Boolean).join("; ") || null,
     };
   }
 
@@ -224,7 +246,7 @@ export default function AppHomePage() {
     productSectionId: status.productSectionId,
   });
 
-  const themeReady = status.appEmbedEnabled;
+  const themeReady = status.storefrontReady;
   const setupComplete = status.hasActiveOffers && themeReady;
   const enabling =
     fetcher.state !== "idle" &&
@@ -254,7 +276,7 @@ export default function AppHomePage() {
       ]}
     >
       <BlockStack gap="500">
-        {!status.appEmbedEnabled ? (
+        {!status.storefrontReady ? (
           <Banner
             tone="warning"
             title="Product page widget is off"
@@ -273,12 +295,12 @@ export default function AppHomePage() {
             }}
           >
             <p>
-              Cart discounts can work without the storefront widget. Turn on{" "}
+              Cart discounts can work without the storefront widget. Click Enable
+              widget now (approves theme/script permissions), or turn on{" "}
               <Text as="span" fontWeight="semibold">
                 Offrefy (global)
               </Text>{" "}
-              under Theme settings → App embeds, then Save — or use Enable
-              widget now.
+              under Theme settings → App embeds → Save.
               {status.appEmbedErrors.length > 0
                 ? ` (${status.appEmbedErrors[0]})`
                 : ""}
@@ -463,6 +485,9 @@ export default function AppHomePage() {
                     <DetailRow label="Shop">{status.shop}</DetailRow>
                     <DetailRow label="App embed">
                       {status.appEmbedEnabled ? "On" : "Off"}
+                    </DetailRow>
+                    <DetailRow label="Script fallback">
+                      {status.scriptTagOk ? "On" : "Off"}
                     </DetailRow>
                     <DetailRow label="Extension">Offrefy — Storefront</DetailRow>
                     <DetailRow label="Blocks">

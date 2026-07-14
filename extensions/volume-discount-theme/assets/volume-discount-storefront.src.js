@@ -3799,7 +3799,7 @@
     trackImpression(campaign, root.getAttribute("data-product-id"));
     window.VolumeDiscount = window.VolumeDiscount || {};
     window.VolumeDiscount.embed = window.VolumeDiscount.embed || {};
-    window.VolumeDiscount.embed.version = "1.22.0";
+    window.VolumeDiscount.embed.version = "1.23.0";
 
     /**
      * Remove the body app-embed fallback only after a section "Quantity breaks" widget
@@ -4007,9 +4007,92 @@
     fetchConfig(productId, variantId).then(finishFetch);
   }
 
+  function ensureHostedStorefrontCss() {
+    if (document.querySelector('link[data-vd-hosted-css="1"]')) return;
+    if (document.querySelector('link[href*="volume-discount-storefront.css"]')) return;
+    var origin =
+      (typeof window.__vdAppOrigin === "string" && window.__vdAppOrigin) ||
+      "https://offrey.xloxi.com";
+    var ver =
+      (typeof window.__vdAssetVersion === "string" && window.__vdAssetVersion) ||
+      "1.23.0";
+    var link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href =
+      String(origin).replace(/\/$/, "") +
+      "/vd-storefront.css?v=" +
+      encodeURIComponent(ver);
+    link.setAttribute("data-vd-hosted-css", "1");
+    (document.head || document.documentElement).appendChild(link);
+  }
+
+  function isLikelyProductPage() {
+    try {
+      if (/\/products\/[^/?#]+/i.test(String(location.pathname || ""))) return true;
+    } catch (e) {
+      void e;
+    }
+    try {
+      if (
+        window.ShopifyAnalytics &&
+        window.ShopifyAnalytics.meta &&
+        window.ShopifyAnalytics.meta.product
+      ) {
+        return true;
+      }
+    } catch (e2) {
+      void e2;
+    }
+    if (document.querySelector('form[action*="/cart/add"]')) return true;
+    return false;
+  }
+
+  /**
+   * When App Embed / section block is not enabled, theme Liquid never outputs a
+   * widget root. Autoinject so ScriptTag / hosted JS can still mount on PDPs.
+   */
+  function ensureAutoinjectRoot() {
+    if (document.querySelector(".vd-storefront-root")) return null;
+    if (!isLikelyProductPage()) return null;
+
+    ensureHostedStorefrontCss();
+
+    var root = document.createElement("div");
+    root.className = "vd-storefront-root volume-discount-embed";
+    root.id = "vd-shopify-autoinject";
+    root.setAttribute("data-vd-embed-fallback", "true");
+    root.setAttribute("data-config-id", "vd-json-autoinject");
+    root.setAttribute("data-heading", "Get more, save more");
+    root.setAttribute("data-section-heading", "");
+    try {
+      if (window.Shopify && window.Shopify.currency && window.Shopify.currency.active) {
+        root.setAttribute("data-currency", String(window.Shopify.currency.active));
+      }
+    } catch (e3) {
+      void e3;
+    }
+
+    var cfg = document.createElement("script");
+    cfg.type = "application/json";
+    cfg.id = "vd-json-autoinject";
+    cfg.textContent = '{"version":1,"campaigns":[]}';
+
+    var mount = document.createElement("div");
+    mount.className = "volume-discount-embed__inner vd-mount";
+    mount.setAttribute("data-vd-mount", "");
+    mount.hidden = true;
+
+    root.appendChild(cfg);
+    root.appendChild(mount);
+    (document.body || document.documentElement).appendChild(root);
+    return root;
+  }
+
   function scan(options) {
     var opts = options || {};
     var syncCartSideEffects = opts.syncCart !== false;
+
+    ensureAutoinjectRoot();
 
     /* Widget first — never wait on cart network before mounting. */
     document.querySelectorAll(".vd-storefront-root").forEach(function (el) {

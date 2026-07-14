@@ -43,6 +43,14 @@ const shopify = shopifyApp({
       await ensureThemeAppEmbedEnabled(admin).catch((error) => {
         console.warn("[Offrefy] afterAuth theme embed enable", error);
       });
+      const { ensureOffrefyStorefrontScriptTag } = await import(
+        "./services/ensureOffrefyStorefrontScriptTag.server"
+      );
+      await ensureOffrefyStorefrontScriptTag(admin, session.shop).catch(
+        (error) => {
+          console.warn("[Offrefy] afterAuth storefront ScriptTag", error);
+        },
+      );
     },
   },
   ...(process.env.SHOP_CUSTOM_DOMAIN
