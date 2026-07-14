@@ -34,10 +34,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     };
   }
 
-  if (!url.searchParams.get("shop")) {
-    throw redirect("/");
-  }
-
+  // No shop yet: show the login form (do not bounce back to `/`).
   return { errors, embedded: false as const };
 };
 
@@ -103,4 +100,3 @@ export default function Auth() {
     </AppProvider>
   );
 }
-s
