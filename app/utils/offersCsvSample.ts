@@ -1,19 +1,10 @@
-/** Sample CSV for import modal — same columns as export (`VOLUME_DISCOUNT_CSV_HEADERS`). */
+/** Sample / template CSV for import modal — same columns as export. */
 
-const HEADERS = [
-  "campaignName",
-  "displayName",
-  "status",
-  "productScope",
-  "quantityCondition",
-  "customerType",
-  "customerTags",
-  "productIds",
-  "collectionIds",
-  "tiers",
-  "countdownStartsAt",
-  "countdownEndsAt",
-] as const;
+import {
+  buildOffersCsvHeaders,
+  buildOffersCsvOptionsGuideCells,
+  CSV_EASY_TIER_COUNT,
+} from "./offersCsvColumns";
 
 function escapeCsvField(value: string): string {
   const needsQuotes =
@@ -22,26 +13,60 @@ function escapeCsvField(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
 }
 
-export const OFFERS_SAMPLE_CSV_FILENAME = "offrefy-offers-sample.csv";
+function csvLine(cells: string[]): string {
+  return cells.map(escapeCsvField).join(",");
+}
 
-/** UTF-8 CSV with BOM (Excel-friendly), one example row. */
+export const OFFERS_SAMPLE_CSV_FILENAME = "offrefy-offers-template.csv";
+
+/**
+ * UTF-8 CSV with BOM (Excel-friendly):
+ * 1) headers
+ * 2) # OPTIONS guide row (delete before import — or leave; importer skips `#` rows)
+ * 3) one filled example row
+ */
 export function buildOffersSampleCsv(): string {
-  const headerLine = HEADERS.map(escapeCsvField).join(",");
-  const sampleRow = [
-    "Sample offer",
-    "Buy more save more",
-    "draft",
-    "specific-products",
-    "per-variant",
-    "everyone",
-    "",
-    "gid://shopify/Product/123456789",
-    "",
-    "1|per-item|0|%|n;2|per-item|10|%|n;4|per-item|15|%|n",
-    "",
-    "",
-  ]
-    .map(escapeCsvField)
-    .join(",");
-  return `\uFEFF${headerLine}\r\n${sampleRow}\r\n`;
+  const headers = buildOffersCsvHeaders();
+  const guide = buildOffersCsvOptionsGuideCells();
+
+  const sampleByHeader: Record<string, string> = {
+    campaignName: "Sample offer",
+    displayName: "Buy more save more",
+    status: "draft",
+    productScope: "specific-products",
+    quantityCondition: "per-variant",
+    customerType: "everyone",
+    customerTags: "",
+    productIds: "gid://shopify/Product/123456789",
+    collectionIds: "",
+    countdownStartsAt: "",
+    countdownEndsAt: "",
+    tier1_buyFrom: "1",
+    tier1_discountMode: "per-item",
+    tier1_value: "0",
+    tier1_valueUnit: "%",
+    tier1_multiples: "no",
+    tier2_buyFrom: "2",
+    tier2_discountMode: "per-item",
+    tier2_value: "10",
+    tier2_valueUnit: "%",
+    tier2_multiples: "no",
+    tier3_buyFrom: "4",
+    tier3_discountMode: "per-item",
+    tier3_value: "15",
+    tier3_valueUnit: "%",
+    tier3_multiples: "no",
+  };
+
+  for (let i = 4; i <= CSV_EASY_TIER_COUNT; i++) {
+    sampleByHeader[`tier${i}_buyFrom`] = "";
+    sampleByHeader[`tier${i}_discountMode`] = "";
+    sampleByHeader[`tier${i}_value`] = "";
+    sampleByHeader[`tier${i}_valueUnit`] = "";
+    sampleByHeader[`tier${i}_multiples`] = "";
+  }
+
+  const sampleRow = headers.map((h) => sampleByHeader[h] ?? "");
+
+  return `\uFEFF${csvLine(headers)}\r\n${csvLine(guide)}\r\n${csvLine(sampleRow)}\r\n`;
 }

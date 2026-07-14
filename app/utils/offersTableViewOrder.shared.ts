@@ -2,7 +2,7 @@
  * Mirrors the offers index table: filter (tab + search) then sort.
  * Shared by admin UI and CSV export.
  */
-export type OffersListTab = "all" | "active" | "draft";
+export type OffersListTab = "all" | "active" | "draft" | "scheduled";
 
 export type OffersListRow = {
   campaignName: string;
@@ -51,6 +51,8 @@ export function filterSortOffersForListView<T extends OffersListRow>(
     list = list.filter((c) => c.status === "active");
   } else if (options.tab === "draft") {
     list = list.filter((c) => c.status === "draft");
+  } else if (options.tab === "scheduled") {
+    list = list.filter((c) => c.status === "scheduled");
   }
 
   const sortValue = options.sort.trim() || "modified desc";
@@ -79,7 +81,9 @@ export function parseOffersExportListParams(url: URL): {
 } {
   const tabRaw = url.searchParams.get("listTab") ?? "all";
   const tab: OffersListTab =
-    tabRaw === "active" || tabRaw === "draft" ? tabRaw : "all";
+    tabRaw === "active" || tabRaw === "draft" || tabRaw === "scheduled"
+      ? tabRaw
+      : "all";
   const searchQuery = url.searchParams.get("listQ") ?? "";
   const sort = url.searchParams.get("listSort") ?? "modified desc";
   return { tab, searchQuery, sort };

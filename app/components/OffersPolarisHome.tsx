@@ -62,7 +62,7 @@ import {
 } from "../utils/offersCsvSample";
 import { preloadVolumeDiscountEditor } from "../utils/preloadVolumeDiscountEditor.client";
 
-export type OfferTab = "all" | "active" | "draft";
+export type OfferTab = "all" | "active" | "draft" | "scheduled";
 
 export type OfferCampaignRow = {
   id: string;
@@ -129,6 +129,7 @@ export type OffersPolarisHomeProps = {
 const offerTabs: TabProps[] = [
   { id: "all", content: "All", isLocked: true },
   { id: "active", content: "Active", isLocked: true },
+  { id: "scheduled", content: "Scheduled", isLocked: true },
   { id: "draft", content: "Draft", isLocked: true },
 ];
 
@@ -200,13 +201,15 @@ function CampaignNameSortHeader({
 
 function tabIndex(offerTab: OfferTab): number {
   if (offerTab === "active") return 1;
-  if (offerTab === "draft") return 2;
+  if (offerTab === "scheduled") return 2;
+  if (offerTab === "draft") return 3;
   return 0;
 }
 
 function tabFromIndex(index: number): OfferTab {
   if (index === 1) return "active";
-  if (index === 2) return "draft";
+  if (index === 2) return "scheduled";
+  if (index === 3) return "draft";
   return "all";
 }
 
@@ -507,7 +510,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
       a.click();
       a.remove();
       URL.revokeObjectURL(href);
-      notify("CSV downloaded — you can open it in Excel or re-import here");
+      notify("Excel CSV downloaded — edit columns and Import when ready");
     } else if (!d.ok) {
       notify(d.error);
     }
@@ -980,7 +983,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
           if (csvImportPending) return;
           resetImportModal();
         }}
-        title="Import offers from CSV"
+        title="Import offers (Excel / CSV)"
         primaryAction={{
           content: "Import",
           loading: csvImportPending,
@@ -997,33 +1000,20 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
       >
         <Modal.Section>
           <BlockStack gap="300">
-            <BlockStack gap="100">
+            <BlockStack gap="200">
               <Text as="p" tone="subdued">
-                Use the same columns as Export.{" "}
-                <Text as="span" fontWeight="semibold">
-                  tiers
-                </Text>{" "}
-                per row:{" "}
-                <Text as="span" fontWeight="semibold">
-                  qty|mode|value|unit|multiples
-                </Text>{" "}
-                — separate with{" "}
-                <Text as="span" fontWeight="semibold">
-                  ;
-                </Text>{" "}
-                (e.g.{" "}
-                <Text as="span" fontWeight="semibold">
-                  1|per-item|10|%|n
-                </Text>
-                ). Existing names are skipped unless Overwrite is checked.
+                Download the template, edit in Excel, save as CSV, then upload.
+                All allowed values are in the template’s OPTIONS row.
               </Text>
-              <Button
-                variant="plain"
-                onClick={downloadSampleCsv}
-                disabled={csvImportPending}
-              >
-                Download sample CSV
-              </Button>
+              <InlineStack>
+                <Button
+                  variant="plain"
+                  onClick={downloadSampleCsv}
+                  disabled={csvImportPending}
+                >
+                  Download template
+                </Button>
+              </InlineStack>
             </BlockStack>
             <DropZone
               accept=".csv,text/csv,text/comma-separated-values,application/vnd.ms-excel"
@@ -1045,15 +1035,13 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
             >
               {importCsvDropZone}
             </DropZone>
-            <BlockStack gap="200">
-              <Checkbox
-                label="Overwrite existing campaigns"
-                helpText="On: update matching names. Off: skip them."
-                checked={importOverwriteCampaign}
-                disabled={csvImportPending}
-                onChange={setImportOverwriteCampaign}
-              />
-            </BlockStack>
+            <Checkbox
+              label="Overwrite existing campaigns"
+              helpText="Update matching names instead of skipping them."
+              checked={importOverwriteCampaign}
+              disabled={csvImportPending}
+              onChange={setImportOverwriteCampaign}
+            />
           </BlockStack>
         </Modal.Section>
       </Modal>

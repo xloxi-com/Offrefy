@@ -1,27 +1,20 @@
 import type { TierPayload } from "../types/volumeDiscount";
+import {
+  CSV_EASY_TIER_COUNT,
+  offersCsvTierHeaders,
+  TIER_EASY_FIELDS,
+  type TierEasyField,
+} from "./offersCsvColumns";
 import { normalizeTierValueForForm, normalizeTiersFromDb } from "./volumeDiscountTier";
 
-/** How many tier rows appear as flat columns in CSV (tier1_… … tierN_…). */
-export const CSV_EASY_TIER_COUNT = 10;
-
-export const TIER_EASY_FIELDS = [
-  "buyFrom",
-  "discountMode",
-  "value",
-  "valueUnit",
-  "multiples",
-] as const;
-
-export type TierEasyField = (typeof TIER_EASY_FIELDS)[number];
+export {
+  CSV_EASY_TIER_COUNT,
+  TIER_EASY_FIELDS,
+  type TierEasyField,
+};
 
 export function tierEasyCsvHeaders(): string[] {
-  const h: string[] = [];
-  for (let i = 1; i <= CSV_EASY_TIER_COUNT; i++) {
-    for (const f of TIER_EASY_FIELDS) {
-      h.push(`tier${i}_${f}`);
-    }
-  }
-  return h;
+  return offersCsvTierHeaders();
 }
 
 function parseYesNo(raw: string): boolean {

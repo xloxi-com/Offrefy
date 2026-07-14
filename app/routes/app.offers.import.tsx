@@ -139,7 +139,7 @@ export const action = async ({
     const rowData = {
       campaignName: d.campaignName,
       displayName: d.displayName || null,
-      status: wantsActive ? "active" : "draft",
+      status: d.campaignStatus,
       productScope: d.productScope,
       quantityCondition: d.quantityCondition,
       customerType: d.customerType,

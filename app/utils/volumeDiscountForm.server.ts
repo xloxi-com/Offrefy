@@ -7,6 +7,7 @@ import {
   type VolumeDiscountProductScope,
   type VolumeDiscountQuantityCondition,
 } from "../types/volumeDiscount";
+import { resolveCampaignStatusFromSchedule } from "./campaignScheduleStatus";
 import { parseOptionalIsoDate } from "./countdownTimes";
 import { toTierPayload } from "./volumeDiscountTier";
 import {
@@ -21,8 +22,8 @@ export type ParsedVolumeDiscountForm =
       data: {
         campaignName: string;
         displayName: string;
-        /** Persisted on `VolumeDiscountCampaign.status` (draft = off in editor). */
-        campaignStatus: "draft" | "active";
+        /** Persisted on `VolumeDiscountCampaign.status`: draft | active | scheduled. */
+        campaignStatus: "draft" | "active" | "scheduled";
         productScope: VolumeDiscountProductScope;
         quantityCondition: VolumeDiscountQuantityCondition;
         customerType: VolumeDiscountCustomerType;
@@ -168,8 +169,13 @@ export function parseVolumeDiscountForm(form: FormData): ParsedVolumeDiscountFor
   const statusRaw = String(form.get("campaignStatus") ?? "active")
     .trim()
     .toLowerCase();
-  const campaignStatus: "draft" | "active" =
+  const requestedStatus: "draft" | "active" =
     statusRaw === "draft" ? "draft" : "active";
+  const campaignStatus = resolveCampaignStatusFromSchedule({
+    requestedStatus,
+    startsAt: countdownStartsAt,
+    endsAt: countdownEndsAt,
+  });
 
   if (productScope === "collections") {
     if (collectionIdsParsed.length === 0) {

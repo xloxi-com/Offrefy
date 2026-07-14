@@ -3,8 +3,10 @@ import {
   filterSortOffersForListView,
   type OffersListTab,
 } from "./offersTableViewOrder.server";
-import { stringifyJsonStringArrayForCsv } from "./csvTiersEasy.server";
-import { tiersJsonToCompactCsvCell } from "./csvTierCompact.server";
+import {
+  stringifyJsonStringArrayForCsv,
+  tierEasyValuesForCsvExport,
+} from "./csvTiersEasy.server";
 import {
   escapeCsvField,
   VOLUME_DISCOUNT_CSV_HEADERS,
@@ -12,7 +14,7 @@ import {
 
 /**
  * UTF-8 CSV with BOM for Excel; rows match list filters/sort.
- * Short column set for easy edit — see `VOLUME_DISCOUNT_CSV_HEADERS`.
+ * Flat tier columns for easy Excel edit — see `VOLUME_DISCOUNT_CSV_HEADERS`.
  * Returns `null` when there are no matching offers (avoid empty header-only files).
  */
 export async function buildVolumeDiscountOffersCsvExport(
@@ -56,13 +58,13 @@ export async function buildVolumeDiscountOffersCsvExport(
       escapeCsvField(stringifyJsonStringArrayForCsv(c.customerTags)),
       escapeCsvField(stringifyJsonStringArrayForCsv(c.productIds)),
       escapeCsvField(stringifyJsonStringArrayForCsv(c.collectionIds)),
-      escapeCsvField(tiersJsonToCompactCsvCell(c.tiers)),
       escapeCsvField(
         c.countdownStartsAt ? c.countdownStartsAt.toISOString() : "",
       ),
       escapeCsvField(
         c.countdownEndsAt ? c.countdownEndsAt.toISOString() : "",
       ),
+      ...tierEasyValuesForCsvExport(c.tiers).map(escapeCsvField),
     ].join(",");
     lines.push(line);
   }

@@ -14,6 +14,7 @@ import { IndeterminateLinearProgress } from "../components/IndeterminateLinearPr
 import { prisma } from "../db.server";
 import { scheduleVolumeDiscountShopSync } from "../services/deferredShopSync.server";
 import { flushStorefrontWidgetPayloadNow } from "../services/refreshStorefrontWidget.server";
+import { applyDueCampaignScheduleTransitions } from "../services/campaignScheduleTransitions.server";
 import { authenticate } from "../shopify.server";
 import { parseVolumeDiscountForm } from "../utils/volumeDiscountForm.server";
 import type { VolumeDiscountNewOfferPreset } from "../types/volumeDiscount";
@@ -90,12 +91,25 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     } as unknown as Prisma.VolumeDiscountCampaignCreateInput,
   });
 
-  /* Draft offers are not in the aggregate discount — skip slow GraphQL (collection expansion, metafields). */
-  if (d.campaignStatus === "active") {
+  const transition = await applyDueCampaignScheduleTransitions(session.shop);
+  const liveNow =
+    d.campaignStatus === "active" ||
+    transition.activatedIds.includes(record.id) ||
+    transition.shopsNeedingShopifySync.includes(session.shop);
+
+  /* Draft / scheduled offers are not in the aggregate discount — skip slow GraphQL. */
+  if (liveNow) {
     await flushStorefrontWidgetPayloadNow(admin, session.shop);
     scheduleVolumeDiscountShopSync(admin, session.shop, {
       changedCampaignIds: [record.id],
     });
+  } else if (
+    d.campaignStatus === "scheduled" ||
+    d.countdownStartsAt ||
+    d.countdownEndsAt
+  ) {
+    /* Keep storefront cache/rev fresh for countdown schedule metadata. */
+    await flushStorefrontWidgetPayloadNow(admin, session.shop);
   }
 
   return { ok: true as const, campaignId: record.id, syncPending: true as const };

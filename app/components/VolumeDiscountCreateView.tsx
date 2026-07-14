@@ -38,6 +38,7 @@ import {
 } from "react";
 import { useFetcher } from "react-router";
 
+import { CampaignStatusScheduleCard } from "./CampaignStatusScheduleCard";
 import { CountdownTimerSettingsCard } from "./CountdownTimerSettingsCard";
 import { WidgetDisplayColorField } from "./WidgetDisplayColorField";
 import createStyles from "../styles/volume-discount-create.module.css";
@@ -46,7 +47,14 @@ import {
   countdownDatetimeLocalFromNow,
   datetimeLocalToIsoUtc,
   isoToDatetimeLocalValue,
+  parseOptionalIsoDate,
 } from "../utils/countdownTimes";
+import {
+  isCampaignScheduleExpired,
+  isCampaignSchedulePendingStart,
+  resolveCampaignStatusFromSchedule,
+} from "../utils/campaignScheduleStatus";
+import { statusBadgeTone, statusLabel } from "../utils/offers-display";
 import {
   BADGE_POSITION_OPTIONS,
   BADGE_SIZE_SCALE_PERCENT_MAX,
@@ -330,6 +338,7 @@ export type VolumeDiscountInitialCampaign = {
   collectionIds: string[];
   tiers: TierPayload[];
   widgetDisplay?: VolumeDiscountWidgetDisplay;
+  countdownStartsAt?: string | null;
   countdownEndsAt?: string | null;
 };
 
@@ -349,7 +358,7 @@ function tiersFromInitialCampaign(ic: VolumeDiscountInitialCampaign): TierForm[]
 function volumeDiscountFormSnapshot(input: {
   campaignName: string;
   displayName: string;
-  campaignStatus: "draft" | "active";
+  campaignStatus: "draft" | "active" | "scheduled";
   productScope: VolumeDiscountProductScope;
   productIds: string[];
   collectionIds: string[];
@@ -358,6 +367,7 @@ function volumeDiscountFormSnapshot(input: {
   customerTags: string[];
   tiers: TierForm[];
   widgetDisplay: VolumeDiscountWidgetDisplay;
+  countdownStartsAt: string | null;
   countdownEndsAt: string | null;
 }) {
   return JSON.stringify({
@@ -372,7 +382,7 @@ function volumeDiscountFormSnapshot(input: {
     customerTags: [...input.customerTags].slice().sort(),
     tiers: input.tiers,
     widgetDisplay: input.widgetDisplay,
-    countdownStartsAt: null,
+    countdownStartsAt: input.countdownStartsAt,
     countdownEndsAt: input.countdownEndsAt,
   });
 }
@@ -452,6 +462,22 @@ export function VolumeDiscountCreateView({
   );
   const [countdownEndsAtLocal, setCountdownEndsAtLocal] = useState(() =>
     initialCountdownEndsAtLocalForEditor(initialCampaign, newOfferPreset),
+  );
+  const [countdownStartsAtLocal, setCountdownStartsAtLocal] = useState(() =>
+    isoToDatetimeLocalValue(initialCampaign?.countdownStartsAt ?? null),
+  );
+  const [scheduleStartEnabled, setScheduleStartEnabled] = useState(() =>
+    Boolean(
+      isoToDatetimeLocalValue(initialCampaign?.countdownStartsAt ?? null).trim(),
+    ),
+  );
+  const [scheduleEndEnabled, setScheduleEndEnabled] = useState(() =>
+    Boolean(
+      initialCountdownEndsAtLocalForEditor(
+        initialCampaign,
+        newOfferPreset,
+      ).trim(),
+    ),
   );
   /** Bumps preview countdown effect when user clicks “Reset timer” (same ISO within 1s). */
   const [countdownPreviewNonce, setCountdownPreviewNonce] = useState(0);
@@ -774,6 +800,17 @@ export function VolumeDiscountCreateView({
         ? isoToDatetimeLocalValue(ends)
         : "",
     );
+    setScheduleEndEnabled(
+      typeof ends === "string" && ends.trim() !== "",
+    );
+
+    const starts = o.countdownStartsAt;
+    const startLocal =
+      typeof starts === "string" && starts.trim()
+        ? isoToDatetimeLocalValue(starts)
+        : "";
+    setCountdownStartsAtLocal(startLocal);
+    setScheduleStartEnabled(startLocal.trim() !== "");
 
     setPreviewCampaignOn(o.campaignStatus === "active");
   }, []);
@@ -799,22 +836,35 @@ export function VolumeDiscountCreateView({
     fd.set("productIds", JSON.stringify(productIds));
     fd.set("collectionIds", JSON.stringify(collectionIds));
     fd.set("widgetDisplay", JSON.stringify(widgetDisplay));
-    fd.set("countdownStartsAt", "");
     fd.set(
-      "countdownEndsAt",
-      countdownEndsAtLocal.trim()
-        ? datetimeLocalToIsoUtc(countdownEndsAtLocal) ?? ""
+      "countdownStartsAt",
+      scheduleStartEnabled && countdownStartsAtLocal.trim()
+        ? datetimeLocalToIsoUtc(countdownStartsAtLocal) ?? ""
         : "",
     );
     fd.set(
+      "countdownEndsAt",
+      scheduleEndEnabled && countdownEndsAtLocal.trim()
+        ? datetimeLocalToIsoUtc(countdownEndsAtLocal) ?? ""
+        : "",
+    );
+    const startIsoForStatus =
+      scheduleStartEnabled && countdownStartsAtLocal.trim()
+        ? datetimeLocalToIsoUtc(countdownStartsAtLocal)
+        : null;
+    const pendingStart = isCampaignSchedulePendingStart(
+      startIsoForStatus ? parseOptionalIsoDate(startIsoForStatus) : null,
+    );
+    fd.set(
       "campaignStatus",
-      previewCampaignOn ? "active" : "draft",
+      previewCampaignOn || pendingStart ? "active" : "draft",
     );
     fetcher.submit(fd, { method: "post" });
   }, [
     campaignName,
     collectionIds,
     countdownEndsAtLocal,
+    countdownStartsAtLocal,
     customerTags,
     customerType,
     displayName,
@@ -823,6 +873,8 @@ export function VolumeDiscountCreateView({
     productIds,
     productScope,
     quantityCondition,
+    scheduleEndEnabled,
+    scheduleStartEnabled,
     tiers,
     widgetDisplay,
   ]);
@@ -861,6 +913,17 @@ export function VolumeDiscountCreateView({
       setCountdownEndsAtLocal(
         initialCountdownEndsAtLocalForEditor(initialCampaign, newOfferPreset),
       );
+      const startLocal = isoToDatetimeLocalValue(
+        initialCampaign.countdownStartsAt ?? null,
+      );
+      setCountdownStartsAtLocal(startLocal);
+      setScheduleStartEnabled(startLocal.trim() !== "");
+      setScheduleEndEnabled(
+        initialCountdownEndsAtLocalForEditor(
+          initialCampaign,
+          newOfferPreset,
+        ).trim() !== "",
+      );
       setPreviewCampaignOn(initialCampaign.status === "active");
     } else {
       setCampaignName(defaultCampaignName ?? "Offer 1");
@@ -876,6 +939,14 @@ export function VolumeDiscountCreateView({
       setWidgetDisplay(initialWidgetDisplayForNewCampaign(newOfferPreset));
       setCountdownEndsAtLocal(
         initialCountdownEndsAtLocalForEditor(undefined, newOfferPreset),
+      );
+      setCountdownStartsAtLocal("");
+      setScheduleStartEnabled(false);
+      setScheduleEndEnabled(
+        initialCountdownEndsAtLocalForEditor(
+          undefined,
+          newOfferPreset,
+        ).trim() !== "",
       );
       setProductQuery("");
       setCollectionQuery("");
@@ -898,6 +969,7 @@ export function VolumeDiscountCreateView({
 
     if (!widgetDisplay.showCountdown) {
       setCountdownEndsAtLocal("");
+      setScheduleEndEnabled(false);
       lastCountdownAmountRef.current = widgetDisplay.countdownTimeAmount;
       lastCountdownUnitRef.current = widgetDisplay.countdownTimeUnit;
       lastShowCountdownRef.current = false;
@@ -955,6 +1027,7 @@ export function VolumeDiscountCreateView({
 
     if (shouldSyncFromNow || !hadStoredEnd) {
       setCountdownEndsAtLocal(nextLocal);
+      setScheduleEndEnabled(true);
     }
 
     lastCountdownAmountRef.current = widgetDisplay.countdownTimeAmount;
@@ -976,6 +1049,7 @@ export function VolumeDiscountCreateView({
         widgetDisplay.countdownTimeUnit,
       ),
     );
+    setScheduleEndEnabled(true);
     lastCountdownAmountRef.current = widgetDisplay.countdownTimeAmount;
     lastCountdownUnitRef.current = widgetDisplay.countdownTimeUnit;
     lastShowCountdownRef.current = true;
@@ -1044,17 +1118,77 @@ export function VolumeDiscountCreateView({
   const wasSubmittingRef = useRef(false);
 
   const formBaselineKey = initialCampaign?.id ?? "__new__";
+  const countdownStartsSnapshot =
+    scheduleStartEnabled && countdownStartsAtLocal.trim() !== ""
+      ? datetimeLocalToIsoUtc(countdownStartsAtLocal)
+      : null;
   const countdownEndsSnapshot =
-    countdownEndsAtLocal.trim() === ""
-      ? null
-      : datetimeLocalToIsoUtc(countdownEndsAtLocal);
+    scheduleEndEnabled && countdownEndsAtLocal.trim() !== ""
+      ? datetimeLocalToIsoUtc(countdownEndsAtLocal)
+      : null;
+
+  const scheduleStartsAtDate = useMemo(
+    () =>
+      countdownStartsSnapshot
+        ? parseOptionalIsoDate(countdownStartsSnapshot)
+        : null,
+    [countdownStartsSnapshot],
+  );
+  const scheduleEndsAtDate = useMemo(
+    () =>
+      countdownEndsSnapshot
+        ? parseOptionalIsoDate(countdownEndsSnapshot)
+        : null,
+    [countdownEndsSnapshot],
+  );
+  const schedulePendingStart = isCampaignSchedulePendingStart(
+    scheduleStartsAtDate,
+  );
+  const scheduleExpired = isCampaignScheduleExpired(scheduleEndsAtDate);
+
+  /** Keep Campaign status aligned with the schedule window. */
+  useEffect(() => {
+    const next = resolveCampaignStatusFromSchedule({
+      requestedStatus:
+        previewCampaignOn || schedulePendingStart ? "active" : "draft",
+      startsAt: scheduleStartsAtDate,
+      endsAt: scheduleEndsAtDate,
+    });
+    if ((next === "draft" || next === "scheduled") && previewCampaignOn) {
+      setPreviewCampaignOn(false);
+      return;
+    }
+    if (
+      next === "active" &&
+      !previewCampaignOn &&
+      scheduleStartsAtDate &&
+      !schedulePendingStart &&
+      !scheduleExpired
+    ) {
+      /* Start time reached (or moved into the past) — go live. */
+      setPreviewCampaignOn(true);
+    }
+  }, [
+    previewCampaignOn,
+    scheduleEndsAtDate,
+    scheduleExpired,
+    schedulePendingStart,
+    scheduleStartsAtDate,
+  ]);
+
+  const editorCampaignStatus = resolveCampaignStatusFromSchedule({
+    requestedStatus:
+      previewCampaignOn || schedulePendingStart ? "active" : "draft",
+    startsAt: scheduleStartsAtDate,
+    endsAt: scheduleEndsAtDate,
+  });
 
   const currentFormSnapshot = useMemo(
     () =>
       volumeDiscountFormSnapshot({
         campaignName,
         displayName,
-        campaignStatus: previewCampaignOn ? "active" : "draft",
+        campaignStatus: editorCampaignStatus,
         productScope,
         productIds,
         collectionIds,
@@ -1063,16 +1197,18 @@ export function VolumeDiscountCreateView({
         customerTags: [...customerTags].sort(),
         tiers,
         widgetDisplay,
+        countdownStartsAt: countdownStartsSnapshot,
         countdownEndsAt: countdownEndsSnapshot,
       }),
     [
       campaignName,
       collectionIds,
       countdownEndsSnapshot,
+      countdownStartsSnapshot,
       customerTags,
       customerType,
       displayName,
-      previewCampaignOn,
+      editorCampaignStatus,
       productIds,
       productScope,
       quantityCondition,
@@ -1679,26 +1815,8 @@ export function VolumeDiscountCreateView({
                           Set quantity conditions
                         </Text>
                         <Text as="p" variant="bodyMd" tone="subdued">
-                          Define how tier thresholds (e.g. Buy 25+) are counted.{" "}
-                          <Text as="span" variant="bodyMd" fontWeight="semibold">
-                            Total quantity of all products
-                          </Text>{" "}
-                          sums every line quantity in the cart, picks one tier for
-                          the whole cart, and applies that tier to each eligible
-                          line — use this for cart-wide volume discounts.{" "}
-                          <Text as="span" variant="bodyMd" fontWeight="semibold">
-                            Each product variant
-                          </Text>{" "}
-                          evaluates tiers separately per line (line quantity only).
-                          Per collection applies when{" "}
-                          <Text as="span" variant="bodyMd" fontWeight="semibold">
-                            Product scope
-                          </Text>{" "}
-                          is{" "}
-                          <Text as="span" variant="bodyMd" fontWeight="semibold">
-                            Specific collections
-                          </Text>
-                          .
+                          Choose how Buy quantity tiers are counted — cart total,
+                          per product, per variant, or per collection.
                         </Text>
                       </BlockStack>
                       <ChoiceList
@@ -1716,80 +1834,153 @@ export function VolumeDiscountCreateView({
                     </BlockStack>
                   </Card>
 
-                  <s-box
-                    padding="large-200"
-                    borderWidth="base"
-                    borderRadius="large"
-                    background="base"
-                  >
-                    <s-stack direction="block" gap="base">
-                      <s-heading>Target customer</s-heading>
-                      <s-paragraph color="subdued">
-                        Choose which customers can use this discount.
-                      </s-paragraph>
-                      <s-select
+                  <CampaignStatusScheduleCard
+                    scheduleStartEnabled={scheduleStartEnabled}
+                    onScheduleStartEnabledChange={(next) => {
+                      setScheduleStartEnabled(next);
+                      if (next) {
+                        const seed =
+                          countdownStartsAtLocal.trim() ||
+                          isoToDatetimeLocalValue(
+                            new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+                          );
+                        if (!countdownStartsAtLocal.trim()) {
+                          setCountdownStartsAtLocal(seed);
+                        }
+                        const iso = datetimeLocalToIsoUtc(seed);
+                        const start = iso ? parseOptionalIsoDate(iso) : null;
+                        if (isCampaignSchedulePendingStart(start)) {
+                          setPreviewCampaignOn(false);
+                        }
+                      }
+                    }}
+                    scheduleStartLocal={countdownStartsAtLocal}
+                    onScheduleStartLocalChange={(v) => {
+                      setCountdownStartsAtLocal(v);
+                      const iso = datetimeLocalToIsoUtc(v);
+                      const start = iso ? parseOptionalIsoDate(iso) : null;
+                      if (isCampaignSchedulePendingStart(start)) {
+                        setPreviewCampaignOn(false);
+                      } else if (
+                        start &&
+                        !isCampaignScheduleExpired(scheduleEndsAtDate)
+                      ) {
+                        setPreviewCampaignOn(true);
+                      }
+                    }}
+                    scheduleEndEnabled={scheduleEndEnabled}
+                    onScheduleEndEnabledChange={(next) => {
+                      setScheduleEndEnabled(next);
+                      if (next && !countdownEndsAtLocal.trim()) {
+                        setCountdownEndsAtLocal(
+                          countdownDatetimeLocalFromNow(
+                            widgetDisplay.countdownTimeAmount,
+                            widgetDisplay.countdownTimeUnit,
+                          ),
+                        );
+                      }
+                      if (next) {
+                        const endLocal =
+                          countdownEndsAtLocal.trim() ||
+                          countdownDatetimeLocalFromNow(
+                            widgetDisplay.countdownTimeAmount,
+                            widgetDisplay.countdownTimeUnit,
+                          );
+                        const iso = datetimeLocalToIsoUtc(endLocal);
+                        const end = iso ? parseOptionalIsoDate(iso) : null;
+                        if (isCampaignScheduleExpired(end)) {
+                          setPreviewCampaignOn(false);
+                        }
+                      }
+                    }}
+                    scheduleEndLocal={countdownEndsAtLocal}
+                    onScheduleEndLocalChange={(v) => {
+                      setCountdownEndsAtLocal(v);
+                      setScheduleEndEnabled(true);
+                      const iso = datetimeLocalToIsoUtc(v);
+                      const end = iso ? parseOptionalIsoDate(iso) : null;
+                      if (isCampaignScheduleExpired(end)) {
+                        setPreviewCampaignOn(false);
+                      } else if (
+                        !isCampaignSchedulePendingStart(scheduleStartsAtDate)
+                      ) {
+                        setPreviewCampaignOn(true);
+                      }
+                    }}
+                  />
+
+                  <Card padding="400">
+                    <BlockStack gap="300">
+                      <BlockStack gap="100">
+                        <Text as="h2" variant="headingSm">
+                          Target customer
+                        </Text>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Choose which customers can use this discount.
+                        </Text>
+                      </BlockStack>
+                      <Select
                         label="Customer type"
                         name="customerType"
-                        icon="person"
+                        options={[
+                          { label: "Everyone", value: "everyone" },
+                          {
+                            label: "Logged-in customers",
+                            value: "logged-in",
+                          },
+                          {
+                            label: "Logged-in customers with specific tag",
+                            value: "logged-in-tag-any",
+                          },
+                        ]}
                         value={customerType}
-                        onChange={(e) => {
-                          const v = e.currentTarget.value;
+                        onChange={(v) => {
                           if (isVolumeDiscountCustomerType(v)) {
                             setCustomerType(v);
                           }
                         }}
-                      >
-                        <s-option value="everyone">Everyone</s-option>
-                        <s-option value="logged-in">
-                          Logged-in customers
-                        </s-option>
-                        <s-option value="logged-in-tag-any">
-                          Logged-in customers with specific tag
-                        </s-option>
-                      </s-select>
+                      />
                       {customerType === "logged-in-tag-any" ? (
-                        <Card padding="400">
-                          <BlockStack gap="300">
-                            <Text as="p" variant="bodyMd" tone="subdued">
-                              Match spelling to customer tags in Shopify admin
-                              (Customers). Add one tag per chip; remove with ×.
-                            </Text>
-                            <InlineStack gap="200" wrap>
-                              {customerTags.map((tag) => (
-                                <Tag
-                                  key={tag}
-                                  onRemove={() => removeCustomerTag(tag)}
-                                >
-                                  {tag}
-                                </Tag>
-                              ))}
+                        <BlockStack gap="300">
+                          <Text as="p" variant="bodyMd" tone="subdued">
+                            Match spelling to customer tags in Shopify admin
+                            (Customers). Add one tag per chip; remove with ×.
+                          </Text>
+                          <InlineStack gap="200" wrap>
+                            {customerTags.map((tag) => (
+                              <Tag
+                                key={tag}
+                                onRemove={() => removeCustomerTag(tag)}
+                              >
+                                {tag}
+                              </Tag>
+                            ))}
+                          </InlineStack>
+                          <form
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              addCustomerTag();
+                            }}
+                          >
+                            <InlineStack gap="200" wrap blockAlign="end">
+                              <div style={{ flex: "1 1 12rem", minWidth: 0 }}>
+                                <TextField
+                                  label="Add customer tag"
+                                  value={customerTagInput}
+                                  onChange={(v) => setCustomerTagInput(v)}
+                                  autoComplete="off"
+                                  placeholder="e.g. Wholesale"
+                                />
+                              </div>
+                              <Button submit variant="primary">
+                                Add
+                              </Button>
                             </InlineStack>
-                            <form
-                              onSubmit={(e) => {
-                                e.preventDefault();
-                                addCustomerTag();
-                              }}
-                            >
-                              <InlineStack gap="200" wrap blockAlign="end">
-                                <div style={{ flex: "1 1 12rem", minWidth: 0 }}>
-                                  <TextField
-                                    label="Add customer tag"
-                                    value={customerTagInput}
-                                    onChange={(v) => setCustomerTagInput(v)}
-                                    autoComplete="off"
-                                    placeholder="e.g. Wholesale"
-                                  />
-                                </div>
-                                <Button submit variant="primary">
-                                  Add
-                                </Button>
-                              </InlineStack>
-                            </form>
-                          </BlockStack>
-                        </Card>
+                          </form>
+                        </BlockStack>
                       ) : null}
-                    </s-stack>
-                  </s-box>
+                    </BlockStack>
+                  </Card>
                       </s-stack>
                     ) : settingsTab === 1 ? (
                       <BlockStack gap="400">
@@ -3315,17 +3506,30 @@ export function VolumeDiscountCreateView({
                         <Text as="h3" variant="headingSm">
                           Campaign status
                         </Text>
-                        <Badge
-                          tone={previewCampaignOn ? "success" : "info"}
-                        >
-                          {previewCampaignOn ? "On" : "Draft"}
+                        <Badge tone={statusBadgeTone(editorCampaignStatus)}>
+                          {statusLabel(editorCampaignStatus)}
                         </Badge>
                       </InlineStack>
                       <Button
                         variant="tertiary"
-                        onClick={() => setPreviewCampaignOn((v) => !v)}
+                        onClick={() => {
+                          setPreviewCampaignOn((v) => {
+                            if (v || editorCampaignStatus === "scheduled") {
+                              /* Manual off — clear start so it becomes Draft, not Scheduled. */
+                              setScheduleStartEnabled(false);
+                              setCountdownStartsAtLocal("");
+                              return false;
+                            }
+                            if (scheduleExpired) {
+                              return false;
+                            }
+                            return true;
+                          });
+                        }}
                       >
-                        {previewCampaignOn ? "Turn off" : "Turn on"}
+                        {editorCampaignStatus === "active"
+                          ? "Turn off"
+                          : "Turn on"}
                       </Button>
                     </InlineStack>
                   </Card>
@@ -3366,7 +3570,9 @@ export function VolumeDiscountCreateView({
                         background="bg-surface-secondary"
                         borderRadius="200"
                         overflowX="hidden"
-                        opacity={previewCampaignOn ? undefined : "0.5"}
+                        opacity={
+                          editorCampaignStatus === "active" ? undefined : "0.5"
+                        }
                       >
                         <div
                           className={
@@ -3375,7 +3581,7 @@ export function VolumeDiscountCreateView({
                               : `${createStyles.previewViewport} ${createStyles.previewViewportDesktop}`
                           }
                           style={
-                            previewCampaignOn
+                            editorCampaignStatus === "active"
                               ? undefined
                               : { pointerEvents: "none" as const }
                           }
@@ -3392,11 +3598,19 @@ export function VolumeDiscountCreateView({
                                 previewDevice={previewDevice}
                                 countdownPreviewNonce={countdownPreviewNonce}
                                 countdownEndsAtIso={
+                                  scheduleEndEnabled &&
                                   countdownEndsAtLocal.trim()
                                     ? datetimeLocalToIsoUtc(countdownEndsAtLocal)
                                     : null
                                 }
-                                countdownStartsAtIso={null}
+                                countdownStartsAtIso={
+                                  scheduleStartEnabled &&
+                                  countdownStartsAtLocal.trim()
+                                    ? datetimeLocalToIsoUtc(
+                                        countdownStartsAtLocal,
+                                      )
+                                    : null
+                                }
                               />
                             </Suspense>
                           </Box>

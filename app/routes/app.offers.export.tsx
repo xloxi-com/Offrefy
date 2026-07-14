@@ -27,7 +27,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition":
-        'attachment; filename="offrefy-offers.csv"',
+        'attachment; filename="offrefy-offers-excel.csv"',
       "X-Content-Type-Options": "nosniff",
       "Cache-Control": "no-store",
     },

@@ -28,6 +28,7 @@ import {
   runAfterResponse,
   scheduleVolumeDiscountShopSync,
 } from "../services/deferredShopSync.server";
+import { applyDueCampaignScheduleTransitions } from "../services/scheduledVolumeDiscountSync.server";
 import { flushStorefrontWidgetPayloadNow } from "../services/refreshStorefrontWidget.server";
 import { syncVolumeDiscountShop } from "../services/volumeDiscountFunctionSync.server";
 import { authenticate } from "../shopify.server";
@@ -91,6 +92,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       console.warn("[volume-discount] ensure function discount", e);
     })
   );
+
+  /* Flip Scheduled → Active / Active → Ended before listing. */
+  const flipped = await applyDueCampaignScheduleTransitions(session.shop);
+  if (flipped.shopsNeedingShopifySync.length) {
+    scheduleVolumeDiscountShopSync(admin, session.shop);
+  }
 
   const rows = await prisma.$queryRaw<
     Array<{
@@ -225,7 +232,11 @@ export async function action({ request }: ActionFunctionArgs) {
   if (intent === "exportCsv") {
     const tabRaw = String(form.get("listTab") ?? "all");
     const tab: OffersListTab =
-      tabRaw === "active" || tabRaw === "draft" ? tabRaw : "all";
+      tabRaw === "active" ||
+      tabRaw === "draft" ||
+      tabRaw === "scheduled"
+        ? tabRaw
+        : "all";
     const searchQuery = String(form.get("listQ") ?? "");
     const sort = String(form.get("listSort") ?? "modified desc");
     const csv = await buildVolumeDiscountOffersCsvExport(session.shop, {
@@ -243,7 +254,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return {
       ok: true as const,
       intent: "exportCsv" as const,
-      filename: "offrefy-offers.csv",
+      filename: "offrefy-offers-excel.csv",
       csv,
     };
   }

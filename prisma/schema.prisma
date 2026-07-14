@@ -69,7 +69,7 @@ model VolumeDiscountCampaign {
   widgetDisplay       Json     @default("{}")
   /// Linked DiscountAutomaticNode GID(s); active offers share one app Function discount
   shopifyDiscountIds  Json     @default("[]")
-  /// draft | active | archived
+  /// draft | active | scheduled | archived
   status              String   @default("active")
   /// When set, countdown is hidden until this instant (UTC). Optional promo window start.
   countdownStartsAt   DateTime?

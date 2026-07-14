@@ -12,6 +12,7 @@ import type { Prisma } from "@prisma/client";
 import { IndeterminateLinearProgress } from "../components/IndeterminateLinearProgress";
 import { prisma } from "../db.server";
 import { planCampaignSaveSync } from "../utils/campaignSyncDelta.server";
+import { applyDueCampaignScheduleTransitions } from "../services/campaignScheduleTransitions.server";
 import {
   scheduleVolumeDiscountShopSync,
 } from "../services/deferredShopSync.server";
@@ -54,6 +55,7 @@ export type VolumeDiscountEditLoaderData = {
     collectionIds: string[];
     tiers: unknown;
     widgetDisplay: VolumeDiscountWidgetDisplay;
+    countdownStartsAt: string | null;
     countdownEndsAt: string | null;
   };
 };
@@ -88,6 +90,7 @@ export const loader = async ({
       collectionIds: true,
       tiers: true,
       widgetDisplay: true,
+      countdownStartsAt: true,
       countdownEndsAt: true,
     } as unknown as Prisma.VolumeDiscountCampaignSelect,
   });
@@ -119,6 +122,7 @@ export const loader = async ({
       widgetDisplay: normalizeVolumeDiscountWidgetDisplay(
         rowWithWidget.widgetDisplay ?? {},
       ),
+      countdownStartsAt: row.countdownStartsAt?.toISOString() ?? null,
       countdownEndsAt: row.countdownEndsAt?.toISOString() ?? null,
     },
   };
@@ -188,6 +192,15 @@ export const action = async ({
     } as unknown as Prisma.VolumeDiscountCampaignUpdateInput,
   });
 
+  /* If start/end already due at save time, flip Scheduled↔Active/Draft before sync plan. */
+  const transition = await applyDueCampaignScheduleTransitions(session.shop);
+  const afterStatus =
+    transition.activatedIds.includes(id)
+      ? "active"
+      : transition.deactivatedIds.includes(id)
+        ? "draft"
+        : d.campaignStatus;
+
   const syncPlan = planCampaignSaveSync(
     {
       status: existing.status,
@@ -204,10 +217,13 @@ export const action = async ({
       countdownStartsAt: existing.countdownStartsAt,
       countdownEndsAt: existing.countdownEndsAt,
     },
-    d,
+    { ...d, campaignStatus: afterStatus },
   );
 
-  if (syncPlan.kind === "full") {
+  if (
+    syncPlan.kind === "full" ||
+    transition.shopsNeedingShopifySync.includes(session.shop)
+  ) {
     /* Storefront JSON must be fresh immediately; Function sync can finish in background. */
     await flushStorefrontWidgetPayloadNow(admin, session.shop);
     scheduleVolumeDiscountShopSync(admin, session.shop, {
@@ -272,6 +288,7 @@ export default function VolumeDiscountEditRoute() {
           collectionIds: campaign.collectionIds,
           tiers: tiersNorm,
           widgetDisplay: campaign.widgetDisplay,
+          countdownStartsAt: campaign.countdownStartsAt,
           countdownEndsAt: campaign.countdownEndsAt,
         }}
       />

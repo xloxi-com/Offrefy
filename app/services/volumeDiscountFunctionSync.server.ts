@@ -1,6 +1,7 @@
 import type { VolumeDiscountCampaignSyncRow } from "../utils/volumeDiscountCampaignSelect.server";
 import { volumeDiscountCampaignSyncSelect } from "../utils/volumeDiscountCampaignSelect.server";
 import { prisma } from "../db.server";
+import { applyDueCampaignScheduleTransitions } from "./campaignScheduleTransitions.server";
 import { buildVolumeDiscountFunctionConfig } from "../utils/volumeDiscountFunctionConfig.server";
 import {
   isAutomaticDiscountLimitError,
@@ -387,6 +388,9 @@ export async function syncVolumeDiscountShop(
   const recursionDepth = options.recursionDepth ?? 0;
   const incrementalIds = options.changedCampaignIds;
   const force = options.force === true;
+
+  /* Ensure Scheduled/Ended windows are applied before we read Active rows. */
+  await applyDueCampaignScheduleTransitions(shop);
 
   const [activeRows, stateRow] = await Promise.all([
     prisma.volumeDiscountCampaign.findMany({

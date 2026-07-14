@@ -4,25 +4,13 @@ import {
   parseJsonStringArrayFromEasyList,
 } from "./csvTiersEasy.server";
 import { compactCsvCellToTiersJson } from "./csvTierCompact.server";
+import { buildOffersCsvHeaders } from "./offersCsvColumns";
 
 /**
- * Minimal export/import columns (easy Excel edit). `tiers` uses compact syntax
- * (see `tiersJsonToCompactCsvCell`). Legacy wide CSVs still import via old keys.
+ * Flat Excel columns (tier1_buyFrom …). Legacy compact `tiers` cell still imports.
  */
-export const VOLUME_DISCOUNT_CSV_HEADERS: readonly string[] = [
-  "campaignName",
-  "displayName",
-  "status",
-  "productScope",
-  "quantityCondition",
-  "customerType",
-  "customerTags",
-  "productIds",
-  "collectionIds",
-  "tiers",
-  "countdownStartsAt",
-  "countdownEndsAt",
-];
+export const VOLUME_DISCOUNT_CSV_HEADERS: readonly string[] =
+  buildOffersCsvHeaders();
 
 export type VolumeDiscountCsvHeader = string;
 
@@ -138,6 +126,9 @@ export function csvRowsToRecords(rows: string[][]): Record<string, string>[] {
       if (!key) continue;
       rec[key] = cells[c] ?? "";
     }
+    /** Guide / comment rows from the Excel template (campaignName starts with #). */
+    const name = (rec.campaignname ?? "").trim();
+    if (name.startsWith("#")) continue;
     out.push(rec);
   }
   return out;
@@ -246,11 +237,9 @@ export function csvRecordToFormData(rec: Record<string, string>): FormData {
     .replace(/^\uFEFF/, "")
     .toLowerCase();
   const campaignStatus =
-    statusRaw === "active"
+    statusRaw === "active" || statusRaw === "scheduled"
       ? "active"
-      : statusRaw === "archived"
-        ? "draft"
-        : "draft";
+      : "draft";
   form.set("campaignStatus", campaignStatus);
 
   form.set("productScope", csvRecordGet(rec, "productScope").trim());

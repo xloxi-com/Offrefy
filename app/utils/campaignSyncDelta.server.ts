@@ -97,24 +97,39 @@ export function planCampaignSaveSync(
 ): SaveSyncPlan {
   const wasActive = normCampaignStatus(before.status) === "active";
   const nowActive = normCampaignStatus(after.campaignStatus) === "active";
+  const statusChanged =
+    normCampaignStatus(before.status) !==
+    normCampaignStatus(after.campaignStatus);
 
+  /* Active membership flip (incl. Active ↔ Scheduled/Draft) → Function sync. */
+  if (wasActive !== nowActive) {
+    return { kind: "full" };
+  }
+
+  if (wasActive && nowActive && discountFunctionFieldsChanged(before, after)) {
+    return { kind: "full" };
+  }
+
+  if (wasActive && nowActive && storefrontPresentationChanged(before, after)) {
+    return { kind: "storefront_only" };
+  }
+
+  /*
+   * Scheduled / Draft: still refresh storefront when schedule times or status change
+   * so countdown + listing stay consistent after save.
+   */
   if (!wasActive && !nowActive) {
+    if (storefrontPresentationChanged(before, after) || statusChanged) {
+      return { kind: "storefront_only" };
+    }
     return { kind: "none" };
-  }
-
-  if (!wasActive && nowActive) {
-    return { kind: "full" };
-  }
-
-  if (wasActive && !nowActive) {
-    return { kind: "full" };
   }
 
   if (discountFunctionFieldsChanged(before, after)) {
     return { kind: "full" };
   }
 
-  if (storefrontPresentationChanged(before, after)) {
+  if (storefrontPresentationChanged(before, after) || statusChanged) {
     return { kind: "storefront_only" };
   }
 

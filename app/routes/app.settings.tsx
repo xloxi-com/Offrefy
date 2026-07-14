@@ -26,7 +26,7 @@ import { authenticate } from "../shopify.server";
 import { prisma } from "../db.server";
 import { syncVolumeDiscountShop } from "../services/volumeDiscountFunctionSync.server";
 import { refreshStorefrontWidgetForShop, pushStorefrontWidgetToShop } from "../services/refreshStorefrontWidget.server";
-import { scheduleDueSyncForShopIfNeeded } from "../services/scheduledVolumeDiscountSync.server";
+import { scheduleDueSyncForShopIfNeeded, applyShopCampaignScheduleTransitionsIfNeeded } from "../services/scheduledVolumeDiscountSync.server";
 import { reconcileOrderAnalyticsForShop } from "../services/orderAnalyticsReconcile.server";
 import { runAfterResponse } from "../services/deferredShopSync.server";
 import { invalidateMemoryCachePrefix } from "../utils/memoryCache.server";
@@ -151,6 +151,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     dbSettings.syncInterval,
     lastSyncedAt,
   );
+  applyShopCampaignScheduleTransitionsIfNeeded(session.shop);
 
   const settings: SettingsData = {
     syncInterval: dbSettings.syncInterval,

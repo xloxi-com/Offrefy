@@ -48,14 +48,18 @@ export function formatCreatedAt(iso: string): string {
 export function statusBadgeTone(
   status: string,
 ): "success" | "attention" | "warning" | "critical" | "info" | "new" | "read-only" | "enabled" {
-  if (status === "active") return "success";
-  if (status === "draft") return "info";
+  const s = status.toLowerCase();
+  if (s === "active") return "success";
+  if (s === "scheduled") return "attention";
+  if (s === "draft") return "info";
   return "warning";
 }
 
 export function statusLabel(status: string): string {
-  if (status === "active") return "Active";
-  if (status === "draft") return "Draft";
-  if (status === "archived") return "Archived";
+  const s = status.toLowerCase();
+  if (s === "active") return "Active";
+  if (s === "draft") return "Draft";
+  if (s === "scheduled") return "Scheduled";
+  if (s === "archived") return "Archived";
   return status;
 }
