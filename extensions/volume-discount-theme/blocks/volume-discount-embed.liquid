@@ -3,7 +3,7 @@
   Loads storefront JS/CSS. On product pages, also outputs the quantity-breaks widget if the section block was not added (data-vd-embed-fallback; removed in JS when a section block exists).
 {% endcomment %}
 {% render 'vd-storefront-assets' %}
-{% if request.page_type == 'product' %}
+{% if request.page_type == 'product' or template.name == 'product' %}
   {% render 'vd-quantity-breaks', vd_from_embed: true %}
 {% endif %}
 

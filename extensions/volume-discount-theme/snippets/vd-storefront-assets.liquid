@@ -8,6 +8,10 @@
   assign locale_base = request.locale.iso_code | split: '-' | first | downcase
   assign vd_cart_discount = '{{ discount }} OFF'
   assign vd_cart_discount_qty = '(qty {{ qty }})'
+  assign vd_is_product = false
+  if request.page_type == 'product' or template.name == 'product'
+    assign vd_is_product = true
+  endif
 
   if vd_widget and vd_widget.translations and vd_widget.translations[locale_base]
     assign locale_trans = vd_widget.translations[locale_base]
@@ -25,9 +29,11 @@
 %}
 <script>
 (function () {
-  var VD_ASSET_VERSION = "1.20.0";
+  var VD_ASSET_VERSION = "1.21.0";
+  var APP_ORIGIN = "https://offrey.xloxi.com";
   window.__vdStorefrontLocale = {{ request.locale.iso_code | json }};
   window.__vdAssetVersion = VD_ASSET_VERSION;
+  window.__vdAppOrigin = APP_ORIGIN;
   window.__vdCartBadgeTemplates = {
     locale: {{ locale_base | json }},
     discount: {{ vd_cart_discount | json }},
@@ -37,7 +43,38 @@
   window.__vdStorefrontTranslations = {{ vd_widget.translations | json }};
   {% endif %}
 
-  (function syncVdCartLocaleAttribute() {
+  {% if vd_is_product and product %}
+  /* Start widget-config before the main bundle parses — biggest TTI win on product pages. */
+  (function prefetchVdConfig() {
+    var shop = {{ shop.permanent_domain | json }};
+    var pid = {{ product.id | json }};
+    var vid = {{ product.selected_or_first_available_variant.id | json }};
+    if (!shop || !pid) return;
+    var key = String(pid) + "|" + String(vid || "");
+    window.__vdConfigPrefetchKey = key;
+    var u =
+      APP_ORIGIN +
+      "/widget-config?shop=" +
+      encodeURIComponent(shop) +
+      "&product_id=" +
+      encodeURIComponent(String(pid)) +
+      (vid ? "&variant_id=" + encodeURIComponent(String(vid)) : "");
+    window.__vdConfigPrefetch = fetch(u, {
+      credentials: "omit",
+      headers: { Accept: "application/json" },
+      priority: "high",
+    })
+      .then(function (r) {
+        return r && r.ok ? r.json() : null;
+      })
+      .catch(function () {
+        return null;
+      });
+  })();
+  {% endif %}
+
+  /* Cart locale sync is non-critical — never compete with widget boot. */
+  function syncVdCartLocaleAttribute() {
     var loc = window.__vdStorefrontLocale;
     if (!loc && document.documentElement) {
       var lang = document.documentElement.getAttribute("lang");
@@ -71,7 +108,16 @@
         } catch (e) {}
       })
       .catch(function () {});
-  })();
+  }
+  var deferLocale =
+    typeof requestIdleCallback === "function"
+      ? function (cb) {
+          requestIdleCallback(cb, { timeout: 2500 });
+        }
+      : function (cb) {
+          setTimeout(cb, 1200);
+        };
+  deferLocale(syncVdCartLocaleAttribute);
 
   var scriptSrc = {{ 'volume-discount-storefront.js' | asset_url | json }};
   scriptSrc +=
@@ -91,19 +137,30 @@
   window.__vdStorefrontAssetsLoaded = true;
   var head = document.head || document.getElementsByTagName("head")[0];
   var cssHref = {{ 'volume-discount-storefront.css' | asset_url | json }};
-  var cssPreload = document.createElement("link");
-  cssPreload.rel = "preload";
-  cssPreload.as = "style";
-  cssPreload.href = cssHref;
-  head.appendChild(cssPreload);
   var css = document.createElement("link");
   css.rel = "stylesheet";
   css.href = cssHref;
+  {% if vd_is_product %}
+  css.fetchPriority = "high";
+  {% endif %}
   head.appendChild(css);
+
+  {% if vd_is_product %}
+  var pre = document.createElement("link");
+  pre.rel = "preload";
+  pre.as = "script";
+  pre.href = scriptSrc;
+  head.appendChild(pre);
+  {% endif %}
+
   var s = document.createElement("script");
   s.src = scriptSrc;
   s.defer = true;
+  {% if vd_is_product %}
+  s.fetchPriority = "high";
+  {% else %}
   s.fetchPriority = "low";
+  {% endif %}
   s.setAttribute("data-vd-asset-version", VD_ASSET_VERSION);
   (document.body || head).appendChild(s);
 })();

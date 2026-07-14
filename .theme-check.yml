@@ -1,6 +1,13 @@
 # Theme app extension lives here.
 root: extensions/volume-discount-theme
 
+# Use the app-extension preset so schemas may include `target` / `enabled_on`
+# (online-store theme ValidSchema would reject those).
+extends: theme-check:theme-app-extension
+
+ignore:
+  - node_modules/**
+
 # App blocks under blocks/*.liquid render snippets; some Theme Check runs (or repo-as-root) still
 # miss those edges, which falsely flags snippets as orphaned.
 OrphanedSnippet:

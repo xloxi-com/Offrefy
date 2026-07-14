@@ -22,15 +22,25 @@ import { buildStorefrontWidgetForProduct } from "../utils/storefrontWidgetConfig
  * Optional `product_id` + `variant_id` — returns one campaign for that product (large catalogs).
  * Without those params, returns full cached payload (small catalogs / legacy).
  */
+const STOREFRONT_CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Accept, Content-Type",
+};
+
 function emptyJson(request: Request) {
   return cachedJsonResponse(STOREFRONT_EMPTY_PAYLOAD, {
     request,
     maxAge: 60,
     staleWhileRevalidate: 300,
+    extraHeaders: STOREFRONT_CORS_HEADERS,
   });
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: STOREFRONT_CORS_HEADERS });
+  }
   let admin: Awaited<
     ReturnType<typeof authenticate.public.appProxy>
   >["admin"] | undefined;
@@ -63,8 +73,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     if (memHit) {
       return cachedJsonResponse(memHit, {
         request,
-        maxAge: 120,
-        staleWhileRevalidate: 600,
+        maxAge: 300,
+        staleWhileRevalidate: 3600,
+        publicCache: true,
+        extraHeaders: STOREFRONT_CORS_HEADERS,
       });
     }
     try {
@@ -74,11 +86,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         variantId || null,
         admin ?? null,
       );
-      setMemoryCachedJson(memKey, value, 60_000);
+      setMemoryCachedJson(memKey, value, 180_000);
       return cachedJsonResponse(value, {
         request,
-        maxAge: 120,
-        staleWhileRevalidate: 600,
+        maxAge: 300,
+        staleWhileRevalidate: 3600,
+        publicCache: true,
+        extraHeaders: STOREFRONT_CORS_HEADERS,
       });
     } catch (e) {
       console.error("[volume-discount] widget-config product", e);
@@ -92,8 +106,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (fullMemHit) {
     return cachedJsonResponse(fullMemHit, {
       request,
-      maxAge: 60,
-      staleWhileRevalidate: 300,
+      maxAge: 120,
+      staleWhileRevalidate: 900,
+      publicCache: true,
+      extraHeaders: STOREFRONT_CORS_HEADERS,
     });
   }
 
@@ -102,11 +118,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     if (cached.stale && admin) {
       scheduleStorefrontPayloadRevalidation(shop, admin);
     }
-    setMemoryCachedJson(fullMemKey, cached.body, 45_000);
+    setMemoryCachedJson(fullMemKey, cached.body, 120_000);
     return cachedJsonResponse(cached.body, {
       request,
-      maxAge: 60,
-      staleWhileRevalidate: 300,
+      maxAge: 120,
+      staleWhileRevalidate: 900,
+      publicCache: true,
+      extraHeaders: STOREFRONT_CORS_HEADERS,
     });
   }
 
@@ -132,6 +150,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       request,
       maxAge: 60,
       staleWhileRevalidate: 300,
+      extraHeaders: STOREFRONT_CORS_HEADERS,
     });
   } catch (e) {
     console.error("[volume-discount] widget-config", e);
@@ -139,6 +158,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       request,
       maxAge: 10,
       staleWhileRevalidate: 0,
+      extraHeaders: STOREFRONT_CORS_HEADERS,
     });
   }
 };

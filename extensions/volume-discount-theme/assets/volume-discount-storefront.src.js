@@ -23,6 +23,139 @@
     return String(productId || "") + "|" + String(variantId || "");
   }
 
+  var VD_CFG_CACHE_TTL_MS = 5 * 60 * 1000;
+
+  function readSessionConfigCache(key) {
+    try {
+      var raw = sessionStorage.getItem("vd_cfg_" + key);
+      if (!raw) return null;
+      var parsed = JSON.parse(raw);
+      if (!parsed || !parsed.t || Date.now() - parsed.t > VD_CFG_CACHE_TTL_MS) {
+        return null;
+      }
+      if (!parsed.v || !Array.isArray(parsed.v.campaigns) || !parsed.v.campaigns.length) {
+        return null;
+      }
+      return parsed.v;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function writeSessionConfigCache(key, value) {
+    if (!value || !Array.isArray(value.campaigns) || !value.campaigns.length) return;
+    try {
+      sessionStorage.setItem(
+        "vd_cfg_" + key,
+        JSON.stringify({ t: Date.now(), v: value }),
+      );
+    } catch (e) {
+      void e;
+    }
+  }
+
+  function withShopQuery(url) {
+    var shopDomain =
+      window.Shopify && window.Shopify.shop ? window.Shopify.shop : "";
+    if (!shopDomain) return url;
+    return (
+      url +
+      (url.indexOf("?") === -1 ? "?" : "&") +
+      "shop=" +
+      encodeURIComponent(shopDomain)
+    );
+  }
+
+  function widgetConfigQuery(productId, variantId) {
+    if (!productId) return "";
+    return (
+      "?product_id=" +
+      encodeURIComponent(String(productId)) +
+      (variantId
+        ? "&variant_id=" + encodeURIComponent(String(variantId))
+        : "")
+    );
+  }
+
+  /** Prefer direct app host (CORS) — usually faster than Shopify app-proxy hop. */
+  function widgetConfigCandidateUrls(productId, variantId) {
+    var q = widgetConfigQuery(productId, variantId);
+    var root = "/";
+    try {
+      if (
+        window.Shopify &&
+        window.Shopify.routes &&
+        typeof window.Shopify.routes.root === "string"
+      ) {
+        root = window.Shopify.routes.root;
+        if (root.slice(-1) !== "/") root += "/";
+      }
+    } catch (e) {
+      void e;
+    }
+    var urls = [];
+    var abs =
+      typeof window.__vdAppOrigin === "string"
+        ? String(window.__vdAppOrigin).replace(/\/$/, "")
+        : "";
+    if (abs) {
+      urls.push(withShopQuery(abs + "/widget-config" + q));
+    }
+    urls.push(withShopQuery(root + "apps/volume-discount/widget-config" + q));
+    if (root !== "/") {
+      urls.push(withShopQuery(PROXY + q));
+    }
+    return urls;
+  }
+
+  function parseWidgetConfigResponse(res) {
+    if (!res || !res.ok) return Promise.resolve(null);
+    var ct = String(res.headers.get("content-type") || "").toLowerCase();
+    if (ct.indexOf("json") === -1) return Promise.resolve(null);
+    return res.json().catch(function () {
+      return null;
+    });
+  }
+
+  function isUsableWidgetConfig(body) {
+    return !!(
+      body &&
+      Array.isArray(body.campaigns) &&
+      body.campaigns.length > 0
+    );
+  }
+
+  /** Resolve first successful config among parallel candidates. */
+  function raceUsableConfigs(promises) {
+    return new Promise(function (resolve) {
+      var left = promises.length;
+      var settled = false;
+      if (!left) {
+        resolve({ version: 1, campaigns: [] });
+        return;
+      }
+      for (var i = 0; i < promises.length; i++) {
+        promises[i].then(
+          function (body) {
+            if (settled) return;
+            if (isUsableWidgetConfig(body)) {
+              settled = true;
+              resolve(body);
+              return;
+            }
+            left -= 1;
+            if (!left) resolve({ version: 1, campaigns: [] });
+          },
+          function () {
+            if (settled) return;
+            left -= 1;
+            if (!left) resolve({ version: 1, campaigns: [] });
+          },
+        );
+      }
+    });
+  }
+
   function fetchConfig(productId, variantId) {
     var pid = String(productId || "");
     if (pid) {
@@ -32,36 +165,47 @@
     var key = fetchConfigKey(productId, variantId);
     var existing = fetchPromiseByKey.get(key);
     if (existing) return existing;
-    var url = PROXY;
-    if (productId) {
-      url +=
-        "?product_id=" +
-        encodeURIComponent(String(productId)) +
-        (variantId
-          ? "&variant_id=" + encodeURIComponent(String(variantId))
-          : "");
+
+    var cached = readSessionConfigCache(key);
+    if (cached) {
+      var hit = Promise.resolve(cached);
+      fetchPromiseByKey.set(key, hit);
+      if (pid) fetchPromiseByProductId.set(pid, hit);
+      return hit;
     }
-    var shopDomain = window.Shopify && window.Shopify.shop ? window.Shopify.shop : "";
-    if (shopDomain) {
-      url += (url.indexOf("?") === -1 ? "?" : "&") + "shop=" + encodeURIComponent(shopDomain);
-    }
-    var promise = fetch(url, {
-      credentials: "same-origin",
-      headers: { Accept: "application/json" },
-    })
-      .then(function (res) {
-        if (!res || !res.ok) {
-          fetchPromiseByKey.delete(key);
-          if (pid) fetchPromiseByProductId.delete(pid);
-          return { version: 1, campaigns: [] };
-        }
-        return res.json();
-      })
-      .catch(function () {
-        fetchPromiseByKey.delete(key);
-        if (pid) fetchPromiseByProductId.delete(pid);
-        return { version: 1, campaigns: [] };
-      });
+
+    var prefetchKey = window.__vdConfigPrefetchKey;
+    var prefetchPromise =
+      prefetchKey &&
+      prefetchKey === key &&
+      window.__vdConfigPrefetch &&
+      typeof window.__vdConfigPrefetch.then === "function"
+        ? window.__vdConfigPrefetch.then(function (body) {
+            return isUsableWidgetConfig(body) ? body : null;
+          })
+        : Promise.resolve(null);
+
+    var candidates = widgetConfigCandidateUrls(productId, variantId);
+    var networkPromises = candidates.map(function (url) {
+      var cross = String(url).indexOf("://") !== -1;
+      return fetch(url, {
+        credentials: cross ? "omit" : "same-origin",
+        headers: { Accept: "application/json" },
+      }).then(parseWidgetConfigResponse);
+    });
+
+    var promise = raceUsableConfigs(
+      [prefetchPromise].concat(networkPromises),
+    ).then(function (body) {
+      if (isUsableWidgetConfig(body)) {
+        writeSessionConfigCache(key, body);
+        return body;
+      }
+      fetchPromiseByKey.delete(key);
+      if (pid) fetchPromiseByProductId.delete(pid);
+      return { version: 1, campaigns: [] };
+    });
+
     fetchPromiseByKey.set(key, promise);
     if (pid) fetchPromiseByProductId.set(pid, promise);
     return promise;
@@ -3670,7 +3814,7 @@
     trackImpression(campaign, root.getAttribute("data-product-id"));
     window.VolumeDiscount = window.VolumeDiscount || {};
     window.VolumeDiscount.embed = window.VolumeDiscount.embed || {};
-    window.VolumeDiscount.embed.version = "1.19.9";
+    window.VolumeDiscount.embed.version = "1.21.0";
 
     /**
      * Remove the body app-embed fallback only after a section "Quantity breaks" widget
@@ -3683,6 +3827,51 @@
         .forEach(function (el) {
           el.remove();
         });
+    }
+  }
+
+  /** Move app-embed fallback into the main product buy box (above ATC). */
+  function placeEmbedNearBuyButtons(root) {
+    if (!root || !root.parentNode) return;
+    var form = null;
+    var forms = document.querySelectorAll('form[action*="/cart/add"]');
+    for (var fi = 0; fi < forms.length; fi++) {
+      var f = forms[fi];
+      if (f.closest(".vd-storefront-root")) continue;
+      if (
+        f.closest("cart-drawer") ||
+        f.closest("#CartDrawer") ||
+        f.closest("cart-notification")
+      ) {
+        continue;
+      }
+      form = f;
+      break;
+    }
+    var anchor =
+      (form &&
+        (form.closest(".product-form") ||
+          form.closest("product-form") ||
+          form.closest("buy-buttons") ||
+          form.closest(".product__info") ||
+          form.closest(".product-information") ||
+          form.parentNode)) ||
+      document.querySelector(
+        ".product-form__buttons, buy-buttons, .product-form, product-form",
+      );
+    if (!anchor || !anchor.parentNode) {
+      if (form && form.parentNode && root.parentNode !== form.parentNode) {
+        form.parentNode.insertBefore(root, form);
+      }
+      return;
+    }
+    if (root.parentNode === anchor.parentNode && root.nextSibling === anchor) {
+      return;
+    }
+    try {
+      anchor.parentNode.insertBefore(root, anchor);
+    } catch (e) {
+      if (form && form.parentNode) form.parentNode.insertBefore(root, form);
     }
   }
 
@@ -3704,10 +3893,7 @@
 
     var embedFallback = root.getAttribute("data-vd-embed-fallback") === "true";
     if (embedFallback) {
-      var form = document.querySelector('form[action*="/cart/add"]');
-      if (form && form.parentNode && root.parentNode !== form.parentNode) {
-        form.parentNode.insertBefore(root, form);
-      }
+      placeEmbedNearBuyButtons(root);
     }
     var variantId = root.getAttribute("data-variant-id");
     var productGid = root.getAttribute("data-product-gid");
@@ -3839,6 +4025,12 @@
   function scan(options) {
     var opts = options || {};
     var syncCartSideEffects = opts.syncCart !== false;
+
+    /* Widget first — never wait on cart network before mounting. */
+    document.querySelectorAll(".vd-storefront-root").forEach(function (el) {
+      runWidget(el);
+    });
+
     installCartMutationInterceptor();
     bindCartDrawerDiscountLabelPatching();
     bindStorefrontLocaleWatcher();
@@ -3852,22 +4044,29 @@
     } catch (e) {
       void e;
     }
-    if (syncCartSideEffects) {
-      syncCartLocaleAttribute(false)
-        .then(function () {
-          return syncCartLockedProductsAttribute(null);
-        })
-        .then(function () {
-          scheduleCartDrawerDiscountLabelPatch();
-        });
-    } else {
-      scheduleCartDrawerDiscountLabelPatch();
+
+    function runCartSideEffects() {
+      if (syncCartSideEffects) {
+        syncCartLocaleAttribute(false)
+          .then(function () {
+            return syncCartLockedProductsAttribute(null);
+          })
+          .then(function () {
+            scheduleCartDrawerDiscountLabelPatch();
+          });
+      } else {
+        scheduleCartDrawerDiscountLabelPatch();
+      }
     }
-    document.querySelectorAll(".vd-storefront-root").forEach(function (el) {
-      runWidget(el);
-    });
+
+    if (typeof requestIdleCallback === "function") {
+      requestIdleCallback(runCartSideEffects, { timeout: 2000 });
+    } else {
+      setTimeout(runCartSideEffects, syncCartSideEffects ? 400 : 0);
+    }
   }
 
+  /* Defer script runs after parse — mount immediately when roots exist. */
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () {
       scan({ syncCart: true });
