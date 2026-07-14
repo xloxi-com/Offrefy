@@ -76,14 +76,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     grantedScopes.includes("read_locales") ||
     grantedScopes.includes("read_markets_home");
 
-  const dbSettings = await readStorefrontSettingsRow(session.shop);
+  const [dbSettings, localesResult, lastSyncedAt] = await Promise.all([
+    readStorefrontSettingsRow(session.shop),
+    fetchShopPublishedLocales(admin, session.shop),
+    resolveShopLastSyncedAt(session.shop),
+  ]);
+
+  const { languages: shopLanguages, errors: shopLanguageErrors } =
+    localesResult;
   const storedTranslations = parseStoredStorefrontTranslations(
     dbSettings.translationsString,
   );
 
-  const { languages: shopLanguages, errors: shopLanguageErrors } =
-    await fetchShopPublishedLocales(admin, session.shop);
-
+  /* Structure sync only on GET — MyMemory backfill runs after the response. */
   const translationSync = await syncStorefrontTranslationsWithShopLanguages(
     session.shop,
     admin,
@@ -92,24 +97,38 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       syncInterval: dbSettings.syncInterval,
       shopLanguages:
         shopLanguages.length > 0 ? shopLanguages : FALLBACK_SHOP_LANGUAGES,
+      skipAutoTranslate: true,
     },
   );
 
-  if (translationSync.persisted) {
+  if (translationSync.persisted || translationSync.needsAutoTranslate) {
     invalidateMemoryCachePrefix(`widget:${session.shop}:`);
     invalidateMemoryCachePrefix(`cart-rules:${session.shop}:`);
     invalidateMemoryCachePrefix(`sf-translations:${session.shop}`);
     runAfterResponse(
-      pushStorefrontWidgetToShop(admin, session.shop).catch((e) => {
-        console.error(
-          "[volume-discount-settings] Failed refreshing storefront after translation sync",
-          e,
-        );
-      }),
+      (async () => {
+        if (translationSync.needsAutoTranslate) {
+          const backfill = await syncStorefrontTranslationsWithShopLanguages(
+            session.shop,
+            admin,
+            {
+              existingTranslations: translationSync.translations,
+              syncInterval: dbSettings.syncInterval,
+              shopLanguages: translationSync.shopLanguages,
+            },
+          );
+          if (!backfill.persisted && !translationSync.persisted) return;
+        }
+        await pushStorefrontWidgetToShop(admin, session.shop).catch((e) => {
+          console.error(
+            "[volume-discount-settings] Failed refreshing storefront after translation sync",
+            e,
+          );
+        });
+      })(),
     );
   }
 
-  const lastSyncedAt = await resolveShopLastSyncedAt(session.shop);
   scheduleDueSyncForShopIfNeeded(
     session.shop,
     dbSettings.syncInterval,

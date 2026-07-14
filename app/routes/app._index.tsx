@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs, MetaFunction } from "react-router";
 import { useLoaderData, useLocation } from "react-router";
 import type { ReactNode } from "react";
+import { Prisma } from "@prisma/client";
 import {
   Page,
   Layout,
@@ -27,12 +28,9 @@ import { authenticate } from "../shopify.server";
 import { resolveShopLastSyncedAt } from "../utils/shopSyncState.server";
 import { adminEmbeddedPath } from "../utils/adminEmbeddedPath";
 import {
-  mainThemeIdFromGid,
   themeAppBlockEditorUrl,
   themeAppEmbedEditorUrl,
 } from "../utils/themeEditorDeepLinks";
-import { storefrontProductPreviewUrl } from "../utils/storefrontProductPreviewUrl.server";
-import { fetchLiveThemeProductSectionId } from "../utils/themeProductSection.server";
 import { ApprovefyPromoCard } from "../components/ApprovefyPromoCard";
 
 export const meta: MetaFunction = () => [{ title: APP_DISPLAY_NAME }];
@@ -51,62 +49,35 @@ type SetupStatus = {
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session, admin } = await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
 
-  const [campaignCount, activeCount, mainThemeGid] =
-    await Promise.all([
-      prisma.volumeDiscountCampaign.count({ where: { shop: session.shop } }),
-      prisma.volumeDiscountCampaign.count({
-        where: { shop: session.shop, status: "active" },
-      }),
-      admin
-        .graphql(
-          `#graphql
-          query OffrefyMainTheme {
-            themes(first: 1, roles: [MAIN]) {
-              nodes {
-                id
-              }
-            }
-          }`,
-        )
-        .then((res) => res.json())
-        .then(
-          (body: {
-            data?: { themes?: { nodes?: Array<{ id?: string }> } };
-          }) => body.data?.themes?.nodes?.[0]?.id ?? null,
-        )
-        .catch(() => null),
-    ]);
-
-  const mainThemeId = mainThemeIdFromGid(mainThemeGid);
-
-  const [lastSyncedAt, productPreviewUrl, productSectionId] = await Promise.all([
-    resolveShopLastSyncedAt(session.shop).then(
-      (d) => d?.toISOString() ?? null,
+  /* Fast first paint: counts + sync time only. Theme deep-links use "current"
+   * / mainSection defaults — live theme GraphQL is not required to open Home. */
+  const [counts, lastSyncedAt] = await Promise.all([
+    prisma.$queryRaw<Array<{ campaignCount: bigint; activeCount: bigint }>>(
+      Prisma.sql`
+        SELECT
+          COUNT(*)::bigint AS "campaignCount",
+          COUNT(*) FILTER (WHERE c."status" = 'active')::bigint AS "activeCount"
+        FROM "VolumeDiscountCampaign" c
+        WHERE c."shop" = ${session.shop}
+      `,
     ),
-    storefrontProductPreviewUrl(admin, session.shop),
-    fetchLiveThemeProductSectionId(admin, mainThemeGid),
+    resolveShopLastSyncedAt(session.shop),
   ]);
 
-  let productPreviewPath: string | null = null;
-  if (productPreviewUrl) {
-    try {
-      productPreviewPath = new URL(productPreviewUrl).pathname;
-    } catch {
-      productPreviewPath = null;
-    }
-  }
+  const campaignCount = Number(counts[0]?.campaignCount ?? 0);
+  const activeCount = Number(counts[0]?.activeCount ?? 0);
 
   return {
     status: {
       hasOffers: campaignCount > 0,
       hasActiveOffers: activeCount > 0,
-      lastSyncedAt,
+      lastSyncedAt: lastSyncedAt?.toISOString() ?? null,
       shop: session.shop,
-      mainThemeId,
-      productPreviewPath,
-      productSectionId,
+      mainThemeId: null,
+      productPreviewPath: null,
+      productSectionId: null,
       // eslint-disable-next-line no-undef
       apiKey: process.env.SHOPIFY_API_KEY || "",
       campaignCount,
