@@ -4,7 +4,13 @@ import type {
   LoaderFunctionArgs,
   MetaFunction,
 } from "react-router";
-import { useFetcher, useLoaderData, useRevalidator } from "react-router";
+import {
+  useFetcher,
+  useLoaderData,
+  useLocation,
+  useNavigate,
+  useRevalidator,
+} from "react-router";
 import {
   Page,
   Layout,
@@ -43,6 +49,10 @@ import {
   createPlanSubscriptionConfirmationUrl,
   listActiveAppSubscriptions,
 } from "../services/shopifyBilling.server";
+import {
+  hasEphemeralBillingParams,
+  stripEphemeralBillingSearch,
+} from "../utils/adminEmbeddedPath";
 
 export const meta: MetaFunction = () => [
   { title: `Pricing · ${APP_DISPLAY_NAME}` },
@@ -313,6 +323,8 @@ export default function PricingPage() {
   const shopify = useAppBridge();
   const fetcher = useFetcher<typeof action>();
   const revalidator = useRevalidator();
+  const navigate = useNavigate();
+  const { pathname, search } = useLocation();
   const wasSubmitting = useRef(false);
   const shownActivationToast = useRef(false);
 
@@ -320,7 +332,12 @@ export default function PricingPage() {
     if (!justActivated || shownActivationToast.current) return;
     shownActivationToast.current = true;
     shopify.toast.show(`Activated ${PLANS[justActivated].title} plan`);
-  }, [justActivated, shopify]);
+    if (hasEphemeralBillingParams(search)) {
+      navigate(`${pathname}${stripEphemeralBillingSearch(search)}`, {
+        replace: true,
+      });
+    }
+  }, [justActivated, navigate, pathname, search, shopify]);
 
   useEffect(() => {
     if (fetcher.state !== "idle") {

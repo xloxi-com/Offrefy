@@ -8,6 +8,46 @@ export function adminEmbeddedPath(pathname: string, search: string): string {
   return search ? `${path}${search}` : path;
 }
 
+/**
+ * One-shot billing return params. Keeping them in the location search causes
+ * nav links (which forward `search`) to re-trigger "Activated … plan" toasts.
+ */
+const EPHEMERAL_BILLING_KEYS = ["billing", "billing-success", "charge_id"] as const;
+
+/** Strip billing-return query keys; optionally drop `plan` when it was a billing return. */
+export function stripEphemeralBillingSearch(search: string): string {
+  const raw = search.startsWith("?") ? search.slice(1) : search;
+  if (!raw) return search.startsWith("?") ? "?" : "";
+
+  const params = new URLSearchParams(raw);
+  const hadBillingReturn =
+    params.get("billing") === "success" ||
+    params.has("billing-success") ||
+    params.has("charge_id");
+
+  for (const key of EPHEMERAL_BILLING_KEYS) {
+    params.delete(key);
+  }
+  if (hadBillingReturn) {
+    params.delete("plan");
+  }
+
+  const serialized = params.toString();
+  if (!serialized) return "";
+  return `?${serialized}`;
+}
+
+export function hasEphemeralBillingParams(search: string): boolean {
+  const raw = search.startsWith("?") ? search.slice(1) : search;
+  if (!raw) return false;
+  const params = new URLSearchParams(raw);
+  return (
+    params.get("billing") === "success" ||
+    params.has("billing-success") ||
+    params.has("charge_id")
+  );
+}
+
 /** Same as `adminEmbeddedPath` but merges extra query keys (keeps `shop`, `host`, etc.). */
 export function adminEmbeddedPathWithQuery(
   pathname: string,

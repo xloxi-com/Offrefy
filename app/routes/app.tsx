@@ -13,8 +13,10 @@ import {
   redirect,
   useLoaderData,
   useLocation,
+  useNavigate,
   useRouteError,
 } from "react-router";
+import { useEffect } from "react";
 import { AppProvider as PolarisAppProvider } from "@shopify/polaris";
 import en from "@shopify/polaris/locales/en.json";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -22,7 +24,11 @@ import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
 import { APP_DISPLAY_NAME } from "../branding";
 import { CrispChat } from "../components/CrispChat";
-import { adminEmbeddedPath } from "../utils/adminEmbeddedPath";
+import {
+  adminEmbeddedPath,
+  hasEphemeralBillingParams,
+  stripEphemeralBillingSearch,
+} from "../utils/adminEmbeddedPath";
 import { withShopFromEmbeddedHost } from "../utils/embeddedShop.server";
 
 /**
@@ -73,12 +79,24 @@ export function shouldRevalidate({
 
 export default function App() {
   const { apiKey } = useLoaderData<typeof loader>();
-  const { search } = useLocation();
-  const homeHref = adminEmbeddedPath("/app", search);
-  const offersHref = adminEmbeddedPath("/app/offers", search);
-  const analyticsHref = adminEmbeddedPath("/app/analytics", search);
-  const pricingHref = adminEmbeddedPath("/app/pricing", search);
-  const settingsHref = adminEmbeddedPath("/app/settings", search);
+  const { pathname, search } = useLocation();
+  const navigate = useNavigate();
+  // Keep one-shot billing return params out of nav so they don't re-fire toasts.
+  const navSearch = stripEphemeralBillingSearch(search);
+  const homeHref = adminEmbeddedPath("/app", navSearch);
+  const offersHref = adminEmbeddedPath("/app/offers", navSearch);
+  const analyticsHref = adminEmbeddedPath("/app/analytics", navSearch);
+  const pricingHref = adminEmbeddedPath("/app/pricing", navSearch);
+  const settingsHref = adminEmbeddedPath("/app/settings", navSearch);
+
+  useEffect(() => {
+    if (!hasEphemeralBillingParams(search)) return;
+    // Pricing still needs `billing=success` for the first loader+toast pass;
+    // it clears its own URL after showing the toast.
+    if (pathname.startsWith("/app/pricing")) return;
+    const cleaned = stripEphemeralBillingSearch(search);
+    navigate(`${pathname}${cleaned}`, { replace: true });
+  }, [navigate, pathname, search]);
 
   return (
     <PolarisAppProvider i18n={en}>
