@@ -137,6 +137,36 @@ const offerTabs: TabProps[] = [
 const PAGE_SIZE = 50;
 
 const sortOptions: NonNullable<IndexFiltersProps["sortOptions"]> = [
+  { label: "Campaign name", value: "name asc", directionLabel: "A–Z" },
+  { label: "Campaign name", value: "name desc", directionLabel: "Z–A" },
+  { label: "Discount type", value: "discount asc", directionLabel: "A–Z" },
+  { label: "Discount type", value: "discount desc", directionLabel: "Z–A" },
+  { label: "Campaign type", value: "type asc", directionLabel: "A–Z" },
+  { label: "Campaign type", value: "type desc", directionLabel: "Z–A" },
+  { label: "Apply to", value: "apply asc", directionLabel: "A–Z" },
+  { label: "Apply to", value: "apply desc", directionLabel: "Z–A" },
+  {
+    label: "Impression",
+    value: "impression asc",
+    directionLabel: "Low to high",
+  },
+  {
+    label: "Impression",
+    value: "impression desc",
+    directionLabel: "High to low",
+  },
+  { label: "CR", value: "cr asc", directionLabel: "Low to high" },
+  { label: "CR", value: "cr desc", directionLabel: "High to low" },
+  {
+    label: "Order applied",
+    value: "orders asc",
+    directionLabel: "Low to high",
+  },
+  {
+    label: "Order applied",
+    value: "orders desc",
+    directionLabel: "High to low",
+  },
   {
     label: "Last modified",
     value: "modified desc",
@@ -148,52 +178,71 @@ const sortOptions: NonNullable<IndexFiltersProps["sortOptions"]> = [
     directionLabel: "Oldest first",
   },
   {
-    label: "Date created",
+    label: "Created at",
     value: "created desc",
     directionLabel: "Newest first",
   },
   {
-    label: "Date created",
+    label: "Created at",
     value: "created asc",
     directionLabel: "Oldest first",
   },
-  { label: "Campaign name", value: "name asc", directionLabel: "A–Z" },
-  { label: "Campaign name", value: "name desc", directionLabel: "Z–A" },
+  { label: "Status", value: "status asc", directionLabel: "A–Z" },
+  { label: "Status", value: "status desc", directionLabel: "Z–A" },
 ];
 
-function CampaignNameSortHeader({
+function SortableColumnHeader({
+  columnKey,
+  label,
   sortSelected,
   onSort,
+  defaultDir = "asc",
+  ascLabel = "A to Z",
+  descLabel = "Z to A",
 }: {
+  columnKey: string;
+  label: string;
   sortSelected: string[];
   onSort: (value: string[]) => void;
+  defaultDir?: "asc" | "desc";
+  ascLabel?: string;
+  descLabel?: string;
 }) {
   const sort = sortSelected[0] ?? "modified desc";
-  const isNameAsc = sort === "name asc";
-  const isNameDesc = sort === "name desc";
-  const isNameSort = isNameAsc || isNameDesc;
+  const parts = sort.trim().split(/\s+/);
+  const activeField = (parts[0] || "").toLowerCase();
+  const activeDir = (parts[1] || "").toLowerCase();
+  const isActive = activeField === columnKey;
+  const isAsc = isActive && activeDir === "asc";
+  const isDesc = isActive && activeDir === "desc";
 
-  const toggleNameSort = () => {
-    onSort([isNameAsc ? "name desc" : "name asc"]);
+  const toggleSort = () => {
+    if (isActive) {
+      onSort([`${columnKey} ${isAsc ? "desc" : "asc"}`]);
+      return;
+    }
+    onSort([`${columnKey} ${defaultDir}`]);
   };
 
   return (
     <InlineStack gap="100" blockAlign="center" wrap={false}>
       <Text as="span" variant="bodySm" fontWeight="semibold">
-        Campaign name
+        {label}
       </Text>
-      <span className={styles.nameSortArrowWrap}>
+      <span
+        className={`${styles.nameSortArrowWrap}${isDesc ? ` ${styles.nameSortArrowDesc}` : ""}`}
+      >
         <Button
           variant="plain"
           size="micro"
           icon={ArrowUpIcon}
           accessibilityLabel={
-            isNameDesc
-              ? "Sort campaign name Z to A"
-              : "Sort campaign name A to Z"
+            isDesc
+              ? `Sort ${label} ${descLabel}`
+              : `Sort ${label} ${ascLabel}`
           }
-          pressed={isNameSort}
-          onClick={toggleNameSort}
+          pressed={isActive}
+          onClick={toggleSort}
         />
       </span>
     </InlineStack>
@@ -800,21 +849,125 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                 {
                   id: "campaign-name",
                   title: (
-                    <CampaignNameSortHeader
+                    <SortableColumnHeader
+                      columnKey="name"
+                      label="Campaign name"
                       sortSelected={sortSelected}
                       onSort={setSortSelected}
                     />
                   ),
                 },
-                { title: "Discount type" },
-                { title: "Campaign type" },
-                { title: "Apply to" },
-                { title: "Impression" },
-                { title: "CR" },
-                { title: "Order applied" },
-                { title: "Last modified" },
-                { title: "Created at" },
-                { title: "Status" },
+                {
+                  id: "discount-type",
+                  title: (
+                    <SortableColumnHeader
+                      columnKey="discount"
+                      label="Discount type"
+                      sortSelected={sortSelected}
+                      onSort={setSortSelected}
+                    />
+                  ),
+                },
+                {
+                  id: "campaign-type",
+                  title: (
+                    <SortableColumnHeader
+                      columnKey="type"
+                      label="Campaign type"
+                      sortSelected={sortSelected}
+                      onSort={setSortSelected}
+                    />
+                  ),
+                },
+                {
+                  id: "apply-to",
+                  title: (
+                    <SortableColumnHeader
+                      columnKey="apply"
+                      label="Apply to"
+                      sortSelected={sortSelected}
+                      onSort={setSortSelected}
+                    />
+                  ),
+                },
+                {
+                  id: "impression",
+                  title: (
+                    <SortableColumnHeader
+                      columnKey="impression"
+                      label="Impression"
+                      sortSelected={sortSelected}
+                      onSort={setSortSelected}
+                      ascLabel="low to high"
+                      descLabel="high to low"
+                    />
+                  ),
+                },
+                {
+                  id: "cr",
+                  title: (
+                    <SortableColumnHeader
+                      columnKey="cr"
+                      label="CR"
+                      sortSelected={sortSelected}
+                      onSort={setSortSelected}
+                      ascLabel="low to high"
+                      descLabel="high to low"
+                    />
+                  ),
+                },
+                {
+                  id: "order-applied",
+                  title: (
+                    <SortableColumnHeader
+                      columnKey="orders"
+                      label="Order applied"
+                      sortSelected={sortSelected}
+                      onSort={setSortSelected}
+                      ascLabel="low to high"
+                      descLabel="high to low"
+                    />
+                  ),
+                },
+                {
+                  id: "last-modified",
+                  title: (
+                    <SortableColumnHeader
+                      columnKey="modified"
+                      label="Last modified"
+                      sortSelected={sortSelected}
+                      onSort={setSortSelected}
+                      defaultDir="desc"
+                      ascLabel="oldest first"
+                      descLabel="newest first"
+                    />
+                  ),
+                },
+                {
+                  id: "created-at",
+                  title: (
+                    <SortableColumnHeader
+                      columnKey="created"
+                      label="Created at"
+                      sortSelected={sortSelected}
+                      onSort={setSortSelected}
+                      defaultDir="desc"
+                      ascLabel="oldest first"
+                      descLabel="newest first"
+                    />
+                  ),
+                },
+                {
+                  id: "status",
+                  title: (
+                    <SortableColumnHeader
+                      columnKey="status"
+                      label="Status"
+                      sortSelected={sortSelected}
+                      onSort={setSortSelected}
+                    />
+                  ),
+                },
                 { title: "Actions", id: "offers-actions-col" },
               ]}
               lastColumnSticky

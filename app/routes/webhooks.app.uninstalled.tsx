@@ -1,9 +1,9 @@
 import type { ActionFunctionArgs } from "react-router";
-import { authenticate } from "../shopify.server";
 import { prisma as db } from "../db.server";
+import { authenticateShopifyWebhook } from "../utils/webhookAuth.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { shop, session, topic } = await authenticate.webhook(request);
+  const { shop, session, topic } = await authenticateShopifyWebhook(request);
 
   console.log(`Received ${topic} webhook for ${shop}`);
 
@@ -13,5 +13,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     await db.session.deleteMany({ where: { shop } });
   }
 
-  return new Response();
+  return new Response(null, { status: 200 });
 };

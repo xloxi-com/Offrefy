@@ -1,10 +1,10 @@
 import type { ActionFunctionArgs } from "react-router";
-import { authenticate } from "../shopify.server";
 import { reconcileOrderAnalyticsForShop } from "../services/orderAnalyticsReconcile.server";
 import {
   recordOrderAnalyticsFromWebhook,
   type ShopifyOrderWebhookPayload,
 } from "../utils/volumeDiscountAnalytics.server";
+import { authenticateShopifyWebhook } from "../utils/webhookAuth.server";
 
 async function handleOrderWebhook(
   shop: string,
@@ -39,7 +39,7 @@ async function handleOrderWebhook(
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { shop, topic, payload } = await authenticate.webhook(request);
+  const { shop, topic, payload } = await authenticateShopifyWebhook(request);
 
   try {
     await handleOrderWebhook(
@@ -51,5 +51,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     console.error("[volume-discount] orders/paid analytics", shop, e);
   }
 
-  return new Response();
+  return new Response(null, { status: 200 });
 };

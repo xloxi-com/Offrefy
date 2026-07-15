@@ -336,10 +336,23 @@ function isStaleDiscountError(messages: string[]): boolean {
     t.includes("not found") ||
     t.includes("no longer exists") ||
     t.includes("resource not found") ||
-    t.includes("invalid") ||
     t.includes("access denied") ||
     t.includes("access_denied")
   );
+}
+
+/** Another automatic discount on the shop already uses this title. */
+function isUniqueTitleError(messages: string[]): boolean {
+  const t = messages.join(" ").toLowerCase();
+  return (
+    t.includes("title must be unique") ||
+    (t.includes("title") && t.includes("unique") && t.includes("discount"))
+  );
+}
+
+function uniqueSharedDiscountTitle(shop: string): string {
+  const handle = shop.replace(/\.myshopify\.com$/i, "").slice(0, 24);
+  return `${SHARED_DISCOUNT_TITLE} (${handle})`;
 }
 
 /**
@@ -833,14 +846,64 @@ export async function syncVolumeDiscountShop(
           recursionDepth: 1,
         });
       }
-      return {
-        discountIds: [],
-        errors: allUpdateMsgs,
-      };
+      // Title already taken by another automatic discount — adopt it, or
+      // retry update without renaming (metafields still sync).
+      if (recursionDepth === 0 && isUniqueTitleError(allUpdateMsgs)) {
+        const adoptedId = await findSharedAppDiscountNodeId(admin);
+        if (adoptedId && adoptedId !== state.functionDiscountId) {
+          await prisma.volumeDiscountShopState.upsert({
+            where: { shop },
+            create: { shop, functionDiscountId: adoptedId },
+            update: { functionDiscountId: adoptedId },
+          });
+          return syncVolumeDiscountShop(admin, shop, {
+            ...options,
+            recursionDepth: 1,
+          });
+        }
+        const { title: _omitTitle, ...inputWithoutTitle } = baseInput;
+        const retry = await admin.graphql(UPDATE_APP_DISCOUNT, {
+          variables: {
+            id: state.functionDiscountId,
+            d: inputWithoutTitle,
+          },
+        });
+        const retryParsed = (await retry.json()) as {
+          errors?: { message: string }[];
+          data?: {
+            discountAutomaticAppUpdate?: {
+              automaticAppDiscount?: { discountId?: string } | null;
+              userErrors?: { message: string }[];
+            };
+          };
+        };
+        const retryMsgs = [
+          ...(retryParsed.errors?.map((e) => e.message) ?? []),
+          ...(retryParsed.data?.discountAutomaticAppUpdate?.userErrors ?? []).map(
+            (e) => e.message || "Shopify error",
+          ),
+        ];
+        if (!retryMsgs.length) {
+          discountId =
+            retryParsed.data?.discountAutomaticAppUpdate?.automaticAppDiscount
+              ?.discountId ?? state.functionDiscountId;
+        } else {
+          return {
+            discountIds: [],
+            errors: allUpdateMsgs,
+          };
+        }
+      } else {
+        return {
+          discountIds: [],
+          errors: allUpdateMsgs,
+        };
+      }
+    } else {
+      discountId =
+        parsed.data?.discountAutomaticAppUpdate?.automaticAppDiscount
+          ?.discountId ?? state.functionDiscountId;
     }
-    discountId =
-      parsed.data?.discountAutomaticAppUpdate?.automaticAppDiscount
-        ?.discountId ?? state.functionDiscountId;
   } else {
     const res = await admin.graphql(CREATE_APP_DISCOUNT, {
       variables: {
@@ -888,24 +951,81 @@ export async function syncVolumeDiscountShop(
           ],
         };
       }
-      return {
-        discountIds: [],
-        errors: ueMsgs,
-      };
+      // Existing Offrefy automatic discount already owns the shared title —
+      // link it instead of creating a duplicate.
+      if (recursionDepth === 0 && isUniqueTitleError(ueMsgs)) {
+        const adoptedId = await findSharedAppDiscountNodeId(admin);
+        if (adoptedId) {
+          await prisma.volumeDiscountShopState.upsert({
+            where: { shop },
+            create: { shop, functionDiscountId: adoptedId },
+            update: { functionDiscountId: adoptedId },
+          });
+          return syncVolumeDiscountShop(admin, shop, {
+            ...options,
+            recursionDepth: 1,
+          });
+        }
+        const retry = await admin.graphql(CREATE_APP_DISCOUNT, {
+          variables: {
+            d: {
+              ...baseInput,
+              title: uniqueSharedDiscountTitle(shop),
+              startsAt: new Date().toISOString(),
+            },
+          },
+        });
+        const retryParsed = (await retry.json()) as {
+          errors?: { message: string }[];
+          data?: {
+            discountAutomaticAppCreate?: {
+              automaticAppDiscount?: { discountId?: string } | null;
+              userErrors?: { message: string }[];
+            };
+          };
+        };
+        const retryMsgs = [
+          ...(retryParsed.errors?.map((e) => e.message) ?? []),
+          ...(retryParsed.data?.discountAutomaticAppCreate?.userErrors ?? []).map(
+            (e) => e.message || "Shopify error",
+          ),
+        ];
+        const retryId =
+          retryParsed.data?.discountAutomaticAppCreate?.automaticAppDiscount
+            ?.discountId;
+        if (retryMsgs.length || !retryId) {
+          return {
+            discountIds: [],
+            errors: retryMsgs.length ? retryMsgs : ueMsgs,
+          };
+        }
+        discountId = retryId;
+        await prisma.volumeDiscountShopState.upsert({
+          where: { shop },
+          create: { shop, functionDiscountId: discountId },
+          update: { functionDiscountId: discountId },
+        });
+      } else {
+        return {
+          discountIds: [],
+          errors: ueMsgs,
+        };
+      }
+    } else {
+      const id =
+        parsed.data?.discountAutomaticAppCreate?.automaticAppDiscount
+          ?.discountId;
+      if (!id) {
+        await shopGidPromise.catch(() => {});
+        return { discountIds: [], errors: ["Shopify did not return discount id"] };
+      }
+      discountId = id;
+      await prisma.volumeDiscountShopState.upsert({
+        where: { shop },
+        create: { shop, functionDiscountId: discountId },
+        update: { functionDiscountId: discountId },
+      });
     }
-    const id =
-      parsed.data?.discountAutomaticAppCreate?.automaticAppDiscount
-        ?.discountId;
-    if (!id) {
-      await shopGidPromise.catch(() => {});
-      return { discountIds: [], errors: ["Shopify did not return discount id"] };
-    }
-    discountId = id;
-    await prisma.volumeDiscountShopState.upsert({
-      where: { shop },
-      create: { shop, functionDiscountId: discountId },
-      update: { functionDiscountId: discountId },
-    });
   }
 
   const gid = await shopGidPromise;

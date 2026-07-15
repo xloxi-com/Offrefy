@@ -124,3 +124,7 @@
   width: 12px;
   height: 12px;
 }
+
+.nameSortArrowDesc :global(.Polaris-Icon) {
+  transform: rotate(180deg);
+}

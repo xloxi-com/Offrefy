@@ -246,8 +246,15 @@ export default function AppHomePage() {
     productSectionId: status.productSectionId,
   });
 
-  const themeReady = status.storefrontReady;
-  const setupComplete = status.hasActiveOffers && themeReady;
+  // Checklist Done only after merchant finishes that step (real app embed).
+  // Script-tag fallback can keep the widget live but must not fake Done.
+  const embedReady = status.appEmbedEnabled;
+  const hasSynced = Boolean(status.lastSyncedAt);
+  const setupComplete =
+    embedReady &&
+    status.hasOffers &&
+    status.hasActiveOffers &&
+    hasSynced;
   const enabling =
     fetcher.state !== "idle" &&
     String(fetcher.formData?.get("intent") ?? "") === "enableAppEmbed";
@@ -318,8 +325,8 @@ export default function AppHomePage() {
         {fetcher.data && "ok" in fetcher.data && fetcher.data.ok ? (
           <Banner tone="success" title="Widget enabled">
             <p>
-              App embed is on. Hard-refresh a product page (Ctrl+Shift+R) to see
-              quantity breaks.
+              Storefront widget is ready. Hard-refresh a product page
+              (Ctrl+Shift+R) to see quantity breaks.
             </p>
           </Banner>
         ) : null}
@@ -346,13 +353,14 @@ export default function AppHomePage() {
                   </Text>
                   <Divider />
 
-                  <StepRow done={themeReady} title="1. Enable app embed">
+                  <StepRow done={embedReady} title="1. Enable storefront widget">
                     <Text as="p" variant="bodySm" tone="subdued">
                       Theme settings → App embeds → turn on{" "}
                       <Text as="span" fontWeight="semibold">
                         Offrefy (global)
                       </Text>
-                      . Loads scripts on your storefront.
+                      , or use Enable widget now. Loads quantity breaks on product
+                      pages.
                     </Text>
                     <InlineStack gap="200" align="start">
                       <Button
@@ -363,7 +371,7 @@ export default function AppHomePage() {
                       >
                         Theme editor
                       </Button>
-                      {!themeReady ? (
+                      {!embedReady ? (
                         <Button
                           size="slim"
                           variant="primary"
@@ -382,7 +390,7 @@ export default function AppHomePage() {
 
                   <Divider />
 
-                  <StepRow done={themeReady} title="2. Add widget on product page">
+                  <StepRow done={embedReady} title="2. Add widget on product page">
                     <Text as="p" variant="bodySm" tone="subdued">
                       Optional: Product template → Add block →{" "}
                       <Text as="span" fontWeight="semibold">
@@ -439,7 +447,7 @@ export default function AppHomePage() {
 
                   <Divider />
 
-                  <StepRow done={Boolean(status.lastSyncedAt)} title="5. Sync storefront">
+                  <StepRow done={hasSynced} title="5. Sync storefront">
                     <Text as="p" variant="bodySm" tone="subdued">
                       Last sync: {formatSyncedAt(status.lastSyncedAt)}. Re-sync in
                       Settings if the live widget looks outdated.
@@ -450,6 +458,28 @@ export default function AppHomePage() {
                       </Button>
                     </InlineStack>
                   </StepRow>
+                </BlockStack>
+              </Card>
+            </BlockStack>
+          </Layout.Section>
+
+          <Layout.Section variant="oneThird">
+            <BlockStack gap="400">
+              <Card>
+                <BlockStack gap="400">
+                  <Text as="h2" variant="headingMd">
+                    Details
+                  </Text>
+                  <BlockStack gap="300">
+                    <DetailRow label="Shop">{status.shop}</DetailRow>
+                    <DetailRow label="Storefront widget">
+                      {status.storefrontReady ? "Ready" : "Needs setup"}
+                    </DetailRow>
+                    <DetailRow label="Extension">Offrefy — Storefront</DetailRow>
+                    <DetailRow label="Blocks">
+                      Quantity breaks · Offrefy (global)
+                    </DetailRow>
+                  </BlockStack>
                 </BlockStack>
               </Card>
 
@@ -469,39 +499,6 @@ export default function AppHomePage() {
                       Settings
                     </Button>
                   </InlineStack>
-                </BlockStack>
-              </Card>
-            </BlockStack>
-          </Layout.Section>
-
-          <Layout.Section variant="oneThird">
-            <BlockStack gap="400">
-              <Card>
-                <BlockStack gap="400">
-                  <Text as="h2" variant="headingMd">
-                    Details
-                  </Text>
-                  <BlockStack gap="300">
-                    <DetailRow label="Shop">{status.shop}</DetailRow>
-                    <DetailRow label="App embed">
-                      {status.appEmbedEnabled ? "On" : "Off"}
-                    </DetailRow>
-                    <DetailRow label="Script fallback">
-                      {status.scriptTagOk ? "On" : "Off"}
-                    </DetailRow>
-                    <DetailRow label="Extension">Offrefy — Storefront</DetailRow>
-                    <DetailRow label="Blocks">
-                      Quantity breaks · Offrefy (global)
-                    </DetailRow>
-                  </BlockStack>
-                  <Divider />
-                  <DetailRow label="Checkout">
-                    Auto discount at cart & checkout
-                  </DetailRow>
-                  <Divider />
-                  <DetailRow label="Access">
-                    Discounts · Products · Themes · Locales
-                  </DetailRow>
                 </BlockStack>
               </Card>
 
