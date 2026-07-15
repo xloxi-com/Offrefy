@@ -1,3 +1,4 @@
+import { invalidateMemoryCachePrefix } from "../utils/memoryCache.server";
 import type { SyncShopOptions } from "./volumeDiscountFunctionSync.server";
 import { syncVolumeDiscountShop } from "./volumeDiscountFunctionSync.server";
 import { refreshStorefrontWidgetForShop } from "./refreshStorefrontWidget.server";
@@ -47,6 +48,9 @@ export function scheduleVolumeDiscountShopSync(
   shop: string,
   options: SyncShopOptions = {},
 ): void {
+  /* Drop hot proxy caches immediately so next hits rebuild after DB changes. */
+  invalidateMemoryCachePrefix(`widget:${shop}:`);
+  invalidateMemoryCachePrefix(`cart-rules:${shop}:`);
   enqueueShopWork(shop, async () => {
     const { errors } = await syncVolumeDiscountShop(admin, shop, options);
     if (errors.length) {

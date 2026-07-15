@@ -14,9 +14,9 @@ import { prisma } from "../db.server";
 import { planCampaignSaveSync } from "../utils/campaignSyncDelta.server";
 import { applyDueCampaignScheduleTransitions } from "../services/campaignScheduleTransitions.server";
 import {
+  scheduleStorefrontWidgetRefresh,
   scheduleVolumeDiscountShopSync,
 } from "../services/deferredShopSync.server";
-import { flushStorefrontWidgetPayloadNow } from "../services/refreshStorefrontWidget.server";
 import { deleteAutomaticDiscounts } from "../services/volumeDiscountShopify.server";
 import { authenticate } from "../shopify.server";
 import {
@@ -24,7 +24,7 @@ import {
   isVolumeDiscountQuantityCondition,
   normalizeVolumeDiscountCustomerType,
 } from "../types/volumeDiscount";
-import { parseVolumeDiscountForm } from "../utils/volumeDiscountForm.server";
+import { parseVolumeDiscountForm, sanitizeCampaignForPlan, activationBlockedMessage } from "../utils/volumeDiscountForm.server";
 import {
   normalizeTiersFromDb,
   parseShopifyDiscountIds,
@@ -34,6 +34,12 @@ import {
   type VolumeDiscountWidgetDisplay,
 } from "../utils/widgetDisplay";
 import { adminEmbeddedPath } from "../utils/adminEmbeddedPath";
+import { canActivateAnotherCampaign } from "../utils/pricingPlans";
+import {
+  countActiveCampaigns,
+  resolveShopPlanContext,
+} from "../utils/shopPlan.server";
+import type { PlanCapabilities, PricingPlanId } from "../utils/pricingPlans";
 
 const VolumeDiscountCreateView = lazy(() =>
   import("../components/VolumeDiscountCreateView").then((m) => ({
@@ -58,6 +64,8 @@ export type VolumeDiscountEditLoaderData = {
     countdownStartsAt: string | null;
     countdownEndsAt: string | null;
   };
+  plan: PricingPlanId;
+  planCapabilities: PlanCapabilities;
 };
 
 function jsonStringArrayField(value: unknown): string[] {
@@ -75,25 +83,28 @@ export const loader = async ({
     throw new Response("Not found", { status: 404 });
   }
 
-  const row = await prisma.volumeDiscountCampaign.findFirst({
-    where: { id, shop: session.shop },
-    select: {
-      id: true,
-      campaignName: true,
-      displayName: true,
-      status: true,
-      productScope: true,
-      quantityCondition: true,
-      customerType: true,
-      customerTags: true,
-      productIds: true,
-      collectionIds: true,
-      tiers: true,
-      widgetDisplay: true,
-      countdownStartsAt: true,
-      countdownEndsAt: true,
-    } as unknown as Prisma.VolumeDiscountCampaignSelect,
-  });
+  const [planCtx, row] = await Promise.all([
+    resolveShopPlanContext(session.shop),
+    prisma.volumeDiscountCampaign.findFirst({
+      where: { id, shop: session.shop },
+      select: {
+        id: true,
+        campaignName: true,
+        displayName: true,
+        status: true,
+        productScope: true,
+        quantityCondition: true,
+        customerType: true,
+        customerTags: true,
+        productIds: true,
+        collectionIds: true,
+        tiers: true,
+        widgetDisplay: true,
+        countdownStartsAt: true,
+        countdownEndsAt: true,
+      } as unknown as Prisma.VolumeDiscountCampaignSelect,
+    }),
+  ]);
   if (!row) {
     throw new Response("Not found", { status: 404 });
   }
@@ -125,6 +136,8 @@ export const loader = async ({
       countdownStartsAt: row.countdownStartsAt?.toISOString() ?? null,
       countdownEndsAt: row.countdownEndsAt?.toISOString() ?? null,
     },
+    plan: planCtx.plan,
+    planCapabilities: planCtx.capabilities,
   };
 };
 
@@ -155,7 +168,26 @@ export const action = async ({
   if (!parsed.ok) {
     return { ok: false as const, error: parsed.error };
   }
-  const d = parsed.data;
+
+  const wasActive = existing.status === "active";
+  const needsActiveRoom = parsed.data.campaignStatus === "active" && !wasActive;
+  const [planCtx, activeCount] = await Promise.all([
+    resolveShopPlanContext(session.shop),
+    needsActiveRoom
+      ? countActiveCampaigns(session.shop)
+      : Promise.resolve(0),
+  ]);
+  const d = sanitizeCampaignForPlan(parsed.data, planCtx.plan);
+
+  if (needsActiveRoom) {
+    if (!canActivateAnotherCampaign(planCtx.plan, activeCount)) {
+      return {
+        ok: false as const,
+        error: activationBlockedMessage(planCtx.plan),
+      };
+    }
+  }
+
   const oldDiscountIds = parseShopifyDiscountIds(existing.shopifyDiscountIds);
   const legacyOnly = oldDiscountIds.filter(
     (gid) => gid !== shared?.functionDiscountId,
@@ -224,13 +256,12 @@ export const action = async ({
     syncPlan.kind === "full" ||
     transition.shopsNeedingShopifySync.includes(session.shop)
   ) {
-    /* Storefront JSON must be fresh immediately; Function sync can finish in background. */
-    await flushStorefrontWidgetPayloadNow(admin, session.shop);
     scheduleVolumeDiscountShopSync(admin, session.shop, {
       changedCampaignIds: [id],
+      skipScheduleTransitions: true,
     });
   } else if (syncPlan.kind === "storefront_only") {
-    await flushStorefrontWidgetPayloadNow(admin, session.shop);
+    scheduleStorefrontWidgetRefresh(admin, session.shop);
   }
 
   return { ok: true as const, campaignId: id, syncPending: true as const };
@@ -249,7 +280,8 @@ const fallbackTier = {
 };
 
 export default function VolumeDiscountEditRoute() {
-  const { campaign } = useLoaderData<VolumeDiscountEditLoaderData>();
+  const { campaign, planCapabilities } =
+    useLoaderData<VolumeDiscountEditLoaderData>();
   const navigate = useNavigate();
   const { search } = useLocation();
   const shopify = useAppBridge();
@@ -275,6 +307,7 @@ export default function VolumeDiscountEditRoute() {
         key={campaign.id}
         onBack={() => navigate(adminEmbeddedPath("/app/offers", search))}
         onSuccess={onSuccess}
+        planCapabilities={planCapabilities}
         initialCampaign={{
           id: campaign.id,
           campaignName: campaign.campaignName,

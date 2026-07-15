@@ -2,12 +2,14 @@ import "@shopify/shopify-app-react-router/adapters/node";
 import {
   ApiVersion,
   AppDistribution,
+  BillingInterval,
   shopifyApp,
 } from "@shopify/shopify-app-react-router/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import { prisma } from "./db.server";
 import { ensureOffrefyAnalyticsPixel } from "./services/ensureOffrefyAnalyticsPixel.server";
 import { SHOPIFY_APP_SCOPES } from "./shopifyAppScopes";
+import { BILLING_PLAN, billingAmountDollars } from "./utils/billingPlans";
 
 function resolveAppScopes(): string[] {
   const fromEnv = (process.env.SCOPES ?? "")
@@ -32,6 +34,44 @@ const shopify = shopifyApp({
     connectionRetryIntervalMs: 500,
   }),
   distribution: AppDistribution.AppStore,
+  billing: {
+    [BILLING_PLAN.standardMonthly]: {
+      lineItems: [
+        {
+          amount: billingAmountDollars("standard", "monthly"),
+          currencyCode: "USD",
+          interval: BillingInterval.Every30Days,
+        },
+      ],
+    },
+    [BILLING_PLAN.standardYearly]: {
+      lineItems: [
+        {
+          amount: billingAmountDollars("standard", "yearly"),
+          currencyCode: "USD",
+          interval: BillingInterval.Annual,
+        },
+      ],
+    },
+    [BILLING_PLAN.premiumMonthly]: {
+      lineItems: [
+        {
+          amount: billingAmountDollars("premium", "monthly"),
+          currencyCode: "USD",
+          interval: BillingInterval.Every30Days,
+        },
+      ],
+    },
+    [BILLING_PLAN.premiumYearly]: {
+      lineItems: [
+        {
+          amount: billingAmountDollars("premium", "yearly"),
+          currencyCode: "USD",
+          interval: BillingInterval.Annual,
+        },
+      ],
+    },
+  },
   future: {
     expiringOfflineAccessTokens: true,
   },
@@ -70,3 +110,4 @@ export const unauthenticated = shopify.unauthenticated;
 export const login = shopify.login;
 export const registerWebhooks = shopify.registerWebhooks;
 export const sessionStorage = shopify.sessionStorage;
+export { BILLING_PLAN };

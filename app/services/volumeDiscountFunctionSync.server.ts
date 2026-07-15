@@ -45,6 +45,8 @@ export type SyncShopOptions = {
   purgeLegacy?: boolean;
   /** Manual sync: skip fingerprint short-circuits and verify the live Shopify discount. */
   force?: boolean;
+  /** Caller already ran schedule transitions — skip a second DB pass. */
+  skipScheduleTransitions?: boolean;
 };
 
 type AdminGraphql = {
@@ -118,22 +120,26 @@ async function tryConfigByFilteringExistingMetafield(
   admin: AdminGraphql,
   discountNodeId: string,
   activeRows: VolumeDiscountCampaignSyncRow[],
+  preloadedNodes?: { key: string; value: string }[] | null,
 ): Promise<{ version: number; campaigns: unknown[] } | null> {
   if (activeRows.length === 0) return null;
   try {
-    const res = await admin.graphql(READ_APP_DISCOUNT_METAFIELDS, {
-      variables: { id: discountNodeId },
-    });
-    const parsed = (await res.json()) as {
-      errors?: { message: string }[];
-      data?: {
-        discountNode?: {
-          metafields?: { nodes?: { key: string; value: string }[] };
-        } | null;
+    let nodes = preloadedNodes ?? null;
+    if (!nodes) {
+      const res = await admin.graphql(READ_APP_DISCOUNT_METAFIELDS, {
+        variables: { id: discountNodeId },
+      });
+      const parsed = (await res.json()) as {
+        errors?: { message: string }[];
+        data?: {
+          discountNode?: {
+            metafields?: { nodes?: { key: string; value: string }[] };
+          } | null;
+        };
       };
-    };
-    if (parsed.errors?.length) return null;
-    const nodes = parsed.data?.discountNode?.metafields?.nodes ?? [];
+      if (parsed.errors?.length) return null;
+      nodes = parsed.data?.discountNode?.metafields?.nodes ?? [];
+    }
     const merged = mergeCampaignConfigFromMetafieldNodes(nodes);
     if (!merged) return null;
     if (Number(merged.version) >= 4) return null;
@@ -404,7 +410,9 @@ export async function syncVolumeDiscountShop(
   const force = options.force === true;
 
   /* Ensure Scheduled/Ended windows are applied before we read Active rows. */
-  await applyDueCampaignScheduleTransitions(shop);
+  if (!options.skipScheduleTransitions) {
+    await applyDueCampaignScheduleTransitions(shop);
+  }
 
   const [activeRows, stateRow] = await Promise.all([
     prisma.volumeDiscountCampaign.findMany({
@@ -520,6 +528,7 @@ export async function syncVolumeDiscountShop(
           admin,
           state.functionDiscountId,
           activeRows,
+          liveMetafieldNodes,
         );
 
   const rowArgs = activeRows.map((r) => ({

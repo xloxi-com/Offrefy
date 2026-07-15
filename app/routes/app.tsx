@@ -21,6 +21,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
 import { APP_DISPLAY_NAME } from "../branding";
+import { CrispChat } from "../components/CrispChat";
 import { adminEmbeddedPath } from "../utils/adminEmbeddedPath";
 import { withShopFromEmbeddedHost } from "../utils/embeddedShop.server";
 
@@ -76,6 +77,7 @@ export default function App() {
   const homeHref = adminEmbeddedPath("/app", search);
   const offersHref = adminEmbeddedPath("/app/offers", search);
   const analyticsHref = adminEmbeddedPath("/app/analytics", search);
+  const pricingHref = adminEmbeddedPath("/app/pricing", search);
   const settingsHref = adminEmbeddedPath("/app/settings", search);
 
   return (
@@ -87,9 +89,11 @@ export default function App() {
           </s-link>
           <s-link href={analyticsHref}>Analytics</s-link>
           <s-link href={offersHref}>Offers</s-link>
+          <s-link href={pricingHref}>Pricing</s-link>
           <s-link href={settingsHref}>Settings</s-link>
         </s-app-nav>
         <Outlet />
+        <CrispChat />
       </AppProvider>
     </PolarisAppProvider>
   );

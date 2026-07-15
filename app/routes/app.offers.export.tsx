@@ -6,6 +6,19 @@ import { parseOffersExportListParams } from "../utils/offersTableViewOrder.serve
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
+  const { resolveShopPlanContext } = await import("./../utils/shopPlan.server");
+  const { upgradeMessage } = await import("./../utils/pricingPlans");
+  const { capabilities } = await resolveShopPlanContext(session.shop);
+  if (!capabilities.importExport) {
+    return new Response(upgradeMessage("importExport"), {
+      status: 403,
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "no-store",
+      },
+    });
+  }
   const listParams = parseOffersExportListParams(new URL(request.url));
   const body = await buildVolumeDiscountOffersCsvExport(session.shop, {
     tab: listParams.tab,

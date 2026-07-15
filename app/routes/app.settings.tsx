@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { useLoaderData, useFetcher, useRevalidator } from "react-router";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import {
   Page,
   Layout,
@@ -13,13 +13,9 @@ import {
   Button,
   InlineStack,
   Banner,
-  Tabs,
-  Combobox,
-  Listbox,
-  Icon,
-  AutoSelection,
+  Select,
 } from "@shopify/polaris";
-import { SearchIcon, RefreshIcon, AutomationIcon } from "@shopify/polaris-icons";
+import { RefreshIcon, AutomationIcon } from "@shopify/polaris-icons";
 import { ApprovefyPromoCard } from "../components/ApprovefyPromoCard";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
@@ -28,6 +24,8 @@ import { syncVolumeDiscountShop } from "../services/volumeDiscountFunctionSync.s
 import { refreshStorefrontWidgetForShop, pushStorefrontWidgetToShop } from "../services/refreshStorefrontWidget.server";
 import { scheduleDueSyncForShopIfNeeded, applyShopCampaignScheduleTransitionsIfNeeded } from "../services/scheduledVolumeDiscountSync.server";
 import { reconcileOrderAnalyticsForShop } from "../services/orderAnalyticsReconcile.server";
+import { resolveShopPlanContext } from "../utils/shopPlan.server";
+import { PlanUpgradeBanner } from "../components/PlanUpgradeBanner";
 import { runAfterResponse } from "../services/deferredShopSync.server";
 import { invalidateMemoryCachePrefix } from "../utils/memoryCache.server";
 import {
@@ -194,6 +192,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     needsLocaleScope,
     translationsInitialized: translationSync.persisted,
     addedLanguages: translationSync.addedLanguages,
+    canEditTranslations: (await resolveShopPlanContext(session.shop)).capabilities
+      .translations,
   };
 };
 
@@ -203,6 +203,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const intent = String(formData.get("intent") ?? "");
 
   if (intent === "saveSettings") {
+    const { resolveShopPlanContext } = await import("../utils/shopPlan.server");
+    const { upgradeMessage } = await import("../utils/pricingPlans");
+    const { capabilities } = await resolveShopPlanContext(session.shop);
+    if (!capabilities.translations) {
+      return {
+        ok: false,
+        error: upgradeMessage("translations"),
+      };
+    }
     const syncInterval = String(formData.get("syncInterval") ?? "disabled");
     const submittedTranslations = parseStoredStorefrontTranslations(
       String(formData.get("translationsString") ?? "{}"),
@@ -260,6 +269,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (intent === "autoTranslate") {
+    const { resolveShopPlanContext } = await import("../utils/shopPlan.server");
+    const { upgradeMessage } = await import("../utils/pricingPlans");
+    const { capabilities } = await resolveShopPlanContext(session.shop);
+    if (!capabilities.translations) {
+      return {
+        ok: false,
+        error: upgradeMessage("translations"),
+      };
+    }
     const targetLang = String(formData.get("targetLang") ?? "")
       .trim()
       .toLowerCase();
@@ -392,7 +410,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function SettingsPage() {
-  const { settings, shopLanguages, shopLanguageErrors, needsLocaleScope, translationsInitialized } =
+  const {
+    settings,
+    shopLanguages,
+    shopLanguageErrors,
+    needsLocaleScope,
+    translationsInitialized,
+    canEditTranslations,
+  } =
     useLoaderData<typeof loader>();
   const shopify = useAppBridge();
   
@@ -425,34 +450,39 @@ export default function SettingsPage() {
   const revalidator = useRevalidator();
   const isRefreshingLanguages = revalidator.state === "loading";
 
-  // Language options loaded from Shopify (server-side via loader)
-  const languageOptions = shopLanguages;
-  const primaryLang = languageOptions.find((l) => l.primary)?.value || languageOptions[0]?.value || "en";
+  // Language options loaded from Shopify (dedupe by translation key; prefer primary)
+  const languageOptions = useMemo(() => {
+    const byKey = new Map<
+      string,
+      { label: string; value: string; primary: boolean }
+    >();
+    for (const opt of shopLanguages) {
+      const existing = byKey.get(opt.value);
+      if (!existing || opt.primary) {
+        byKey.set(opt.value, {
+          label: opt.label,
+          value: opt.value,
+          primary: opt.primary,
+        });
+      }
+    }
+    return [...byKey.values()];
+  }, [shopLanguages]);
+
+  const primaryLang =
+    languageOptions.find((l) => l.primary)?.value ||
+    languageOptions[0]?.value ||
+    "en";
   const [selectedLang, setSelectedLang] = useState(primaryLang);
 
-  const selectedLangOption = languageOptions.find((l) => l.value === selectedLang);
-  const [langSearchValue, setLangSearchValue] = useState("");
-  const [isLangSearchActive, setIsLangSearchActive] = useState(false);
-
-  const langInputValue = isLangSearchActive
-    ? langSearchValue
-    : (selectedLangOption?.label ?? "");
-
   useEffect(() => {
-    const match = shopLanguages.find((l) => l.value === selectedLang);
+    const match = languageOptions.find((l) => l.value === selectedLang);
     if (match) return;
-    const primary = shopLanguages.find((l) => l.primary) ?? shopLanguages[0];
+    const primary = languageOptions.find((l) => l.primary) ?? languageOptions[0];
     if (primary) {
       setSelectedLang(primary.value);
     }
-  }, [shopLanguages, selectedLang]);
-
-  const filteredLangOptions =
-    isLangSearchActive && langSearchValue
-      ? languageOptions.filter((opt) =>
-          opt.label.toLowerCase().includes(langSearchValue.toLowerCase()),
-        )
-      : languageOptions;
+  }, [languageOptions, selectedLang]);
 
   useEffect(() => {
     if (syncInterval === "disabled") return;
@@ -462,52 +492,54 @@ export default function SettingsPage() {
     return () => window.clearInterval(timer);
   }, [syncInterval, revalidator]);
 
-  const handleLangComboboxChange = useCallback(
+  const handleLangChange = useCallback(
     (value: string) => {
-      const opt = languageOptions.find((o) => o.value === value);
-      if (opt) {
-        setSelectedLang(value);
-        setLangSearchValue("");
-        setIsLangSearchActive(false);
-      }
+      if (!canEditTranslations) return;
+      if (!languageOptions.some((o) => o.value === value)) return;
+      setSelectedLang(value);
     },
-    [languageOptions]
+    [canEditTranslations, languageOptions],
   );
 
-  const handleLangTextChange = useCallback((value: string) => {
-    setLangSearchValue(value);
-    setIsLangSearchActive(true);
-  }, []);
-
-  const handleLangFocus = useCallback(() => {
-    setLangSearchValue("");
-    setIsLangSearchActive(true);
-  }, []);
-
   // Update translation field for the active language
-  const handleFieldChange = useCallback((field: keyof TranslationFields, value: string) => {
-    setTranslations((prev) => {
-      const activeLangDefaults =
-        translationPresetForLanguage(selectedLang);
-      return {
-        ...prev,
-        [selectedLang]: {
-          ...activeLangDefaults,
-          ...(prev[selectedLang] || {}),
-          [field]: value,
-        },
-      };
-    });
-  }, [selectedLang]);
+  const handleFieldChange = useCallback(
+    (field: keyof TranslationFields, value: string) => {
+      if (!canEditTranslations) return;
+      setTranslations((prev) => {
+        const activeLangDefaults = translationPresetForLanguage(selectedLang);
+        return {
+          ...prev,
+          [selectedLang]: {
+            ...activeLangDefaults,
+            ...(prev[selectedLang] || {}),
+            [field]: value,
+          },
+        };
+      });
+    },
+    [canEditTranslations, selectedLang],
+  );
 
   const handleSave = useCallback(() => {
+    if (!canEditTranslations) {
+      shopify.toast.show(
+        "Storefront translations are available on Standard and Premium. Upgrade to unlock.",
+      );
+      return;
+    }
     const data = new FormData();
     data.append("intent", "saveSettings");
     data.append("syncInterval", syncInterval);
     data.append("translationsString", JSON.stringify(translations));
 
     settingsFetcher.submit(data, { method: "post" });
-  }, [syncInterval, translations, settingsFetcher]);
+  }, [
+    canEditTranslations,
+    syncInterval,
+    translations,
+    settingsFetcher,
+    shopify,
+  ]);
 
   const handleSyncNow = useCallback(() => {
     const data = new FormData();
@@ -516,6 +548,12 @@ export default function SettingsPage() {
   }, [syncFetcher]);
 
   const handleAutoTranslate = useCallback(() => {
+    if (!canEditTranslations) {
+      shopify.toast.show(
+        "Storefront translations are available on Standard and Premium. Upgrade to unlock.",
+      );
+      return;
+    }
     if (selectedLang === "en") {
       shopify.toast.show("English is the source language");
       return;
@@ -526,7 +564,13 @@ export default function SettingsPage() {
     data.append("targetLang", selectedLang);
     data.append("translationsString", JSON.stringify(translations));
     translateFetcher.submit(data, { method: "post" });
-  }, [selectedLang, translations, translateFetcher, shopify]);
+  }, [
+    canEditTranslations,
+    selectedLang,
+    translations,
+    translateFetcher,
+    shopify,
+  ]);
 
   // Format Sync Time
   const formatSyncTime = useCallback((isoString: string | null) => {
@@ -607,6 +651,7 @@ export default function SettingsPage() {
         content: "Save settings",
         onAction: handleSave,
         loading: isSaving,
+        disabled: !canEditTranslations,
       }}
     >
       <BlockStack gap="500">
@@ -618,6 +663,9 @@ export default function SettingsPage() {
                 <Text as="h2" variant="headingMd">
                   Storefront Translations
                 </Text>
+                {!canEditTranslations ? (
+                  <PlanUpgradeBanner feature="translations" />
+                ) : null}
                 <Text as="p" tone="subdued">
                   Translate widget headings and table labels.
                 </Text>
@@ -632,51 +680,29 @@ export default function SettingsPage() {
                   </Banner>
                 )}
                 <Divider />
-                
-                <Combobox
-                  activator={
-                    <Combobox.TextField
-                      prefix={<Icon source={SearchIcon} />}
-                      onChange={handleLangTextChange}
-                      onFocus={handleLangFocus}
-                      label="Language"
-                      value={langInputValue}
-                      placeholder="Search language..."
-                      autoComplete="off"
-                    />
+
+                <Select
+                  label="Language"
+                  options={languageOptions.map((opt) => ({
+                    label: opt.label,
+                    value: opt.value,
+                  }))}
+                  value={selectedLang}
+                  onChange={handleLangChange}
+                  disabled={!canEditTranslations || languageOptions.length === 0}
+                  helpText={
+                    canEditTranslations
+                      ? "Pick a shop language, edit strings below, then Save."
+                      : "Upgrade to Standard or Premium to edit translations."
                   }
-                >
-                  {filteredLangOptions.length > 0 ? (
-                    <Listbox
-                      autoSelection={AutoSelection.None}
-                      onSelect={handleLangComboboxChange}
-                    >
-                      {filteredLangOptions.map((opt) => (
-                        <Listbox.Option
-                          key={opt.locale}
-                          value={opt.value}
-                          selected={selectedLang === opt.value}
-                          accessibilityLabel={opt.label}
-                        >
-                          {opt.label}
-                        </Listbox.Option>
-                      ))}
-                    </Listbox>
-                  ) : (
-                    <Listbox>
-                      <Listbox.Option value="" disabled accessibilityLabel="No results">
-                        No languages found
-                      </Listbox.Option>
-                    </Listbox>
-                  )}
-                </Combobox>
+                />
 
                 <InlineStack gap="200" wrap>
                   <Button
                     icon={AutomationIcon}
                     onClick={handleAutoTranslate}
                     loading={isAutoTranslating}
-                    disabled={selectedLang === "en"}
+                    disabled={!canEditTranslations || selectedLang === "en"}
                     tone="success"
                   >
                     Auto translate
@@ -705,6 +731,7 @@ export default function SettingsPage() {
                       onChange={(v) => handleFieldChange("transHeading", v)}
                       autoComplete="off"
                       placeholder="e.g. Buy more save more"
+                      disabled={!canEditTranslations}
                     />
                     <TextField
                       label="Add to Cart Button Text"
@@ -712,6 +739,7 @@ export default function SettingsPage() {
                       onChange={(v) => handleFieldChange("transCta", v)}
                       autoComplete="off"
                       placeholder="e.g. Grab this deal"
+                      disabled={!canEditTranslations}
                     />
                   </FormLayout.Group>
 
@@ -723,6 +751,7 @@ export default function SettingsPage() {
                       onChange={(v) => handleFieldChange("transQty", v)}
                       autoComplete="off"
                       placeholder="e.g. Qty"
+                      disabled={!canEditTranslations}
                     />
                     <TextField
                       label="Discount Column Title"
@@ -730,6 +759,7 @@ export default function SettingsPage() {
                       onChange={(v) => handleFieldChange("transDiscount", v)}
                       autoComplete="off"
                       placeholder="e.g. Discount"
+                      disabled={!canEditTranslations}
                     />
                     <TextField
                       label="Price Column Title"
@@ -737,6 +767,7 @@ export default function SettingsPage() {
                       onChange={(v) => handleFieldChange("transPrice", v)}
                       autoComplete="off"
                       placeholder="e.g. Price / ea"
+                      disabled={!canEditTranslations}
                     />
                   </FormLayout.Group>
 
@@ -748,6 +779,7 @@ export default function SettingsPage() {
                       autoComplete="off"
                       placeholder="e.g. Buy"
                       helpText='Used for tier labels like "Buy 10" → "Achetez 10".'
+                      disabled={!canEditTranslations}
                     />
                     <TextField
                       label="Savings Text (You save)"
@@ -755,6 +787,7 @@ export default function SettingsPage() {
                       onChange={(v) => handleFieldChange("transYouSave", v)}
                       autoComplete="off"
                       placeholder="e.g. You save"
+                      disabled={!canEditTranslations}
                     />
                   </FormLayout.Group>
 
@@ -765,6 +798,7 @@ export default function SettingsPage() {
                       onChange={(v) => handleFieldChange("transAdd", v)}
                       autoComplete="off"
                       placeholder="e.g. Add"
+                      disabled={!canEditTranslations}
                     />
                   </FormLayout.Group>
 
@@ -776,6 +810,7 @@ export default function SettingsPage() {
                       autoComplete="off"
                       placeholder="e.g. {{ discount }} OFF"
                       helpText="Shown in cart/checkout, e.g. 6% OFF. Use {{ discount }} and {{ amount }}."
+                      disabled={!canEditTranslations}
                     />
                     <TextField
                       label="Cart Discount Quantity Suffix"
@@ -784,6 +819,7 @@ export default function SettingsPage() {
                       autoComplete="off"
                       placeholder="e.g. (qty {{ qty }})"
                       helpText='Grouped quantity label, e.g. "(qty 20)" → "(qté 20)".'
+                      disabled={!canEditTranslations}
                     />
                   </FormLayout.Group>
 
@@ -795,6 +831,7 @@ export default function SettingsPage() {
                       onChange={(v) => handleFieldChange("transCountdown", v)}
                       autoComplete="off"
                       placeholder="e.g. Sale ends in"
+                      disabled={!canEditTranslations}
                     />
                     <TextField
                       label="Footnote / Helper Text"
@@ -802,6 +839,7 @@ export default function SettingsPage() {
                       onChange={(v) => handleFieldChange("transFootnote", v)}
                       autoComplete="off"
                       placeholder="e.g. Pick a tier to set quantity, then add to cart."
+                      disabled={!canEditTranslations}
                     />
                   </FormLayout.Group>
                 </FormLayout>

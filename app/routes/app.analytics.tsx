@@ -39,6 +39,7 @@ import {
 } from "../utils/volumeDiscountAnalytics.shared";
 import { AnalyticsDateRangeFilter } from "../components/AnalyticsDateRangeFilter";
 import { AnalyticsCampaignSortDropdown } from "../components/AnalyticsCampaignSortDropdown";
+import { PlanUpgradeBanner } from "../components/PlanUpgradeBanner";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, admin } = await authenticate.admin(request);
@@ -56,7 +57,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     { grantedScopes },
   );
 
-  return { analytics, rangeSelection };
+  const { resolveShopPlanContext } = await import("../utils/shopPlan.server");
+  const { plan, capabilities } = await resolveShopPlanContext(session.shop);
+
+  return {
+    analytics,
+    rangeSelection,
+    plan,
+    analyticsTier: capabilities.analytics,
+  };
 };
 
 function changeBadgeTone(change: string | null): "success" | "critical" | "info" {
@@ -236,12 +245,16 @@ function sortCampaignRows(
 }
 
 export default function AnalyticsPage() {
-  const { analytics, rangeSelection } = useLoaderData<typeof loader>();
+  const { analytics, rangeSelection, analyticsTier } =
+    useLoaderData<typeof loader>();
   const revalidator = useRevalidator();
   const [campaignSearch, setCampaignSearch] = useState("");
   const [sortBy, setSortBy] = useState("revenue desc");
   const [campaignPageIndex, setCampaignPageIndex] = useState(0);
   const isRefreshing = revalidator.state === "loading";
+  const showStandardAnalytics =
+    analyticsTier === "standard" || analyticsTier === "advanced";
+  const showAdvancedAnalytics = analyticsTier === "advanced";
 
   useEffect(() => {
     const intervalMs = 30_000;
@@ -441,6 +454,7 @@ export default function AnalyticsPage() {
           />
         </InlineGrid>
 
+        {showStandardAnalytics ? (
         <InlineGrid columns={{ xs: 1, sm: 2, md: 4 }} gap="400">
           <MetricCard
             title="Avg cart value"
@@ -466,7 +480,11 @@ export default function AnalyticsPage() {
             hint="Currently synced offers"
           />
         </InlineGrid>
+        ) : (
+          <PlanUpgradeBanner feature="analytics" />
+        )}
 
+        {showStandardAnalytics ? (
         <Layout>
           <Layout.Section variant="oneHalf">
             <Card>
@@ -725,7 +743,10 @@ export default function AnalyticsPage() {
             </BlockStack>
           </Layout.Section>
         </Layout>
+        ) : null}
 
+        {showAdvancedAnalytics ? (
+        <>
         <Layout>
           <Layout.Section>
             <Card padding="0">
@@ -923,6 +944,13 @@ export default function AnalyticsPage() {
             </Card>
           </Layout.Section>
         </Layout>
+        </>
+        ) : showStandardAnalytics ? (
+          <PlanUpgradeBanner
+            feature="analytics"
+            message="Per-campaign and product breakdowns are available on Premium. Upgrade to unlock."
+          />
+        ) : null}
       </BlockStack>
     </Page>
   );

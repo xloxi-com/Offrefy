@@ -9,33 +9,101 @@ import {
 } from "../types/volumeDiscount";
 import { resolveCampaignStatusFromSchedule } from "./campaignScheduleStatus";
 import { parseOptionalIsoDate } from "./countdownTimes";
+import {
+  planCapabilities,
+  upgradeMessage,
+  type PricingPlanId,
+} from "./pricingPlans";
 import { toTierPayload } from "./volumeDiscountTier";
 import {
   normalizeVolumeDiscountWidgetDisplay,
   type VolumeDiscountWidgetDisplay,
 } from "./widgetDisplay";
 
+export type VolumeDiscountFormData = {
+  campaignName: string;
+  displayName: string;
+  /** Persisted on `VolumeDiscountCampaign.status`: draft | active | scheduled. */
+  campaignStatus: "draft" | "active" | "scheduled";
+  productScope: VolumeDiscountProductScope;
+  quantityCondition: VolumeDiscountQuantityCondition;
+  customerType: VolumeDiscountCustomerType;
+  customerTags: string[];
+  tiers: TierPayload[];
+  productIds: string[];
+  collectionIds: string[];
+  widgetDisplay: VolumeDiscountWidgetDisplay;
+  countdownStartsAt: Date | null;
+  countdownEndsAt: Date | null;
+};
+
 export type ParsedVolumeDiscountForm =
   | { ok: false; error: string }
   | {
       ok: true;
-      data: {
-        campaignName: string;
-        displayName: string;
-        /** Persisted on `VolumeDiscountCampaign.status`: draft | active | scheduled. */
-        campaignStatus: "draft" | "active" | "scheduled";
-        productScope: VolumeDiscountProductScope;
-        quantityCondition: VolumeDiscountQuantityCondition;
-        customerType: VolumeDiscountCustomerType;
-        customerTags: string[];
-        tiers: TierPayload[];
-        productIds: string[];
-        collectionIds: string[];
-        widgetDisplay: VolumeDiscountWidgetDisplay;
-        countdownStartsAt: Date | null;
-        countdownEndsAt: Date | null;
-      };
+      data: VolumeDiscountFormData;
     };
+
+/**
+ * Strip / downgrade fields the plan does not allow.
+ * Returns sanitized data (does not reject — use with activation cap checks separately).
+ */
+export function sanitizeCampaignForPlan(
+  data: VolumeDiscountFormData,
+  planId: PricingPlanId,
+): VolumeDiscountFormData {
+  const caps = planCapabilities(planId);
+  let next = { ...data, widgetDisplay: { ...data.widgetDisplay } };
+
+  if (!caps.customerTargeting) {
+    next = {
+      ...next,
+      customerType: "everyone",
+      customerTags: [],
+    };
+  }
+
+  if (!caps.scheduling) {
+    next = {
+      ...next,
+      countdownStartsAt: null,
+      countdownEndsAt: null,
+      campaignStatus:
+        next.campaignStatus === "scheduled" ? "draft" : next.campaignStatus,
+    };
+  }
+
+  if (!caps.countdown) {
+    next.widgetDisplay = {
+      ...next.widgetDisplay,
+      showCountdown: false,
+    };
+  }
+
+  if (!caps.customCss) {
+    next.widgetDisplay = {
+      ...next.widgetDisplay,
+      customCss: "",
+    };
+  }
+
+  // Re-resolve status if schedule was stripped
+  if (!caps.scheduling) {
+    const requestedStatus: "draft" | "active" =
+      next.campaignStatus === "draft" ? "draft" : "active";
+    next.campaignStatus = resolveCampaignStatusFromSchedule({
+      requestedStatus,
+      startsAt: next.countdownStartsAt,
+      endsAt: next.countdownEndsAt,
+    });
+  }
+
+  return next;
+}
+
+export function activationBlockedMessage(_planId: PricingPlanId): string {
+  return upgradeMessage("activeCampaigns");
+}
 
 function parseJsonArray(raw: string): string[] | null {
   try {

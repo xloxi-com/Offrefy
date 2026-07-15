@@ -64,6 +64,20 @@ type ThemeEmbedStatus = {
   errors: string[];
 };
 
+const embedStatusCache = new Map<
+  string,
+  { status: ThemeEmbedStatus; expiresAt: number }
+>();
+const EMBED_STATUS_TTL_MS = 2 * 60 * 1000;
+
+export function invalidateThemeAppEmbedStatusCache(shop?: string): void {
+  if (!shop) {
+    embedStatusCache.clear();
+    return;
+  }
+  embedStatusCache.delete(shop);
+}
+
 function stripJsonComments(raw: string): string {
   return raw.replace(/\/\*[\s\S]*?\*\//g, "");
 }
@@ -120,6 +134,27 @@ async function adminJson<T>(
 }
 
 export async function getMainThemeAppEmbedStatus(
+  admin: AdminGraphql,
+  shopCacheKey?: string,
+): Promise<ThemeEmbedStatus> {
+  if (shopCacheKey) {
+    const hit = embedStatusCache.get(shopCacheKey);
+    if (hit && hit.expiresAt > Date.now()) {
+      return hit.status;
+    }
+  }
+
+  const status = await fetchMainThemeAppEmbedStatus(admin);
+  if (shopCacheKey && status.errors.length === 0) {
+    embedStatusCache.set(shopCacheKey, {
+      status,
+      expiresAt: Date.now() + EMBED_STATUS_TTL_MS,
+    });
+  }
+  return status;
+}
+
+async function fetchMainThemeAppEmbedStatus(
   admin: AdminGraphql,
 ): Promise<ThemeEmbedStatus> {
   const { data, errors } = await adminJson<{

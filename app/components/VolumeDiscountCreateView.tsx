@@ -40,7 +40,12 @@ import { useFetcher } from "react-router";
 
 import { CampaignStatusScheduleCard } from "./CampaignStatusScheduleCard";
 import { CountdownTimerSettingsCard } from "./CountdownTimerSettingsCard";
+import { PlanUpgradeBanner, PlanUpgradeHint } from "./PlanUpgradeBanner";
 import { WidgetDisplayColorField } from "./WidgetDisplayColorField";
+import {
+  planCapabilities as defaultPlanCapabilities,
+  type PlanCapabilities,
+} from "../utils/pricingPlans";
 import createStyles from "../styles/volume-discount-create.module.css";
 import { buyLabelsForQuantityTiers } from "../utils/buyLabelsForQuantityTiers";
 import {
@@ -398,6 +403,8 @@ type VolumeDiscountCreateViewProps = {
   defaultCampaignName?: string;
   /** When creating from Select offer type → Volume discount (`?preset=volume`). */
   newOfferPreset?: VolumeDiscountNewOfferPreset;
+  /** Plan feature gates (defaults to Free if omitted). */
+  planCapabilities?: PlanCapabilities;
 };
 
 export function VolumeDiscountCreateView({
@@ -406,7 +413,9 @@ export function VolumeDiscountCreateView({
   initialCampaign,
   defaultCampaignName,
   newOfferPreset,
+  planCapabilities: planCapsProp,
 }: VolumeDiscountCreateViewProps) {
+  const planCaps = planCapsProp ?? defaultPlanCapabilities("free");
   const shopify = useAppBridge();
   const fetcher = useFetcher<SaveResponse>();
   const [campaignName, setCampaignName] = useState(
@@ -826,8 +835,14 @@ export function VolumeDiscountCreateView({
     fd.set("displayName", displayName.trim());
     fd.set("productScope", productScope);
     fd.set("quantityCondition", quantityCondition);
-    fd.set("customerType", customerType);
-    fd.set("customerTags", JSON.stringify(customerTags));
+    fd.set(
+      "customerType",
+      planCaps.customerTargeting ? customerType : "everyone",
+    );
+    fd.set(
+      "customerTags",
+      JSON.stringify(planCaps.customerTargeting ? customerTags : []),
+    );
     const tiersForSave = tiers.map((t) => ({
       ...t,
       value: normalizeTierValueForForm(t.value),
@@ -835,26 +850,37 @@ export function VolumeDiscountCreateView({
     fd.set("tiers", JSON.stringify(tiersForSave));
     fd.set("productIds", JSON.stringify(productIds));
     fd.set("collectionIds", JSON.stringify(collectionIds));
-    fd.set("widgetDisplay", JSON.stringify(widgetDisplay));
     fd.set(
       "countdownStartsAt",
-      scheduleStartEnabled && countdownStartsAtLocal.trim()
+      planCaps.scheduling &&
+        scheduleStartEnabled &&
+        countdownStartsAtLocal.trim()
         ? datetimeLocalToIsoUtc(countdownStartsAtLocal) ?? ""
         : "",
     );
     fd.set(
       "countdownEndsAt",
-      scheduleEndEnabled && countdownEndsAtLocal.trim()
+      planCaps.scheduling &&
+        scheduleEndEnabled &&
+        countdownEndsAtLocal.trim()
         ? datetimeLocalToIsoUtc(countdownEndsAtLocal) ?? ""
         : "",
     );
     const startIsoForStatus =
-      scheduleStartEnabled && countdownStartsAtLocal.trim()
+      planCaps.scheduling &&
+      scheduleStartEnabled &&
+      countdownStartsAtLocal.trim()
         ? datetimeLocalToIsoUtc(countdownStartsAtLocal)
         : null;
     const pendingStart = isCampaignSchedulePendingStart(
       startIsoForStatus ? parseOptionalIsoDate(startIsoForStatus) : null,
     );
+    const widgetForSave = {
+      ...widgetDisplay,
+      showCountdown: planCaps.countdown ? widgetDisplay.showCountdown : false,
+      customCss: planCaps.customCss ? widgetDisplay.customCss : "",
+    };
+    fd.set("widgetDisplay", JSON.stringify(widgetForSave));
     fd.set(
       "campaignStatus",
       previewCampaignOn || pendingStart ? "active" : "draft",
@@ -869,6 +895,7 @@ export function VolumeDiscountCreateView({
     customerType,
     displayName,
     fetcher,
+    planCaps,
     previewCampaignOn,
     productIds,
     productScope,
@@ -1834,80 +1861,91 @@ export function VolumeDiscountCreateView({
                     </BlockStack>
                   </Card>
 
-                  <CampaignStatusScheduleCard
-                    scheduleStartEnabled={scheduleStartEnabled}
-                    onScheduleStartEnabledChange={(next) => {
-                      setScheduleStartEnabled(next);
-                      if (next) {
-                        const seed =
-                          countdownStartsAtLocal.trim() ||
-                          isoToDatetimeLocalValue(
-                            new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-                          );
-                        if (!countdownStartsAtLocal.trim()) {
-                          setCountdownStartsAtLocal(seed);
+                  {planCaps.scheduling ? (
+                    <CampaignStatusScheduleCard
+                      scheduleStartEnabled={scheduleStartEnabled}
+                      onScheduleStartEnabledChange={(next) => {
+                        setScheduleStartEnabled(next);
+                        if (next) {
+                          const seed =
+                            countdownStartsAtLocal.trim() ||
+                            isoToDatetimeLocalValue(
+                              new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+                            );
+                          if (!countdownStartsAtLocal.trim()) {
+                            setCountdownStartsAtLocal(seed);
+                          }
+                          const iso = datetimeLocalToIsoUtc(seed);
+                          const start = iso ? parseOptionalIsoDate(iso) : null;
+                          if (isCampaignSchedulePendingStart(start)) {
+                            setPreviewCampaignOn(false);
+                          }
                         }
-                        const iso = datetimeLocalToIsoUtc(seed);
+                      }}
+                      scheduleStartLocal={countdownStartsAtLocal}
+                      onScheduleStartLocalChange={(v) => {
+                        setCountdownStartsAtLocal(v);
+                        const iso = datetimeLocalToIsoUtc(v);
                         const start = iso ? parseOptionalIsoDate(iso) : null;
                         if (isCampaignSchedulePendingStart(start)) {
                           setPreviewCampaignOn(false);
+                        } else if (
+                          start &&
+                          !isCampaignScheduleExpired(scheduleEndsAtDate)
+                        ) {
+                          setPreviewCampaignOn(true);
                         }
-                      }
-                    }}
-                    scheduleStartLocal={countdownStartsAtLocal}
-                    onScheduleStartLocalChange={(v) => {
-                      setCountdownStartsAtLocal(v);
-                      const iso = datetimeLocalToIsoUtc(v);
-                      const start = iso ? parseOptionalIsoDate(iso) : null;
-                      if (isCampaignSchedulePendingStart(start)) {
-                        setPreviewCampaignOn(false);
-                      } else if (
-                        start &&
-                        !isCampaignScheduleExpired(scheduleEndsAtDate)
-                      ) {
-                        setPreviewCampaignOn(true);
-                      }
-                    }}
-                    scheduleEndEnabled={scheduleEndEnabled}
-                    onScheduleEndEnabledChange={(next) => {
-                      setScheduleEndEnabled(next);
-                      if (next && !countdownEndsAtLocal.trim()) {
-                        setCountdownEndsAtLocal(
-                          countdownDatetimeLocalFromNow(
-                            widgetDisplay.countdownTimeAmount,
-                            widgetDisplay.countdownTimeUnit,
-                          ),
-                        );
-                      }
-                      if (next) {
-                        const endLocal =
-                          countdownEndsAtLocal.trim() ||
-                          countdownDatetimeLocalFromNow(
-                            widgetDisplay.countdownTimeAmount,
-                            widgetDisplay.countdownTimeUnit,
+                      }}
+                      scheduleEndEnabled={scheduleEndEnabled}
+                      onScheduleEndEnabledChange={(next) => {
+                        setScheduleEndEnabled(next);
+                        if (next && !countdownEndsAtLocal.trim()) {
+                          setCountdownEndsAtLocal(
+                            countdownDatetimeLocalFromNow(
+                              widgetDisplay.countdownTimeAmount,
+                              widgetDisplay.countdownTimeUnit,
+                            ),
                           );
-                        const iso = datetimeLocalToIsoUtc(endLocal);
+                        }
+                        if (next) {
+                          const endLocal =
+                            countdownEndsAtLocal.trim() ||
+                            countdownDatetimeLocalFromNow(
+                              widgetDisplay.countdownTimeAmount,
+                              widgetDisplay.countdownTimeUnit,
+                            );
+                          const iso = datetimeLocalToIsoUtc(endLocal);
+                          const end = iso ? parseOptionalIsoDate(iso) : null;
+                          if (isCampaignScheduleExpired(end)) {
+                            setPreviewCampaignOn(false);
+                          }
+                        }
+                      }}
+                      scheduleEndLocal={countdownEndsAtLocal}
+                      onScheduleEndLocalChange={(v) => {
+                        setCountdownEndsAtLocal(v);
+                        setScheduleEndEnabled(true);
+                        const iso = datetimeLocalToIsoUtc(v);
                         const end = iso ? parseOptionalIsoDate(iso) : null;
                         if (isCampaignScheduleExpired(end)) {
                           setPreviewCampaignOn(false);
+                        } else if (
+                          !isCampaignSchedulePendingStart(scheduleStartsAtDate)
+                        ) {
+                          setPreviewCampaignOn(true);
                         }
-                      }
-                    }}
-                    scheduleEndLocal={countdownEndsAtLocal}
-                    onScheduleEndLocalChange={(v) => {
-                      setCountdownEndsAtLocal(v);
-                      setScheduleEndEnabled(true);
-                      const iso = datetimeLocalToIsoUtc(v);
-                      const end = iso ? parseOptionalIsoDate(iso) : null;
-                      if (isCampaignScheduleExpired(end)) {
-                        setPreviewCampaignOn(false);
-                      } else if (
-                        !isCampaignSchedulePendingStart(scheduleStartsAtDate)
-                      ) {
-                        setPreviewCampaignOn(true);
-                      }
-                    }}
-                  />
+                      }}
+                    />
+                  ) : (
+                    <Card padding="400">
+                      <BlockStack gap="300">
+                        <Text as="h2" variant="headingSm">
+                          Schedule
+                        </Text>
+                        <PlanUpgradeBanner feature="scheduling" />
+                      </BlockStack>
+                    </Card>
+                  )}
 
                   <Card padding="400">
                     <BlockStack gap="300">
@@ -1919,9 +1957,13 @@ export function VolumeDiscountCreateView({
                           Choose which customers can use this discount.
                         </Text>
                       </BlockStack>
+                      {!planCaps.customerTargeting ? (
+                        <PlanUpgradeHint feature="customerTargeting" />
+                      ) : null}
                       <Select
                         label="Customer type"
                         name="customerType"
+                        disabled={!planCaps.customerTargeting}
                         options={[
                           { label: "Everyone", value: "everyone" },
                           {
@@ -1933,8 +1975,11 @@ export function VolumeDiscountCreateView({
                             value: "logged-in-tag-any",
                           },
                         ]}
-                        value={customerType}
+                        value={
+                          planCaps.customerTargeting ? customerType : "everyone"
+                        }
                         onChange={(v) => {
+                          if (!planCaps.customerTargeting) return;
                           if (isVolumeDiscountCustomerType(v)) {
                             setCustomerType(v);
                           }
@@ -2271,6 +2316,7 @@ export function VolumeDiscountCreateView({
                           patchWidgetDisplay={patchWidgetDisplay}
                           onResetTimer={handleResetCountdownTimer}
                           showLayoutControls={!isVolumeTableOffer}
+                          locked={!planCaps.countdown}
                         />
 
                         <Card padding="400">
@@ -3449,6 +3495,10 @@ export function VolumeDiscountCreateView({
                             <Text as="h3" variant="headingSm">
                               Custom CSS
                             </Text>
+                            {!planCaps.customCss ? (
+                              <PlanUpgradeBanner feature="customCss" />
+                            ) : (
+                              <>
                             <Text as="p" variant="bodySm" tone="subdued">
                               Extra rules injected on the storefront root (
                               <Text as="span" fontWeight="semibold">
@@ -3486,6 +3536,8 @@ export function VolumeDiscountCreateView({
                               monospaced
                               helpText={`Max ${WIDGET_DISPLAY_CUSTOM_CSS_MAX_CHARS.toLocaleString()} characters.`}
                             />
+                              </>
+                            )}
                           </BlockStack>
                         </Card>
                       </BlockStack>

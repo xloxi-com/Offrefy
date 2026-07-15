@@ -125,6 +125,14 @@ export type OffersPolarisHomeProps = {
   offerEditTo: (id: string) => string;
   onCampaignsMutated: () => void;
   notify: (message: string) => void;
+  /** Plan gates for import/export and campaign cap messaging. */
+  canImportExport?: boolean;
+  activeCount?: number;
+  maxActiveCampaigns?: number | null;
+  /** When true, Create / Duplicate are blocked (offer count at plan limit). */
+  atOfferCap?: boolean;
+  createOfferBlockedMessage?: string;
+  onCreateOffer?: () => void;
 };
 
 const offerTabs: TabProps[] = [
@@ -277,6 +285,12 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
   offerEditTo,
   onCampaignsMutated,
   notify,
+  canImportExport = false,
+  activeCount = 0,
+  maxActiveCampaigns = 5,
+  atOfferCap = false,
+  createOfferBlockedMessage = "You’ve reached your plan’s offer limit. Upgrade to create more.",
+  onCreateOffer,
 }: OffersPolarisHomeProps) {
   const { search } = useLocation();
   const listIndexAction = adminEmbeddedIndexActionPath(search);
@@ -578,6 +592,10 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
   }, [campaigns.length, listIndexAction, syncAllFetcher]);
 
   const submitDuplicate = (campaignId: string) => {
+    if (atOfferCap) {
+      notify(createOfferBlockedMessage);
+      return;
+    }
     const fd = new FormData();
     fd.set("_action", "duplicate");
     fd.set("campaignId", campaignId);
@@ -604,12 +622,23 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     listFetcher.submit(fd, { method: "post", action: listIndexAction });
   };
 
+  const atCampaignCap =
+    maxActiveCampaigns != null && activeCount >= maxActiveCampaigns;
+
   const offersTableBulkActions = useMemo(
     () => [
       {
         content: "Active",
-        onAction: () => submitBulkStatus("bulkActivate"),
-        disabled: listMutationPending,
+        onAction: () => {
+          if (atCampaignCap) {
+            notify(
+              "You’ve reached your plan’s active campaign limit. Upgrade to activate more.",
+            );
+            return;
+          }
+          submitBulkStatus("bulkActivate");
+        },
+        disabled: listMutationPending || atCampaignCap,
       },
       {
         content: "Draft",
@@ -623,7 +652,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
         disabled: listMutationPending,
       },
     ],
-    [listMutationPending, selectedResources],
+    [atCampaignCap, listMutationPending, notify, selectedResources],
   );
 
   const csvImportAction = adminEmbeddedPath("/app/offers/import", search);
@@ -631,10 +660,19 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
   const csvExportPending = csvExportFetcher.state !== "idle";
   const syncAllPending = syncAllFetcher.state !== "idle";
   const canExportOffers =
-    campaigns.length > 0 && filteredCampaigns.length > 0;
+    canImportExport &&
+    campaigns.length > 0 &&
+    filteredCampaigns.length > 0;
 
   const submitExportCsv = useCallback(() => {
-    if (csvExportPending || !canExportOffers) return;
+    if (csvExportPending || !canExportOffers) {
+      if (!canImportExport) {
+        notify(
+          "Import & export is available on Premium. Upgrade to unlock.",
+        );
+      }
+      return;
+    }
     const fd = new FormData();
     fd.set("_action", "exportCsv");
     fd.set("listTab", offerTab);
@@ -725,11 +763,26 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     () => ({
       content: "Create offer",
       onAction: () => {
+        if (onCreateOffer) {
+          onCreateOffer();
+          return;
+        }
+        if (atOfferCap) {
+          notify(createOfferBlockedMessage);
+          return;
+        }
         warmEditorChunk();
         setScreen("select");
       },
     }),
-    [setScreen, warmEditorChunk],
+    [
+      atOfferCap,
+      createOfferBlockedMessage,
+      notify,
+      onCreateOffer,
+      setScreen,
+      warmEditorChunk,
+    ],
   );
 
   const revalidator = useRevalidator();
@@ -761,14 +814,28 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
         disabled: csvExportPending || !canExportOffers,
         onAction: submitExportCsv,
       },
-      { content: "Import", onAction: () => setImportModalOpen(true) },
+      {
+        content: "Import",
+        onAction: () => {
+          if (!canImportExport) {
+            notify(
+              "Import & export is available on Premium. Upgrade to unlock.",
+            );
+            return;
+          }
+          setImportModalOpen(true);
+        },
+        disabled: !canImportExport,
+      },
     ],
     [
       campaigns.length,
       canExportOffers,
+      canImportExport,
       csvExportPending,
       isReloading,
       listFetcher.state,
+      notify,
       revalidator,
       submitExportCsv,
       submitSyncAll,
@@ -795,6 +862,14 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
         <Button
           variant="primary"
           onClick={() => {
+            if (onCreateOffer) {
+              onCreateOffer();
+              return;
+            }
+            if (atOfferCap) {
+              notify(createOfferBlockedMessage);
+              return;
+            }
             warmEditorChunk();
             setScreen("select");
           }}
@@ -1054,7 +1129,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                         variant="tertiary"
                         icon={DuplicateIcon}
                         accessibilityLabel="Duplicate"
-                        disabled={listMutationPending}
+                        disabled={listMutationPending || atOfferCap}
                         onPointerDown={(
                           e: ReactPointerEvent<HTMLButtonElement>,
                         ) => e.stopPropagation()}

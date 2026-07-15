@@ -141,6 +141,8 @@ model VolumeDiscountSettings {
   translationsString    String   @default("{}") @db.Text
   /// Last successful Shopify sync (manual or scheduled).
   lastSyncedAt            DateTime?
+  /// free | standard | premium — Billing not live yet; set from Pricing page.
+  plan                    String   @default("free")
 
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt

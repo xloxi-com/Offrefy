@@ -12,11 +12,27 @@ import type { Prisma } from "@prisma/client";
 
 import { IndeterminateLinearProgress } from "../components/IndeterminateLinearProgress";
 import { prisma } from "../db.server";
-import { scheduleVolumeDiscountShopSync } from "../services/deferredShopSync.server";
-import { flushStorefrontWidgetPayloadNow } from "../services/refreshStorefrontWidget.server";
+import {
+  scheduleStorefrontWidgetRefresh,
+  scheduleVolumeDiscountShopSync,
+} from "../services/deferredShopSync.server";
 import { applyDueCampaignScheduleTransitions } from "../services/campaignScheduleTransitions.server";
 import { authenticate } from "../shopify.server";
-import { parseVolumeDiscountForm } from "../utils/volumeDiscountForm.server";
+import {
+  canActivateAnotherCampaign,
+  canCreateAnotherOffer,
+  createOfferBlockedMessage,
+} from "../utils/pricingPlans";
+import {
+  countActiveCampaigns,
+  countAllCampaigns,
+  resolveShopPlanContext,
+} from "../utils/shopPlan.server";
+import {
+  parseVolumeDiscountForm,
+  sanitizeCampaignForPlan,
+  activationBlockedMessage,
+} from "../utils/volumeDiscountForm.server";
 import type { VolumeDiscountNewOfferPreset } from "../types/volumeDiscount";
 import { adminEmbeddedPath } from "../utils/adminEmbeddedPath";
 
@@ -31,11 +47,20 @@ type NewOfferNavigationState = {
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const presetParam = new URL(request.url).searchParams.get("preset");
   const newOfferPreset: VolumeDiscountNewOfferPreset =
     presetParam === "volume" ? "volume_table" : "quantity_breaks";
-  return { newOfferPreset };
+  const [{ plan, capabilities }, activeCount] = await Promise.all([
+    resolveShopPlanContext(session.shop),
+    countActiveCampaigns(session.shop),
+  ]);
+  return {
+    newOfferPreset,
+    plan,
+    planCapabilities: capabilities,
+    activeCount,
+  };
 };
 
 /** React Router may skip re-running loaders when only the query string changes (same path, no dynamic params). Preset lives in `?preset=` — always revalidate on search change. */
@@ -69,7 +94,29 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (!parsed.ok) {
     return { ok: false as const, error: parsed.error };
   }
-  const d = parsed.data;
+
+  const [{ plan }, offerCount] = await Promise.all([
+    resolveShopPlanContext(session.shop),
+    countAllCampaigns(session.shop),
+  ]);
+  const d = sanitizeCampaignForPlan(parsed.data, plan);
+
+  if (!canCreateAnotherOffer(plan, offerCount)) {
+    return {
+      ok: false as const,
+      error: createOfferBlockedMessage(plan),
+    };
+  }
+
+  if (d.campaignStatus === "active") {
+    const activeCount = await countActiveCampaigns(session.shop);
+    if (!canActivateAnotherCampaign(plan, activeCount)) {
+      return {
+        ok: false as const,
+        error: activationBlockedMessage(plan),
+      };
+    }
+  }
 
   const record = await prisma.volumeDiscountCampaign.create({
     data: {
@@ -99,9 +146,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   /* Draft / scheduled offers are not in the aggregate discount — skip slow GraphQL. */
   if (liveNow) {
-    await flushStorefrontWidgetPayloadNow(admin, session.shop);
     scheduleVolumeDiscountShopSync(admin, session.shop, {
       changedCampaignIds: [record.id],
+      skipScheduleTransitions: true,
     });
   } else if (
     d.campaignStatus === "scheduled" ||
@@ -109,14 +156,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     d.countdownEndsAt
   ) {
     /* Keep storefront cache/rev fresh for countdown schedule metadata. */
-    await flushStorefrontWidgetPayloadNow(admin, session.shop);
+    scheduleStorefrontWidgetRefresh(admin, session.shop);
   }
 
   return { ok: true as const, campaignId: record.id, syncPending: true as const };
 };
 
 export default function VolumeDiscountNewRoute() {
-  const { newOfferPreset: loaderPreset } = useLoaderData<typeof loader>();
+  const {
+    newOfferPreset: loaderPreset,
+    planCapabilities,
+  } = useLoaderData<typeof loader>();
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const navState = location.state as NewOfferNavigationState | null;
@@ -142,6 +192,7 @@ export default function VolumeDiscountNewRoute() {
         onSuccess={onSuccess}
         defaultCampaignName={defaultCampaignName}
         newOfferPreset={newOfferPreset}
+        planCapabilities={planCapabilities}
       />
     </Suspense>
   );

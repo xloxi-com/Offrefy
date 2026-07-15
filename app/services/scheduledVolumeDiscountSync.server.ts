@@ -10,7 +10,6 @@ import {
   enqueueOrderAnalyticsReconcileForAllShops,
   reconcileOrderAnalyticsForShop,
 } from "./orderAnalyticsReconcile.server";
-import { refreshStorefrontWidgetForShop } from "./refreshStorefrontWidget.server";
 import { syncVolumeDiscountShop } from "./volumeDiscountFunctionSync.server";
 import { touchShopLastSyncedAt } from "../utils/shopSyncState.server";
 
@@ -61,17 +60,14 @@ export async function runScheduledSyncForShop(shop: string): Promise<string[]> {
     const { admin } = await unauthenticated.admin(shop);
     const syncResult = await syncVolumeDiscountShop(admin, shop, {
       purgeLegacy: true,
+      skipScheduleTransitions: true,
     });
     if (syncResult.errors.length) {
       errors.push(...syncResult.errors);
     } else {
       invalidateMemoryCachePrefix(`widget:${shop}:`);
       invalidateMemoryCachePrefix(`cart-rules:${shop}:`);
-
-      const refreshResult = await refreshStorefrontWidgetForShop(admin, shop);
-      if (refreshResult.errors.length) {
-        errors.push(...refreshResult.errors);
-      }
+      /* syncVolumeDiscountShop already writes the storefront widget payload. */
     }
 
     await reconcileOrderAnalyticsForShop(shop, { force: true });

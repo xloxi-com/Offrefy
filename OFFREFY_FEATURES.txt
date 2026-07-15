@@ -1,0 +1,229 @@
+Offrefy — Full Feature List
+===========================
+Last updated: 16 Jul 2026
+
+Offrefy is a Shopify app for quantity-break / volume discounts.
+Create offers once, show them on product pages, and apply savings
+automatically at cart and checkout (no discount codes).
+
+------------------------------------------------------------------------------
+1. OFFERS & DISCOUNT RULES
+------------------------------------------------------------------------------
+
+- Quantity break campaigns (tier cards on the product page)
+- Volume discount table layout (Quantity / Discount / Price per item)
+- Multiple tiers per campaign (quantity from + discount value)
+- Discount types: percentage off, amount off per item, fixed price per item
+- Per-tier badge text (e.g. Most Popular)
+- Custom tier labels (or auto labels like Buy 1, Buy 10–14)
+- Option subtext under each tier label
+- Default selected tier (one tier pre-selected)
+- Product scope: specific products, variants, collections, product group, or all products
+- Quantity basis: cart total, per collection, per product, or per variant
+- Customer targeting: everyone, logged-in only, or customers with specific tags
+- Campaign name (admin) and display name (cart/checkout)
+- Placeholders in discount message: {{ discount }}, {{ amount }}
+- Live preview while editing (desktop / mobile)
+- Undo / redo in the offer editor
+
+------------------------------------------------------------------------------
+2. STOREFRONT WIDGET
+------------------------------------------------------------------------------
+
+- Two layouts: tier cards or volume pricing table
+- Optional widget heading
+- Optional countdown timer (“Sale ends in”)
+- Countdown duration: days / hours / minutes
+- Optional countdown start delay
+- Header layout: same row or stacked; left / center / right align
+- Heading and timer order swap; mobile stack option
+- CTA actions: Add to cart, Add to cart + open cart, Go to checkout, Go to a page URL
+- Custom CTA text and footnote per offer
+- Hide theme Add to cart, Buy it now, variant picker, and/or quantity stepper
+- Widget options: hide variant picker, OOS variants, qty stepper, line total,
+  per-tier +Add, compare-at price, table main CTA
+- Price display: tier total or per-item price
+- Badge placement options (after label, float positions, above price, etc.)
+- 10 color presets + Custom; reset styles
+- Color controls: primary, hover, selected, countdown, savings, columns,
+  subtext, muted, borders, badge, radios
+- Size / radius controls for cards, CTA, controls, radio, badge scale
+- Typography: global scale, per-role font sizes and weights
+- Volume table column align and padding
+- Custom CSS (injected on widget root)
+- Theme product section block (“Quantity breaks”)
+- App embed fallback injects widget if the block is missing
+
+------------------------------------------------------------------------------
+3. SCHEDULING & STATUS
+------------------------------------------------------------------------------
+
+- Statuses: Active, Draft, Scheduled
+- Active / Draft toggle in the editor
+- Schedule start → stays Scheduled until start, then auto-activates
+- Schedule end → auto turns offer to Draft (also ends countdown)
+- Offers list filters by status (tabs)
+- Bulk activate / deactivate
+- Duplicate offer (as draft)
+- Delete offer (single or bulk) and clean up linked discounts
+- Background schedule transitions on sync / cron
+
+------------------------------------------------------------------------------
+4. ANALYTICS
+------------------------------------------------------------------------------
+
+- Dashboard metrics:
+  - Attributed revenue
+  - Offer impressions
+  - Add to carts
+  - Conversion (ATC / impressions)
+  - Average cart value
+  - Average quantity
+  - Revenue per impression
+  - Active / total campaigns
+- Period comparison (change vs previous period)
+- Sales + impressions chart
+- Funnel: impressions → add to cart
+- Day-of-week activity breakdown
+- Per-campaign performance table with sorting
+- Date ranges: Today, Last 7 days, Last 30 days, All time, Custom
+- Storefront tracking: impressions and add_to_cart
+- Order attribution via orders/paid webhook, web pixel (checkout completed),
+  and Admin API reconcile fallback
+
+------------------------------------------------------------------------------
+5. SETTINGS
+------------------------------------------------------------------------------
+
+- Storefront translations per published shop language
+- Editable strings: heading, CTA, Qty / Discount / Price headers,
+  Buy prefix, You save, tier Add, cart badge, countdown, footnote
+- Language presets (e.g. Spanish, French, German, Tamil, Dutch)
+- Auto-translate from English into selected language
+- Reload languages from Shopify
+- Sync now (push active offers + storefront payload)
+- Last synced timestamp
+
+------------------------------------------------------------------------------
+6. IMPORT / EXPORT
+------------------------------------------------------------------------------
+
+- CSV / Excel export of offers (respects list filters)
+- CSV import (max 5 MB) to create or update offers
+- Optional overwrite by campaign name
+- Import summary: created / updated / skipped / errors
+
+------------------------------------------------------------------------------
+7. CHECKOUT & CART (SHOPIFY FUNCTIONS)
+------------------------------------------------------------------------------
+
+- One automatic product discount holds all campaigns
+  (works around Shopify’s ~25 automatic discount limit)
+- Discounts apply at cart / checkout — no codes needed
+- Highest qualifying tier applied to matching lines
+- Honors product scope, quantity basis, and customer rules
+- Powered by Shopify Discount Functions
+- App proxy endpoints for cart rules, widget config, calc, analytics
+
+------------------------------------------------------------------------------
+8. SETUP & THEME
+------------------------------------------------------------------------------
+
+- Home Setup Guide (dismissible):
+  1. Enable app embed
+  2. Add widget block
+  3. Create offer
+  4. Activate offer
+  5. Sync storefront
+- One-click enable app embed (needs write_themes)
+- Deep links to Theme editor (app embed + product block)
+- ScriptTag fallback if app embed is off
+- Theme extension: app embed + product section block
+- Analytics web pixel extension
+
+------------------------------------------------------------------------------
+9. ADMIN NAVIGATION
+------------------------------------------------------------------------------
+
+- Home — setup guide and overview
+- Analytics — performance dashboard
+- Offers — list, create, edit, bulk actions, sync
+- Pricing — plans
+- Settings — translations and sync
+
+------------------------------------------------------------------------------
+10. PRICING PLANS (UI)
+------------------------------------------------------------------------------
+
+Free — $0 / month
+  - 5 active campaigns
+  - Quantity breaks (tier cards)
+  - Volume discount (pricing table)
+  - Appearance templates
+  - Product page widget
+  - Automatic checkout discounts
+  - Basic analytics
+  - Email support
+
+Standard — $8.99 / month  |  yearly = 20% off → $7.19 / month (billed yearly)
+  - 25 active campaigns
+  - Quantity breaks (tier cards)
+  - Volume discount (pricing table)
+  - Appearance templates
+  - Product, collection & customer targeting
+  - Offer scheduling & countdown timers
+  - Campaign analytics
+  - Storefront translations
+  - Email support
+
+Premium — $19.99 / month  |  yearly = 20% off → $15.99 / month (billed yearly)  |  Most popular
+  - Unlimited campaigns
+  - Quantity breaks (tier cards)
+  - Volume discount (pricing table)
+  - All appearance templates
+  - Advanced analytics & attribution
+  - Scheduling & automation
+  - Import & export (CSV / Excel)
+  - Custom CSS & advanced styling
+  - Priority support
+
+NOTES:
+- Billing checkout is not live yet (upgrade still notes billing coming soon)
+- Plan can be switched on the Pricing page; feature locks follow the selected plan
+- Plan limits are enforced in the app (activate caps, locked UI + server sanitize)
+
+------------------------------------------------------------------------------
+11. OTHER
+------------------------------------------------------------------------------
+
+- GDPR / compliance webhooks (customer request, redact, shop redact)
+- App uninstall and scopes-update webhooks
+- Scheduled sync / transition cron endpoint
+- Cross-promo card for Approvefy (sister app)
+
+------------------------------------------------------------------------------
+COMING SOON / PARTIAL
+------------------------------------------------------------------------------
+
+- Shopify Billing checkout (upgrade flow)
+- Plan limit enforcement in the app
+- Offer “Learn more” docs (toast only today)
+- Scheduled sync interval picker in Settings UI (backend ready)
+- Free shipping discount sample (not wired to live Function config)
+
+------------------------------------------------------------------------------
+MERCHANT FLOW (SUMMARY)
+------------------------------------------------------------------------------
+
+1. Enable app embed (or rely on ScriptTag fallback)
+2. Add Quantity breaks block on a product template (optional but recommended)
+3. Create a quantity-break or volume-table offer
+4. Style the widget and set CTA / targeting
+5. Schedule or activate
+6. Sync storefront
+7. Customers see tiers on the product page; discounts apply at checkout
+8. Track performance in Analytics
+
+===========================
+End of feature list
+===========================

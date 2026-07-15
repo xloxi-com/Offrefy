@@ -66,6 +66,13 @@ export const action = async ({
 }: ActionFunctionArgs): Promise<OffersImportActionData> => {
   const { admin, session } = await authenticate.admin(request);
 
+  const { resolveShopPlanContext } = await import("../utils/shopPlan.server");
+  const { upgradeMessage } = await import("../utils/pricingPlans");
+  const { capabilities } = await resolveShopPlanContext(session.shop);
+  if (!capabilities.importExport) {
+    return { ok: false, error: upgradeMessage("importExport") };
+  }
+
   let form: FormData;
   try {
     form = await request.formData();

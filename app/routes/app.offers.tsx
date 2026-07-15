@@ -29,7 +29,6 @@ import {
   scheduleVolumeDiscountShopSync,
 } from "../services/deferredShopSync.server";
 import { applyDueCampaignScheduleTransitions } from "../services/scheduledVolumeDiscountSync.server";
-import { flushStorefrontWidgetPayloadNow } from "../services/refreshStorefrontWidget.server";
 import { syncVolumeDiscountShop } from "../services/volumeDiscountFunctionSync.server";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -43,6 +42,17 @@ import type { OffersListTab } from "../utils/offersTableViewOrder.server";
 import { filterSortOffersForListView } from "../utils/offersTableViewOrder.shared";
 import { storefrontProductPreviewUrl } from "../utils/storefrontProductPreviewUrl.server";
 import { widgetPresentationFromStoredJson } from "../utils/widgetDisplay";
+import {
+  countActiveCampaigns,
+  countAllCampaigns,
+  resolveShopPlanContext,
+} from "../utils/shopPlan.server";
+import {
+  canCreateAnotherOffer,
+  createOfferBlockedMessage,
+  getMaxActiveCampaigns,
+  upgradeMessage,
+} from "../utils/pricingPlans";
 
 const OfferTypePreviewModal = lazy(() =>
   import("../components/OfferTypePreviewModal").then((m) => ({
@@ -96,22 +106,25 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   /* Flip Scheduled → Active / Active → Ended before listing. */
   const flipped = await applyDueCampaignScheduleTransitions(session.shop);
   if (flipped.shopsNeedingShopifySync.length) {
-    scheduleVolumeDiscountShopSync(admin, session.shop);
+    scheduleVolumeDiscountShopSync(admin, session.shop, {
+      skipScheduleTransitions: true,
+    });
   }
 
-  const rows = await prisma.$queryRaw<
-    Array<{
-      id: string;
-      campaignName: string;
-      displayName: string | null;
-      productScope: string;
-      status: string;
-      createdAt: Date;
-      updatedAt: Date;
-      tierCount: bigint;
-      widgetDisplay: unknown;
-    }>
-  >(Prisma.sql`
+  const [rows, planCtx] = await Promise.all([
+    prisma.$queryRaw<
+      Array<{
+        id: string;
+        campaignName: string;
+        displayName: string | null;
+        productScope: string;
+        status: string;
+        createdAt: Date;
+        updatedAt: Date;
+        tierCount: bigint;
+        widgetDisplay: unknown;
+      }>
+    >(Prisma.sql`
       SELECT
         c."id",
         c."campaignName",
@@ -128,7 +141,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       FROM "VolumeDiscountCampaign" c
       WHERE c."shop" = ${session.shop}
       ORDER BY c."updatedAt" DESC, c."createdAt" DESC
-    `);
+    `),
+    resolveShopPlanContext(session.shop),
+  ]);
 
   /* Warm preview URL cache without blocking Offers table + header actions paint. */
   runAfterResponse(
@@ -137,8 +152,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     })
   );
 
+  const { plan, capabilities } = planCtx;
+  let activeCount = 0;
+  for (const c of rows) {
+    if (String(c.status).toLowerCase() === "active") activeCount += 1;
+  }
+  const offerCount = rows.length;
+
   return {
     storefrontProductPreviewUrl: null as string | null,
+    plan,
+    planCapabilities: capabilities,
+    activeCount,
+    offerCount,
+    maxActiveCampaigns: getMaxActiveCampaigns(plan),
     campaigns: rows.map((c) => ({
       id: c.id,
       campaignName: c.campaignName,
@@ -195,7 +222,6 @@ export async function action({ request }: ActionFunctionArgs) {
       };
     }
     scheduleVolumeDiscountShopSync(admin, session.shop);
-    await flushStorefrontWidgetPayloadNow(admin, session.shop);
     return {
       ok: true as const,
       intent: "delete" as const,
@@ -230,6 +256,13 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   if (intent === "exportCsv") {
+    const { capabilities } = await resolveShopPlanContext(session.shop);
+    if (!capabilities.importExport) {
+      return {
+        ok: false as const,
+        error: upgradeMessage("importExport"),
+      };
+    }
     const tabRaw = String(form.get("listTab") ?? "all");
     const tab: OffersListTab =
       tabRaw === "active" ||
@@ -265,21 +298,65 @@ export async function action({ request }: ActionFunctionArgs) {
     }
     const rows = await prisma.volumeDiscountCampaign.findMany({
       where: { shop: session.shop, id: { in: campaignIds } },
-      select: { id: true },
+      select: { id: true, status: true },
     });
     if (rows.length !== campaignIds.length) {
       return { ok: false as const, error: "One or more offers not found" };
     }
-    const status = intent === "bulkActivate" ? "active" : "draft";
+
+    if (intent === "bulkActivate") {
+      const [{ plan }, activeCount] = await Promise.all([
+        resolveShopPlanContext(session.shop),
+        countActiveCampaigns(session.shop),
+      ]);
+      const notAlreadyActive = rows.filter(
+        (r) => String(r.status).toLowerCase() !== "active",
+      );
+      const max = getMaxActiveCampaigns(plan);
+      const room =
+        max == null
+          ? notAlreadyActive.length
+          : Math.max(0, max - activeCount);
+      if (room === 0 && notAlreadyActive.length > 0) {
+        return {
+          ok: false as const,
+          error: upgradeMessage("activeCampaigns"),
+        };
+      }
+      const toActivate = notAlreadyActive.slice(0, room).map((r) => r.id);
+      if (toActivate.length === 0) {
+        return {
+          ok: true as const,
+          intent: "bulkActivate" as const,
+          count: 0,
+        };
+      }
+      await prisma.volumeDiscountCampaign.updateMany({
+        where: { shop: session.shop, id: { in: toActivate } },
+        data: { status: "active" },
+      });
+      scheduleVolumeDiscountShopSync(admin, session.shop);
+      const skipped = notAlreadyActive.length - toActivate.length;
+      return {
+        ok: true as const,
+        intent: "bulkActivate" as const,
+        count: toActivate.length,
+        syncPending: true as const,
+        warning:
+          skipped > 0
+            ? `Activated ${toActivate.length}. ${skipped} skipped — ${upgradeMessage("activeCampaigns")}`
+            : undefined,
+      };
+    }
+
     await prisma.volumeDiscountCampaign.updateMany({
       where: { shop: session.shop, id: { in: campaignIds } },
-      data: { status },
+      data: { status: "draft" },
     });
     scheduleVolumeDiscountShopSync(admin, session.shop);
-    await flushStorefrontWidgetPayloadNow(admin, session.shop);
     return {
       ok: true as const,
-      intent: intent === "bulkActivate" ? ("bulkActivate" as const) : ("bulkDeactivate" as const),
+      intent: "bulkDeactivate" as const,
       count: campaignIds.length,
       syncPending: true as const,
     };
@@ -297,6 +374,14 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   if (intent === "duplicate") {
+    const { plan } = await resolveShopPlanContext(session.shop);
+    const offerCount = await countAllCampaigns(session.shop);
+    if (!canCreateAnotherOffer(plan, offerCount)) {
+      return {
+        ok: false as const,
+        error: createOfferBlockedMessage(plan),
+      };
+    }
     const copyName = `${row.campaignName} (copy)`.slice(0, 500);
     await prisma.volumeDiscountCampaign.create({
       data: {
@@ -323,8 +408,15 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Index() {
-  const { campaigns, storefrontProductPreviewUrl: storefrontProductPreviewUrlFromLoader } =
-    useLoaderData<typeof loader>();
+  const {
+    campaigns,
+    storefrontProductPreviewUrl: storefrontProductPreviewUrlFromLoader,
+    planCapabilities,
+    activeCount,
+    offerCount,
+    maxActiveCampaigns,
+    plan,
+  } = useLoaderData<typeof loader>();
   const { search } = useLocation();
   const shopify = useAppBridge();
   const navigate = useNavigate();
@@ -336,6 +428,17 @@ export default function Index() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortSelected, setSortSelected] = useState<string[]>(["modified desc"]);
   const deferredSearchQuery = useDeferredValue(searchQuery);
+
+  const atOfferCap =
+    maxActiveCampaigns != null && offerCount >= maxActiveCampaigns;
+
+  const tryOpenCreate = useCallback(() => {
+    if (atOfferCap) {
+      shopify.toast.show(createOfferBlockedMessage(plan));
+      return;
+    }
+    setScreen("select");
+  }, [atOfferCap, plan, shopify]);
 
   const nextDefaultCampaignName = useMemo(
     () => `Offer ${campaigns.length + 1}`,
@@ -406,7 +509,11 @@ export default function Index() {
                     title="Quantity breaks"
                     onPreview={() => setOfferPreviewModal("quantity")}
                     onLearnMore={() => toastSoon("Learn more")}
-                    onCreate={() =>
+                    onCreate={() => {
+                      if (atOfferCap) {
+                        shopify.toast.show(createOfferBlockedMessage(plan));
+                        return;
+                      }
                       navigate(
                         adminEmbeddedPathWithQuery(
                           "/app/volume-discount/new",
@@ -418,14 +525,18 @@ export default function Index() {
                             defaultCampaignName: nextDefaultCampaignName,
                           },
                         },
-                      )
-                    }
+                      );
+                    }}
                   />
                   <VolumeDiscountComingSoonCard
                     title="Volume discount"
                     onPreview={() => setOfferPreviewModal("volume")}
                     onLearnMore={() => toastSoon("Learn more")}
-                    onCreate={() =>
+                    onCreate={() => {
+                      if (atOfferCap) {
+                        shopify.toast.show(createOfferBlockedMessage(plan));
+                        return;
+                      }
                       navigate(
                         adminEmbeddedPathWithQuery(
                           "/app/volume-discount/new",
@@ -437,8 +548,8 @@ export default function Index() {
                             defaultCampaignName: nextDefaultCampaignName,
                           },
                         },
-                      )
-                    }
+                      );
+                    }}
                   />
                 </Suspense>
               </InlineGrid>
@@ -465,6 +576,12 @@ export default function Index() {
       offerEditTo={offerEditTo}
       onCampaignsMutated={onCampaignsMutated}
       notify={notify}
+      canImportExport={planCapabilities.importExport}
+      activeCount={activeCount}
+      maxActiveCampaigns={maxActiveCampaigns}
+      atOfferCap={atOfferCap}
+      createOfferBlockedMessage={createOfferBlockedMessage(plan)}
+      onCreateOffer={tryOpenCreate}
     />
   );
 }
