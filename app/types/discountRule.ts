@@ -37,7 +37,10 @@ export type DiscountRuleDelegate = {
       | { shop: string; id: { in: string[] } }
       | { shop: string; productId: { in: string[] } };
   }) => Promise<{ count: number }>;
-  createMany: (args: { data: DiscountRuleCreateInput[] }) => Promise<{ count: number }>;
+  createMany: (args: {
+    data: DiscountRuleCreateInput[];
+    skipDuplicates?: boolean;
+  }) => Promise<{ count: number }>;
   findMany: (args: {
     where: {
       shop: string;

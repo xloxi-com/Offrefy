@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Link, useFetcher, useLocation } from "react-router";
+import { Link, useFetcher, useLocation, useRevalidator } from "react-router";
 import {
   Badge,
   BlockStack,
@@ -39,6 +39,7 @@ import {
   DiscountIcon,
   DuplicateIcon,
   EditIcon,
+  RefreshIcon,
 } from "@shopify/polaris-icons";
 
 import styles from "../styles/offers-dashboard.module.css";
@@ -682,8 +683,20 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     [setScreen, warmEditorChunk],
   );
 
+  const revalidator = useRevalidator();
+  const isReloading = revalidator.state === "loading";
+
   const pageSecondaryActions = useMemo(
     () => [
+      {
+        // Icon-only reload (separate from Sync all), same pattern as Analytics.
+        content: "",
+        icon: RefreshIcon,
+        loading: isReloading,
+        disabled: isReloading,
+        onAction: () => revalidator.revalidate(),
+        accessibilityLabel: "Reload",
+      },
       {
         content: "Sync all",
         loading: syncAllPending,
@@ -705,7 +718,9 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
       campaigns.length,
       canExportOffers,
       csvExportPending,
+      isReloading,
       listFetcher.state,
+      revalidator,
       submitExportCsv,
       submitSyncAll,
       syncAllPending,
@@ -815,7 +830,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                   <IndexTable.Cell>
                     <Link
                       to={offerEditTo(c.id)}
-                      prefetch="render"
+                      prefetch="intent"
                       className={styles.nameEditButton}
                       title={c.campaignName}
                       aria-label={`Edit ${c.campaignName}`}
@@ -870,7 +885,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                     <InlineStack gap="0" blockAlign="center" wrap={false}>
                       <Link
                         to={offerEditTo(c.id)}
-                        prefetch="render"
+                        prefetch="intent"
                         className={styles.editIconLink}
                         aria-label="Edit"
                         onMouseEnter={warmEditorChunk}

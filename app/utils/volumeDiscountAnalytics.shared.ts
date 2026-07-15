@@ -1,4 +1,4 @@
-export type AnalyticsTimeRange = "7d" | "30d" | "all" | "custom";
+export type AnalyticsTimeRange = "today" | "7d" | "30d" | "all" | "custom";
 
 export type AnalyticsRangeSelection = {
   range: AnalyticsTimeRange;
@@ -46,6 +46,7 @@ export function parseAnalyticsRangeFromUrl(url: URL): AnalyticsRangeSelection {
   ) {
     return { range: "custom", from, to };
   }
+  if (rangeParam === "today") return { range: "today", from: null, to: null };
   if (rangeParam === "30d") return { range: "30d", from: null, to: null };
   if (rangeParam === "all") return { range: "all", from: null, to: null };
   return { range: "7d", from: null, to: null };
@@ -63,6 +64,7 @@ export function formatAnalyticsRangeLabel(selection: AnalyticsRangeSelection): s
     });
     return `${fmt.format(from)} – ${fmt.format(to)}`;
   }
+  if (selection.range === "today") return "Today";
   if (selection.range === "30d") return "Last 30 days";
   if (selection.range === "all") return "All time";
   return "Last 7 days";

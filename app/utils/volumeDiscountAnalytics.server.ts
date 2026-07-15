@@ -252,7 +252,8 @@ function rangeBounds(selection: AnalyticsRangeSelection): {
     };
   }
 
-  const days = selection.range === "30d" ? 30 : 7;
+  const days =
+    selection.range === "today" ? 1 : selection.range === "30d" ? 30 : 7;
   const start = addUtcDays(startOfUtcDay(end), -(days - 1));
   const prevEnd = addUtcDays(start, -1);
   const prevStart = addUtcDays(prevEnd, -(days - 1));

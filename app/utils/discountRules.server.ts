@@ -159,25 +159,39 @@ export async function rebuildDiscountRulesForShop(
     },
   });
 
-  const existingByProduct = new Map(
-    existing.map((row) => [row.productId, row]),
-  );
+  // Unique is (shop, campaignId, productId) — many rows can share productId.
+  // Index by productId with ALL matches so orphans from older winners are deleted.
+  const existingByProduct = new Map<string, typeof existing>();
+  for (const row of existing) {
+    const list = existingByProduct.get(row.productId);
+    if (list) list.push(row);
+    else existingByProduct.set(row.productId, [row]);
+  }
+
   const idsToDelete: string[] = [];
   const rowsToCreate: import("../types/discountRule").DiscountRuleCreateInput[] =
     [];
 
   for (const row of desiredRows) {
-    const prev = existingByProduct.get(row.productId);
+    const prevs = existingByProduct.get(row.productId) ?? [];
     existingByProduct.delete(row.productId);
-    if (prev && discountRuleFingerprint(prev) === desiredFingerprint.get(row.productId)) {
-      continue;
+    const wantFp = desiredFingerprint.get(row.productId);
+    const keep = prevs.find(
+      (prev) =>
+        prev.campaignId === row.campaignId &&
+        discountRuleFingerprint(prev) === wantFp,
+    );
+    for (const prev of prevs) {
+      if (keep && prev.id === keep.id) continue;
+      if (prev.id) idsToDelete.push(prev.id);
     }
-    if (prev?.id) idsToDelete.push(prev.id);
-    rowsToCreate.push(row);
+    if (!keep) rowsToCreate.push(row);
   }
 
-  for (const leftover of existingByProduct.values()) {
-    if (leftover.id) idsToDelete.push(leftover.id);
+  for (const leftovers of existingByProduct.values()) {
+    for (const leftover of leftovers) {
+      if (leftover.id) idsToDelete.push(leftover.id);
+    }
   }
 
   const DELETE_BATCH = 500;
@@ -191,6 +205,7 @@ export async function rebuildDiscountRulesForShop(
   for (let i = 0; i < rowsToCreate.length; i += CREATE_BATCH) {
     await discountRuleDb().createMany({
       data: rowsToCreate.slice(i, i + CREATE_BATCH),
+      skipDuplicates: true,
     });
   }
 

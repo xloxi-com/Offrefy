@@ -26,7 +26,11 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   // Hoisted @shopify/shopify-api vs nested copy under shopify-app-react-router — types differ; runtime is fine.
   // @ts-expect-error SessionStorage / Session mismatch from duplicate shopify-api installations
-  sessionStorage: new PrismaSessionStorage(prisma),
+  sessionStorage: new PrismaSessionStorage(prisma, {
+    // Serverless cold starts + PgBouncer: fail fast between retries instead of 5s×2.
+    connectionRetries: 5,
+    connectionRetryIntervalMs: 500,
+  }),
   distribution: AppDistribution.AppStore,
   future: {
     expiringOfflineAccessTokens: true,
