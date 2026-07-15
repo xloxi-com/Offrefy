@@ -3,13 +3,13 @@ import { handleComplianceWebhook } from "../services/complianceWebhooks.server";
 import { authenticateShopifyWebhook } from "../utils/webhookAuth.server";
 
 /**
- * Mandatory compliance webhooks:
+ * Mandatory compliance webhooks (registered via shopify.app.toml compliance_topics):
  * - customers/data_request
  * - customers/redact
  * - shop/redact
  *
  * Invalid HMAC → 401 (via authenticateShopifyWebhook).
- * Valid requests → 200.
+ * Valid requests → 200 quickly (Shopify requires fast ack).
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { shop, topic, payload } = await authenticateShopifyWebhook(request);
@@ -18,7 +18,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     await handleComplianceWebhook(shop, topic, payload);
   } catch (error) {
     // Still acknowledge receipt so Shopify does not retry forever.
-    // Redaction can be completed manually if needed within 30 days.
+    // Complete any remaining redaction within 30 days if needed.
     console.error("[compliance] handler error", { shop, topic, error });
   }
 
