@@ -73,6 +73,11 @@
         {%- endfor -%}
       ]
     </script>
+    {% if product.metafields.volume_discount.tiers.value %}
+      <script type="application/json" data-vd-product-rule>
+        {{ product.metafields.volume_discount.tiers.value | json }}
+      </script>
+    {% endif %}
   {% endif %}
   <script type="application/json" id="vd-json-{{ vd_id_suffix }}">
     {% if vd_widget == blank %}

@@ -55,6 +55,7 @@ const METAFIELD_DEF = `#graphql
 `;
 
 let definitionEnsured = false;
+let productTiersDefinitionEnsured = false;
 
 async function ensureStorefrontWidgetDefinition(
   admin: AdminGraphql,
@@ -99,6 +100,52 @@ async function ensureStorefrontWidgetDefinition(
 }
 
 /**
+ * Product-level compact offer JSON for Liquid boot when shop widget is per_product
+ * (large catalogs). Must be storefront-readable for theme app embeds.
+ */
+export async function ensureProductTiersStorefrontDefinition(
+  admin: AdminGraphql,
+): Promise<void> {
+  if (productTiersDefinitionEnsured) return;
+  const res = await admin.graphql(METAFIELD_DEF, {
+    variables: {
+      definition: {
+        name: "Offrefy — product tiers",
+        namespace: "volume_discount",
+        key: "tiers",
+        description: "Compact volume-discount tiers for storefront widget bootstrap.",
+        type: "json",
+        ownerType: "PRODUCT",
+        access: {
+          admin: "MERCHANT_READ_WRITE",
+          storefront: "PUBLIC_READ",
+        },
+      },
+    },
+  });
+  const parsed = (await res.json()) as {
+    data?: {
+      metafieldDefinitionCreate?: {
+        userErrors?: { message?: string }[];
+      };
+    };
+  };
+  const ue =
+    parsed.data?.metafieldDefinitionCreate?.userErrors ?? [];
+  const already = ue.some((e) => {
+    const m = (e?.message || "").toLowerCase();
+    return m.includes("taken") || m.includes("already");
+  });
+  if (ue.length && !already) {
+    console.warn(
+      "[Offrefy] product tiers metafieldDefinitionCreate:",
+      ue.map((e) => e.message).join("; "),
+    );
+  }
+  productTiersDefinitionEnsured = true;
+}
+
+/**
  * Runs alongside discount sync so save/delete waits on one fewer sequential Admin round-trip.
  */
 export async function resolveStorefrontWidgetShopGid(
@@ -114,6 +161,11 @@ export async function resolveStorefrontWidgetShopGid(
     await ensureStorefrontWidgetDefinition(admin);
   } catch (e) {
     console.warn("[Offrefy] storefront widget definition:", e);
+  }
+  try {
+    await ensureProductTiersStorefrontDefinition(admin);
+  } catch (e) {
+    console.warn("[Offrefy] product tiers definition:", e);
   }
   const shopRes = await admin.graphql(SHOP_ID);
   const shopJson = (await shopRes.json()) as {

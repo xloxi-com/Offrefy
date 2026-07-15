@@ -2324,8 +2324,15 @@
     return "";
   }
 
-  function hydrateRootProductDataFromJson(root) {
-    if (root.getAttribute("data-product-id")) {
+  function hydrateRootProductDataFromJson(root, options) {
+    var opts = options || {};
+    var forcePrice = opts.forcePrice === true;
+    var existingPid = root.getAttribute("data-product-id");
+    var existingPrice = parseInt(
+      String(root.getAttribute("data-unit-price-cents") || "0"),
+      10,
+    );
+    if (existingPid && (!forcePrice || (existingPrice && existingPrice > 0))) {
       return Promise.resolve(true);
     }
     if (root.getAttribute("data-vd-hydrating") === "1") {
@@ -2339,7 +2346,9 @@
         root.setAttribute("data-product-id", productId);
         root.setAttribute("data-product-gid", "gid://shopify/Product/" + productId);
 
-        var wantedVid = readThemeVariantIdForHydration();
+        var wantedVid =
+          root.getAttribute("data-variant-id") ||
+          readThemeVariantIdForHydration();
         var variants = Array.isArray(pj.variants) ? pj.variants : [];
         var chosen = null;
         for (var i = 0; i < variants.length; i++) {
@@ -2364,6 +2373,8 @@
         var unit = parseInt(String(chosen.price), 10);
         if (Number.isFinite(unit) && unit > 0) {
           root.setAttribute("data-unit-price-cents", String(unit));
+        } else if (forcePrice) {
+          return false;
         }
 
         var variantsScript = root.querySelector("script[data-vd-variants-json]");
@@ -3799,7 +3810,7 @@
     trackImpression(campaign, root.getAttribute("data-product-id"));
     window.VolumeDiscount = window.VolumeDiscount || {};
     window.VolumeDiscount.embed = window.VolumeDiscount.embed || {};
-    window.VolumeDiscount.embed.version = "1.23.0";
+    window.VolumeDiscount.embed.version = "1.24.0";
 
     /**
      * Remove the body app-embed fallback only after a section "Quantity breaks" widget
@@ -3815,34 +3826,139 @@
     }
   }
 
+  /** True when a /cart/add form is cart/upsell/sticky chrome — not the main PDP buy box. */
+  function isSecondaryCartAddForm(form) {
+    if (!form || form.closest(".vd-storefront-root")) return true;
+    var hosts = [
+      "cart-drawer",
+      "#CartDrawer",
+      "#CartDrawer-Overlay",
+      ".cart-drawer",
+      "cart-notification",
+      "#cart-notification",
+      "quick-view",
+      "#quick-view",
+      ".quick-view",
+      "[data-quick-view]",
+      "product-recommendations",
+      ".product-recommendations",
+      ".complementary-products",
+      "#complementary-products",
+      "sticky-add-to-cart",
+      ".sticky-add-to-cart",
+      "[data-sticky-add-to-cart]",
+      ".sticky-atc",
+      "#sticky-atc",
+      ".product-sticky-form",
+      ".mini-cart",
+      "#mini-cart",
+      "predictive-search",
+      ".upsell",
+      ".cross-sell",
+      "[data-upsell]",
+    ];
+    for (var i = 0; i < hosts.length; i++) {
+      try {
+        if (form.closest(hosts[i])) return true;
+      } catch (e) {
+        void e;
+      }
+    }
+    var node = form;
+    for (var depth = 0; node && depth < 8; depth++) {
+      var id = String(node.id || "").toLowerCase();
+      var cls = String(node.className || "").toLowerCase();
+      var blob = id + " " + cls;
+      if (
+        blob.indexOf("cart-drawer") !== -1 ||
+        blob.indexOf("mini-cart") !== -1 ||
+        blob.indexOf("quick-view") !== -1 ||
+        blob.indexOf("quickview") !== -1 ||
+        blob.indexOf("sticky-atc") !== -1 ||
+        blob.indexOf("sticky-add") !== -1 ||
+        blob.indexOf("complementary") !== -1 ||
+        blob.indexOf("upsell") !== -1 ||
+        blob.indexOf("cross-sell") !== -1
+      ) {
+        return true;
+      }
+      node = node.parentElement;
+    }
+    return false;
+  }
+
+  function scoreMainProductForm(form) {
+    if (!form || isSecondaryCartAddForm(form)) return -1000;
+    var score = 0;
+    try {
+      if (
+        form.closest(
+          '[id*="MainProduct"], [id*="main-product"], [id*="ProductInfo"], .product-information, .product__info, .product-info, product-info, .product__info-wrapper, .product-details, .product__details, .product-single, .product-main',
+        )
+      ) {
+        score += 80;
+      }
+      if (form.closest("main, #MainContent, #main-content, .main-content, #Main")) {
+        score += 20;
+      }
+      if (form.closest(".shopify-section")) score += 5;
+    } catch (e) {
+      void e;
+    }
+    if (form.querySelector('button[name="add"], input[name="add"]')) score += 10;
+    if (form.querySelector('[name="quantity"]')) score += 6;
+    if (form.querySelector(".shopify-payment-button, [data-shopify='payment-button']")) {
+      score += 8;
+    }
+    var walk = form;
+    for (var d = 0; walk && d < 6; d++) {
+      var bit = (
+        String(walk.id || "") +
+        " " +
+        String(walk.className || "")
+      ).toLowerCase();
+      if (bit.indexOf("sticky") !== -1) {
+        score -= 60;
+        break;
+      }
+      walk = walk.parentElement;
+    }
+    return score;
+  }
+
+  function findMainProductAddForm() {
+    var forms = document.querySelectorAll('form[action*="/cart/add"]');
+    var best = null;
+    var bestScore = -999;
+    for (var fi = 0; fi < forms.length; fi++) {
+      var f = forms[fi];
+      var s = scoreMainProductForm(f);
+      if (s > bestScore) {
+        bestScore = s;
+        best = f;
+      }
+    }
+    return bestScore >= 0 ? best : null;
+  }
+
   /** Move app-embed fallback into the main product buy box (above ATC). */
   function placeEmbedNearBuyButtons(root) {
     if (!root || !root.parentNode) return;
-    var form = null;
-    var forms = document.querySelectorAll('form[action*="/cart/add"]');
-    for (var fi = 0; fi < forms.length; fi++) {
-      var f = forms[fi];
-      if (f.closest(".vd-storefront-root")) continue;
-      if (
-        f.closest("cart-drawer") ||
-        f.closest("#CartDrawer") ||
-        f.closest("cart-notification")
-      ) {
-        continue;
-      }
-      form = f;
-      break;
-    }
+    var form = findMainProductAddForm();
     var anchor =
       (form &&
-        (form.closest(".product-form") ||
+        (form.closest("buy-buttons") ||
+          form.closest(".product-form__buttons") ||
+          form.closest(".product-form") ||
           form.closest("product-form") ||
-          form.closest("buy-buttons") ||
+          form.closest("[data-product-form]") ||
           form.closest(".product__info") ||
           form.closest(".product-information") ||
+          form.closest(".product-info") ||
+          form.closest("product-info") ||
           form.parentNode)) ||
       document.querySelector(
-        ".product-form__buttons, buy-buttons, .product-form, product-form",
+        "buy-buttons, .product-form__buttons, .product-form, product-form, [data-product-form]",
       );
     if (!anchor || !anchor.parentNode) {
       if (form && form.parentNode && root.parentNode !== form.parentNode) {
@@ -3857,6 +3973,71 @@
       anchor.parentNode.insertBefore(root, anchor);
     } catch (e) {
       if (form && form.parentNode) form.parentNode.insertBefore(root, form);
+    }
+  }
+
+  /**
+   * Compact product metafield `volume_discount.tiers` written on sync.
+   * Used when shop metafield is in per_product mode (large catalogs) so the
+   * widget can paint without waiting on /widget-config.
+   */
+  function expandCompactProductRule(rule) {
+    if (!rule || typeof rule !== "object") return null;
+    var rawTiers = Array.isArray(rule.t) ? rule.t : [];
+    if (!rawTiers.length) return null;
+    var tiers = [];
+    for (var i = 0; i < rawTiers.length; i++) {
+      var t = rawTiers[i];
+      if (!t || typeof t !== "object") continue;
+      var minQty = Math.max(1, Math.floor(Number(t.m) || 1));
+      var tier = {
+        minQty: minQty,
+        buyLabel: "Buy " + minQty + (i === 0 ? "" : "+"),
+        badge: null,
+        activeByDefault: i === 0,
+        optionSubtext: "",
+      };
+      if (t.p != null && t.p !== undefined) {
+        tier.percent = Math.min(100, Math.max(0, Number(t.p)));
+      } else if (t.fp != null && t.fp !== undefined) {
+        tier.fixedPricePerUnit = Number(t.fp);
+      } else if (t.f != null && t.f !== undefined) {
+        tier.fixedAmount = Number(t.f);
+        tier.appliesToEachItem = t.e === 1 || t.e === true;
+      } else {
+        continue;
+      }
+      tiers.push(tier);
+    }
+    if (!tiers.length) return null;
+    return {
+      id: String(rule.c || "_product_rule"),
+      campaignName: String(rule.m || "Volume discount"),
+      displayName: String(rule.m || "Volume discount"),
+      productScope: "all",
+      quantityCondition:
+        rule.q === "a"
+          ? "total-all"
+          : rule.q === "c"
+            ? "per-collection"
+            : rule.q === "p"
+              ? "per-product"
+              : "per-variant",
+      customerType: "everyone",
+      customerTags: [],
+      productIds: [],
+      tiers: tiers,
+      widgetDisplay: {},
+    };
+  }
+
+  function readCompactProductRule(root) {
+    var el = root && root.querySelector("script[data-vd-product-rule]");
+    if (!el) return null;
+    try {
+      return expandCompactProductRule(JSON.parse(String(el.textContent || "").trim()));
+    } catch (e) {
+      return null;
     }
   }
 
@@ -3891,21 +4072,36 @@
     if (sectionHeading == null) sectionHeading = "";
     var variants = parseVariantsFromRoot(root);
     var designMode = root.getAttribute("data-design-mode") === "true";
+    var productRuleCampaign = readCompactProductRule(root);
 
     if (!productId) {
       mount.hidden = true;
       return;
     }
     if (!unitCents || unitCents < 1) {
-      if (designMode) unitCents = 2500;
-      else {
-        mount.hidden = true;
+      if (designMode) {
+        unitCents = 2500;
+      } else {
+        /* Hyper / markets sometimes omit Liquid price — hydrate from /products/*.js */
+        hydrateRootProductDataFromJson(root, { forcePrice: true }).then(
+          function (ok) {
+            if (!ok) {
+              mount.hidden = true;
+              return;
+            }
+            root.removeAttribute("data-vd-inited");
+            runWidget(root);
+          },
+        );
         return;
       }
     }
 
     function applyConfig(cfg) {
       var camp = pickCampaign(cfg, productId, variantId, productGid, variantGid);
+      if (!camp || !camp.tiers || !camp.tiers.length) {
+        camp = productRuleCampaign;
+      }
       if (!camp || !camp.tiers || !camp.tiers.length) {
         root.style.display = "none";
         return;
@@ -3955,6 +4151,10 @@
       };
     }
 
+    if ((!matched || !matched.tiers || !matched.tiers.length) && productRuleCampaign) {
+      matched = productRuleCampaign;
+    }
+
     if (matched && matched.tiers && matched.tiers.length) {
       if (inline && inline.translations) {
         matched.translations = inline.translations;
@@ -3972,11 +4172,6 @@
       );
       return;
     }
-
-    var usePerProductApi =
-      inline.mode === "per_product" ||
-      !Array.isArray(inline.campaigns) ||
-      inline.campaigns.length === 0;
 
     function finishFetch(remote) {
       if (!root.isConnected) return;
@@ -3999,11 +4194,6 @@
       applyConfig(cfg);
     }
 
-    if (usePerProductApi) {
-      fetchConfig(productId, variantId).then(finishFetch);
-      return;
-    }
-
     fetchConfig(productId, variantId).then(finishFetch);
   }
 
@@ -4015,7 +4205,7 @@
       "https://offrey.xloxi.com";
     var ver =
       (typeof window.__vdAssetVersion === "string" && window.__vdAssetVersion) ||
-      "1.23.0";
+      "1.24.0";
     var link = document.createElement("link");
     link.rel = "stylesheet";
     link.href =

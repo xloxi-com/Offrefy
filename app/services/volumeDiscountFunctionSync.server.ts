@@ -13,6 +13,7 @@ import {
   compactStorefrontShopMetafieldPayload,
 } from "../utils/storefrontWidgetConfig.server";
 import {
+  ensureProductTiersStorefrontDefinition,
   resolveStorefrontWidgetShopGid,
   syncShopStorefrontWidgetMetafield,
 } from "./shopStorefrontMetafield.server";
@@ -606,6 +607,10 @@ export async function syncVolumeDiscountShop(
         }> = [];
 
         const newProductIds = new Set<string>();
+
+        await ensureProductTiersStorefrontDefinition(admin).catch((e) => {
+          console.warn("[volume-discount] product tiers storefront definition", e);
+        });
 
         for (const row of newRules) {
           if (row.productId === "*") continue;
