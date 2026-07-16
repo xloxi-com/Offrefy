@@ -484,10 +484,7 @@ export function VolumeDiscountCreateView({
   );
   const [scheduleEndEnabled, setScheduleEndEnabled] = useState(() =>
     Boolean(
-      initialCountdownEndsAtLocalForEditor(
-        initialCampaign,
-        newOfferPreset,
-      ).trim(),
+      isoToDatetimeLocalValue(initialCampaign?.countdownEndsAt ?? null).trim(),
     ),
   );
   /** Bumps preview countdown effect when user clicks “Reset timer” (same ISO within 1s). */
@@ -948,10 +945,8 @@ export function VolumeDiscountCreateView({
       setCountdownStartsAtLocal(startLocal);
       setScheduleStartEnabled(startLocal.trim() !== "");
       setScheduleEndEnabled(
-        initialCountdownEndsAtLocalForEditor(
-          initialCampaign,
-          newOfferPreset,
-        ).trim() !== "",
+        isoToDatetimeLocalValue(initialCampaign.countdownEndsAt ?? null).trim() !==
+          "",
       );
       setPreviewCampaignOn(initialCampaign.status === "active");
     } else {
@@ -971,12 +966,7 @@ export function VolumeDiscountCreateView({
       );
       setCountdownStartsAtLocal("");
       setScheduleStartEnabled(false);
-      setScheduleEndEnabled(
-        initialCountdownEndsAtLocalForEditor(
-          undefined,
-          newOfferPreset,
-        ).trim() !== "",
-      );
+      setScheduleEndEnabled(false);
       setProductQuery("");
       setCollectionQuery("");
       setPreviewCampaignOn(true);
@@ -1056,7 +1046,6 @@ export function VolumeDiscountCreateView({
 
     if (shouldSyncFromNow || !hadStoredEnd) {
       setCountdownEndsAtLocal(nextLocal);
-      setScheduleEndEnabled(true);
     }
 
     lastCountdownAmountRef.current = widgetDisplay.countdownTimeAmount;

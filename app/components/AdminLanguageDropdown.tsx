@@ -12,6 +12,7 @@ export type AdminLanguageDropdownProps = {
   options: AdminLanguageOption[];
   onChange: (value: string) => void;
   disabled?: boolean;
+  helpText?: string;
 };
 
 /**
@@ -23,6 +24,7 @@ export function AdminLanguageDropdown({
   options,
   onChange,
   disabled = false,
+  helpText,
 }: AdminLanguageDropdownProps) {
   const [active, setActive] = useState(false);
 
@@ -69,6 +71,11 @@ export function AdminLanguageDropdown({
           />
         </div>
       </Popover>
+      {helpText ? (
+        <Text as="p" variant="bodySm" tone="subdued">
+          {helpText}
+        </Text>
+      ) : null}
     </BlockStack>
   );
 }

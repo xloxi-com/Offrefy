@@ -13,7 +13,6 @@ import {
   Button,
   InlineStack,
   Banner,
-  Select,
 } from "@shopify/polaris";
 import { RefreshIcon, AutomationIcon } from "@shopify/polaris-icons";
 import { ApprovefyPromoCard } from "../components/ApprovefyPromoCard";
@@ -802,7 +801,7 @@ export default function SettingsPage() {
                 )}
                 <Divider />
 
-                <Select
+                <AdminLanguageDropdown
                   label={t("settings.language")}
                   options={languageOptions.map((opt) => ({
                     label: opt.label,
