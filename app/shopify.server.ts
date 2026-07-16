@@ -87,6 +87,12 @@ const shopify = shopifyApp({
       await ensureThemeAppEmbedEnabled(admin).catch((error) => {
         console.warn("[Offrefy] afterAuth theme embed enable", error);
       });
+      const { ensureQuantityBreaksBlockInLiveTheme } = await import(
+        "./services/themeProductBlock.server"
+      );
+      await ensureQuantityBreaksBlockInLiveTheme(admin).catch((error) => {
+        console.warn("[Offrefy] afterAuth quantity-breaks block", error);
+      });
       const { ensureOffrefyStorefrontScriptTag } = await import(
         "./services/ensureOffrefyStorefrontScriptTag.server"
       );
@@ -95,27 +101,16 @@ const shopify = shopifyApp({
           console.warn("[Offrefy] afterAuth storefront ScriptTag", error);
         },
       );
-      const { getVolumeDiscountStorefrontPayload } = await import(
-        "./services/volumeDiscountStorefrontCache.server"
-      );
       const { pushStorefrontWidgetToShop } = await import(
         "./services/refreshStorefrontWidget.server"
-      );
-      const { storefrontWidgetPayloadHasCampaigns } = await import(
-        "./utils/storefrontWidgetConfig.server"
       );
       const activeCount = await prisma.volumeDiscountCampaign.count({
         where: { shop: session.shop, status: "active" },
       });
       if (activeCount > 0) {
-        const cached = await getVolumeDiscountStorefrontPayload(session.shop).catch(
-          () => null,
-        );
-        if (!storefrontWidgetPayloadHasCampaigns(cached?.payload)) {
-          await pushStorefrontWidgetToShop(admin, session.shop).catch((error) => {
-            console.warn("[Offrefy] afterAuth storefront widget refresh", error);
-          });
-        }
+        await pushStorefrontWidgetToShop(admin, session.shop).catch((error) => {
+          console.warn("[Offrefy] afterAuth storefront widget refresh", error);
+        });
       }
     },
   },

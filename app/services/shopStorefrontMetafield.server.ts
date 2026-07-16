@@ -123,7 +123,6 @@ async function ensureMetafieldStorefrontAccess(
         definition: {
           id: node.id,
           access: {
-            admin: "MERCHANT_READ_WRITE",
             storefront: "PUBLIC_READ",
           },
         },
@@ -161,10 +160,6 @@ async function ensureStorefrontWidgetDefinition(
         description: "Quantity breaks for theme app blocks (JSON).",
         type: "json",
         ownerType: "SHOP",
-        access: {
-          admin: "MERCHANT_READ_WRITE",
-          storefront: "PUBLIC_READ",
-        },
       },
     },
   });
@@ -193,7 +188,7 @@ async function ensureStorefrontWidgetDefinition(
       "SHOP",
       "volume_discount",
       "storefront_widget",
-    );
+    ).catch(() => {});
   }
   definitionEnsured = true;
 }
@@ -215,10 +210,6 @@ export async function ensureProductTiersStorefrontDefinition(
         description: "Compact volume-discount tiers for storefront widget bootstrap.",
         type: "json",
         ownerType: "PRODUCT",
-        access: {
-          admin: "MERCHANT_READ_WRITE",
-          storefront: "PUBLIC_READ",
-        },
       },
     },
   });
@@ -247,7 +238,7 @@ export async function ensureProductTiersStorefrontDefinition(
       "PRODUCT",
       "volume_discount",
       "tiers",
-    );
+    ).catch(() => {});
   }
   productTiersDefinitionEnsured = true;
 }

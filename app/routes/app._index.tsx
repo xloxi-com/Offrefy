@@ -37,10 +37,9 @@ import {
   getMainThemeAppEmbedStatus,
   invalidateThemeAppEmbedStatusCache,
 } from "../services/themeAppEmbed.server";
+import { ensureQuantityBreaksBlockInLiveTheme } from "../services/themeProductBlock.server";
 import { ensureOffrefyStorefrontScriptTag } from "../services/ensureOffrefyStorefrontScriptTag.server";
 import { pushStorefrontWidgetToShop } from "../services/refreshStorefrontWidget.server";
-import { getVolumeDiscountStorefrontPayload } from "../services/volumeDiscountStorefrontCache.server";
-import { storefrontWidgetPayloadHasCampaigns } from "../utils/storefrontWidgetConfig.server";
 import { parseSessionScopes } from "../utils/shopPublishedLocales.server";
 
 export const meta: MetaFunction = () => [{ title: APP_DISPLAY_NAME }];
@@ -121,6 +120,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
   }
 
+  if (hasWriteThemes) {
+    await ensureQuantityBreaksBlockInLiveTheme(admin).catch((error) => {
+      console.warn("[Offrefy] home quantity-breaks block", error);
+    });
+  }
+
   if (hasWriteScriptTags) {
     const tag = await scriptTagPromise;
     scriptTagOk = tag.ok;
@@ -133,14 +138,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const activeCount = Number(counts[0]?.activeCount ?? 0);
 
   if (activeCount > 0) {
-    const cachedWidget = await getVolumeDiscountStorefrontPayload(session.shop).catch(
-      () => null,
-    );
-    if (!storefrontWidgetPayloadHasCampaigns(cachedWidget?.payload)) {
-      void pushStorefrontWidgetToShop(admin, session.shop).catch((error) => {
-        console.warn("[Offrefy] home storefront widget refresh", error);
-      });
-    }
+    void pushStorefrontWidgetToShop(admin, session.shop).catch((error) => {
+      console.warn("[Offrefy] home storefront widget refresh", error);
+    });
   }
 
   // ScriptTag alone is enough for the widget to show without App Embed.

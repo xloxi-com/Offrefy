@@ -95,22 +95,26 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         variantId || null,
         admin ?? null,
       );
-      /* Stale empty full-shop cache can poison per-product lookups — rebuild when admin available. */
-      if (!storefrontWidgetPayloadHasCampaigns(value) && admin) {
+      /* Stale empty full-shop cache can poison per-product lookups — rebuild when possible. */
+      if (!storefrontWidgetPayloadHasCampaigns(value)) {
         const rows = await prisma.volumeDiscountCampaign.findMany({
           where: { shop, status: "active" },
           orderBy: { createdAt: "asc" },
           select: volumeDiscountCampaignSyncSelect,
         });
         if (rows.length > 0) {
-          await rebuildAndPersistStorefrontPayload(shop, rows, admin);
+          if (admin) {
+            await rebuildAndPersistStorefrontPayload(shop, rows, admin);
+          }
           const rebuilt = await buildStorefrontWidgetForProduct(
             shop,
             productId,
             variantId || null,
-            admin,
+            admin ?? null,
           );
-          return jsonBody(request, rebuilt);
+          if (storefrontWidgetPayloadHasCampaigns(rebuilt)) {
+            return jsonBody(request, rebuilt);
+          }
         }
       }
       return jsonBody(request, value);
