@@ -405,6 +405,7 @@
   "pricing.payYearly": "Pay yearly",
   "pricing.saveYearly": "Save {percent}% with yearly billing",
   "pricing.frequency.month": "month",
+  "pricing.freeTrial": "{days}-day free trial",
   "pricing.selectFree": "Select Free",
   "pricing.selectStandard": "Select Standard",
   "pricing.upgradePremium": "Upgrade to Premium",

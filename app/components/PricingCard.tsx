@@ -16,6 +16,8 @@ export type PricingCardProps = {
   frequency: string;
   features: string[];
   featuredText?: string;
+  /** e.g. "3-day free trial" under the price (Standard / Premium). */
+  trialText?: string;
   /** Merchant's active plan — highlight as selected. */
   selected?: boolean;
   button: PricingButton;
@@ -28,6 +30,7 @@ export function PricingCard({
   comparePrice,
   features,
   featuredText,
+  trialText,
   selected = false,
   button,
   frequency,
@@ -90,29 +93,36 @@ export function PricingCard({
         ) : null}
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          alignItems: "baseline",
-          gap: "0.35rem",
-          flexWrap: "wrap",
-        }}
-      >
-        {comparePrice ? (
-          <span
-            style={{
-              fontSize: "14px",
-              color: "var(--p-color-text-secondary, #6d7175)",
-              textDecoration: "line-through",
-            }}
-          >
-            {comparePrice}
-          </span>
+      <div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            gap: "0.35rem",
+            flexWrap: "wrap",
+          }}
+        >
+          {comparePrice ? (
+            <span
+              style={{
+                fontSize: "14px",
+                color: "var(--p-color-text-secondary, #6d7175)",
+                textDecoration: "line-through",
+              }}
+            >
+              {comparePrice}
+            </span>
+          ) : null}
+          <h3 style={{ fontSize: "28px", fontWeight: "bold", margin: 0 }}>
+            {price}
+          </h3>
+          <s-text>/ {frequency}</s-text>
+        </div>
+        {trialText ? (
+          <div style={{ marginTop: "0.35rem" }}>
+            <s-text color="subdued">{trialText}</s-text>
+          </div>
         ) : null}
-        <h3 style={{ fontSize: "28px", fontWeight: "bold", margin: 0 }}>
-          {price}
-        </h3>
-        <s-text>/ {frequency}</s-text>
       </div>
 
       <div style={{ minHeight: 0 }}>

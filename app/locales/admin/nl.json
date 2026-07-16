@@ -405,6 +405,7 @@
   "pricing.payYearly": "Jaarlijks betalen",
   "pricing.saveYearly": "Bespaar {percent}% met jaarlijkse facturering",
   "pricing.frequency.month": "maand",
+  "pricing.freeTrial": "{days} dagen gratis proberen",
   "pricing.selectFree": "Free selecteren",
   "pricing.selectStandard": "Standard selecteren",
   "pricing.upgradePremium": "Upgraden naar Premium",

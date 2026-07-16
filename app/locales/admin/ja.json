@@ -405,6 +405,7 @@
   "pricing.payYearly": "年払い",
   "pricing.saveYearly": "年払いで{percent}%お得",
   "pricing.frequency.month": "月",
+  "pricing.freeTrial": "{days}日間無料トライアル",
   "pricing.selectFree": "Freeを選択",
   "pricing.selectStandard": "Standardを選択",
   "pricing.upgradePremium": "Premiumにアップグレード",

@@ -405,6 +405,7 @@
   "pricing.payYearly": "Platit ročně",
   "pricing.saveYearly": "Ušetřete {percent}% s roční fakturací",
   "pricing.frequency.month": "měsíc",
+  "pricing.freeTrial": "Bezplatná zkušební verze na {days} dny",
   "pricing.selectFree": "Vybrat Free",
   "pricing.selectStandard": "Vybrat Standard",
   "pricing.upgradePremium": "Upgradovat na Premium",

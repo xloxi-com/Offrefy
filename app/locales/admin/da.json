@@ -405,6 +405,7 @@
   "pricing.payYearly": "Betal årligt",
   "pricing.saveYearly": "Spar {percent}% med årlig fakturering",
   "pricing.frequency.month": "måned",
+  "pricing.freeTrial": "{days} dages gratis prøveperiode",
   "pricing.selectFree": "Vælg Free",
   "pricing.selectStandard": "Vælg Standard",
   "pricing.upgradePremium": "Opgrader til Premium",

@@ -405,6 +405,7 @@
   "pricing.payYearly": "ชำระรายปี",
   "pricing.saveYearly": "ประหยัด {percent}% ด้วยการเรียกเก็บรายปี",
   "pricing.frequency.month": "เดือน",
+  "pricing.freeTrial": "ทดลองใช้ฟรี {days} วัน",
   "pricing.selectFree": "เลือก Free",
   "pricing.selectStandard": "เลือก Standard",
   "pricing.upgradePremium": "อัปเกรดเป็น Premium",

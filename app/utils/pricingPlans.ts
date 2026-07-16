@@ -9,6 +9,9 @@ export type PricingPlanId = "free" | "standard" | "premium";
 /** Yearly billing discount vs monthly list price (percent). */
 export const YEARLY_DISCOUNT_PERCENT = 20;
 
+/** Free trial length for Standard / Premium Shopify app subscriptions. */
+export const PAID_PLAN_TRIAL_DAYS = 3;
+
 export type PlanFlag = true | false | string;
 
 export type FeatureCompareRow = {

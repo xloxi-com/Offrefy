@@ -405,6 +405,7 @@
   "pricing.payYearly": "Maksa vuosittain",
   "pricing.saveYearly": "Säästä {percent}% vuosilaskutuksella",
   "pricing.frequency.month": "kuukausi",
+  "pricing.freeTrial": "{days} päivän ilmainen kokeilu",
   "pricing.selectFree": "Valitse Free",
   "pricing.selectStandard": "Valitse Standard",
   "pricing.upgradePremium": "Päivitä Premiumiin",

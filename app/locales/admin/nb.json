@@ -405,6 +405,7 @@
   "pricing.payYearly": "Betal årlig",
   "pricing.saveYearly": "Spar {percent}% med årlig fakturering",
   "pricing.frequency.month": "måned",
+  "pricing.freeTrial": "{days} dagers gratis prøveperiode",
   "pricing.selectFree": "Velg Free",
   "pricing.selectStandard": "Velg Standard",
   "pricing.upgradePremium": "Oppgrader til Premium",

@@ -405,6 +405,7 @@
   "pricing.payYearly": "按年付费",
   "pricing.saveYearly": "年付可省 {percent}%",
   "pricing.frequency.month": "月",
+  "pricing.freeTrial": "{days} 天免费试用",
   "pricing.selectFree": "选择 Free",
   "pricing.selectStandard": "选择 Standard",
   "pricing.upgradePremium": "升级到 Premium",

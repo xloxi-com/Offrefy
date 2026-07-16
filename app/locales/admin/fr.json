@@ -405,6 +405,7 @@
   "pricing.payYearly": "Paiement annuel",
   "pricing.saveYearly": "Économisez {percent}% avec la facturation annuelle",
   "pricing.frequency.month": "mois",
+  "pricing.freeTrial": "Essai gratuit de {days} jours",
   "pricing.selectFree": "Choisir Free",
   "pricing.selectStandard": "Choisir Standard",
   "pricing.upgradePremium": "Passer à Premium",

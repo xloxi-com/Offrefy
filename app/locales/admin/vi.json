@@ -405,6 +405,7 @@
   "pricing.payYearly": "Thanh toán hàng năm",
   "pricing.saveYearly": "Tiết kiệm {percent}% với thanh toán năm",
   "pricing.frequency.month": "tháng",
+  "pricing.freeTrial": "Dùng thử miễn phí {days} ngày",
   "pricing.selectFree": "Chọn Free",
   "pricing.selectStandard": "Chọn Standard",
   "pricing.upgradePremium": "Nâng cấp lên Premium",

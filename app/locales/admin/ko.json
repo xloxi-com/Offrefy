@@ -405,6 +405,7 @@
   "pricing.payYearly": "연간 결제",
   "pricing.saveYearly": "연간 결제로 {percent}% 절약",
   "pricing.frequency.month": "월",
+  "pricing.freeTrial": "{days}일 무료 체험",
   "pricing.selectFree": "Free 선택",
   "pricing.selectStandard": "Standard 선택",
   "pricing.upgradePremium": "Premium으로 업그레이드",

@@ -4,7 +4,11 @@ import {
   billingPlanKeyFor,
   type BillingPlanKey,
 } from "../utils/billingPlans";
-import type { PricingInterval, PricingPlanId } from "../utils/pricingPlans";
+import {
+  PAID_PLAN_TRIAL_DAYS,
+  type PricingInterval,
+  type PricingPlanId,
+} from "../utils/pricingPlans";
 
 type GraphqlAdmin = {
   graphql: (
@@ -18,6 +22,7 @@ const APP_SUBSCRIPTION_CREATE = `#graphql
     $name: String!
     $returnUrl: URL!
     $test: Boolean
+    $trialDays: Int
     $replacementBehavior: AppSubscriptionReplacementBehavior
     $lineItems: [AppSubscriptionLineItemInput!]!
   ) {
@@ -25,6 +30,7 @@ const APP_SUBSCRIPTION_CREATE = `#graphql
       name: $name
       returnUrl: $returnUrl
       test: $test
+      trialDays: $trialDays
       replacementBehavior: $replacementBehavior
       lineItems: $lineItems
     ) {
@@ -127,6 +133,7 @@ export async function createPlanSubscriptionConfirmationUrl(
       name: billingPlan,
       returnUrl,
       test: isTest,
+      trialDays: PAID_PLAN_TRIAL_DAYS,
       replacementBehavior: "APPLY_IMMEDIATELY",
       lineItems: [
         {

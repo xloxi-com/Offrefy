@@ -6,6 +6,7 @@ import { PricingCard } from "./PricingCard";
 import type { AdminUiMessageKey } from "../utils/adminUiMessages";
 import {
   getPlanDisplayPrice,
+  PAID_PLAN_TRIAL_DAYS,
   PLANS,
   PLAN_ORDER,
   YEARLY_DISCOUNT_PERCENT,
@@ -169,6 +170,11 @@ export function PricingTable({
                 featuredText={
                   plan.featuredText
                     ? t("pricing.plan.premium.featured")
+                    : undefined
+                }
+                trialText={
+                  planId === "standard" || planId === "premium"
+                    ? t("pricing.freeTrial", { days: PAID_PLAN_TRIAL_DAYS })
                     : undefined
                 }
                 selected={isCurrent}

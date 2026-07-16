@@ -405,6 +405,7 @@
   "pricing.payYearly": "Yıllık öde",
   "pricing.saveYearly": "Yıllık faturalamayla %{percent} tasarruf edin",
   "pricing.frequency.month": "ay",
+  "pricing.freeTrial": "{days} günlük ücretsiz deneme",
   "pricing.selectFree": "Free’yi seç",
   "pricing.selectStandard": "Standard’ı seç",
   "pricing.upgradePremium": "Premium’a yükselt",
