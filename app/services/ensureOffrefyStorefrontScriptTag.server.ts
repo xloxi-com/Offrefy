@@ -32,11 +32,28 @@ const SCRIPT_TAG_CREATE = `#graphql
   }
 `;
 
+const SCRIPT_TAG_DELETE = `#graphql
+  mutation OffrefyScriptTagDelete($id: ID!) {
+    scriptTagDelete(id: $id) {
+      deletedScriptTagId
+      userErrors {
+        field
+        message
+      }
+    }
+  }
+`;
+
 const ensuredUntil = new Map<string, number>();
 const ENSURE_TTL_MS = 30 * 60 * 1000;
 
 function loaderSrc(appUrl: string): string {
   return `${appUrl.replace(/\/$/, "")}/vd-loader.js`;
+}
+
+/** True when this ScriptTag is one of ours (loads the Offrefy widget loader). */
+function isOffrefyLoaderScriptTag(src: unknown): boolean {
+  return typeof src === "string" && src.includes("/vd-loader.js");
 }
 
 /** True when ScriptTag was ensured recently (no Admin API call). */
@@ -84,14 +101,37 @@ export async function ensureOffrefyStorefrontScriptTag(
     }
 
     const nodes = listJson.data?.scriptTags?.nodes ?? [];
-    const already = nodes.some(
-      (n) =>
-        typeof n.src === "string" &&
-        (n.src === desired ||
-          n.src.includes("/vd-loader.js") ||
-          n.src.includes("offrey.xloxi.com/vd-loader")),
+
+    /*
+     * `shopify app dev` creates a loader ScriptTag pointing at the temporary
+     * cloudflare/ngrok tunnel (SHOPIFY_APP_URL). After the tunnel dies the
+     * storefront can no longer load the widget JS, so the widget silently
+     * disappears while the discount Function (runs on Shopify) keeps working.
+     * Only treat the current (desired) URL as "already ensured"; remove any
+     * stale/foreign loader tags so production self-heals to the deployed URL.
+     */
+    const staleLoaderTags = nodes.filter(
+      (n) => isOffrefyLoaderScriptTag(n.src) && n.src !== desired,
     );
-    if (already) {
+    const alreadyCorrect = nodes.some((n) => n.src === desired);
+
+    for (const stale of staleLoaderTags) {
+      if (!stale.id) continue;
+      try {
+        await admin.graphql(SCRIPT_TAG_DELETE, {
+          variables: { id: stale.id },
+        });
+      } catch (e) {
+        if (e instanceof Response && e.status >= 300 && e.status < 400) throw e;
+        console.warn(
+          "[Offrefy] failed to remove stale storefront ScriptTag",
+          stale.src,
+          e,
+        );
+      }
+    }
+
+    if (alreadyCorrect) {
       ensuredUntil.set(cacheKey, now + ENSURE_TTL_MS);
       return { ok: true, errors: [] };
     }
