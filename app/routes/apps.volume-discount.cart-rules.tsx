@@ -63,7 +63,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   const productIds = Array.isArray(body.product_ids)
-    ? [...new Set(body.product_ids.map(String).filter(Boolean))].slice(0, 25)
+    ? [...new Set(body.product_ids.map(String).filter(Boolean))].slice(0, 24)
     : [];
 
   if (productIds.length === 0) {
@@ -86,7 +86,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   const [rules, storefrontTranslations] = await Promise.all([
-    lookupDiscountRulesForProducts(shop, productIds, { maxProducts: 25 }),
+    lookupDiscountRulesForProducts(shop, productIds, { maxProducts: 24 }),
     loadStorefrontTranslationsForShop(shop)
       .then((translations) =>
         compactTranslationsForDiscountFunction(translations),

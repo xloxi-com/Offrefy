@@ -34,69 +34,7 @@ export type DiscountEngineCalcRequest = {
   /** For customer-scoped offers */
   customer_logged_in?: boolean;
   customer_tags?: string[];
-  /**
-   * Stable discount slots from cart attribute `vd_locked_products` (comma-separated
-   * numeric product IDs). When omitted, eligibility follows cart item order.
-   */
-  locked_product_ids?: string[];
 };
-
-/** Shopify caps automatic product discount candidates (~25 unique products). */
-export const MAX_DISCOUNT_CART_PRODUCTS = 25;
-
-function parseLockedProductIds(raw: unknown): string[] {
-  const s = String(raw ?? "").trim();
-  if (!s) return [];
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const part of s.split(",")) {
-    const trimmed = part.trim();
-    if (!trimmed) continue;
-    const n = trimmed.replace(/.*\/(\d+)\s*$/, "$1") || trimmed;
-    if (!n || seen.has(n)) continue;
-    seen.add(n);
-    out.push(n);
-  }
-  return out.slice(0, MAX_DISCOUNT_CART_PRODUCTS);
-}
-
-/**
- * Pick up to 25 product IDs that may receive discounts (locked cart products first).
- * Mirrors `selectEligibleProductIds` in the Shopify discount function.
- */
-export function selectEligibleProductIdsForCalc(
-  items: DiscountEngineCalcItemIn[],
-  lockedProductIds: string[],
-): Set<string> {
-  const lockedRank = new Map<string, number>();
-  lockedProductIds.forEach((id, i) => lockedRank.set(id, i));
-
-  const ranked: { productId: string; sortKey: number; lineIndex: number }[] =
-    [];
-  const seen = new Set<string>();
-
-  for (let i = 0; i < items.length; i++) {
-    const productId = String(items[i]?.product_id ?? "").trim();
-    if (!productId || seen.has(productId)) continue;
-    seen.add(productId);
-    ranked.push({
-      productId,
-      sortKey: lockedRank.has(productId)
-        ? lockedRank.get(productId)!
-        : MAX_DISCOUNT_CART_PRODUCTS + i,
-      lineIndex: i,
-    });
-  }
-
-  ranked.sort((a, b) => a.sortKey - b.sortKey || a.lineIndex - b.lineIndex);
-
-  const eligible = new Set<string>();
-  for (const row of ranked) {
-    if (eligible.size >= MAX_DISCOUNT_CART_PRODUCTS) break;
-    eligible.add(row.productId);
-  }
-  return eligible;
-}
 
 export type AppliedOfferPreview = {
   offer_id: string;
@@ -384,14 +322,8 @@ export function computeUnlimitedDiscountPreview(
     customerMatches(row, loggedIn, tags),
   );
 
-  const lockedFromBody = Array.isArray(body.locked_product_ids)
-    ? body.locked_product_ids.map(String)
-    : [];
-  const lockedProductIds = parseLockedProductIds(lockedFromBody.join(","));
-  const eligibleProductIds = selectEligibleProductIdsForCalc(
-    items,
-    lockedProductIds,
-  );
+  const MAX_DISCOUNT_CART_PRODUCTS = 25;
+  const discountedProductIds = new Set<string>();
 
   const outItems: DiscountEngineCalcLineOut[] = [];
   let totalOrig = 0;
@@ -408,7 +340,8 @@ export function computeUnlimitedDiscountPreview(
     if (
       qty <= 0 ||
       orig <= 0 ||
-      !eligibleProductIds.has(productId)
+      (!discountedProductIds.has(productId) &&
+        discountedProductIds.size >= MAX_DISCOUNT_CART_PRODUCTS)
     ) {
       outItems.push({
         variant_id: variantId,
@@ -473,6 +406,10 @@ export function computeUnlimitedDiscountPreview(
 
     const finalCents = Math.max(0, remaining);
     totalDisc += finalCents;
+
+    if (applied.length > 0) {
+      discountedProductIds.add(productId);
+    }
 
     outItems.push({
       variant_id: variantId,
