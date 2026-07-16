@@ -66,7 +66,7 @@
     );
   }
 
-  /** Prefer Shopify app proxy (same-origin) — reliable after App Store publish. */
+  /** Prefer direct app host (CORS) — usually faster than Shopify app-proxy hop. */
   function widgetConfigCandidateUrls(productId, variantId) {
     var q = widgetConfigQuery(productId, variantId);
     var root = "/";
@@ -83,6 +83,13 @@
       void e;
     }
     var urls = [];
+    var abs =
+      typeof window.__vdAppOrigin === "string"
+        ? String(window.__vdAppOrigin).replace(/\/$/, "")
+        : "";
+    if (abs) {
+      urls.push(withRevQuery(withShopQuery(abs + "/widget-config" + q)));
+    }
     urls.push(
       withRevQuery(
         withShopQuery(root + "apps/volume-discount/widget-config" + q),
@@ -90,13 +97,6 @@
     );
     if (root !== "/") {
       urls.push(withRevQuery(withShopQuery(PROXY + q)));
-    }
-    var abs =
-      typeof window.__vdAppOrigin === "string"
-        ? String(window.__vdAppOrigin).replace(/\/$/, "")
-        : "";
-    if (abs) {
-      urls.push(withRevQuery(withShopQuery(abs + "/widget-config" + q)));
     }
     return urls;
   }
@@ -3810,7 +3810,7 @@
     trackImpression(campaign, root.getAttribute("data-product-id"));
     window.VolumeDiscount = window.VolumeDiscount || {};
     window.VolumeDiscount.embed = window.VolumeDiscount.embed || {};
-    window.VolumeDiscount.embed.version = "1.24.2";
+    window.VolumeDiscount.embed.version = "1.24.0";
 
     /**
      * Remove the body app-embed fallback only after a section "Quantity breaks" widget
@@ -4205,7 +4205,7 @@
       "https://offrey.xloxi.com";
     var ver =
       (typeof window.__vdAssetVersion === "string" && window.__vdAssetVersion) ||
-      "1.24.2";
+      "1.24.0";
     var link = document.createElement("link");
     link.rel = "stylesheet";
     link.href =
@@ -4260,37 +4260,6 @@
       }
     } catch (e3) {
       void e3;
-    }
-    try {
-      var metaProduct =
-        window.ShopifyAnalytics &&
-        window.ShopifyAnalytics.meta &&
-        window.ShopifyAnalytics.meta.product;
-      if (metaProduct && metaProduct.id) {
-        root.setAttribute("data-product-id", String(metaProduct.id));
-        root.setAttribute(
-          "data-product-gid",
-          "gid://shopify/Product/" + String(metaProduct.id),
-        );
-        var metaVariants = Array.isArray(metaProduct.variants)
-          ? metaProduct.variants
-          : [];
-        if (metaVariants[0] && metaVariants[0].id) {
-          root.setAttribute("data-variant-id", String(metaVariants[0].id));
-          root.setAttribute(
-            "data-variant-gid",
-            "gid://shopify/ProductVariant/" + String(metaVariants[0].id),
-          );
-        }
-        if (metaVariants[0] && metaVariants[0].price) {
-          root.setAttribute(
-            "data-unit-price-cents",
-            String(metaVariants[0].price),
-          );
-        }
-      }
-    } catch (e4) {
-      void e4;
     }
 
     var cfg = document.createElement("script");

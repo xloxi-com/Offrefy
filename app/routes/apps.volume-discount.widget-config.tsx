@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs } from "react-router";
 
 import { prisma } from "../db.server";
-import { authenticate, unauthenticated } from "../shopify.server";
+import { authenticate } from "../shopify.server";
 import {
   readStorefrontPayloadForServe,
   rebuildAndPersistStorefrontPayload,
@@ -14,7 +14,6 @@ import { volumeDiscountCampaignSyncSelect } from "../utils/volumeDiscountCampaig
 import {
   buildStorefrontWidgetForProduct,
   stampStorefrontWidgetRev,
-  storefrontWidgetPayloadHasCampaigns,
 } from "../utils/storefrontWidgetConfig.server";
 
 /**
@@ -84,18 +83,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return emptyJson(request);
   }
 
-  if (!admin) {
-    try {
-      ({ admin } = await unauthenticated.admin(shop));
-    } catch (e) {
-      console.warn(
-        "[volume-discount] widget-config offline admin fallback failed",
-        shop,
-        e,
-      );
-    }
-  }
-
   const productId = url.searchParams.get("product_id")?.trim() ?? "";
   const variantId = url.searchParams.get("variant_id")?.trim() ?? "";
 
@@ -116,7 +103,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   /* Cache-first: sync writes VolumeDiscountStorefrontPayload on every save — avoid DB + Admin on hot path. */
   const cached = await readStorefrontPayloadForServe(shop);
-  if (cached && storefrontWidgetPayloadHasCampaigns(cached.body)) {
+  if (cached) {
     if (cached.stale && admin) {
       scheduleStorefrontPayloadRevalidation(shop, admin);
     }
@@ -128,21 +115,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   if (!admin) {
-    if (productId) {
-      try {
-        const value = await buildStorefrontWidgetForProduct(
-          shop,
-          productId,
-          variantId || null,
-          null,
-        );
-        if (storefrontWidgetPayloadHasCampaigns(value)) {
-          return jsonBody(request, value);
-        }
-      } catch (e) {
-        console.error("[volume-discount] widget-config product fallback", e);
-      }
-    }
     return emptyJson(request);
   }
 
