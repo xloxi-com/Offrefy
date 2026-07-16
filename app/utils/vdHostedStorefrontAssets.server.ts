@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-const ASSET_VERSION = "1.24.0";
+const ASSET_VERSION = "1.24.1";
 
 function assetPath(fileName: string) {
   return path.join(

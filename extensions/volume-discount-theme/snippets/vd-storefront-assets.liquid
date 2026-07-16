@@ -29,7 +29,7 @@
 %}
 <script>
 (function () {
-  var VD_ASSET_VERSION = "1.24.0";
+  var VD_ASSET_VERSION = "1.24.1";
   var APP_ORIGIN = "https://offrey.xloxi.com";
   window.__vdStorefrontLocale = {{ request.locale.iso_code | json }};
   window.__vdAssetVersion = VD_ASSET_VERSION;
@@ -49,7 +49,7 @@
   {% endif %}
 
   {% if vd_is_product and product %}
-  /* Start widget-config before the main bundle parses — biggest TTI win on product pages. */
+  /* Prefetch via same-origin app proxy first (CSP-safe), then app host CORS fallback. */
   (function prefetchVdConfig() {
     var shop = {{ shop.permanent_domain | json }};
     var pid = {{ product.id | json }};
@@ -58,9 +58,8 @@
     var rev = window.__vdConfigRev ? String(window.__vdConfigRev) : "";
     var key = rev + "|" + String(pid) + "|" + String(vid || "");
     window.__vdConfigPrefetchKey = key;
-    var u =
-      APP_ORIGIN +
-      "/widget-config?shop=" +
+    var q =
+      "?shop=" +
       encodeURIComponent(shop) +
       "&product_id=" +
       encodeURIComponent(String(pid)) +
@@ -68,18 +67,34 @@
       (rev ? "&rev=" + encodeURIComponent(rev) : "") +
       "&_=" +
       encodeURIComponent(String(Math.floor(Date.now() / 5000)));
-    window.__vdConfigPrefetch = fetch(u, {
-      credentials: "omit",
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-      priority: "high",
-    })
-      .then(function (r) {
-        return r && r.ok ? r.json() : null;
+    var root = "/";
+    try {
+      if (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) {
+        root = window.Shopify.routes.root;
+        if (root.slice(-1) !== "/") root += "/";
+      }
+    } catch (e) {}
+    var candidates = [
+      root + "apps/volume-discount/widget-config" + q,
+      APP_ORIGIN + "/widget-config" + q
+    ];
+    function tryFetch(i) {
+      if (i >= candidates.length) return Promise.resolve(null);
+      return fetch(candidates[i], {
+        credentials: "omit",
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+        priority: "high",
       })
-      .catch(function () {
-        return null;
-      });
+        .then(function (r) {
+          if (r && r.ok) return r.json();
+          return tryFetch(i + 1);
+        })
+        .catch(function () {
+          return tryFetch(i + 1);
+        });
+    }
+    window.__vdConfigPrefetch = tryFetch(0);
   })();
   {% endif %}
 

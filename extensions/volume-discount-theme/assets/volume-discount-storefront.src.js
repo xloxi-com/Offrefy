@@ -66,7 +66,10 @@
     );
   }
 
-  /** Prefer direct app host (CORS) — usually faster than Shopify app-proxy hop. */
+  /**
+   * Prefer same-origin app proxy first (works under storefront CSP).
+   * Direct app host is a CORS fallback when Partner app-proxy URL is stale.
+   */
   function widgetConfigCandidateUrls(productId, variantId) {
     var q = widgetConfigQuery(productId, variantId);
     var root = "/";
@@ -83,13 +86,6 @@
       void e;
     }
     var urls = [];
-    var abs =
-      typeof window.__vdAppOrigin === "string"
-        ? String(window.__vdAppOrigin).replace(/\/$/, "")
-        : "";
-    if (abs) {
-      urls.push(withRevQuery(withShopQuery(abs + "/widget-config" + q)));
-    }
     urls.push(
       withRevQuery(
         withShopQuery(root + "apps/volume-discount/widget-config" + q),
@@ -97,6 +93,13 @@
     );
     if (root !== "/") {
       urls.push(withRevQuery(withShopQuery(PROXY + q)));
+    }
+    var abs =
+      typeof window.__vdAppOrigin === "string"
+        ? String(window.__vdAppOrigin).replace(/\/$/, "")
+        : "";
+    if (abs) {
+      urls.push(withRevQuery(withShopQuery(abs + "/widget-config" + q)));
     }
     return urls;
   }
@@ -4205,7 +4208,7 @@
       "https://offrey.xloxi.com";
     var ver =
       (typeof window.__vdAssetVersion === "string" && window.__vdAssetVersion) ||
-      "1.24.0";
+      "1.24.1";
     var link = document.createElement("link");
     link.rel = "stylesheet";
     link.href =
@@ -4260,6 +4263,30 @@
       }
     } catch (e3) {
       void e3;
+    }
+    /* Seed ids from Shopify analytics when App Embed/Liquid is missing. */
+    try {
+      var meta =
+        window.ShopifyAnalytics &&
+        window.ShopifyAnalytics.meta &&
+        window.ShopifyAnalytics.meta.product;
+      if (meta && meta.id) {
+        root.setAttribute("data-product-id", String(meta.id));
+        root.setAttribute(
+          "data-product-gid",
+          "gid://shopify/Product/" + String(meta.id),
+        );
+        var variants = Array.isArray(meta.variants) ? meta.variants : [];
+        if (variants[0] && variants[0].id) {
+          root.setAttribute("data-variant-id", String(variants[0].id));
+          root.setAttribute(
+            "data-variant-gid",
+            "gid://shopify/ProductVariant/" + String(variants[0].id),
+          );
+        }
+      }
+    } catch (e4) {
+      void e4;
     }
 
     var cfg = document.createElement("script");
