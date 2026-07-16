@@ -29,8 +29,9 @@
 %}
 <script>
 (function () {
-  var VD_ASSET_VERSION = "1.24.1";
+  var VD_ASSET_VERSION = "1.24.2";
   var APP_ORIGIN = "https://offrey.xloxi.com";
+  var SHOP_DOMAIN = {{ shop.permanent_domain | json }};
   window.__vdStorefrontLocale = {{ request.locale.iso_code | json }};
   window.__vdAssetVersion = VD_ASSET_VERSION;
   window.__vdAppOrigin = APP_ORIGIN;
@@ -49,52 +50,67 @@
   {% endif %}
 
   {% if vd_is_product and product %}
-  /* Prefetch via same-origin app proxy first (CSP-safe), then app host CORS fallback. */
+  /* Start widget-config before the main bundle parses — biggest TTI win on product pages. */
   (function prefetchVdConfig() {
-    var shop = {{ shop.permanent_domain | json }};
+    var shop = SHOP_DOMAIN;
     var pid = {{ product.id | json }};
     var vid = {{ product.selected_or_first_available_variant.id | json }};
     if (!shop || !pid) return;
     var rev = window.__vdConfigRev ? String(window.__vdConfigRev) : "";
     var key = rev + "|" + String(pid) + "|" + String(vid || "");
     window.__vdConfigPrefetchKey = key;
+    var root = "/";
+    try {
+      if (window.Shopify && window.Shopify.routes && typeof window.Shopify.routes.root === "string") {
+        root = window.Shopify.routes.root;
+        if (root.slice(-1) !== "/") root += "/";
+      }
+    } catch (e) {}
+    var bucket = String(Math.floor(Date.now() / 5000));
     var q =
-      "?shop=" +
+      "shop=" +
       encodeURIComponent(shop) +
       "&product_id=" +
       encodeURIComponent(String(pid)) +
       (vid ? "&variant_id=" + encodeURIComponent(String(vid)) : "") +
       (rev ? "&rev=" + encodeURIComponent(rev) : "") +
       "&_=" +
-      encodeURIComponent(String(Math.floor(Date.now() / 5000)));
-    var root = "/";
-    try {
-      if (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) {
-        root = window.Shopify.routes.root;
-        if (root.slice(-1) !== "/") root += "/";
-      }
-    } catch (e) {}
-    var candidates = [
-      root + "apps/volume-discount/widget-config" + q,
-      APP_ORIGIN + "/widget-config" + q
-    ];
-    function tryFetch(i) {
-      if (i >= candidates.length) return Promise.resolve(null);
-      return fetch(candidates[i], {
-        credentials: "omit",
-        cache: "no-store",
-        headers: { Accept: "application/json" },
-        priority: "high",
-      })
-        .then(function (r) {
-          if (r && r.ok) return r.json();
-          return tryFetch(i + 1);
-        })
-        .catch(function () {
-          return tryFetch(i + 1);
-        });
+      encodeURIComponent(bucket);
+    var urls = [root + "apps/volume-discount/widget-config?" + q];
+    if (APP_ORIGIN) {
+      urls.push(APP_ORIGIN.replace(/\/$/, "") + "/widget-config?" + q);
     }
-    window.__vdConfigPrefetch = tryFetch(0);
+    function parsePrefetch(res) {
+      if (!res || !res.ok) return null;
+      var ct = String(res.headers.get("content-type") || "").toLowerCase();
+      if (ct.indexOf("json") === -1) return null;
+      return res.json().catch(function () {
+        return null;
+      });
+    }
+    function usable(body) {
+      return !!(body && Array.isArray(body.campaigns) && body.campaigns.length > 0);
+    }
+    window.__vdConfigPrefetch = Promise.all(
+      urls.map(function (u) {
+        var cross = String(u).indexOf("://") !== -1;
+        return fetch(u, {
+          credentials: cross ? "omit" : "same-origin",
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+          priority: "high",
+        }).then(parsePrefetch);
+      }),
+    )
+      .then(function (results) {
+        for (var i = 0; i < results.length; i++) {
+          if (usable(results[i])) return results[i];
+        }
+        return null;
+      })
+      .catch(function () {
+        return null;
+      });
   })();
   {% endif %}
 

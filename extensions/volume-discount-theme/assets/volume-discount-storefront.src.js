@@ -66,10 +66,7 @@
     );
   }
 
-  /**
-   * Prefer same-origin app proxy first (works under storefront CSP).
-   * Direct app host is a CORS fallback when Partner app-proxy URL is stale.
-   */
+  /** Prefer Shopify app proxy (same-origin) — reliable after App Store publish. */
   function widgetConfigCandidateUrls(productId, variantId) {
     var q = widgetConfigQuery(productId, variantId);
     var root = "/";
@@ -3813,7 +3810,7 @@
     trackImpression(campaign, root.getAttribute("data-product-id"));
     window.VolumeDiscount = window.VolumeDiscount || {};
     window.VolumeDiscount.embed = window.VolumeDiscount.embed || {};
-    window.VolumeDiscount.embed.version = "1.24.0";
+    window.VolumeDiscount.embed.version = "1.24.2";
 
     /**
      * Remove the body app-embed fallback only after a section "Quantity breaks" widget
@@ -4208,7 +4205,7 @@
       "https://offrey.xloxi.com";
     var ver =
       (typeof window.__vdAssetVersion === "string" && window.__vdAssetVersion) ||
-      "1.24.1";
+      "1.24.2";
     var link = document.createElement("link");
     link.rel = "stylesheet";
     link.href =
@@ -4264,24 +4261,31 @@
     } catch (e3) {
       void e3;
     }
-    /* Seed ids from Shopify analytics when App Embed/Liquid is missing. */
     try {
-      var meta =
+      var metaProduct =
         window.ShopifyAnalytics &&
         window.ShopifyAnalytics.meta &&
         window.ShopifyAnalytics.meta.product;
-      if (meta && meta.id) {
-        root.setAttribute("data-product-id", String(meta.id));
+      if (metaProduct && metaProduct.id) {
+        root.setAttribute("data-product-id", String(metaProduct.id));
         root.setAttribute(
           "data-product-gid",
-          "gid://shopify/Product/" + String(meta.id),
+          "gid://shopify/Product/" + String(metaProduct.id),
         );
-        var variants = Array.isArray(meta.variants) ? meta.variants : [];
-        if (variants[0] && variants[0].id) {
-          root.setAttribute("data-variant-id", String(variants[0].id));
+        var metaVariants = Array.isArray(metaProduct.variants)
+          ? metaProduct.variants
+          : [];
+        if (metaVariants[0] && metaVariants[0].id) {
+          root.setAttribute("data-variant-id", String(metaVariants[0].id));
           root.setAttribute(
             "data-variant-gid",
-            "gid://shopify/ProductVariant/" + String(variants[0].id),
+            "gid://shopify/ProductVariant/" + String(metaVariants[0].id),
+          );
+        }
+        if (metaVariants[0] && metaVariants[0].price) {
+          root.setAttribute(
+            "data-unit-price-cents",
+            String(metaVariants[0].price),
           );
         }
       }

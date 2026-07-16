@@ -32,18 +32,6 @@ const SCRIPT_TAG_CREATE = `#graphql
   }
 `;
 
-const SCRIPT_TAG_DELETE = `#graphql
-  mutation OffrefyScriptTagDelete($id: ID!) {
-    scriptTagDelete(id: $id) {
-      deletedScriptTagId
-      userErrors {
-        field
-        message
-      }
-    }
-  }
-`;
-
 const ensuredUntil = new Map<string, number>();
 const ENSURE_TTL_MS = 30 * 60 * 1000;
 
@@ -51,20 +39,10 @@ function loaderSrc(appUrl: string): string {
   return `${appUrl.replace(/\/$/, "")}/vd-loader.js`;
 }
 
-function isOffrefyLoaderSrc(src: string): boolean {
-  return (
-    typeof src === "string" &&
-    (src.includes("/vd-loader.js") || src.includes("offrey.xloxi.com/vd-loader"))
-  );
-}
-
 /**
  * Registers a storefront ScriptTag that loads Offrefy widget assets even when
  * Theme App Embed is disabled (common on custom / newly installed apps).
  * Requires read_script_tags + write_script_tags.
- *
- * Replaces stale loaders that still point at old tunnels / Vercel hosts after
- * the app URL or distribution changes (public deploy).
  */
 export async function ensureOffrefyStorefrontScriptTag(
   admin: AdminGraphql,
@@ -75,14 +53,13 @@ export async function ensureOffrefyStorefrontScriptTag(
     return { ok: false, errors: ["Missing SHOPIFY_APP_URL"] };
   }
 
-  const desired = loaderSrc(appUrl);
-  // Cache per desired host so URL migrations (public deploy) re-check immediately.
-  const cacheKey = `${shop || appUrl}::${desired}`;
+  const cacheKey = shop || appUrl;
   const now = Date.now();
   if ((ensuredUntil.get(cacheKey) ?? 0) > now) {
     return { ok: true, errors: [] };
   }
-  const errors: string[] = [];
+
+  const desired = loaderSrc(appUrl);
 
   try {
     const listRes = await admin.graphql(SCRIPT_TAGS_QUERY);
@@ -97,38 +74,16 @@ export async function ensureOffrefyStorefrontScriptTag(
     }
 
     const nodes = listJson.data?.scriptTags?.nodes ?? [];
-    const ours = nodes.filter((n) => isOffrefyLoaderSrc(n.src));
-    const hasExact = ours.some((n) => n.src === desired);
-    const stale = ours.filter((n) => n.src !== desired);
-
-    for (const tag of stale) {
-      const delRes = await admin.graphql(SCRIPT_TAG_DELETE, {
-        variables: { id: tag.id },
-      });
-      const delJson = (await delRes.json()) as {
-        data?: {
-          scriptTagDelete?: {
-            userErrors?: Array<{ message: string }>;
-          };
-        };
-        errors?: Array<{ message: string }>;
-      };
-      const delMsgs = [
-        ...(delJson.errors ?? []).map((e) => e.message),
-        ...(delJson.data?.scriptTagDelete?.userErrors ?? []).map(
-          (e) => e.message,
-        ),
-      ];
-      if (delMsgs.length) {
-        errors.push(...delMsgs);
-      }
-    }
-
-    if (hasExact) {
-      if (errors.length === 0) {
-        ensuredUntil.set(cacheKey, now + ENSURE_TTL_MS);
-      }
-      return { ok: errors.length === 0, errors };
+    const already = nodes.some(
+      (n) =>
+        typeof n.src === "string" &&
+        (n.src === desired ||
+          n.src.includes("/vd-loader.js") ||
+          n.src.includes("offrey.xloxi.com/vd-loader")),
+    );
+    if (already) {
+      ensuredUntil.set(cacheKey, now + ENSURE_TTL_MS);
+      return { ok: true, errors: [] };
     }
 
     const createRes = await admin.graphql(SCRIPT_TAG_CREATE, {
@@ -158,11 +113,11 @@ export async function ensureOffrefyStorefrontScriptTag(
     );
 
     if (messages.length && !alreadyExists) {
-      return { ok: false, errors: [...errors, ...messages] };
+      return { ok: false, errors: messages };
     }
 
     ensuredUntil.set(cacheKey, now + ENSURE_TTL_MS);
-    return { ok: true, errors };
+    return { ok: true, errors: [] };
   } catch (e) {
     if (e instanceof Response && e.status >= 300 && e.status < 400) throw e;
     return {

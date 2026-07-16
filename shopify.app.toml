@@ -6,9 +6,7 @@ application_url = "https://offrey.xloxi.com"
 embedded = true
 
 [build]
-# Keep Partner/app-proxy URLs on production host. Auto-tunnel rewrites break
-# live storefront widget-config after public / App Store distribution.
-automatically_update_urls_on_dev = false
+automatically_update_urls_on_dev = true
 
 [webhooks]
 api_version = "2026-07"

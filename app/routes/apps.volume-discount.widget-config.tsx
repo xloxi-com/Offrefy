@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs } from "react-router";
 
 import { prisma } from "../db.server";
-import { authenticate } from "../shopify.server";
+import { authenticate, unauthenticated } from "../shopify.server";
 import {
   readStorefrontPayloadForServe,
   rebuildAndPersistStorefrontPayload,
@@ -81,6 +81,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     "";
   if (!shop) {
     return emptyJson(request);
+  }
+
+  if (!admin) {
+    try {
+      ({ admin } = await unauthenticated.admin(shop));
+    } catch (e) {
+      console.warn(
+        "[volume-discount] widget-config offline admin fallback failed",
+        shop,
+        e,
+      );
+    }
   }
 
   const productId = url.searchParams.get("product_id")?.trim() ?? "";
