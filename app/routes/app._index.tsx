@@ -38,6 +38,9 @@ import {
   invalidateThemeAppEmbedStatusCache,
 } from "../services/themeAppEmbed.server";
 import { ensureOffrefyStorefrontScriptTag } from "../services/ensureOffrefyStorefrontScriptTag.server";
+import { pushStorefrontWidgetToShop } from "../services/refreshStorefrontWidget.server";
+import { getVolumeDiscountStorefrontPayload } from "../services/volumeDiscountStorefrontCache.server";
+import { storefrontWidgetPayloadHasCampaigns } from "../utils/storefrontWidgetConfig.server";
 import { parseSessionScopes } from "../utils/shopPublishedLocales.server";
 
 export const meta: MetaFunction = () => [{ title: APP_DISPLAY_NAME }];
@@ -128,6 +131,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const campaignCount = Number(counts[0]?.campaignCount ?? 0);
   const activeCount = Number(counts[0]?.activeCount ?? 0);
+
+  if (activeCount > 0) {
+    const cachedWidget = await getVolumeDiscountStorefrontPayload(session.shop).catch(
+      () => null,
+    );
+    if (!storefrontWidgetPayloadHasCampaigns(cachedWidget?.payload)) {
+      void pushStorefrontWidgetToShop(admin, session.shop).catch((error) => {
+        console.warn("[Offrefy] home storefront widget refresh", error);
+      });
+    }
+  }
 
   // ScriptTag alone is enough for the widget to show without App Embed.
   const storefrontReady = appEmbedEnabled || scriptTagOk;

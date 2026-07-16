@@ -191,6 +191,35 @@ export async function buildStorefrontWidgetJsonString(
 /** Max shop metafield JSON embedded in Liquid before switching to per-product API mode. */
 export const STOREFRONT_WIDGET_INLINE_MAX_CHARS = 180_000;
 
+type StorefrontWidgetPayloadShape = {
+  version?: number;
+  mode?: string;
+  campaigns?: unknown[];
+};
+
+/** True when inline / proxy JSON can paint tiers without a per-product fetch. */
+export function storefrontWidgetPayloadHasCampaigns(payload?: string | null): boolean {
+  if (!payload?.trim()) return false;
+  try {
+    const parsed = JSON.parse(payload) as StorefrontWidgetPayloadShape;
+    return Array.isArray(parsed.campaigns) && parsed.campaigns.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+export function storefrontWidgetPayloadIsPerProduct(
+  payload?: string | null,
+): boolean {
+  if (!payload?.trim()) return false;
+  try {
+    const parsed = JSON.parse(payload) as StorefrontWidgetPayloadShape;
+    return parsed.mode === "per_product";
+  } catch {
+    return false;
+  }
+}
+
 /** Stamp / refresh `rev` so storefront clients can bust session + CDN caches on offer edits. */
 export function stampStorefrontWidgetRev(
   fullWidgetJson: string,
@@ -294,6 +323,60 @@ async function resolveStorefrontTranslationsForWidget(
   return loadStorefrontTranslationsForShop(shop);
 }
 
+async function pickActiveCampaignRowForProduct(
+  shop: string,
+  productId: string,
+  variantId: string | null,
+): Promise<VolumeDiscountCampaignStorefrontRow | null> {
+  const rows = await prisma.volumeDiscountCampaign.findMany({
+    where: { shop, status: "active" },
+    orderBy: { createdAt: "asc" },
+    select: volumeDiscountCampaignSyncSelect,
+  });
+  for (const row of rows) {
+    const built = buildCampaignConfigFromDbRow(
+      {
+        id: row.id,
+        campaignName: row.campaignName,
+        displayName: row.displayName,
+        productScope: row.productScope,
+        quantityCondition: row.quantityCondition,
+        customerType: row.customerType,
+        customerTags: row.customerTags,
+        productIds: row.productIds,
+        collectionIds: row.collectionIds,
+        tiers: row.tiers,
+      },
+      productId || variantId || undefined,
+    );
+    if (!built) continue;
+    const match = storefrontProductMatch(
+      {
+        id: row.id,
+        campaignName: row.campaignName,
+        displayName: row.displayName,
+        productScope: row.productScope,
+        quantityCondition: row.quantityCondition,
+        customerType: row.customerType,
+        customerTags: Array.isArray(row.customerTags)
+          ? row.customerTags.filter((x): x is string => typeof x === "string")
+          : [],
+        productIds: Array.isArray(built.productIds)
+          ? built.productIds.map(String)
+          : [],
+        tiers: [],
+        widgetDisplay: normalizeVolumeDiscountWidgetDisplay(row.widgetDisplay ?? {}),
+        countdownStartsAt: row.countdownStartsAt?.toISOString() ?? null,
+        countdownEndsAt: row.countdownEndsAt?.toISOString() ?? null,
+      },
+      productId,
+      variantId,
+    );
+    if (match) return row;
+  }
+  return null;
+}
+
 /**
  * Build widget JSON for one product page (avoids downloading 1000+ campaigns to the browser).
  */
@@ -374,6 +457,31 @@ export async function buildStorefrontWidgetForProduct(
     ruleByProductId.get("*");
 
   if (!campaignId) {
+    const directRow = await pickActiveCampaignRowForProduct(
+      shop,
+      productKey,
+      variantKey || null,
+    );
+    if (directRow) {
+      const builtDirect = buildCampaignConfigFromDbRow(
+        {
+          id: directRow.id,
+          campaignName: directRow.campaignName,
+          displayName: directRow.displayName,
+          productScope: directRow.productScope,
+          quantityCondition: directRow.quantityCondition,
+          customerType: directRow.customerType,
+          customerTags: directRow.customerTags,
+          productIds: directRow.productIds,
+          collectionIds: directRow.collectionIds,
+          tiers: directRow.tiers,
+        },
+        productKey || variantKey || undefined,
+      );
+      if (builtDirect) {
+        return await buildStorefrontWidgetJsonString([directRow], [builtDirect]);
+      }
+    }
     return JSON.stringify({ version: 1, campaigns: [] });
   }
 

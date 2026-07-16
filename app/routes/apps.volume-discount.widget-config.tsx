@@ -14,6 +14,7 @@ import { volumeDiscountCampaignSyncSelect } from "../utils/volumeDiscountCampaig
 import {
   buildStorefrontWidgetForProduct,
   stampStorefrontWidgetRev,
+  storefrontWidgetPayloadHasCampaigns,
 } from "../utils/storefrontWidgetConfig.server";
 
 /**
@@ -115,7 +116,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   /* Cache-first: sync writes VolumeDiscountStorefrontPayload on every save — avoid DB + Admin on hot path. */
   const cached = await readStorefrontPayloadForServe(shop);
-  if (cached) {
+  if (cached && storefrontWidgetPayloadHasCampaigns(cached.body)) {
     if (cached.stale && admin) {
       scheduleStorefrontPayloadRevalidation(shop, admin);
     }
@@ -127,6 +128,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   if (!admin) {
+    if (productId) {
+      try {
+        const value = await buildStorefrontWidgetForProduct(
+          shop,
+          productId,
+          variantId || null,
+          null,
+        );
+        if (storefrontWidgetPayloadHasCampaigns(value)) {
+          return jsonBody(request, value);
+        }
+      } catch (e) {
+        console.error("[volume-discount] widget-config product fallback", e);
+      }
+    }
     return emptyJson(request);
   }
 

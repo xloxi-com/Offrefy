@@ -11,6 +11,7 @@ import { deleteAutomaticDiscounts } from "./volumeDiscountShopify.server";
 import {
   buildStorefrontWidgetJsonString,
   compactStorefrontShopMetafieldPayload,
+  storefrontWidgetPayloadHasCampaigns,
 } from "../utils/storefrontWidgetConfig.server";
 import {
   ensureProductTiersStorefrontDefinition,
@@ -461,7 +462,7 @@ export async function syncVolumeDiscountShop(
     try {
       const cached = await prisma.volumeDiscountStorefrontPayload.findUnique({
         where: { shop },
-        select: { syncRowFingerprint: true },
+        select: { syncRowFingerprint: true, payload: true },
       });
       if (
         cached?.syncRowFingerprint === rowFp &&
@@ -471,11 +472,21 @@ export async function syncVolumeDiscountShop(
           admin,
           state.functionDiscountId,
         );
-        if (exists) {
+        if (
+          exists &&
+          storefrontWidgetPayloadHasCampaigns(cached.payload)
+        ) {
           return { discountIds: [state.functionDiscountId], errors: [] };
         }
-        await clearStaleFunctionDiscountState(shop);
-        state = null;
+        if (exists) {
+          console.warn(
+            "[volume-discount] storefront widget cache empty — forcing full sync",
+            shop,
+          );
+        } else {
+          await clearStaleFunctionDiscountState(shop);
+          state = null;
+        }
       }
     } catch {
       /* column may be missing until migration — continue full sync */
