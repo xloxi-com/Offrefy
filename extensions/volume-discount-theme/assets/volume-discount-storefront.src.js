@@ -3810,7 +3810,7 @@
     trackImpression(campaign, root.getAttribute("data-product-id"));
     window.VolumeDiscount = window.VolumeDiscount || {};
     window.VolumeDiscount.embed = window.VolumeDiscount.embed || {};
-    window.VolumeDiscount.embed.version = "1.24.0";
+    window.VolumeDiscount.embed.version = "1.25.0";
 
     /**
      * Remove the body app-embed fallback only after a section "Quantity breaks" widget
@@ -3956,9 +3956,14 @@
           form.closest(".product-information") ||
           form.closest(".product-info") ||
           form.closest("product-info") ||
+          form.closest(".product__details") ||
+          form.closest(".product-details") ||
+          form.closest("[data-product-info]") ||
+          form.closest(".product-single__meta") ||
+          form.closest(".product__meta") ||
           form.parentNode)) ||
       document.querySelector(
-        "buy-buttons, .product-form__buttons, .product-form, product-form, [data-product-form]",
+        "buy-buttons, .product-form__buttons, .product-form, product-form, [data-product-form], .product__info, .product-information, product-info, .product__details",
       );
     if (!anchor || !anchor.parentNode) {
       if (form && form.parentNode && root.parentNode !== form.parentNode) {
@@ -4101,6 +4106,19 @@
       var camp = pickCampaign(cfg, productId, variantId, productGid, variantGid);
       if (!camp || !camp.tiers || !camp.tiers.length) {
         camp = productRuleCampaign;
+      }
+      if ((!camp || !camp.tiers || !camp.tiers.length) && designMode) {
+        camp = {
+          id: "_preview",
+          campaignName: "Preview",
+          productScope: "all",
+          tiers: [
+            { minQty: 1, buyLabel: "Buy 1", badge: "Most Popular ⚡", activeByDefault: true, percent: 0 },
+            { minQty: 3, buyLabel: "Buy 3+", badge: null, activeByDefault: false, percent: 10 },
+            { minQty: 5, buyLabel: "Buy 5+", badge: null, activeByDefault: false, percent: 15 },
+          ],
+          widgetDisplay: WD_DEFAULT,
+        };
       }
       if (!camp || !camp.tiers || !camp.tiers.length) {
         root.style.display = "none";

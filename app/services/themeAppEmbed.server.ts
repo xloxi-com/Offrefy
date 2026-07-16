@@ -8,7 +8,7 @@ type AdminGraphql = {
 };
 
 /** Theme extension UID from `extensions/volume-discount-theme/shopify.extension.toml`. */
-export const THEME_EXTENSION_UID = "bf69e48e-bed3-2f4e-10f1-fa992f1fd7a3642c6510";
+export const THEME_EXTENSION_UID = "019f469b-9c3e-742f-82ba-53cdb7f1d129";
 
 const MAIN_THEME_SETTINGS_QUERY = `#graphql
   query OffrefyMainThemeSettings {
@@ -57,9 +57,12 @@ type ThemeEmbedStatus = {
   themeId: string | null;
   themeName: string | null;
   appHandle: string | null;
+  /** True only when embed is ON and points at the current extension UID. */
   enabled: boolean;
-  /** True when our embed block exists in settings_data (even if disabled). */
+  /** True when any Offrefy embed block exists (even stale UID / disabled). */
   present: boolean;
+  /** True when an Offrefy embed exists but uses an old extension UID. */
+  staleUid: boolean;
   settingsRaw: string | null;
   errors: string[];
 };
@@ -90,6 +93,18 @@ function isOurEmbedType(type: unknown, appHandle: string | null): boolean {
   if (appHandle && t.includes(`/apps/${appHandle.toLowerCase()}/`)) return true;
   // Match even if app handle slug differs slightly (e.g. Offrefy vs offrefy).
   return t.includes("offrefy") || t.includes(THEME_APP_EMBED_HANDLE);
+}
+
+function hasCurrentExtensionUid(type: unknown): boolean {
+  return (
+    typeof type === "string" &&
+    type.toLowerCase().includes(THEME_EXTENSION_UID.toLowerCase())
+  );
+}
+
+export function buildThemeAppEmbedBlockType(appHandle: string): string {
+  const handle = (appHandle || "offrefy").trim() || "offrefy";
+  return `shopify://apps/${handle}/blocks/${THEME_APP_EMBED_HANDLE}/${THEME_EXTENSION_UID}`;
 }
 
 type SettingsData = {
@@ -180,6 +195,7 @@ async function fetchMainThemeAppEmbedStatus(
       appHandle: null,
       enabled: false,
       present: false,
+      staleUid: false,
       settingsRaw: null,
       errors,
     };
@@ -195,6 +211,7 @@ async function fetchMainThemeAppEmbedStatus(
       appHandle,
       enabled: false,
       present: false,
+      staleUid: false,
       settingsRaw,
       errors: settingsRaw ? [] : ["Could not read theme settings_data.json"],
     };
@@ -204,10 +221,13 @@ async function fetchMainThemeAppEmbedStatus(
   const blocks = parsed?.current?.blocks ?? {};
   let present = false;
   let enabled = false;
+  let staleUid = false;
   for (const block of Object.values(blocks)) {
     if (!isOurEmbedType(block?.type, appHandle)) continue;
     present = true;
-    if (block?.disabled !== true) {
+    const currentUid = hasCurrentExtensionUid(block?.type);
+    if (!currentUid) staleUid = true;
+    if (block?.disabled !== true && currentUid) {
       enabled = true;
       break;
     }
@@ -219,6 +239,7 @@ async function fetchMainThemeAppEmbedStatus(
     appHandle,
     enabled,
     present,
+    staleUid,
     settingsRaw,
     errors: [],
   };
@@ -226,7 +247,7 @@ async function fetchMainThemeAppEmbedStatus(
 
 /**
  * Enable Offrefy app embed on the live (MAIN) theme by updating settings_data.json.
- * Requires `write_themes`. Safe no-op when already enabled.
+ * Requires `write_themes`. Rewrites stale extension UIDs from older deploys.
  */
 export async function ensureThemeAppEmbedEnabled(
   admin: AdminGraphql,
@@ -235,7 +256,7 @@ export async function ensureThemeAppEmbedEnabled(
   if (status.errors.length) {
     return { ok: false, alreadyEnabled: false, errors: status.errors };
   }
-  if (status.enabled) {
+  if (status.enabled && !status.staleUid) {
     return { ok: true, alreadyEnabled: true, errors: [] };
   }
   if (!status.themeId || !status.settingsRaw) {
@@ -264,14 +285,15 @@ export async function ensureThemeAppEmbedEnabled(
   }
 
   const blocks = parsed.current.blocks;
-  const blockType = `shopify://apps/${appHandle}/blocks/${THEME_APP_EMBED_HANDLE}/${THEME_EXTENSION_UID}`;
+  const blockType = buildThemeAppEmbedBlockType(appHandle);
 
   let updated = false;
   for (const [id, block] of Object.entries(blocks)) {
     if (!isOurEmbedType(block?.type, appHandle)) continue;
     blocks[id] = {
       ...block,
-      type: block.type || blockType,
+      /* Always rewrite to the current published extension UID. */
+      type: blockType,
       disabled: false,
       settings: block.settings ?? {},
     };
@@ -310,5 +332,6 @@ export async function ensureThemeAppEmbedEnabled(
     return { ok: false, alreadyEnabled: false, errors: allErrors };
   }
 
+  invalidateThemeAppEmbedStatusCache();
   return { ok: true, alreadyEnabled: false, errors: [] };
 }

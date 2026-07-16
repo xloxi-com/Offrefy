@@ -14,6 +14,7 @@ import { volumeDiscountCampaignSyncSelect } from "../utils/volumeDiscountCampaig
 import {
   buildStorefrontWidgetForProduct,
   stampStorefrontWidgetRev,
+  storefrontWidgetPayloadHasCampaigns,
 } from "../utils/storefrontWidgetConfig.server";
 
 /**
@@ -94,6 +95,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         variantId || null,
         admin ?? null,
       );
+      /* Stale empty full-shop cache can poison per-product lookups — rebuild when admin available. */
+      if (!storefrontWidgetPayloadHasCampaigns(value) && admin) {
+        const rows = await prisma.volumeDiscountCampaign.findMany({
+          where: { shop, status: "active" },
+          orderBy: { createdAt: "asc" },
+          select: volumeDiscountCampaignSyncSelect,
+        });
+        if (rows.length > 0) {
+          await rebuildAndPersistStorefrontPayload(shop, rows, admin);
+          const rebuilt = await buildStorefrontWidgetForProduct(
+            shop,
+            productId,
+            variantId || null,
+            admin,
+          );
+          return jsonBody(request, rebuilt);
+        }
+      }
       return jsonBody(request, value);
     } catch (e) {
       console.error("[volume-discount] widget-config product", e);
@@ -101,9 +120,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
   }
 
-  /* Cache-first: sync writes VolumeDiscountStorefrontPayload on every save — avoid DB + Admin on hot path. */
+  /* Cache-first — but never serve a permanent empty payload when active offers exist. */
   const cached = await readStorefrontPayloadForServe(shop);
-  if (cached) {
+  if (cached && storefrontWidgetPayloadHasCampaigns(cached.body)) {
     if (cached.stale && admin) {
       scheduleStorefrontPayloadRevalidation(shop, admin);
     }
@@ -119,7 +138,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   try {
-    /* One query instead of count + findMany on cold cache (same branches, fewer round-trips). */
     const rows = await prisma.volumeDiscountCampaign.findMany({
       where: { shop, status: "active" },
       orderBy: { createdAt: "asc" },

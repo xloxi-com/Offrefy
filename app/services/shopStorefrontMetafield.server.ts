@@ -54,8 +54,99 @@ const METAFIELD_DEF = `#graphql
   }
 `;
 
+const METAFIELD_DEF_UPDATE_ACCESS = `#graphql
+  mutation VolumeDiscountMetafieldDefAccess(
+    $definition: MetafieldDefinitionUpdateInput!
+  ) {
+    metafieldDefinitionUpdate(definition: $definition) {
+      updatedDefinition {
+        id
+      }
+      userErrors {
+        field
+        message
+      }
+    }
+  }
+`;
+
+const METAFIELD_DEF_LOOKUP = `#graphql
+  query VolumeDiscountMetafieldDefLookup(
+    $ownerType: MetafieldOwnerType!
+    $namespace: String!
+    $key: String!
+  ) {
+    metafieldDefinitions(
+      first: 1
+      ownerType: $ownerType
+      namespace: $namespace
+      key: $key
+    ) {
+      nodes {
+        id
+        access {
+          storefront
+        }
+      }
+    }
+  }
+`;
+
 let definitionEnsured = false;
 let productTiersDefinitionEnsured = false;
+
+async function ensureMetafieldStorefrontAccess(
+  admin: AdminGraphql,
+  ownerType: "SHOP" | "PRODUCT",
+  namespace: string,
+  key: string,
+): Promise<void> {
+  try {
+    const lookup = await admin.graphql(METAFIELD_DEF_LOOKUP, {
+      variables: { ownerType, namespace, key },
+    });
+    const parsed = (await lookup.json()) as {
+      data?: {
+        metafieldDefinitions?: {
+          nodes?: Array<{
+            id?: string;
+            access?: { storefront?: string | null };
+          }>;
+        };
+      };
+    };
+    const node = parsed.data?.metafieldDefinitions?.nodes?.[0];
+    if (!node?.id) return;
+    if (node.access?.storefront === "PUBLIC_READ") return;
+    const upd = await admin.graphql(METAFIELD_DEF_UPDATE_ACCESS, {
+      variables: {
+        definition: {
+          id: node.id,
+          access: {
+            admin: "MERCHANT_READ_WRITE",
+            storefront: "PUBLIC_READ",
+          },
+        },
+      },
+    });
+    const updJson = (await upd.json()) as {
+      data?: {
+        metafieldDefinitionUpdate?: {
+          userErrors?: { message?: string }[];
+        };
+      };
+    };
+    const ue = updJson.data?.metafieldDefinitionUpdate?.userErrors ?? [];
+    if (ue.length) {
+      console.warn(
+        "[Offrefy] metafieldDefinitionUpdate access:",
+        ue.map((e) => e.message).join("; "),
+      );
+    }
+  } catch (e) {
+    console.warn("[Offrefy] ensureMetafieldStorefrontAccess", e);
+  }
+}
 
 async function ensureStorefrontWidgetDefinition(
   admin: AdminGraphql,
@@ -94,6 +185,14 @@ async function ensureStorefrontWidgetDefinition(
     console.warn(
       "[Offrefy] metafieldDefinitionCreate:",
       ue.map((e) => e.message).join("; "),
+    );
+  }
+  if (already) {
+    await ensureMetafieldStorefrontAccess(
+      admin,
+      "SHOP",
+      "volume_discount",
+      "storefront_widget",
     );
   }
   definitionEnsured = true;
@@ -140,6 +239,14 @@ export async function ensureProductTiersStorefrontDefinition(
     console.warn(
       "[Offrefy] product tiers metafieldDefinitionCreate:",
       ue.map((e) => e.message).join("; "),
+    );
+  }
+  if (already) {
+    await ensureMetafieldStorefrontAccess(
+      admin,
+      "PRODUCT",
+      "volume_discount",
+      "tiers",
     );
   }
   productTiersDefinitionEnsured = true;

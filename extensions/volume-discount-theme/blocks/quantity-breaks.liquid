@@ -1,7 +1,15 @@
 {% comment %}
   Section app block — appears in Product information → Add block → Apps.
+  Horizon nests this under theme blocks — product comes from `closest.product`.
 {% endcomment %}
-{% render 'vd-quantity-breaks', block: block %}
+{% liquid
+  if closest.product != blank
+    assign vd_product = closest.product
+  elsif product != blank
+    assign vd_product = product
+  endif
+%}
+{% render 'vd-quantity-breaks', block: block, vd_product: vd_product %}
 
 {% schema %}
 {

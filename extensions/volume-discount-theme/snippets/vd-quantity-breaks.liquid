@@ -1,6 +1,14 @@
 {% liquid
   assign vd_widget = shop.metafields.volume_discount.storefront_widget.value
   assign demo_json = '{"version":1,"campaigns":[{"id":"_preview","campaignName":"Preview","displayName":null,"productScope":"all","quantityCondition":"per-variant","customerType":"everyone","customerTags":[],"productIds":[],"countdownStartsAt":null,"countdownEndsAt":"2099-12-31T23:59:59.999Z","tiers":[{"minQty":1,"buyLabel":"Buy 1","badge":"Most Popular ⚡","activeByDefault":true,"percent":0},{"minQty":2,"buyLabel":"Buy 2+","badge":null,"activeByDefault":false,"percent":10},{"minQty":4,"buyLabel":"Buy 4+","badge":null,"activeByDefault":false,"percent":15}],"widgetDisplay":{"widgetHeading":"","showCountdown":true,"countdownLabel":"Sale end in","ctaLabel":"Grab this deal","footnote":"Pick a tier to set quantity, then add to cart.","primaryColor":"#6b1d1e","primaryHoverColor":"#551618","selectedBgColor":"#fff5f5","countdownBgColor":"#fce8e8","countdownTextColor":"#b42318","savingsColor":"#784a4f","optionSubtextColor":"#784a4f","mutedColor":"#616161","cardBorderColor":"#d4d4d4","fontScale":"default","fontSizeScalePercent":100,"fontSizeTitle":19,"fontSizeBuyLabel":16,"fontSizeBadge":12,"fontSizePrice":17,"fontSizeComparePrice":13,"fontSizeSavings":12,"fontSizeButton":17,"fontSizeCountdownLabel":13,"fontSizeCountdownValue":13,"fontSizeFootnote":12,"ctaButtonAction":"add_to_cart_open_drawer","ctaButtonPageUrl":"","hideThemeAddToCart":false}}]}'
+
+  if vd_product == blank and closest.product != blank
+    assign vd_product = closest.product
+  endif
+  if vd_product == blank and product != blank
+    assign vd_product = product
+  endif
+
   if vd_from_embed
     assign vd_heading = 'Get more, save more 🥳'
     assign vd_section_heading = ''
@@ -35,7 +43,7 @@
     endif
   endif
 %}
-{% render 'vd-storefront-assets' %}
+{% render 'vd-storefront-assets', vd_product: vd_product %}
 <div
   class="vd-storefront-root volume-discount-embed"
   id="vd-shopify-{{ vd_id_suffix }}"
@@ -49,46 +57,56 @@
   {% endif %}
   data-heading="{{ vd_heading | escape }}"
   data-section-heading="{{ vd_section_heading | escape }}"
-  {% if product %}
-    data-product-id="{{ product.id }}"
-    data-variant-id="{{ product.selected_or_first_available_variant.id }}"
-    {% if product.admin_graphql_api_id != blank %}
-      data-product-gid="{{ product.admin_graphql_api_id | escape }}"
+  {% if vd_product != blank %}
+    data-product-id="{{ vd_product.id }}"
+    data-variant-id="{{ vd_product.selected_or_first_available_variant.id }}"
+    {% if vd_product.admin_graphql_api_id != blank %}
+      data-product-gid="{{ vd_product.admin_graphql_api_id | escape }}"
     {% endif %}
-    {% if product.selected_or_first_available_variant.admin_graphql_api_id != blank %}
-      data-variant-gid="{{ product.selected_or_first_available_variant.admin_graphql_api_id | escape }}"
+    {% if vd_product.selected_or_first_available_variant.admin_graphql_api_id != blank %}
+      data-variant-gid="{{ vd_product.selected_or_first_available_variant.admin_graphql_api_id | escape }}"
     {% endif %}
-    data-unit-price-cents="{{ product.selected_or_first_available_variant.price }}"
+    data-unit-price-cents="{{ vd_product.selected_or_first_available_variant.price }}"
     data-currency="{% if cart.currency.iso_code %}{{ cart.currency.iso_code }}{% elsif shop.currency.iso_code %}{{ shop.currency.iso_code }}{% else %}USD{% endif %}"
   {% endif %}
   {% if request.design_mode %}
     data-design-mode="true"
   {% endif %}
 >
-  {% if product %}
+  {% if vd_product != blank %}
     <script type="application/json" data-vd-variants-json>
       [
-        {%- for v in product.variants -%}
+        {%- for v in vd_product.variants -%}
           {"id":{{ v.id }},"title":{{ v.title | json }},"price":{{ v.price }},"available":{% if v.available %}true{% else %}false{% endif %}}{%- unless forloop.last -%},{%- endunless -%}
         {%- endfor -%}
       ]
     </script>
-    {% if product.metafields.volume_discount.tiers.value %}
+    {% if vd_product.metafields.volume_discount.tiers.value %}
       <script type="application/json" data-vd-product-rule>
-        {{ product.metafields.volume_discount.tiers.value | json }}
+        {{ vd_product.metafields.volume_discount.tiers.value | json }}
       </script>
     {% endif %}
   {% endif %}
   <script type="application/json" id="vd-json-{{ vd_id_suffix }}">
-    {% if vd_widget == blank %}
-      {% if request.design_mode %}
-        {{ demo_json }}
+    {% if request.design_mode %}
+      {% if vd_widget != blank and vd_widget.campaigns.size > 0 %}
+        {{ vd_widget | json }}
       {% else %}
-        {"version":1,"campaigns":[]}
+        {{ demo_json }}
       {% endif %}
+    {% elsif vd_widget == blank %}
+      {"version":1,"campaigns":[]}
     {% else %}
       {{ vd_widget | json }}
     {% endif %}
   </script>
-  <div class="volume-discount-embed__inner vd-mount" data-vd-mount hidden></div>
+  {%- comment -%}
+    Keep mount visible in the theme editor so Shopify does not mark the app block
+    as "hidden" (red eye icon). Live storefront starts hidden until JS mounts tiers.
+  {%- endcomment -%}
+  <div
+    class="volume-discount-embed__inner vd-mount"
+    data-vd-mount
+    {% unless request.design_mode %}hidden{% endunless %}
+  ></div>
 </div>
