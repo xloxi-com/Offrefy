@@ -505,11 +505,11 @@ function numericTailFromGid(gid) {
 }
 
 /** Shopify caps automatic product discount candidates (~25 cart lines). */
-const MAX_DISCOUNT_CART_LINES = 25;
-const MAX_LOCKED_CART_PRODUCTS = 25;
+export const MAX_DISCOUNT_CART_LINES = 25;
+export const MAX_LOCKED_CART_PRODUCTS = 25;
 
 /** @param {unknown} raw */
-function parseLockedProductIds(raw) {
+export function parseLockedProductIds(raw) {
   const s = String(raw ?? "").trim();
   if (!s) return [];
   /** @type {string[]} */
@@ -532,7 +532,7 @@ function parseLockedProductIds(raw) {
  * @param {unknown[]} lines
  * @param {string[]} lockedProductIds
  */
-function selectEligibleProductIds(lines, lockedProductIds) {
+export function selectEligibleProductIds(lines, lockedProductIds) {
   /** @type {Map<string, number>} */
   const lockedRank = new Map();
   lockedProductIds.forEach((id, i) => lockedRank.set(id, i));
@@ -573,7 +573,7 @@ function selectEligibleProductIds(lines, lockedProductIds) {
  * @param {Map<string, { message: string, value: object, score: number }>} bestByLine
  * @param {string[]} lockedProductIds
  */
-function capDiscountCandidates(lines, bestByLine, lockedProductIds) {
+export function capDiscountCandidates(lines, bestByLine, lockedProductIds) {
   /** @type {Map<string, number>} */
   const lockedRank = new Map();
   lockedProductIds.forEach((id, i) => lockedRank.set(id, i));
@@ -731,30 +731,54 @@ function pctBadge(pct, qty) {
  * @param {Record<string, unknown>} productRules
  * @param {boolean} authenticated
  * @param {Map<string, boolean>} customerTagMap
+ * @param {string[]} lockedProductIds
  */
 function applyProductRulesLean(
   eligibleLines,
   productRules,
   authenticated,
   customerTagMap,
+  lockedProductIds = [],
 ) {
   /** @type {Map<string, unknown[]>} */
   const byProduct = new Map();
-  for (const line of eligibleLines) {
+  /** @type {Map<string, number>} */
+  const firstLineIndex = new Map();
+  for (let i = 0; i < eligibleLines.length; i++) {
+    const line = eligibleLines[i];
     const m = line?.merchandise;
     if (!m?.product?.id) continue;
     const pid = numericTailFromGid(m.product.id);
     if (!pid) continue;
     const list = byProduct.get(pid);
     if (list) list.push(line);
-    else byProduct.set(pid, [line]);
+    else {
+      byProduct.set(pid, [line]);
+      firstLineIndex.set(pid, i);
+    }
   }
+
+  /** @type {Map<string, number>} */
+  const lockedRank = new Map();
+  lockedProductIds.forEach((id, i) => lockedRank.set(id, i));
+
+  const productOrder = [...byProduct.keys()].sort((a, b) => {
+    const ra = lockedRank.has(a)
+      ? lockedRank.get(a)
+      : MAX_LOCKED_CART_PRODUCTS + (firstLineIndex.get(a) ?? 0);
+    const rb = lockedRank.has(b)
+      ? lockedRank.get(b)
+      : MAX_LOCKED_CART_PRODUCTS + (firstLineIndex.get(b) ?? 0);
+    return ra - rb || (firstLineIndex.get(a) ?? 0) - (firstLineIndex.get(b) ?? 0);
+  });
 
   /** @type {Map<string, { message: string, value: object }>} */
   const bestByLine = new Map();
   let targetBudget = MAX_DISCOUNT_CART_LINES;
 
-  for (const [pid, productLines] of byProduct) {
+  for (const pid of productOrder) {
+    const productLines = byProduct.get(pid);
+    if (!productLines) continue;
     if (targetBudget <= 0) break;
     const compact = productRules[pid] ?? productRules["*"];
     if (!compact || typeof compact !== "object") continue;
@@ -952,13 +976,20 @@ export function cartLinesDiscountsGenerateRun(input) {
       productRules,
       authenticated,
       customerTagMap,
+      lockedProductIds,
     );
 
     if (!bestByLine.size) return { operations: [] };
 
+    const cappedBestByLine = capDiscountCandidates(
+      eligibleLines,
+      bestByLine,
+      lockedProductIds,
+    );
+
     /** @type {import("../generated/api").ProductDiscountCandidate[]} */
     const candidates = [];
-    for (const [lineId, cand] of bestByLine) {
+    for (const [lineId, cand] of cappedBestByLine) {
       candidates.push({
         message: cand.message,
         value: cand.value,
