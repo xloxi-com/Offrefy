@@ -18,6 +18,7 @@ import {
   getOfferTypePreviewRows,
   getOfferTypePreviewWidgetDisplay,
 } from "../utils/offerTypeSelectPreviewRows";
+import { useAdminI18n } from "./AdminI18nProvider";
 
 const DEMO_PRODUCT_IMAGE =
   "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=800&q=80&auto=format&fit=crop";
@@ -39,6 +40,7 @@ export function OfferTypePreviewModal({
   preset,
   storefrontPreviewUrl,
 }: OfferTypePreviewModalProps) {
+  const { t } = useAdminI18n();
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">(
     "desktop",
   );
@@ -66,7 +68,9 @@ export function OfferTypePreviewModal({
   );
 
   const modalTitle =
-    previewDevice === "desktop" ? "Desktop preview" : "Mobile preview";
+    previewDevice === "desktop"
+      ? t("offers.preview.desktop")
+      : t("offers.preview.mobile");
 
   const viewportClass =
     previewDevice === "mobile"
@@ -76,7 +80,7 @@ export function OfferTypePreviewModal({
   const footnote = (
     <BlockStack gap="100">
       <Text as="p" variant="bodyXs" tone="subdued">
-        Sample preview (€98 unit base). Live theme may differ.
+        {t("offers.preview.sampleFootnote")}
       </Text>
       {storefrontPreviewUrl && storefrontPreviewUrl.length > 0 ? (
         <Text as="p" variant="bodyXs">
@@ -86,7 +90,7 @@ export function OfferTypePreviewModal({
             external
             target="_blank"
           >
-            View on storefront
+            {t("offers.preview.viewOnStorefront")}
           </Button>
         </Text>
       ) : null}
@@ -101,7 +105,7 @@ export function OfferTypePreviewModal({
       size="large"
       limitHeight
       primaryAction={{
-        content: "Close",
+        content: t("common.close"),
         onAction: onClose,
       }}
     >
@@ -113,13 +117,13 @@ export function OfferTypePreviewModal({
               <Button
                 pressed={previewDevice === "desktop"}
                 icon={DesktopIcon}
-                accessibilityLabel="Desktop preview"
+                accessibilityLabel={t("offers.preview.desktop")}
                 onClick={() => setPreviewDevice("desktop")}
               />
               <Button
                 pressed={previewDevice === "mobile"}
                 icon={MobileIcon}
-                accessibilityLabel="Mobile preview"
+                accessibilityLabel={t("offers.preview.mobile")}
                 onClick={() => setPreviewDevice("mobile")}
               />
             </ButtonGroup>

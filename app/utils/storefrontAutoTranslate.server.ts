@@ -227,7 +227,10 @@ export async function autoTranslateStorefrontFields(
 
   for (const field of STOREFRONT_TRANSLATION_FIELD_KEYS) {
     try {
-      result[field] = await translateTextWithMyMemory(source[field], from, to);
+      const value = source[field];
+      result[field] = /\{\{\s*\w+\s*\}\}/.test(value)
+        ? await translateTemplateWithPlaceholders(value, from, to)
+        : await translateTextWithMyMemory(value, from, to);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Translation request failed";

@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Button, ButtonGroup, Text } from "@shopify/polaris";
 
+import { useAdminI18n } from "./AdminI18nProvider";
 import { PricingCard } from "./PricingCard";
+import type { AdminUiMessageKey } from "../utils/adminUiMessages";
 import {
   getPlanDisplayPrice,
   PLANS,
@@ -19,20 +21,68 @@ type PricingTableProps = {
   onSelectPlan?: (plan: PricingPlanId, interval: PricingInterval) => void;
 };
 
+const PLAN_TITLE_KEY: Record<PricingPlanId, AdminUiMessageKey> = {
+  free: "pricing.plan.free",
+  standard: "pricing.plan.standard",
+  premium: "pricing.plan.premium",
+};
+
+const PLAN_DESCRIPTION_KEY: Record<PricingPlanId, AdminUiMessageKey> = {
+  free: "pricing.plan.free.description",
+  standard: "pricing.plan.standard.description",
+  premium: "pricing.plan.premium.description",
+};
+
+const PLAN_FEATURE_KEYS: Record<PricingPlanId, AdminUiMessageKey[]> = {
+  free: [
+    "pricing.feature.campaigns5",
+    "pricing.feature.quantityBreaks",
+    "pricing.feature.volumeDiscount",
+    "pricing.feature.appearanceTemplates",
+    "pricing.feature.productPageWidget",
+    "pricing.feature.automaticCheckout",
+    "pricing.feature.basicAnalytics",
+    "pricing.feature.emailSupport",
+  ],
+  standard: [
+    "pricing.feature.campaigns25",
+    "pricing.feature.quantityBreaks",
+    "pricing.feature.volumeDiscount",
+    "pricing.feature.appearanceTemplates",
+    "pricing.feature.targeting",
+    "pricing.feature.schedulingCountdown",
+    "pricing.feature.campaignAnalytics",
+    "pricing.feature.storefrontTranslations",
+    "pricing.feature.emailSupport",
+  ],
+  premium: [
+    "pricing.feature.campaignsUnlimited",
+    "pricing.feature.quantityBreaks",
+    "pricing.feature.volumeDiscount",
+    "pricing.feature.allAppearanceTemplates",
+    "pricing.feature.advancedAnalytics",
+    "pricing.feature.schedulingAutomation",
+    "pricing.feature.importExport",
+    "pricing.feature.customCss",
+    "pricing.feature.prioritySupport",
+  ],
+};
+
 export function PricingTable({
   currentPlan = "free",
   selecting = false,
   onSelectPlan,
 }: PricingTableProps) {
+  const { t } = useAdminI18n();
   const [interval, setInterval] = useState<PricingInterval>("monthly");
 
   const selectLabel = (plan: PricingPlanId, label: string) =>
-    currentPlan === plan ? "Current plan" : label;
+    currentPlan === plan ? t("pricing.currentPlan") : label;
 
   const buttonForPlan = (planId: PricingPlanId) => {
     if (planId === "free") {
       return {
-        content: selectLabel("free", "Downgrade"),
+        content: selectLabel("free", t("pricing.selectFree")),
         props: {
           variant:
             currentPlan === "free"
@@ -45,7 +95,7 @@ export function PricingTable({
     }
     if (planId === "standard") {
       return {
-        content: selectLabel("standard", "Select Standard"),
+        content: selectLabel("standard", t("pricing.selectStandard")),
         props: {
           variant:
             currentPlan === "standard"
@@ -57,9 +107,12 @@ export function PricingTable({
       };
     }
     return {
-      content: selectLabel("premium", "Upgrade to Premium"),
+      content: selectLabel("premium", t("pricing.upgradePremium")),
       props: {
-        variant: "primary" as const,
+        variant:
+          currentPlan === "premium"
+            ? ("secondary" as const)
+            : ("primary" as const),
         disabled: currentPlan === "premium" || selecting,
         onClick: () => onSelectPlan?.("premium", interval),
       },
@@ -74,18 +127,18 @@ export function PricingTable({
             pressed={interval === "monthly"}
             onClick={() => setInterval("monthly")}
           >
-            Pay monthly
+            {t("pricing.payMonthly")}
           </Button>
           <Button
             pressed={interval === "yearly"}
             onClick={() => setInterval("yearly")}
           >
-            Pay yearly
+            {t("pricing.payYearly")}
           </Button>
         </ButtonGroup>
         {interval === "yearly" ? (
           <Text as="p" variant="bodySm" tone="success">
-            Save {YEARLY_DISCOUNT_PERCENT}% with yearly billing
+            {t("pricing.saveYearly", { percent: YEARLY_DISCOUNT_PERCENT })}
           </Text>
         ) : null}
       </s-stack>
@@ -103,16 +156,22 @@ export function PricingTable({
         {PLAN_ORDER.map((planId) => {
           const plan = PLANS[planId];
           const display = getPlanDisplayPrice(planId, interval);
+          const isCurrent = currentPlan === planId;
           return (
             <div key={planId} style={{ display: "flex", minHeight: "100%" }}>
               <PricingCard
-                title={plan.title}
-                description={plan.description}
+                title={t(PLAN_TITLE_KEY[planId])}
+                description={t(PLAN_DESCRIPTION_KEY[planId])}
                 price={display.price}
                 comparePrice={display.comparePrice}
-                frequency={display.frequency}
-                features={plan.cardFeatures}
-                featuredText={plan.featuredText}
+                frequency={t("pricing.frequency.month")}
+                features={PLAN_FEATURE_KEYS[planId].map((key) => t(key))}
+                featuredText={
+                  plan.featuredText
+                    ? t("pricing.plan.premium.featured")
+                    : undefined
+                }
+                selected={isCurrent}
                 button={buttonForPlan(planId)}
               />
             </div>

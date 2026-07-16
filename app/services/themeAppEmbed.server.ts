@@ -81,6 +81,15 @@ export function invalidateThemeAppEmbedStatusCache(shop?: string): void {
   embedStatusCache.delete(shop);
 }
 
+/** Sync read of warm embed status — no Shopify Admin round-trip. */
+export function peekMainThemeAppEmbedStatus(
+  shop: string,
+): ThemeEmbedStatus | null {
+  const hit = embedStatusCache.get(shop);
+  if (!hit || hit.expiresAt <= Date.now()) return null;
+  return hit.status;
+}
+
 function stripJsonComments(raw: string): string {
   return raw.replace(/\/\*[\s\S]*?\*\//g, "");
 }

@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { useLoaderData, useFetcher, useRevalidator } from "react-router";
+import { data, useLoaderData, useFetcher, useRevalidator } from "react-router";
 import { useState, useCallback, useEffect, useMemo } from "react";
 import {
   Page,
@@ -17,6 +17,8 @@ import {
 } from "@shopify/polaris";
 import { RefreshIcon, AutomationIcon } from "@shopify/polaris-icons";
 import { ApprovefyPromoCard } from "../components/ApprovefyPromoCard";
+import { AdminLanguageDropdown } from "../components/AdminLanguageDropdown";
+import { useAdminI18n } from "../components/AdminI18nProvider";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { prisma } from "../db.server";
@@ -39,7 +41,6 @@ import {
   parseSessionScopes,
 } from "../utils/shopPublishedLocales.server";
 import {
-  ENGLISH_STOREFRONT_TRANSLATION,
   buildStorefrontTranslationsForLanguages,
   translationPresetForLanguage,
   type StorefrontTranslationFields,
@@ -55,6 +56,18 @@ import {
   autoTranslateStorefrontFields,
   resolveEnglishSourceForAutoTranslate,
 } from "../utils/storefrontAutoTranslate.server";
+import {
+  ADMIN_LANGUAGE_OPTIONS,
+  adminLanguageCookieHeader,
+  isAdminLanguageCode,
+  normalizeAdminLanguage,
+  type AdminLanguageCode,
+} from "../utils/adminLanguage";
+import {
+  ensureAdminLanguageColumn,
+  resolveAdminLanguage,
+  setAdminLanguage,
+} from "../utils/adminLanguage.server";
 
 type TranslationFields = StorefrontTranslationFields;
 type TranslationsMap = StorefrontTranslationsMap;
@@ -78,11 +91,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     hasLocaleScope = true;
   }
 
-  const [dbSettings, localesResult, lastSyncedAt] = await Promise.all([
-    readStorefrontSettingsRow(session.shop),
-    fetchShopPublishedLocales(admin, session.shop),
-    resolveShopLastSyncedAt(session.shop),
-  ]);
+  const [dbSettings, localesResult, lastSyncedAt, adminLanguage] =
+    await Promise.all([
+      readStorefrontSettingsRow(session.shop),
+      fetchShopPublishedLocales(admin, session.shop),
+      resolveShopLastSyncedAt(session.shop),
+      resolveAdminLanguage(session.shop),
+    ]);
 
   let { languages: shopLanguages, errors: shopLanguageErrors, missingLocaleScope } =
     localesResult;
@@ -185,22 +200,51 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
   }
 
-  return {
-    settings,
-    shopLanguages: translationSync.shopLanguages,
-    shopLanguageErrors,
-    needsLocaleScope,
-    translationsInitialized: translationSync.persisted,
-    addedLanguages: translationSync.addedLanguages,
-    canEditTranslations: (await resolveShopPlanContext(session.shop)).capabilities
-      .translations,
-  };
+  return data(
+    {
+      settings,
+      shopLanguages: translationSync.shopLanguages,
+      shopLanguageErrors,
+      needsLocaleScope,
+      translationsInitialized: translationSync.persisted,
+      addedLanguages: translationSync.addedLanguages,
+      canEditTranslations: (await resolveShopPlanContext(session.shop))
+        .capabilities.translations,
+      adminLanguage,
+    },
+    {
+      headers: {
+        "Set-Cookie": adminLanguageCookieHeader(adminLanguage),
+      },
+    },
+  );
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");
+
+  if (intent === "saveAdminLanguage") {
+    const raw = String(formData.get("adminLanguage") ?? "");
+    if (!isAdminLanguageCode(raw)) {
+      return { ok: false, intent, error: "Invalid admin language" };
+    }
+    await ensureAdminLanguageColumn();
+    await setAdminLanguage(session.shop, raw);
+    return data(
+      {
+        ok: true as const,
+        intent,
+        adminLanguage: raw,
+      },
+      {
+        headers: {
+          "Set-Cookie": adminLanguageCookieHeader(raw),
+        },
+      },
+    );
+  }
 
   if (intent === "saveSettings") {
     const { resolveShopPlanContext } = await import("../utils/shopPlan.server");
@@ -417,18 +461,26 @@ export default function SettingsPage() {
     needsLocaleScope,
     translationsInitialized,
     canEditTranslations,
+    adminLanguage: initialAdminLanguage,
   } =
     useLoaderData<typeof loader>();
   const shopify = useAppBridge();
+  const { t, setAdminLanguage, adminLanguage: liveAdminLanguage } =
+    useAdminI18n();
   
   const settingsFetcher = useFetcher<typeof action>();
   const syncFetcher = useFetcher<typeof action>();
   const translateFetcher = useFetcher<typeof action>();
+  const adminLangFetcher = useFetcher<typeof action>();
 
   // Local Form States
   const [syncInterval, setSyncInterval] = useState(settings.syncInterval);
   const [lastSynced, setLastSynced] = useState<string | null>(settings.lastSynced);
   const [translations, setTranslations] = useState<TranslationsMap>(settings.translations);
+  const [adminLanguageDraft, setAdminLanguageDraft] =
+    useState<AdminLanguageCode>(() =>
+      normalizeAdminLanguage(initialAdminLanguage),
+    );
 
   useEffect(() => {
     setLastSynced(settings.lastSynced);
@@ -443,12 +495,36 @@ export default function SettingsPage() {
   }, [settings.translations]);
 
   useEffect(() => {
+    setAdminLanguageDraft(normalizeAdminLanguage(initialAdminLanguage));
+  }, [initialAdminLanguage]);
+
+  useEffect(() => {
+    setAdminLanguageDraft(liveAdminLanguage);
+  }, [liveAdminLanguage]);
+
+  useEffect(() => {
     if (!translationsInitialized) return;
-    shopify.toast.show("Translation sheets created for all Shopify store languages");
-  }, [translationsInitialized, shopify]);
+    shopify.toast.show(t("settings.toast.sheetsCreated"));
+  }, [translationsInitialized, shopify, t]);
 
   const revalidator = useRevalidator();
   const isRefreshingLanguages = revalidator.state === "loading";
+  const savingAdminLanguage =
+    adminLangFetcher.state !== "idle" &&
+    String(adminLangFetcher.formData?.get("intent") ?? "") ===
+      "saveAdminLanguage";
+
+  const adminLanguageOptions = useMemo(
+    () =>
+      ADMIN_LANGUAGE_OPTIONS.map((opt) => ({
+        value: opt.value,
+        label:
+          opt.value === "auto"
+            ? t("lang.auto")
+            : t(`lang.${opt.value}` as Parameters<typeof t>[0]),
+      })),
+    [t],
+  );
 
   // Language options loaded from Shopify (dedupe by translation key; prefer primary)
   const languageOptions = useMemo(() => {
@@ -522,9 +598,7 @@ export default function SettingsPage() {
 
   const handleSave = useCallback(() => {
     if (!canEditTranslations) {
-      shopify.toast.show(
-        "Storefront translations are available on Standard and Premium. Upgrade to unlock.",
-      );
+      shopify.toast.show(t("settings.toast.upgradeTranslations"));
       return;
     }
     const data = new FormData();
@@ -539,6 +613,7 @@ export default function SettingsPage() {
     translations,
     settingsFetcher,
     shopify,
+    t,
   ]);
 
   const handleSyncNow = useCallback(() => {
@@ -549,13 +624,11 @@ export default function SettingsPage() {
 
   const handleAutoTranslate = useCallback(() => {
     if (!canEditTranslations) {
-      shopify.toast.show(
-        "Storefront translations are available on Standard and Premium. Upgrade to unlock.",
-      );
+      shopify.toast.show(t("settings.toast.upgradeTranslations"));
       return;
     }
     if (selectedLang === "en") {
-      shopify.toast.show("English is the source language");
+      shopify.toast.show(t("settings.toast.englishSource"));
       return;
     }
 
@@ -570,32 +643,55 @@ export default function SettingsPage() {
     translations,
     translateFetcher,
     shopify,
+    t,
   ]);
 
+  const onAdminLanguageSelect = useCallback(
+    (value: string) => {
+      const next = normalizeAdminLanguage(value);
+      setAdminLanguageDraft(next);
+      // Apply UI language immediately; Save persists to the shop.
+      setAdminLanguage(next);
+    },
+    [setAdminLanguage],
+  );
+
+  const saveAdminLanguagePreference = useCallback(() => {
+    const fd = new FormData();
+    fd.set("intent", "saveAdminLanguage");
+    fd.set("adminLanguage", adminLanguageDraft);
+    adminLangFetcher.submit(fd, { method: "post" });
+  }, [adminLanguageDraft, adminLangFetcher]);
+
   // Format Sync Time
-  const formatSyncTime = useCallback((isoString: string | null) => {
-    if (!isoString) return "Never synced";
-    try {
-      const date = new Date(isoString);
-      return date.toLocaleString(undefined, {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: true,
-      });
-    } catch (e) {
-      return "Unknown";
-    }
-  }, []);
+  const formatSyncTime = useCallback(
+    (isoString: string | null) => {
+      if (!isoString) return t("settings.neverSynced");
+      try {
+        const date = new Date(isoString);
+        return date.toLocaleString(undefined, {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: true,
+        });
+      } catch (e) {
+        return t("settings.unknownTime");
+      }
+    },
+    [t],
+  );
 
   // Listen to fetcher actions and trigger toast notifications
   useEffect(() => {
     if (settingsFetcher.data && settingsFetcher.state === "idle") {
       if (settingsFetcher.data.ok) {
-        shopify.toast.show(settingsFetcher.data.message || "Settings saved");
+        shopify.toast.show(
+          settingsFetcher.data.message || t("settings.toast.settingsSaved"),
+        );
         if (settingsFetcher.data.warning) {
           shopify.toast.show(settingsFetcher.data.warning);
         }
@@ -603,12 +699,14 @@ export default function SettingsPage() {
         shopify.toast.show(`Error: ${settingsFetcher.data.error}`);
       }
     }
-  }, [settingsFetcher.data, settingsFetcher.state, shopify]);
+  }, [settingsFetcher.data, settingsFetcher.state, shopify, t]);
 
   useEffect(() => {
     if (syncFetcher.data && syncFetcher.state === "idle") {
       if (syncFetcher.data.ok) {
-        shopify.toast.show(syncFetcher.data.message || "Shopify sync complete");
+        shopify.toast.show(
+          syncFetcher.data.message || t("settings.toast.syncComplete"),
+        );
         if (syncFetcher.data.lastSynced) {
           setLastSynced(syncFetcher.data.lastSynced);
         }
@@ -616,7 +714,7 @@ export default function SettingsPage() {
         shopify.toast.show(`Sync Error: ${syncFetcher.data.error}`);
       }
     }
-  }, [syncFetcher.data, syncFetcher.state, shopify]);
+  }, [syncFetcher.data, syncFetcher.state, shopify, t]);
 
   useEffect(() => {
     if (translateFetcher.data && translateFetcher.state === "idle") {
@@ -625,13 +723,36 @@ export default function SettingsPage() {
           setTranslations(translateFetcher.data.translations);
         }
         shopify.toast.show(
-          translateFetcher.data.message || "Auto-translate complete",
+          translateFetcher.data.message ||
+            t("settings.toast.autoTranslateComplete"),
         );
       } else if (translateFetcher.data.error) {
         shopify.toast.show(`Auto-translate error: ${translateFetcher.data.error}`);
       }
     }
-  }, [translateFetcher.data, translateFetcher.state, shopify]);
+  }, [translateFetcher.data, translateFetcher.state, shopify, t]);
+
+  useEffect(() => {
+    if (!adminLangFetcher.data || adminLangFetcher.state !== "idle") return;
+    if (!("intent" in adminLangFetcher.data)) return;
+    if (adminLangFetcher.data.intent !== "saveAdminLanguage") return;
+    if (!adminLangFetcher.data.ok) {
+      shopify.toast.show(
+        adminLangFetcher.data.error || t("settings.adminLanguageSaveError"),
+        { isError: true },
+      );
+      return;
+    }
+    if (
+      "adminLanguage" in adminLangFetcher.data &&
+      adminLangFetcher.data.adminLanguage
+    ) {
+      const next = normalizeAdminLanguage(adminLangFetcher.data.adminLanguage);
+      setAdminLanguage(next);
+      setAdminLanguageDraft(next);
+    }
+    shopify.toast.show(t("settings.adminLanguageSaved"));
+  }, [adminLangFetcher.data, adminLangFetcher.state, setAdminLanguage, shopify, t]);
 
   const isSaving = settingsFetcher.state === "submitting";
   const isSyncing = syncFetcher.state === "submitting";
@@ -644,11 +765,11 @@ export default function SettingsPage() {
 
   return (
     <Page
-      title="Settings"
-      subtitle="Manage sync settings and storefront translations."
+      title={t("settings.title")}
+      subtitle={t("settings.subtitle")}
       compactTitle
       primaryAction={{
-        content: "Save settings",
+        content: t("settings.save"),
         onAction: handleSave,
         loading: isSaving,
         disabled: !canEditTranslations,
@@ -661,28 +782,28 @@ export default function SettingsPage() {
             <Card>
               <BlockStack gap="400">
                 <Text as="h2" variant="headingMd">
-                  Storefront Translations
+                  {t("settings.storefrontTranslations")}
                 </Text>
                 {!canEditTranslations ? (
                   <PlanUpgradeBanner feature="translations" />
                 ) : null}
                 <Text as="p" tone="subdued">
-                  Translate widget headings and table labels.
+                  {t("settings.storefrontHelp")}
                 </Text>
                 {shopLanguageErrors.length > 0 && (
                   <Banner tone="warning">
                     <p>
                       {shopLanguageErrors.join(" ")}
                       {needsLocaleScope
-                        ? " Then refresh this page after approving permissions."
-                        : " Use the refresh button if languages were added in Shopify recently."}
+                        ? t("settings.localeScopeHint")
+                        : t("settings.refreshLanguagesHint")}
                     </p>
                   </Banner>
                 )}
                 <Divider />
 
                 <Select
-                  label="Language"
+                  label={t("settings.language")}
                   options={languageOptions.map((opt) => ({
                     label: opt.label,
                     value: opt.value,
@@ -692,8 +813,8 @@ export default function SettingsPage() {
                   disabled={!canEditTranslations || languageOptions.length === 0}
                   helpText={
                     canEditTranslations
-                      ? "Pick a shop language, edit strings below, then Save."
-                      : "Upgrade to Standard or Premium to edit translations."
+                      ? t("settings.languageHelp")
+                      : t("settings.languageHelpLocked")
                   }
                 />
 
@@ -705,19 +826,18 @@ export default function SettingsPage() {
                     disabled={!canEditTranslations || selectedLang === "en"}
                     tone="success"
                   >
-                    Auto translate
+                    {t("settings.autoTranslate")}
                   </Button>
                   <Button
                     icon={RefreshIcon}
                     onClick={() => revalidator.revalidate()}
                     loading={isRefreshingLanguages}
                   >
-                    Reload
+                    {t("settings.reload")}
                   </Button>
                 </InlineStack>
                 <Text as="p" variant="bodySm" tone="subdued">
-                  Select a language, then use Auto translate to fill all fields from
-                  English. Use Reload to refresh languages from Shopify.
+                  {t("settings.autoTranslateHelp")}
                 </Text>
 
                 <Divider />
@@ -726,19 +846,19 @@ export default function SettingsPage() {
                   {/* Compact 2-column layout for main labels */}
                   <FormLayout.Group>
                     <TextField
-                      label="Widget Heading"
+                      label={t("settings.widgetHeading")}
                       value={activeTranslation.transHeading}
                       onChange={(v) => handleFieldChange("transHeading", v)}
                       autoComplete="off"
-                      placeholder="e.g. Buy more save more"
+                      placeholder={t("settings.ph.heading")}
                       disabled={!canEditTranslations}
                     />
                     <TextField
-                      label="Add to Cart Button Text"
+                      label={t("settings.ctaText")}
                       value={activeTranslation.transCta}
                       onChange={(v) => handleFieldChange("transCta", v)}
                       autoComplete="off"
-                      placeholder="e.g. Grab this deal"
+                      placeholder={t("settings.ph.cta")}
                       disabled={!canEditTranslations}
                     />
                   </FormLayout.Group>
@@ -746,79 +866,79 @@ export default function SettingsPage() {
                   {/* Compact 3-column layout for table headers */}
                   <FormLayout.Group>
                     <TextField
-                      label="Quantity Column Title"
+                      label={t("settings.qtyColumn")}
                       value={activeTranslation.transQty}
                       onChange={(v) => handleFieldChange("transQty", v)}
                       autoComplete="off"
-                      placeholder="e.g. Qty"
+                      placeholder={t("settings.ph.qty")}
                       disabled={!canEditTranslations}
                     />
                     <TextField
-                      label="Discount Column Title"
+                      label={t("settings.discountColumn")}
                       value={activeTranslation.transDiscount}
                       onChange={(v) => handleFieldChange("transDiscount", v)}
                       autoComplete="off"
-                      placeholder="e.g. Discount"
+                      placeholder={t("settings.ph.discount")}
                       disabled={!canEditTranslations}
                     />
                     <TextField
-                      label="Price Column Title"
+                      label={t("settings.priceColumn")}
                       value={activeTranslation.transPrice}
                       onChange={(v) => handleFieldChange("transPrice", v)}
                       autoComplete="off"
-                      placeholder="e.g. Price / ea"
+                      placeholder={t("settings.ph.price")}
                       disabled={!canEditTranslations}
                     />
                   </FormLayout.Group>
 
                   <FormLayout.Group>
                     <TextField
-                      label="Tier Label Prefix (Buy)"
+                      label={t("settings.buyPrefix")}
                       value={activeTranslation.transBuy}
                       onChange={(v) => handleFieldChange("transBuy", v)}
                       autoComplete="off"
-                      placeholder="e.g. Buy"
-                      helpText='Used for tier labels like "Buy 10" → "Achetez 10".'
+                      placeholder={t("settings.ph.buy")}
+                      helpText={t("settings.help.buyPrefix")}
                       disabled={!canEditTranslations}
                     />
                     <TextField
-                      label="Savings Text (You save)"
+                      label={t("settings.youSave")}
                       value={activeTranslation.transYouSave}
                       onChange={(v) => handleFieldChange("transYouSave", v)}
                       autoComplete="off"
-                      placeholder="e.g. You save"
+                      placeholder={t("settings.ph.youSave")}
                       disabled={!canEditTranslations}
                     />
                   </FormLayout.Group>
 
                   <FormLayout.Group>
                     <TextField
-                      label="Tier Add Button Text"
+                      label={t("settings.addLabel")}
                       value={activeTranslation.transAdd}
                       onChange={(v) => handleFieldChange("transAdd", v)}
                       autoComplete="off"
-                      placeholder="e.g. Add"
+                      placeholder={t("settings.ph.add")}
                       disabled={!canEditTranslations}
                     />
                   </FormLayout.Group>
 
                   <FormLayout.Group>
                     <TextField
-                      label="Cart Discount Badge"
+                      label={t("settings.cartDiscount")}
                       value={activeTranslation.transCartDiscount}
                       onChange={(v) => handleFieldChange("transCartDiscount", v)}
                       autoComplete="off"
-                      placeholder="e.g. {{ discount }} OFF"
-                      helpText="Shown in cart/checkout, e.g. 6% OFF. Use {{ discount }} and {{ amount }}."
+                      placeholder={t("settings.ph.cartDiscount")}
+                      helpText={t("settings.help.cartDiscount")}
                       disabled={!canEditTranslations}
                     />
                     <TextField
-                      label="Cart Discount Quantity Suffix"
+                      label={t("settings.cartDiscountQty")}
                       value={activeTranslation.transCartDiscountQty}
                       onChange={(v) => handleFieldChange("transCartDiscountQty", v)}
                       autoComplete="off"
-                      placeholder="e.g. (qty {{ qty }})"
-                      helpText='Grouped quantity label, e.g. "(qty 20)" → "(qté 20)".'
+                      placeholder={t("settings.ph.cartDiscountQty")}
+                      helpText={t("settings.help.cartDiscountQty")}
                       disabled={!canEditTranslations}
                     />
                   </FormLayout.Group>
@@ -826,19 +946,19 @@ export default function SettingsPage() {
                   {/* Compact 2-column layout for remaining helper text */}
                   <FormLayout.Group>
                     <TextField
-                      label="Countdown Timer Text"
+                      label={t("settings.countdown")}
                       value={activeTranslation.transCountdown}
                       onChange={(v) => handleFieldChange("transCountdown", v)}
                       autoComplete="off"
-                      placeholder="e.g. Sale ends in"
+                      placeholder={t("settings.ph.countdown")}
                       disabled={!canEditTranslations}
                     />
                     <TextField
-                      label="Footnote / Helper Text"
+                      label={t("settings.footnote")}
                       value={activeTranslation.transFootnote}
                       onChange={(v) => handleFieldChange("transFootnote", v)}
                       autoComplete="off"
-                      placeholder="e.g. Pick a tier to set quantity, then add to cart."
+                      placeholder={t("settings.ph.footnote")}
                       disabled={!canEditTranslations}
                     />
                   </FormLayout.Group>
@@ -847,30 +967,60 @@ export default function SettingsPage() {
             </Card>
           </Layout.Section>
 
-          {/* Right Side: Manual Actions */}
+          {/* Right Side: Manual Actions + Admin Language */}
           <Layout.Section variant="oneThird">
             <BlockStack gap="500">
               <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingMd">
+                    {t("settings.adminLanguage")}
+                  </Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    {t("settings.adminLanguageHelp")}
+                  </Text>
+                  <AdminLanguageDropdown
+                    label={t("common.language")}
+                    options={adminLanguageOptions}
+                    value={adminLanguageDraft}
+                    onChange={onAdminLanguageSelect}
+                  />
+                  <InlineStack align="end">
+                    <Button
+                      variant="primary"
+                      onClick={saveAdminLanguagePreference}
+                      loading={savingAdminLanguage}
+                      disabled={
+                        adminLanguageDraft ===
+                        normalizeAdminLanguage(initialAdminLanguage)
+                      }
+                    >
+                      {t("common.save")}
+                    </Button>
+                  </InlineStack>
+                </BlockStack>
+              </Card>
+
+              <Card>
                 <BlockStack gap="400">
                   <Text as="h2" variant="headingMd">
-                    Manual Actions
+                    {t("settings.manualActions")}
                   </Text>
                   <Text as="p" tone="subdued">
-                    Instantly push all active offers to your storefront.
+                    {t("settings.manualActionsHelp")}
                   </Text>
                   <Divider />
                   {syncFetcher.data && !syncFetcher.data.ok && (
-                    <Banner title="Sync Failed" tone="critical">
-                      <p>{syncFetcher.data.error || "An unknown error occurred during manual synchronization."}</p>
+                    <Banner title={t("settings.syncFailed")} tone="critical">
+                      <p>{syncFetcher.data.error || t("common.unknownError")}</p>
                     </Banner>
                   )}
                   <InlineStack align="space-between" blockAlign="center">
                     <Button onClick={handleSyncNow} loading={isSyncing} variant="primary">
-                      Sync now
+                      {t("settings.syncNow")}
                     </Button>
                     <BlockStack gap="050">
                       <Text as="p" variant="bodyMd" fontWeight="semibold" tone="subdued">
-                        Last synced:
+                        {t("settings.lastSynced")}
                       </Text>
                       <Text as="p" variant="bodyMd" tone={lastSynced ? "success" : "subdued"}>
                         {formatSyncTime(lastSynced)}

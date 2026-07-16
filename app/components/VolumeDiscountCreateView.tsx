@@ -38,6 +38,7 @@ import {
 } from "react";
 import { useFetcher } from "react-router";
 
+import { useAdminI18n } from "./AdminI18nProvider";
 import { CampaignStatusScheduleCard } from "./CampaignStatusScheduleCard";
 import { CountdownTimerSettingsCard } from "./CountdownTimerSettingsCard";
 import { PlanUpgradeBanner, PlanUpgradeHint } from "./PlanUpgradeBanner";
@@ -415,6 +416,7 @@ export function VolumeDiscountCreateView({
   newOfferPreset,
   planCapabilities: planCapsProp,
 }: VolumeDiscountCreateViewProps) {
+  const { t } = useAdminI18n();
   const planCaps = planCapsProp ?? defaultPlanCapabilities("free");
   const shopify = useAppBridge();
   const fetcher = useFetcher<SaveResponse>();
@@ -516,17 +518,17 @@ export function VolumeDiscountCreateView({
     widgetDisplay.widgetPresentation === "volume_table";
   /** Matches Select offer type cards: “Quantity breaks” vs “Volume discount”. */
   const offerTypePageTitle = useMemo((): string => {
-    if (initialCampaign != null) {
-      return widgetDisplay.widgetPresentation === "volume_table"
-        ? "Volume discount"
-        : "Quantity breaks";
-    }
-    return newOfferPreset === "volume_table"
-      ? "Volume discount"
-      : "Quantity breaks";
+    const isVolume =
+      initialCampaign != null
+        ? widgetDisplay.widgetPresentation === "volume_table"
+        : newOfferPreset === "volume_table";
+    return isVolume
+      ? t("offerEditor.volumeDiscount")
+      : t("offerEditor.quantityBreaks");
   }, [
     initialCampaign,
     newOfferPreset,
+    t,
     widgetDisplay.widgetPresentation,
   ]);
   const appearanceFontSizeFields = useMemo(() => {
@@ -1346,8 +1348,8 @@ export function VolumeDiscountCreateView({
       inlineSize="base"
       heading={
         initialCampaign
-          ? `Edit ${offerTypePageTitle}`
-          : `Create ${offerTypePageTitle}`
+          ? t("offerEditor.editTitle", { type: offerTypePageTitle })
+          : t("offerEditor.createTitle", { type: offerTypePageTitle })
       }
     >
       <SaveBar
@@ -1360,7 +1362,7 @@ export function VolumeDiscountCreateView({
           disabled={saveBusy}
           onClick={() => handleDiscard()}
         >
-          Discard
+          {t("offerEditor.discard")}
         </button>
         <button
           type="button"
@@ -1371,12 +1373,12 @@ export function VolumeDiscountCreateView({
           loading={saveSubmitting}
           onClick={() => handleSave()}
         >
-          Save
+          {t("offerEditor.save")}
         </button>
       </SaveBar>
       <s-stack direction="block" gap="base">
         {saveError ? (
-          <s-banner tone="critical" heading="Could not save">
+          <s-banner tone="critical" heading={t("offerEditor.couldNotSave")}>
             {saveError}
           </s-banner>
         ) : null}
@@ -1391,24 +1393,24 @@ export function VolumeDiscountCreateView({
             <s-button
               variant="tertiary"
               icon="arrow-left"
-              accessibilityLabel="Back to offer types"
+              accessibilityLabel={t("offerEditor.backA11y")}
               onClick={() => void handleBack()}
             >
-              Offer types
+              {t("offerEditor.offerTypes")}
             </s-button>
             <InlineStack gap="200" blockAlign="center" wrap={false}>
               <ButtonGroup variant="segmented">
                 <Button
                   icon={UndoIcon}
                   size="slim"
-                  accessibilityLabel="Undo"
+                  accessibilityLabel={t("offerEditor.undo")}
                   disabled={!canUndo || saveBusy}
                   onClick={handleUndo}
                 />
                 <Button
                   icon={RedoIcon}
                   size="slim"
-                  accessibilityLabel="Redo"
+                  accessibilityLabel={t("offerEditor.redo")}
                   disabled={!canRedo || saveBusy}
                   onClick={handleRedo}
                 />
@@ -1422,7 +1424,7 @@ export function VolumeDiscountCreateView({
                 }
                 loading={saveSubmitting}
               >
-                Save
+                {t("offerEditor.save")}
               </s-button>
             </InlineStack>
           </s-stack>
@@ -1437,17 +1439,17 @@ export function VolumeDiscountCreateView({
                     tabs={[
                       {
                         id: "rules",
-                        content: "Rule settings",
+                        content: t("offerEditor.tab.rules"),
                         panelID: "vd-rule-settings-panel",
                       },
                       {
                         id: "display",
-                        content: "Display settings",
+                        content: t("offerEditor.tab.display"),
                         panelID: "vd-display-settings-panel",
                       },
                       {
                         id: "appearance",
-                        content: "Appearance",
+                        content: t("offerEditor.tab.appearance"),
                         panelID: "vd-appearance-panel",
                       },
                     ]}
@@ -1463,9 +1465,9 @@ export function VolumeDiscountCreateView({
                           background="base"
                         >
                           <s-stack direction="block" gap="base">
-                            <s-heading>Campaign details</s-heading>
+                            <s-heading>{t("offerEditor.campaignDetails")}</s-heading>
                             <s-text-field
-                              label="Campaign name"
+                              label={t("offerEditor.campaignName")}
                               name="campaignName"
                               value={campaignName}
                               onChange={(e) =>
@@ -1481,8 +1483,7 @@ export function VolumeDiscountCreateView({
                               autocomplete="off"
                             />
                             <s-paragraph color="subdued">
-                              Internal name for this offer in the app.
-                              Customer-facing text is set under Display settings.
+                              {t("offerEditor.campaignNameHelp")}
                             </s-paragraph>
                           </s-stack>
                         </s-box>
@@ -1494,7 +1495,7 @@ export function VolumeDiscountCreateView({
                     background="base"
                   >
                     <s-stack direction="block" gap="base">
-                      <s-heading>Discount rules</s-heading>
+                      <s-heading>{t("offerEditor.discountRules")}</s-heading>
 
                       <s-stack
                         direction="inline"
@@ -1683,15 +1684,14 @@ export function VolumeDiscountCreateView({
                     <BlockStack gap="400">
                       <BlockStack gap="200">
                         <Text as="h2" variant="headingMd">
-                          Discounted products
+                          {t("offerEditor.discountedProducts")}
                         </Text>
                         <Text as="p" variant="bodyMd" tone="subdued">
-                          Choose what this discount applies to. Use Browse to
-                          pick resources from your store.
+                          {t("offerEditor.discountedProductsHelp")}
                         </Text>
                       </BlockStack>
                       <ChoiceList
-                        title="Product scope"
+                        title={t("offerEditor.productScope")}
                         name="product-scope"
                         choices={productScopeChoices}
                         selected={[productScope]}
@@ -1839,15 +1839,14 @@ export function VolumeDiscountCreateView({
                     <BlockStack gap="400">
                       <BlockStack gap="200">
                         <Text as="h2" variant="headingMd">
-                          Set quantity conditions
+                          {t("offerEditor.quantityConditions")}
                         </Text>
                         <Text as="p" variant="bodyMd" tone="subdued">
-                          Choose how Buy quantity tiers are counted — cart total,
-                          per product, per variant, or per collection.
+                          {t("offerEditor.quantityConditionsHelp")}
                         </Text>
                       </BlockStack>
                       <ChoiceList
-                        title="Quantity basis"
+                        title={t("offerEditor.quantityBasis")}
                         name="quantity-condition"
                         choices={quantityBasisChoices}
                         selected={[quantityCondition]}
@@ -1940,7 +1939,7 @@ export function VolumeDiscountCreateView({
                     <Card padding="400">
                       <BlockStack gap="300">
                         <Text as="h2" variant="headingSm">
-                          Schedule
+                          {t("offerEditor.schedule")}
                         </Text>
                         <PlanUpgradeBanner feature="scheduling" />
                       </BlockStack>
@@ -1951,17 +1950,17 @@ export function VolumeDiscountCreateView({
                     <BlockStack gap="300">
                       <BlockStack gap="100">
                         <Text as="h2" variant="headingSm">
-                          Target customer
+                          {t("offerEditor.targetCustomer")}
                         </Text>
                         <Text as="p" variant="bodySm" tone="subdued">
-                          Choose which customers can use this discount.
+                          {t("offerEditor.targetCustomerHelp")}
                         </Text>
                       </BlockStack>
                       {!planCaps.customerTargeting ? (
                         <PlanUpgradeHint feature="customerTargeting" />
                       ) : null}
                       <Select
-                        label="Customer type"
+                        label={t("offerEditor.customerType")}
                         name="customerType"
                         disabled={!planCaps.customerTargeting}
                         options={[
@@ -2032,10 +2031,10 @@ export function VolumeDiscountCreateView({
                         <Card padding="400">
                           <BlockStack gap="300">
                             <Text as="h2" variant="headingSm">
-                              Cart & checkout
+                              {t("offerEditor.cartCheckout")}
                             </Text>
                             <TextField
-                              label="Display name"
+                              label={t("offerEditor.displayName")}
                               name="displayName"
                               value={displayName}
                               onChange={setDisplayName}
@@ -2049,10 +2048,10 @@ export function VolumeDiscountCreateView({
                         <Card padding="400">
                           <BlockStack gap="300">
                             <Text as="h2" variant="headingSm">
-                              Button settings
+                              {t("offerEditor.buttonSettings")}
                             </Text>
                             <TextField
-                              label="Text button"
+                              label={t("offerEditor.textButton")}
                               name="ctaLabel"
                               value={widgetDisplay.ctaLabel}
                               onChange={(v) =>
@@ -2062,7 +2061,7 @@ export function VolumeDiscountCreateView({
                               multiline={2}
                             />
                             <Select
-                              label="Button action"
+                              label={t("offerEditor.buttonAction")}
                               helpText={
                                 isVolumeTableOffer
                                   ? "Applies to the main button below the pricing table. Page URL must be on this shop."
@@ -2085,7 +2084,7 @@ export function VolumeDiscountCreateView({
                             />
                             {widgetDisplay.ctaButtonAction === "go_to_page" ? (
                               <TextField
-                                label="Page URL"
+                                label={t("offerEditor.pageUrl")}
                                 value={widgetDisplay.ctaButtonPageUrl}
                                 onChange={(v) =>
                                   patchWidgetDisplay({
@@ -2102,7 +2101,7 @@ export function VolumeDiscountCreateView({
                         <Card padding="400">
                           <BlockStack gap="300">
                             <Text as="h2" variant="headingSm">
-                              Advanced settings
+                              {t("offerEditor.advancedSettings")}
                             </Text>
                             <Text as="p" variant="bodySm" tone="subdued">
                               {isVolumeTableOffer
@@ -2253,10 +2252,10 @@ export function VolumeDiscountCreateView({
                         <Card padding="400">
                           <BlockStack gap="300">
                             <Text as="h2" variant="headingSm">
-                              Widget text (storefront)
+                              {t("offerEditor.widgetText")}
                             </Text>
                             <Text as="p" variant="bodySm" tone="subdued">
-                              Product page copy. Fonts and colors: Appearance tab.
+                              {t("offerEditor.widgetTextHelp")}
                             </Text>
                             <TextField
                               label="Widget heading (optional)"
@@ -2322,14 +2321,14 @@ export function VolumeDiscountCreateView({
                         <Card padding="400">
                           <BlockStack gap="200">
                             <Text as="h2" variant="headingSm">
-                              Theme setup
+                              {t("offerEditor.themeSetup")}
                             </Text>
                             <Text as="p" variant="bodySm" tone="subdued">
                               Add the{" "}
                               <Text as="span" fontWeight="semibold">
                                 {isVolumeTableOffer
-                                  ? "Volume discount"
-                                  : "Quantity breaks"}
+                                  ? t("offerEditor.volumeDiscount")
+                                  : t("offerEditor.quantityBreaks")}
                               </Text>{" "}
                               app block on the product template (Online Store →
                               Themes → Customize). If widget heading is empty, the
@@ -2368,7 +2367,7 @@ export function VolumeDiscountCreateView({
                               wrap
                             >
                               <Text as="h2" variant="headingSm">
-                                Widget appearance (storefront)
+                                {t("offerEditor.widgetAppearance")}
                               </Text>
                               <Button
                                 variant="tertiary"
@@ -3595,27 +3594,27 @@ export function VolumeDiscountCreateView({
                         wrap
                       >
                         <Text as="h2" variant="headingMd">
-                          Product Page - Preview
+                          {t("offerEditor.productPagePreview")}
                         </Text>
                         <ButtonGroup variant="segmented" noWrap>
                           <Button
                             pressed={previewDevice === "desktop"}
                             icon={DesktopIcon}
-                            accessibilityLabel="Desktop preview"
+                            accessibilityLabel={t("offerEditor.desktopPreview")}
                             onClick={() => setPreviewDevice("desktop")}
                           />
                           <Button
                             pressed={previewDevice === "mobile"}
                             icon={MobileIcon}
-                            accessibilityLabel="Mobile preview"
+                            accessibilityLabel={t("offerEditor.mobilePreview")}
                             onClick={() => setPreviewDevice("mobile")}
                           />
                         </ButtonGroup>
                       </InlineStack>
                       <Text as="p" variant="headingLg" alignment="center">
                         {widgetDisplay.widgetPresentation === "volume_table"
-                          ? "Volume discount"
-                          : "Quantity breaks"}
+                          ? t("offerEditor.volumeDiscount")
+                          : t("offerEditor.quantityBreaks")}
                       </Text>
                       <Box
                         padding="0"

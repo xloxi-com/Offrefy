@@ -78,6 +78,13 @@ const shopify = shopifyApp({
   hooks: {
     afterAuth: async ({ session, admin }) => {
       await shopify.registerWebhooks({ session });
+      // Fresh install (or no paid Shopify subscription) → Free selected by default.
+      const { ensureDefaultFreePlanOnInstall } = await import(
+        "./utils/shopPlan.server"
+      );
+      await ensureDefaultFreePlanOnInstall(session.shop, admin).catch((error) => {
+        console.warn("[Offrefy] afterAuth default Free plan", error);
+      });
       await ensureOffrefyAnalyticsPixel(admin).catch((error) => {
         console.warn("[Offrefy] afterAuth pixel setup", error);
       });

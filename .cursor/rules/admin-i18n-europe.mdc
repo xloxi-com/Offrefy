@@ -1,0 +1,17 @@
+---
+description: Admin UI language — Europe-first Polaris locales and country keys
+alwaysApply: true
+---
+
+# Admin i18n (Europe-first)
+
+- Admin language is separate from storefront widget translations.
+- Source of truth for dropdown: `app/utils/adminLanguage.ts` → `ADMIN_LANGUAGE_OPTIONS`.
+- Only offer locales that ship in `@shopify/polaris/locales/*.json`, plus our packs in `app/locales/admin/*.json`.
+- Prefer **Europe-first** ordering in the dropdown (Western → Northern → Central/Eastern), then Americas/Asia.
+- **Polaris 13.9.5 European packs already supported:** `en`, `de`, `fr`, `es`, `it`, `pt-PT`, `nl`, `sv`, `da`, `nb`, `fi`, `pl`, `cs`, `tr`. Do not add `bg`/`el`/`hu`/`ro`/`ru`/`uk`/etc. until Polaris ships those locale JSON files.
+- Auto-mode nearest maps (no Polaris pack): `sk→cs`, `ca→es`, `lb|rm|gsw→de`; other unsupported EU locales → `en`.
+- When adding a new Polaris-supported European language: update `ADMIN_LANGUAGE_OPTIONS`, `POLARIS_LOCALE_FILES`, `polarisLocale.client.ts` loaders, `adminUiMessages.ts` PACKS, and a full `app/locales/admin/{code}.json` (all keys from `en.json`, including every `country.*` ISO key).
+- Do not invent admin languages Polaris does not ship.
+- Do not run terminal/shell for locale pack edits unless the user asks; prefer file tools.
+- Country list keys: `country.AF` … `country.ZW` must stay in sync across all admin locale files.

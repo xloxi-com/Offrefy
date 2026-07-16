@@ -139,6 +139,9 @@ model VolumeDiscountSettings {
   
   // JSON translations dictionary (e.g. {"en": {...}, "es": {...}})
   translationsString    String   @default("{}") @db.Text
+  /// Admin UI language for the embedded app (Polaris). "auto" = Shopify Admin locale.
+  /// Independent of storefront widget translationsString.
+  adminLanguage           String   @default("auto")
   /// Last successful Shopify sync (manual or scheduled).
   lastSyncedAt            DateTime?
   /// free | standard | premium — Billing not live yet; set from Pricing page.

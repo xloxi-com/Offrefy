@@ -1,4 +1,5 @@
 import { prisma } from "../db.server";
+import { pricingPlanFromBillingName } from "./billingPlans";
 import {
   getMaxActiveCampaigns,
   isPricingPlanId,
@@ -6,6 +7,13 @@ import {
   type PlanCapabilities,
   type PricingPlanId,
 } from "./pricingPlans";
+
+type GraphqlAdmin = {
+  graphql: (
+    query: string,
+    options?: { variables?: Record<string, unknown> },
+  ) => Promise<Response>;
+};
 
 /** Read shop plan from settings; default free. */
 export async function resolveShopPlan(shop: string): Promise<PricingPlanId> {
@@ -22,6 +30,61 @@ export async function resolveShopPlan(shop: string): Promise<PricingPlanId> {
     // Column may not exist yet before migrate — treat as free.
   }
   return "free";
+}
+
+/**
+ * On install / re-auth: default to Free unless Shopify has an active paid
+ * subscription (then sync that plan). Persists Free so Pricing shows it selected.
+ */
+export async function ensureDefaultFreePlanOnInstall(
+  shop: string,
+  admin: GraphqlAdmin,
+): Promise<PricingPlanId> {
+  let billingChecked = false;
+  try {
+    const { listActiveAppSubscriptions } = await import(
+      "../services/shopifyBilling.server"
+    );
+    const active = await listActiveAppSubscriptions(admin);
+    billingChecked = true;
+    const mapped = pricingPlanFromBillingName(active[0]?.name);
+    if (mapped) {
+      if ((await resolveShopPlan(shop)) !== mapped) {
+        await setShopPlan(shop, mapped);
+      }
+      return mapped;
+    }
+  } catch (error) {
+    console.warn("[Offrefy] ensureDefaultFreePlanOnInstall billing check", error);
+  }
+
+  const current = await resolveShopPlan(shop);
+
+  // Only force Free when we confirmed there is no paid Shopify subscription.
+  // If the billing API failed, keep the stored plan to avoid accidental downgrades.
+  if (billingChecked && current !== "free") {
+    await setShopPlan(shop, "free");
+    return "free";
+  }
+
+  // Persist Free so settings exist and Pricing marks Free as current.
+  if (current === "free") {
+    try {
+      const rows = await prisma.$queryRaw<Array<{ shop: string }>>`
+        SELECT "shop"
+        FROM "VolumeDiscountSettings"
+        WHERE "shop" = ${shop}
+        LIMIT 1
+      `;
+      if (!rows[0]) {
+        await setShopPlan(shop, "free");
+      }
+    } catch {
+      await setShopPlan(shop, "free").catch(() => undefined);
+    }
+  }
+
+  return current;
 }
 
 export async function resolveShopPlanContext(shop: string): Promise<{

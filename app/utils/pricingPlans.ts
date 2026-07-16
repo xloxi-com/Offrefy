@@ -12,6 +12,8 @@ export const YEARLY_DISCOUNT_PERCENT = 20;
 export type PlanFlag = true | false | string;
 
 export type FeatureCompareRow = {
+  /** Stable id for admin i18n (`pricing.compare.{id}`). */
+  id: string;
   feature: string;
   free: PlanFlag;
   standard: PlanFlag;
@@ -313,108 +315,126 @@ export function getPlanDisplayPrice(
 /** Comparison-table rows for Free / Standard / Premium. */
 export const FEATURE_COMPARE_ROWS: FeatureCompareRow[] = [
   {
+    id: "activeCampaigns",
     feature: "Active campaigns",
     free: "5",
     standard: "25",
     premium: "Unlimited",
   },
   {
+    id: "quantityBreaks",
     feature: "Quantity breaks (tier cards)",
     free: true,
     standard: true,
     premium: true,
   },
   {
+    id: "volumeDiscount",
     feature: "Volume discount (pricing table)",
     free: true,
     standard: true,
     premium: true,
   },
   {
+    id: "appearanceTemplates",
     feature: "Appearance templates",
     free: true,
     standard: true,
     premium: true,
   },
   {
+    id: "productPageWidget",
     feature: "Product page widget",
     free: true,
     standard: true,
     premium: true,
   },
   {
+    id: "automaticCheckout",
     feature: "Automatic checkout discounts",
     free: true,
     standard: true,
     premium: true,
   },
   {
+    id: "discountTypes",
     feature: "Discount types (% / amount / fixed)",
     free: true,
     standard: true,
     premium: true,
   },
   {
+    id: "productCollectionTargeting",
     feature: "Product & collection targeting",
     free: true,
     standard: true,
     premium: true,
   },
   {
+    id: "customerTargeting",
     feature: "Customer targeting (tags / login)",
     free: false,
     standard: true,
     premium: true,
   },
   {
+    id: "countdownTimers",
     feature: "Countdown timers",
     free: false,
     standard: true,
     premium: true,
   },
   {
+    id: "offerScheduling",
     feature: "Offer scheduling",
     free: false,
     standard: true,
     premium: true,
   },
   {
+    id: "campaignAnalytics",
     feature: "Campaign analytics",
     free: "Basic",
     standard: true,
     premium: "Advanced",
   },
   {
+    id: "storefrontTranslations",
     feature: "Storefront translations",
     free: false,
     standard: true,
     premium: true,
   },
   {
+    id: "schedulingAutomation",
     feature: "Scheduling & automation",
     free: false,
     standard: false,
     premium: true,
   },
   {
+    id: "importExport",
     feature: "Import & export (CSV / Excel)",
     free: false,
     standard: false,
     premium: true,
   },
   {
+    id: "customCss",
     feature: "Custom CSS & advanced styling",
     free: false,
     standard: false,
     premium: true,
   },
   {
+    id: "setupGuide",
     feature: "Setup guide & theme embed",
     free: true,
     standard: true,
     premium: true,
   },
   {
+    id: "emailSupport",
     feature: "Email support",
     free: true,
     standard: true,

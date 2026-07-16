@@ -16,20 +16,11 @@ import {
   type AnalyticsRangeSelection,
   type AnalyticsTimeRange,
 } from "../utils/volumeDiscountAnalytics.shared";
+import { useAdminI18n } from "./AdminI18nProvider";
 
 type AnalyticsDateRangeFilterProps = {
   selection: AnalyticsRangeSelection;
 };
-
-const PRESET_OPTIONS: Array<{
-  value: Exclude<AnalyticsTimeRange, "custom">;
-  label: string;
-}> = [
-  { value: "today", label: "Today" },
-  { value: "7d", label: "Last 7 days" },
-  { value: "30d", label: "Last 30 days" },
-  { value: "all", label: "All time" },
-];
 
 function buildAnalyticsRangePath(
   pathname: string,
@@ -60,10 +51,24 @@ function buildAnalyticsRangePath(
 export function AnalyticsDateRangeFilter({
   selection,
 }: AnalyticsDateRangeFilterProps) {
+  const { t } = useAdminI18n();
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
   const [popoverActive, setPopoverActive] = useState(false);
   const [showCustomPicker, setShowCustomPicker] = useState(false);
+
+  const presetOptions = useMemo(
+    (): Array<{
+      value: Exclude<AnalyticsTimeRange, "custom">;
+      label: string;
+    }> => [
+      { value: "today", label: t("analytics.range.today") },
+      { value: "7d", label: t("analytics.range.last7") },
+      { value: "30d", label: t("analytics.range.last30") },
+      { value: "all", label: t("analytics.range.allTime") },
+    ],
+    [t],
+  );
 
   const initialRange = useMemo(() => {
     if (selection.range === "custom" && selection.from && selection.to) {
@@ -88,10 +93,13 @@ export function AnalyticsDateRangeFilter({
     setYear(initialRange.start.getUTCFullYear());
   }, [initialRange]);
 
-  const selectedLabel = useMemo(
-    () => formatAnalyticsRangeLabel(selection),
-    [selection],
-  );
+  const selectedLabel = useMemo(() => {
+    if (selection.range === "custom" && selection.from && selection.to) {
+      return formatAnalyticsRangeLabel(selection);
+    }
+    const preset = presetOptions.find((o) => o.value === selection.range);
+    return preset?.label ?? formatAnalyticsRangeLabel(selection);
+  }, [presetOptions, selection]);
 
   const navigateToSelection = useCallback(
     (next: AnalyticsRangeSelection) => {
@@ -153,7 +161,7 @@ export function AnalyticsDateRangeFilter({
         <Button
           onClick={togglePopover}
           disclosure="select"
-          accessibilityLabel="Date range"
+          accessibilityLabel={t("analytics.range.dateRange")}
         >
           {selectedLabel}
         </Button>
@@ -168,13 +176,13 @@ export function AnalyticsDateRangeFilter({
             <BlockStack gap="300">
               <InlineStack align="space-between" blockAlign="center">
                 <Text as="p" variant="headingSm">
-                  Custom range
+                  {t("analytics.range.customRange")}
                 </Text>
                 <Button
                   variant="plain"
                   onClick={() => setShowCustomPicker(false)}
                 >
-                  Back
+                  {t("common.back")}
                 </Button>
               </InlineStack>
               <DatePicker
@@ -187,9 +195,9 @@ export function AnalyticsDateRangeFilter({
                 disableDatesAfter={new Date()}
               />
               <InlineStack align="end" gap="200">
-                <Button onClick={closePopover}>Cancel</Button>
+                <Button onClick={closePopover}>{t("common.cancel")}</Button>
                 <Button variant="primary" onClick={applyCustomRange}>
-                  Apply
+                  {t("common.apply")}
                 </Button>
               </InlineStack>
             </BlockStack>
@@ -199,13 +207,13 @@ export function AnalyticsDateRangeFilter({
         <ActionList
           actionRole="menuitemradio"
           items={[
-            ...PRESET_OPTIONS.map((option) => ({
+            ...presetOptions.map((option) => ({
               content: option.label,
               active: selection.range === option.value,
               onAction: () => handlePresetChange(option.value),
             })),
             {
-              content: "Custom",
+              content: t("analytics.range.custom"),
               active: selection.range === "custom",
               onAction: openCustomPicker,
             },

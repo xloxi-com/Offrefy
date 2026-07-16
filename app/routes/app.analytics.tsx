@@ -40,6 +40,8 @@ import {
 import { AnalyticsDateRangeFilter } from "../components/AnalyticsDateRangeFilter";
 import { AnalyticsCampaignSortDropdown } from "../components/AnalyticsCampaignSortDropdown";
 import { PlanUpgradeBanner } from "../components/PlanUpgradeBanner";
+import { useAdminI18n } from "../components/AdminI18nProvider";
+import type { AdminUiMessageKey } from "../utils/adminUiMessages";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, admin } = await authenticate.admin(request);
@@ -85,6 +87,7 @@ function MetricCard({
   change,
   icon,
   iconColor,
+  vsPreviousPeriod,
 }: {
   title: string;
   value: string;
@@ -92,6 +95,7 @@ function MetricCard({
   change?: string | null;
   icon?: typeof ViewIcon;
   iconColor?: string;
+  vsPreviousPeriod: string;
 }) {
   return (
     <Card padding="400">
@@ -122,7 +126,7 @@ function MetricCard({
           <InlineStack gap="100" blockAlign="center">
             <Badge tone={changeBadgeTone(change)}>{change}</Badge>
             <Text as="span" variant="bodyXs" tone="subdued">
-              vs previous period
+              {vsPreviousPeriod}
             </Text>
           </InlineStack>
         ) : hint ? (
@@ -134,6 +138,23 @@ function MetricCard({
     </Card>
   );
 }
+
+const DOW_KEYS: Record<string, AdminUiMessageKey> = {
+  Sun: "analytics.dow.sun",
+  Mon: "analytics.dow.mon",
+  Tue: "analytics.dow.tue",
+  Wed: "analytics.dow.wed",
+  Thu: "analytics.dow.thu",
+  Fri: "analytics.dow.fri",
+  Sat: "analytics.dow.sat",
+};
+
+const CAMPAIGN_STATUS_KEYS: Record<string, AdminUiMessageKey> = {
+  active: "offers.status.active",
+  draft: "offers.status.draft",
+  scheduled: "offers.status.scheduled",
+  archived: "offers.status.archived",
+};
 
 function FunnelBar({
   label,
@@ -182,19 +203,6 @@ function FunnelBar({
 }
 
 const CAMPAIGN_PAGE_SIZE = 25;
-
-const campaignSortSelectOptions = [
-  { label: "Sales · high first", value: "revenue desc" },
-  { label: "Sales · low first", value: "revenue asc" },
-  { label: "Impressions · high first", value: "views desc" },
-  { label: "Impressions · low first", value: "views asc" },
-  { label: "Add to cart · high first", value: "atc desc" },
-  { label: "Add to cart · low first", value: "atc asc" },
-  { label: "Conversion · high first", value: "cr desc" },
-  { label: "Conversion · low first", value: "cr asc" },
-  { label: "Name A–Z", value: "name asc" },
-  { label: "Name Z–A", value: "name desc" },
-];
 
 function parseConversionRate(value: string): number {
   const n = Number.parseFloat(value.replace("%", ""));
@@ -247,6 +255,7 @@ function sortCampaignRows(
 export default function AnalyticsPage() {
   const { analytics, rangeSelection, analyticsTier } =
     useLoaderData<typeof loader>();
+  const { t } = useAdminI18n();
   const revalidator = useRevalidator();
   const [campaignSearch, setCampaignSearch] = useState("");
   const [sortBy, setSortBy] = useState("revenue desc");
@@ -255,6 +264,23 @@ export default function AnalyticsPage() {
   const showStandardAnalytics =
     analyticsTier === "standard" || analyticsTier === "advanced";
   const showAdvancedAnalytics = analyticsTier === "advanced";
+  const vsPreviousPeriod = t("analytics.vsPreviousPeriod");
+
+  const campaignSortSelectOptions = useMemo(
+    () => [
+      { label: t("analytics.sort.salesHigh"), value: "revenue desc" },
+      { label: t("analytics.sort.salesLow"), value: "revenue asc" },
+      { label: t("analytics.sort.impressionsHigh"), value: "views desc" },
+      { label: t("analytics.sort.impressionsLow"), value: "views asc" },
+      { label: t("analytics.sort.atcHigh"), value: "atc desc" },
+      { label: t("analytics.sort.atcLow"), value: "atc asc" },
+      { label: t("analytics.sort.conversionHigh"), value: "cr desc" },
+      { label: t("analytics.sort.conversionLow"), value: "cr asc" },
+      { label: t("analytics.sort.nameAsc"), value: "name asc" },
+      { label: t("analytics.sort.nameDesc"), value: "name desc" },
+    ],
+    [t],
+  );
 
   useEffect(() => {
     const intervalMs = 30_000;
@@ -388,16 +414,12 @@ export default function AnalyticsPage() {
   );
 
   return (
-    <Page
-      fullWidth
-      title="Analytics Dashboard"
-      subtitle="Widget views, add-to-cart clicks, and completed Offrefy discount sales."
-      compactTitle
-    >
+    <Page fullWidth>
+      <div style={{ maxWidth: 1200, margin: "0 auto", width: "100%" }}>
       <BlockStack gap="500">
         {!analytics.hasTrackingData ? (
           <Text as="p" variant="bodySm" tone="subdued">
-            No activity yet — shows after widget views on your store.
+            {t("analytics.noActivity")}
           </Text>
         ) : null}
 
@@ -405,17 +427,19 @@ export default function AnalyticsPage() {
         analytics.ordersSync.syncError ? (
           <Banner
             tone="warning"
-            title="Widget sales need order access"
+            title={t("analytics.ordersBannerTitle")}
           >
             {analytics.ordersSync.syncError ??
-              `Approve read_orders for Offrefy (Shopify Admin → re-open the app), then restart shopify app dev and click Reload. Required scopes: ${SHOPIFY_APP_SCOPES.join(", ")}.`}
+              t("analytics.ordersBannerBody", {
+                scopes: SHOPIFY_APP_SCOPES.join(", "),
+              })}
           </Banner>
         ) : null}
 
         <InlineStack align="end" gap="200" blockAlign="center">
           <Button
             icon={RefreshIcon}
-            accessibilityLabel="Reload"
+            accessibilityLabel={t("common.reload")}
             onClick={() => revalidator.revalidate()}
             loading={isRefreshing}
             disabled={isRefreshing}
@@ -425,59 +449,67 @@ export default function AnalyticsPage() {
 
         <InlineGrid columns={{ xs: 1, sm: 2, md: 4 }} gap="400">
           <MetricCard
-            title="Widget sales"
+            title={t("analytics.metric.widgetSales")}
             value={formatAnalyticsMoney(metrics.revenueCents)}
             change={metrics.revenueChange}
-            hint="Completed revenue from Offrefy discount orders"
+            hint={t("analytics.metric.widgetSalesHint")}
+            vsPreviousPeriod={vsPreviousPeriod}
           />
           <MetricCard
-            title="Offer impressions"
+            title={t("analytics.metric.offerImpressions")}
             value={formatAnalyticsCount(metrics.impressions)}
             change={metrics.impressionsChange}
             icon={ViewIcon}
             iconColor="#2c6ecb"
-            hint="Widget views on product pages"
+            hint={t("analytics.metric.offerImpressionsHint")}
+            vsPreviousPeriod={vsPreviousPeriod}
           />
           <MetricCard
-            title="Add to cart"
+            title={t("analytics.metric.addToCart")}
             value={formatAnalyticsCount(metrics.addToCart)}
             change={metrics.addToCartChange}
             icon={CartIcon}
             iconColor="#b98900"
-            hint="Clicks through the widget"
+            hint={t("analytics.metric.addToCartHint")}
+            vsPreviousPeriod={vsPreviousPeriod}
           />
           <MetricCard
-            title="Conversion rate"
+            title={t("analytics.metric.conversionRate")}
             value={metrics.conversionRate}
             change={metrics.conversionChange}
-            hint="add-to-cart / impressions"
+            hint={t("analytics.metric.conversionRateHint")}
+            vsPreviousPeriod={vsPreviousPeriod}
           />
         </InlineGrid>
 
         {showStandardAnalytics ? (
         <InlineGrid columns={{ xs: 1, sm: 2, md: 4 }} gap="400">
           <MetricCard
-            title="Avg cart value"
+            title={t("analytics.metric.avgCartValue")}
             value={formatAnalyticsMoney(metrics.avgCartValueCents)}
             change={metrics.avgCartValueChange}
-            hint="Revenue per completed widget order"
+            hint={t("analytics.metric.avgCartValueHint")}
+            vsPreviousPeriod={vsPreviousPeriod}
           />
           <MetricCard
-            title="Avg quantity"
+            title={t("analytics.metric.avgQuantity")}
             value={metrics.avgQuantity}
-            hint="Units per completed widget order"
+            hint={t("analytics.metric.avgQuantityHint")}
+            vsPreviousPeriod={vsPreviousPeriod}
           />
           <MetricCard
-            title="Revenue / impression"
+            title={t("analytics.metric.revenuePerImpression")}
             value={formatAnalyticsMoney(metrics.revenuePerImpressionCents)}
-            hint="Completed sales per widget view"
+            hint={t("analytics.metric.revenuePerImpressionHint")}
+            vsPreviousPeriod={vsPreviousPeriod}
           />
           <MetricCard
-            title="Active campaigns"
+            title={t("analytics.metric.activeCampaigns")}
             value={metrics.activeCampaigns}
             icon={DiscountIcon}
             iconColor="#bf0711"
-            hint="Currently synced offers"
+            hint={t("analytics.metric.activeCampaignsHint")}
+            vsPreviousPeriod={vsPreviousPeriod}
           />
         </InlineGrid>
         ) : (
@@ -491,7 +523,7 @@ export default function AnalyticsPage() {
               <BlockStack gap="400">
                 <InlineStack align="space-between" blockAlign="center">
                   <Text as="h2" variant="headingMd">
-                    Performance over time
+                    {t("analytics.chart.performanceOverTime")}
                   </Text>
                   <InlineStack gap="400">
                     <InlineStack gap="150" blockAlign="center">
@@ -505,7 +537,7 @@ export default function AnalyticsPage() {
                         }}
                       />
                       <Text as="span" variant="bodySm" tone="subdued">
-                        Widget sales
+                        {t("analytics.chart.legendWidgetSales")}
                       </Text>
                     </InlineStack>
                     <InlineStack gap="150" blockAlign="center">
@@ -519,7 +551,7 @@ export default function AnalyticsPage() {
                         }}
                       />
                       <Text as="span" variant="bodySm" tone="subdued">
-                        Impressions
+                        {t("analytics.chart.legendImpressions")}
                       </Text>
                     </InlineStack>
                     <InlineStack gap="150" blockAlign="center">
@@ -533,7 +565,7 @@ export default function AnalyticsPage() {
                         }}
                       />
                       <Text as="span" variant="bodySm" tone="subdued">
-                        Add to cart
+                        {t("analytics.chart.legendAddToCart")}
                       </Text>
                     </InlineStack>
                   </InlineStack>
@@ -670,19 +702,19 @@ export default function AnalyticsPage() {
               <Card>
                 <BlockStack gap="400">
                   <Text as="h2" variant="headingMd">
-                    Conversion funnel
+                    {t("analytics.funnel.title")}
                   </Text>
                   <Text as="p" variant="bodySm" tone="subdued">
-                    Shopper journey from widget view to add-to-cart.
+                    {t("analytics.funnel.subtitle")}
                   </Text>
                   <FunnelBar
-                    label="Widget impressions"
+                    label={t("analytics.funnel.impressions")}
                     value={analytics.funnel.impressions}
                     max={analytics.funnel.impressions || 1}
                     tone="#2c6ecb"
                   />
                   <FunnelBar
-                    label="Add to cart"
+                    label={t("analytics.funnel.addToCart")}
                     value={analytics.funnel.addToCart}
                     max={analytics.funnel.impressions || 1}
                     tone="#b98900"
@@ -694,10 +726,10 @@ export default function AnalyticsPage() {
               <Card>
                 <BlockStack gap="400">
                   <Text as="h2" variant="headingMd">
-                    Activity by day of week
+                    {t("analytics.dow.title")}
                   </Text>
                   <Text as="p" variant="bodySm" tone="subdued">
-                    When shoppers view and interact with your offers.
+                    {t("analytics.dow.subtitle")}
                   </Text>
                   <InlineGrid columns={7} gap="200">
                     {analytics.dayOfWeek.map((day) => {
@@ -706,6 +738,8 @@ export default function AnalyticsPage() {
                         72,
                         Math.max(8, Math.round((total / dayOfWeekMax) * 72)),
                       );
+                      const dowKey = DOW_KEYS[day.label];
+                      const dowLabel = dowKey ? t(dowKey) : day.label;
                       return (
                         <BlockStack key={day.label} gap="150" inlineAlign="center">
                           <div
@@ -728,11 +762,14 @@ export default function AnalyticsPage() {
                                     ? "linear-gradient(180deg, #b98900 0%, #2c6ecb 100%)"
                                     : "#d2d5d8",
                               }}
-                              title={`${day.impressions} views · ${day.addToCart} ATC`}
+                              title={t("analytics.dow.barTitle", {
+                                views: day.impressions,
+                                atc: day.addToCart,
+                              })}
                             />
                           </div>
                           <Text as="span" variant="bodyXs" tone="subdued">
-                            {day.label}
+                            {dowLabel}
                           </Text>
                         </BlockStack>
                       );
@@ -753,10 +790,10 @@ export default function AnalyticsPage() {
               <Box padding="400">
                 <BlockStack gap="100">
                   <Text as="h2" variant="headingMd">
-                    Top products
+                    {t("analytics.topProducts.title")}
                   </Text>
                   <Text as="p" variant="bodySm" tone="subdued">
-                    Products with the highest completed widget sales in this period.
+                    {t("analytics.topProducts.subtitle")}
                   </Text>
                 </BlockStack>
               </Box>
@@ -765,22 +802,24 @@ export default function AnalyticsPage() {
                 <Box padding="800">
                   <InlineStack align="center">
                     <Text as="p" variant="bodyMd" tone="subdued">
-                      Product-level data will appear after shoppers interact with
-                      your widget on product pages.
+                      {t("analytics.topProducts.empty")}
                     </Text>
                   </InlineStack>
                 </Box>
               ) : (
                 <IndexTable
-                  resourceName={{ singular: "product", plural: "products" }}
+                  resourceName={{
+                    singular: t("analytics.resource.product"),
+                    plural: t("analytics.resource.products"),
+                  }}
                   itemCount={analytics.topProducts.length}
                   selectable={false}
                   headings={[
-                    { title: "Product" },
-                    { title: "Impressions" },
-                    { title: "Add to cart" },
-                    { title: "Conversion rate" },
-                    { title: "Widget sales", alignment: "end" },
+                    { title: t("analytics.col.product") },
+                    { title: t("analytics.col.impressions") },
+                    { title: t("analytics.col.addToCart") },
+                    { title: t("analytics.col.conversionRate") },
+                    { title: t("analytics.col.widgetSales"), alignment: "end" },
                   ]}
                 >
                   {analytics.topProducts.map((row, idx) => (
@@ -820,10 +859,10 @@ export default function AnalyticsPage() {
               <Box padding="400">
                 <BlockStack gap="100">
                   <Text as="h2" variant="headingMd">
-                    Offer performance breakdown
+                    {t("analytics.campaigns.title")}
                   </Text>
                   <Text as="p" variant="bodySm" tone="subdued">
-                    Per-campaign impressions, add-to-cart events, and completed sales.
+                    {t("analytics.campaigns.subtitle")}
                   </Text>
                 </BlockStack>
               </Box>
@@ -832,7 +871,7 @@ export default function AnalyticsPage() {
                 <Box padding="800">
                   <InlineStack align="center">
                     <Text as="p" variant="bodyMd" tone="subdued">
-                      No discount campaigns created yet. Create a campaign to start tracking metrics.
+                      {t("analytics.campaigns.empty")}
                     </Text>
                   </InlineStack>
                 </Box>
@@ -842,11 +881,11 @@ export default function AnalyticsPage() {
                     <InlineStack gap="300" wrap={false} blockAlign="center">
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <TextField
-                          label="Search campaigns"
+                          label={t("analytics.campaigns.search")}
                           labelHidden
                           value={campaignSearch}
                           onChange={setCampaignSearch}
-                          placeholder="Search campaigns"
+                          placeholder={t("analytics.campaigns.search")}
                           autoComplete="off"
                           clearButton
                           onClearButtonClick={() => setCampaignSearch("")}
@@ -855,7 +894,7 @@ export default function AnalyticsPage() {
                       </div>
                       <div style={{ width: "240px", flexShrink: 0 }}>
                         <AnalyticsCampaignSortDropdown
-                          label="Sort campaigns"
+                          label={t("analytics.campaigns.sort")}
                           value={sortBy}
                           options={campaignSortSelectOptions}
                           onChange={setSortBy}
@@ -867,22 +906,25 @@ export default function AnalyticsPage() {
                   {filteredCampaignRows.length === 0 ? (
                     <Box padding="600">
                       <Text as="p" tone="subdued">
-                        No campaigns match your search.
+                        {t("analytics.campaigns.noMatch")}
                       </Text>
                     </Box>
                   ) : (
                     <>
                       <IndexTable
-                        resourceName={{ singular: "campaign", plural: "campaigns" }}
+                        resourceName={{
+                          singular: t("analytics.resource.campaign"),
+                          plural: t("analytics.resource.campaigns"),
+                        }}
                         itemCount={campaignPagination.total}
                         selectable={false}
                         headings={[
-                          { title: "Campaign name" },
-                          { title: "Status" },
-                          { title: "Impressions" },
-                          { title: "Add to cart" },
-                          { title: "Conversion rate" },
-                          { title: "Widget sales", alignment: "end" },
+                          { title: t("analytics.col.campaignName") },
+                          { title: t("analytics.col.status") },
+                          { title: t("analytics.col.impressions") },
+                          { title: t("analytics.col.addToCart") },
+                          { title: t("analytics.col.conversionRate") },
+                          { title: t("analytics.col.widgetSales"), alignment: "end" },
                         ]}
                       >
                         {campaignPagination.rows.map((row, idx) => (
@@ -900,7 +942,9 @@ export default function AnalyticsPage() {
                                     : "info"
                                 }
                               >
-                                {row.status}
+                                {CAMPAIGN_STATUS_KEYS[row.status.toLowerCase()]
+                                  ? t(CAMPAIGN_STATUS_KEYS[row.status.toLowerCase()]!)
+                                  : row.status}
                               </Badge>
                             </IndexTable.Cell>
                             <IndexTable.Cell>
@@ -933,7 +977,11 @@ export default function AnalyticsPage() {
                               setCampaignPageIndex((p) => Math.max(0, p - 1))
                             }
                             onNext={() => setCampaignPageIndex((p) => p + 1)}
-                            label={`${campaignPagination.rangeStart}-${campaignPagination.rangeEnd} of ${campaignPagination.total.toLocaleString()} campaigns`}
+                            label={t("analytics.campaigns.pagination", {
+                              start: campaignPagination.rangeStart,
+                              end: campaignPagination.rangeEnd,
+                              total: campaignPagination.total.toLocaleString(),
+                            })}
                           />
                         </Box>
                       ) : null}
@@ -948,10 +996,11 @@ export default function AnalyticsPage() {
         ) : showStandardAnalytics ? (
           <PlanUpgradeBanner
             feature="analytics"
-            message="Per-campaign and product breakdowns are available on Premium. Upgrade to unlock."
+            message={t("analytics.upgrade.breakdown")}
           />
         ) : null}
       </BlockStack>
+      </div>
     </Page>
   );
 }

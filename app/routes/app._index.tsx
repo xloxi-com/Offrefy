@@ -1,7 +1,13 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
-import { useFetcher, useLoaderData, useLocation } from "react-router";
+import {
+  data,
+  useFetcher,
+  useLoaderData,
+  useLocation,
+  useRevalidator,
+} from "react-router";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Prisma } from "@prisma/client";
 import {
   Page,
@@ -13,10 +19,8 @@ import {
   Button,
   Banner,
 } from "@shopify/polaris";
-import {
-  ThemeEditIcon,
-  SettingsIcon,
-} from "@shopify/polaris-icons";
+import { SettingsIcon } from "@shopify/polaris-icons";
+import { useAppBridge } from "@shopify/app-bridge-react";
 import { APP_DISPLAY_NAME } from "../branding";
 import { prisma } from "../db.server";
 import { authenticate } from "../shopify.server";
@@ -28,6 +32,8 @@ import {
   mainThemeIdFromGid,
 } from "../utils/themeEditorDeepLinks";
 import { ApprovefyPromoCard } from "../components/ApprovefyPromoCard";
+import { AdminLanguageDropdown } from "../components/AdminLanguageDropdown";
+import { useAdminI18n } from "../components/AdminI18nProvider";
 import {
   SetupGuide,
   type SetupGuideItem,
@@ -36,11 +42,27 @@ import {
   ensureThemeAppEmbedEnabled,
   getMainThemeAppEmbedStatus,
   invalidateThemeAppEmbedStatusCache,
+  peekMainThemeAppEmbedStatus,
 } from "../services/themeAppEmbed.server";
 import { ensureQuantityBreaksBlockInLiveTheme } from "../services/themeProductBlock.server";
-import { ensureOffrefyStorefrontScriptTag } from "../services/ensureOffrefyStorefrontScriptTag.server";
+import {
+  ensureOffrefyStorefrontScriptTag,
+  isOffrefyStorefrontScriptTagRecentlyEnsured,
+} from "../services/ensureOffrefyStorefrontScriptTag.server";
 import { pushStorefrontWidgetToShop } from "../services/refreshStorefrontWidget.server";
+import { runAfterResponse } from "../services/deferredShopSync.server";
 import { parseSessionScopes } from "../utils/shopPublishedLocales.server";
+import {
+  ADMIN_LANGUAGE_OPTIONS,
+  adminLanguageCookieHeader,
+  isAdminLanguageCode,
+  normalizeAdminLanguage,
+  type AdminLanguageCode,
+} from "../utils/adminLanguage";
+import {
+  ensureAdminLanguageColumn,
+  setAdminLanguage,
+} from "../utils/adminLanguage.server";
 
 export const meta: MetaFunction = () => [{ title: APP_DISPLAY_NAME }];
 
@@ -64,6 +86,8 @@ type SetupStatus = {
   storefrontReady: boolean;
   appEmbedErrors: string[];
   needsWriteThemes: boolean;
+  /** True when embed status came from memory cache miss — client should soft-revalidate. */
+  setupStatusStale: boolean;
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -73,7 +97,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const hasWriteThemes = grantedScopes.includes("write_themes");
   const hasWriteScriptTags = grantedScopes.includes("write_script_tags");
 
-  const [counts, lastSyncedAt, embedBefore, planCtx] = await Promise.all([
+  // Fast path: DB only. Theme/ScriptTag Admin API work runs after the response.
+  const [counts, lastSyncedAt, planCtx] = await Promise.all([
     prisma.$queryRaw<Array<{ campaignCount: bigint; activeCount: bigint }>>(
       Prisma.sql`
         SELECT
@@ -84,67 +109,63 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       `,
     ),
     resolveShopLastSyncedAt(session.shop),
-    getMainThemeAppEmbedStatus(admin, session.shop),
     import("../utils/shopPlan.server").then((m) =>
       m.resolveShopPlanContext(session.shop),
     ),
   ]);
 
-  const maxActiveCampaigns = planCtx.capabilities.maxActiveCampaigns;
-
-  let appEmbedEnabled = embedBefore.enabled;
-  let appEmbedErrors = embedBefore.errors;
-  let mainThemeId = mainThemeIdFromGid(embedBefore.themeId);
-  let scriptTagOk = false;
-
-  // Auto-enable when we already have write_themes (e.g. after merchant re-approved).
-  const scriptTagPromise = hasWriteScriptTags
-    ? ensureOffrefyStorefrontScriptTag(admin, session.shop)
-    : Promise.resolve({ ok: false as const, errors: [] as string[] });
-
-  if (!appEmbedEnabled && hasWriteThemes) {
-    const enabled = await ensureThemeAppEmbedEnabled(admin);
-    if (enabled.ok) {
-      appEmbedEnabled = true;
-      appEmbedErrors = [];
-      invalidateThemeAppEmbedStatusCache(session.shop);
-      /* Trust enable mutation — skip a second settings_data.json download. */
-    } else {
-      appEmbedErrors = enabled.errors;
-      const embedAfter = await getMainThemeAppEmbedStatus(admin);
-      appEmbedEnabled = embedAfter.enabled || appEmbedEnabled;
-      mainThemeId = mainThemeIdFromGid(embedAfter.themeId) ?? mainThemeId;
-      if (embedAfter.errors.length && !appEmbedEnabled) {
-        appEmbedErrors = [...new Set([...appEmbedErrors, ...embedAfter.errors])];
-      }
-    }
-  }
-
-  if (hasWriteThemes) {
-    await ensureQuantityBreaksBlockInLiveTheme(admin).catch((error) => {
-      console.warn("[Offrefy] home quantity-breaks block", error);
-    });
-  }
-
-  if (hasWriteScriptTags) {
-    const tag = await scriptTagPromise;
-    scriptTagOk = tag.ok;
-    if (!tag.ok) {
-      appEmbedErrors = [...new Set([...appEmbedErrors, ...tag.errors])];
-    }
-  }
-
   const campaignCount = Number(counts[0]?.campaignCount ?? 0);
   const activeCount = Number(counts[0]?.activeCount ?? 0);
+  const maxActiveCampaigns = planCtx.capabilities.maxActiveCampaigns;
 
-  if (activeCount > 0) {
-    void pushStorefrontWidgetToShop(admin, session.shop).catch((error) => {
-      console.warn("[Offrefy] home storefront widget refresh", error);
-    });
-  }
-
+  const embedCached = peekMainThemeAppEmbedStatus(session.shop);
+  const appEmbedEnabled = embedCached?.enabled ?? false;
+  const appEmbedErrors = embedCached?.errors ?? [];
+  const mainThemeId = mainThemeIdFromGid(embedCached?.themeId ?? null);
+  const scriptTagOk = isOffrefyStorefrontScriptTagRecentlyEnsured(session.shop);
+  const setupStatusStale = !embedCached;
   // ScriptTag alone is enough for the widget to show without App Embed.
   const storefrontReady = appEmbedEnabled || scriptTagOk;
+
+  runAfterResponse(
+    (async () => {
+      try {
+        const embed = await getMainThemeAppEmbedStatus(admin, session.shop);
+
+        if (!embed.enabled && hasWriteThemes) {
+          const result = await ensureThemeAppEmbedEnabled(admin);
+          if (result.ok) {
+            invalidateThemeAppEmbedStatusCache(session.shop);
+            await getMainThemeAppEmbedStatus(admin, session.shop);
+          }
+        }
+
+        if (hasWriteThemes) {
+          await ensureQuantityBreaksBlockInLiveTheme(admin).catch((error) => {
+            console.warn("[Offrefy] home quantity-breaks block", error);
+          });
+        }
+
+        if (hasWriteScriptTags) {
+          await ensureOffrefyStorefrontScriptTag(admin, session.shop).catch(
+            (error) => {
+              console.warn("[Offrefy] home storefront ScriptTag", error);
+            },
+          );
+        }
+
+        if (activeCount > 0) {
+          await pushStorefrontWidgetToShop(admin, session.shop).catch(
+            (error) => {
+              console.warn("[Offrefy] home storefront widget refresh", error);
+            },
+          );
+        }
+      } catch (error) {
+        console.warn("[Offrefy] home deferred setup", error);
+      }
+    })(),
+  );
 
   return {
     status: {
@@ -165,6 +186,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       storefrontReady,
       appEmbedErrors,
       needsWriteThemes: !hasWriteThemes,
+      setupStatusStale,
     } satisfies SetupStatus,
   };
 };
@@ -191,15 +213,41 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     };
   }
 
+  if (intent === "saveAdminLanguage") {
+    const raw = String(formData.get("adminLanguage") ?? "");
+    if (!isAdminLanguageCode(raw)) {
+      return { ok: false, intent, error: "Invalid admin language" };
+    }
+    await ensureAdminLanguageColumn();
+    await setAdminLanguage(session.shop, raw);
+    return data(
+      {
+        ok: true as const,
+        intent,
+        adminLanguage: raw,
+        message: "Admin language saved",
+      },
+      {
+        headers: {
+          "Set-Cookie": adminLanguageCookieHeader(raw),
+        },
+      },
+    );
+  }
+
   return { ok: false, error: "Unknown action" };
 };
 
-function formatSyncedAt(iso: string | null): string {
-  if (!iso) return "Not synced yet";
+function formatSyncedAt(
+  iso: string | null,
+  locale: string,
+  notSyncedLabel: string,
+): string {
+  if (!iso) return notSyncedLabel;
   try {
-    return new Date(iso).toLocaleString();
+    return new Date(iso).toLocaleString(locale);
   } catch {
-    return "Unknown";
+    return notSyncedLabel;
   }
 }
 
@@ -243,11 +291,27 @@ export default function AppHomePage() {
   const { status } = useLoaderData<typeof loader>();
   const { search } = useLocation();
   const fetcher = useFetcher<typeof action>();
+  const revalidator = useRevalidator();
+  const shopify = useAppBridge();
+  const {
+    t,
+    localeKey,
+    setAdminLanguage,
+    adminLanguage: liveAdminLanguage,
+  } = useAdminI18n();
 
   const offersHref = adminEmbeddedPath("/app/offers", search);
   const newOfferHref = adminEmbeddedPath("/app/volume-discount/new", search);
   const settingsHref = adminEmbeddedPath("/app/settings", search);
   const analyticsHref = adminEmbeddedPath("/app/analytics", search);
+
+  const [adminLanguageDraft, setAdminLanguageDraft] =
+    useState<AdminLanguageCode>(() =>
+      normalizeAdminLanguage(liveAdminLanguage),
+    );
+  const savingAdminLanguage =
+    fetcher.state !== "idle" &&
+    String(fetcher.formData?.get("intent") ?? "") === "saveAdminLanguage";
   const themeEmbedHref = themeAppEmbedEditorUrl(
     status.shop,
     status.apiKey,
@@ -288,10 +352,47 @@ export default function AppHomePage() {
     setManualComplete(readManualComplete());
   }, []);
 
+  // After deferred Admin API fills the embed cache, soft-revalidate once.
+  const softRefreshDone = useRef(false);
+  useEffect(() => {
+    if (!status.setupStatusStale || softRefreshDone.current) return;
+    softRefreshDone.current = true;
+    const id = window.setTimeout(() => {
+      revalidator.revalidate();
+    }, 2000);
+    return () => window.clearTimeout(id);
+  }, [status.setupStatusStale, revalidator]);
+
+  useEffect(() => {
+    setAdminLanguageDraft(liveAdminLanguage);
+  }, [liveAdminLanguage]);
+
   useEffect(() => {
     setDismissedSuccessBanner(false);
     setDismissedErrorBanner(false);
   }, [fetcher.data]);
+
+  useEffect(() => {
+    if (!fetcher.data || !("intent" in fetcher.data)) return;
+    if (fetcher.data.intent !== "saveAdminLanguage") return;
+    if (!fetcher.data.ok) {
+      shopify.toast.show(
+        fetcher.data.error || t("home.adminLanguageSaveError"),
+        { isError: true },
+      );
+      return;
+    }
+    if ("adminLanguage" in fetcher.data && fetcher.data.adminLanguage) {
+      const next = normalizeAdminLanguage(fetcher.data.adminLanguage);
+      setAdminLanguage(next);
+      setAdminLanguageDraft(next);
+    }
+    shopify.toast.show(
+      "message" in fetcher.data && fetcher.data.message
+        ? String(fetcher.data.message)
+        : t("home.adminLanguageSaved"),
+    );
+  }, [fetcher.data, setAdminLanguage, shopify, t]);
 
   const dismissGuide = useCallback(() => {
     window.localStorage.setItem(SETUP_GUIDE_DISMISSED_KEY, "1");
@@ -338,28 +439,51 @@ export default function AppHomePage() {
     fetcher.submit(fd, { method: "post" });
   }, [fetcher]);
 
+  const onAdminLanguageSelect = useCallback(
+    (value: string) => {
+      const next = normalizeAdminLanguage(value);
+      setAdminLanguageDraft(next);
+      // Apply UI language immediately; Save persists to the shop.
+      setAdminLanguage(next);
+    },
+    [setAdminLanguage],
+  );
+
+  const saveAdminLanguagePreference = useCallback(() => {
+    const fd = new FormData();
+    fd.set("intent", "saveAdminLanguage");
+    fd.set("adminLanguage", adminLanguageDraft);
+    fetcher.submit(fd, { method: "post" });
+  }, [adminLanguageDraft, fetcher]);
+
   const setupItems = useMemo((): SetupGuideItem[] => {
     const isDone = (id: keyof typeof statusById) =>
       Boolean(statusById[id] || manualComplete[id]);
 
+    const limitSuffix =
+      status.maxActiveCampaigns == null
+        ? ""
+        : t("home.planLimit", { max: status.maxActiveCampaigns });
+
     return [
       {
         id: "enable-widget",
-        title: "Enable app embed",
-        description:
-          "Theme settings → App embeds → turn on Offrefy (global), or use Enable app embed. Required for reliable quantity breaks on product pages.",
+        title: t("home.stepEnableEmbedTitle"),
+        description: t("home.stepEnableEmbedDesc"),
         complete: isDone("enable-widget"),
         image: {
           url: "https://cdn.shopify.com/shopifycloud/shopify/assets/admin/home/onboarding/shop_pay_task-70830ae12d3f01fed1da23e607dc58bc726325144c29f96c949baca598ee3ef6.svg",
-          alt: "Illustration of enabling a storefront integration",
+          alt: t("home.stepEnableEmbedAlt"),
         },
         primaryButton: embedReady
           ? {
-              content: "Theme editor",
+              content: t("home.themeEditor"),
               props: { url: themeEmbedHref, external: true },
             }
           : {
-              content: enabling ? "Enabling…" : "Enable app embed",
+              content: enabling
+                ? t("home.bannerEnabling")
+                : t("home.bannerEnableEmbed"),
               props: {
                 onClick: enableWidget,
                 loading: enabling,
@@ -368,72 +492,78 @@ export default function AppHomePage() {
         secondaryButton: embedReady
           ? undefined
           : {
-              content: "Theme editor",
+              content: t("home.themeEditor"),
               props: { url: themeEmbedHref, external: true },
             },
       },
       {
         id: "add-block",
-        title: "Add widget on product page",
-        description:
-          "Optional: Product template → Add block → Quantity breaks. The global embed already places the widget near Add to cart.",
+        title: t("home.stepAddBlockTitle"),
+        description: t("home.stepAddBlockDesc"),
         complete: isDone("add-block"),
         image: {
           url: "https://cdn.shopify.com/shopifycloud/shopify/assets/admin/home/onboarding/detail-images/home-onboard-share-store-b265242552d9ed38399455a5e4472c147e421cb43d72a0db26d2943b55bdb307.svg",
-          alt: "Illustration of a product page layout",
+          alt: t("home.stepAddBlockAlt"),
         },
         primaryButton: {
-          content: "Theme editor",
+          content: t("home.themeEditor"),
           props: { url: themeBlockHref, external: true },
         },
       },
       {
         id: "create-offer",
-        title: "Create an offer",
-        description:
-          "Set tiers, products, and widget styling. Active offers sync as automatic discounts.",
+        title: t("home.stepCreateOfferTitle"),
+        description: t("home.stepCreateOfferDesc"),
         complete: isDone("create-offer"),
         image: {
           url: "https://cdn.shopify.com/shopifycloud/shopify/assets/admin/home/onboarding/shop_pay_task-70830ae12d3f01fed1da23e607dc58bc726325144c29f96c949baca598ee3ef6.svg",
-          alt: "Illustration of creating a discount offer",
+          alt: t("home.stepCreateOfferAlt"),
         },
         primaryButton: {
-          content: "Create offer",
+          content: t("home.createOffer"),
           props: { url: newOfferHref },
         },
         secondaryButton: status.hasOffers
           ? {
-              content: `View offers (${status.campaignCount})`,
+              content: t("home.viewOffersCount", {
+                count: status.campaignCount,
+              }),
               props: { url: offersHref },
             }
           : undefined,
       },
       {
         id: "activate-offers",
-        title: "Activate offers",
-        description: `Only Active offers show on the storefront. Discount rules sync on save. Active: ${status.activeCount}${
-          status.maxActiveCampaigns == null
-            ? ""
-            : ` / ${status.maxActiveCampaigns} (plan limit)`
-        } (total offers: ${status.campaignCount})`,
+        title: t("home.stepActivateTitle"),
+        description: t("home.stepActivateDesc", {
+          active: status.activeCount,
+          limit: limitSuffix,
+          total: status.campaignCount,
+        }),
         complete: isDone("activate-offers"),
         primaryButton: status.hasOffers
           ? {
-              content: "View offers",
+              content: t("home.viewOffers"),
               props: { url: offersHref },
             }
           : {
-              content: "Create offer",
+              content: t("home.createOffer"),
               props: { url: newOfferHref },
             },
       },
       {
         id: "sync-storefront",
-        title: "Sync storefront",
-        description: `Last sync: ${formatSyncedAt(status.lastSyncedAt)}. Re-sync in Settings if the live widget looks outdated.`,
+        title: t("home.stepSyncTitle"),
+        description: t("home.stepSyncDesc", {
+          synced: formatSyncedAt(
+            status.lastSyncedAt,
+            localeKey,
+            t("home.notSyncedYet"),
+          ),
+        }),
         complete: isDone("sync-storefront"),
         primaryButton: {
-          content: "Settings",
+          content: t("home.settings"),
           props: { url: settingsHref },
         },
       },
@@ -442,6 +572,7 @@ export default function AppHomePage() {
     embedReady,
     enableWidget,
     enabling,
+    localeKey,
     manualComplete,
     newOfferHref,
     offersHref,
@@ -452,58 +583,61 @@ export default function AppHomePage() {
     status.hasOffers,
     status.lastSyncedAt,
     statusById,
+    t,
     themeBlockHref,
     themeEmbedHref,
   ]);
 
+  const languageOptions = useMemo(
+    () =>
+      ADMIN_LANGUAGE_OPTIONS.map((opt) => ({
+        value: opt.value,
+        label:
+          opt.value === "auto"
+            ? t("lang.auto")
+            : t(`lang.${opt.value}` as Parameters<typeof t>[0]),
+      })),
+    [t],
+  );
+
   return (
     <Page
       title={APP_DISPLAY_NAME}
-      subtitle="Volume pricing for your storefront."
+      subtitle={t("home.subtitle")}
       compactTitle
       primaryAction={{
-        content: "Create offer",
+        content: t("home.createOffer"),
         url: newOfferHref,
       }}
       secondaryActions={[
         {
-          content: "Theme editor",
-          url: themeEmbedHref,
-          target: "_blank",
-          icon: ThemeEditIcon,
-        },
-        {
-          content: "Settings",
+          content: t("home.settings"),
           url: settingsHref,
           icon: SettingsIcon,
         },
       ]}
     >
       <BlockStack gap="500">
-        {!embedReady && !dismissedWarningBanner ? (
+        {!embedReady && !status.setupStatusStale && !dismissedWarningBanner ? (
           <Banner
             tone="warning"
-            title="App embed is off"
+            title={t("home.bannerEmbedOffTitle")}
             onDismiss={() => setDismissedWarningBanner(true)}
             action={{
-              content: enabling ? "Enabling…" : "Enable app embed",
+              content: enabling
+                ? t("home.bannerEnabling")
+                : t("home.bannerEnableEmbed"),
               onAction: enableWidget,
               loading: enabling,
             }}
             secondaryAction={{
-              content: "Open theme editor",
+              content: t("home.bannerOpenThemeEditor"),
               url: themeEmbedHref,
             }}
           >
             <p>
-              Turn on{" "}
-              <Text as="span" fontWeight="semibold">
-                Offrefy (global)
-              </Text>{" "}
-              under Theme settings → App embeds → Save, or click Enable app embed.
-              {status.scriptTagOk
-                ? " Script fallback can still show the widget until embed is on."
-                : ""}
+              {t("home.bannerEmbedOffBody")}
+              {status.scriptTagOk ? t("home.bannerEmbedOffScript") : ""}
               {status.appEmbedErrors.length > 0
                 ? ` (${status.appEmbedErrors[0]})`
                 : ""}
@@ -512,44 +646,42 @@ export default function AppHomePage() {
         ) : !setupComplete && showGuide && !dismissedSetupBanner ? (
           <Banner
             tone="info"
-            title="Complete setup"
+            title={t("home.bannerCompleteSetupTitle")}
             onDismiss={() => setDismissedSetupBanner(true)}
           >
-            <p>
-              Finish the steps below to show quantity breaks on product pages and
-              apply discounts at checkout.
-            </p>
+            <p>{t("home.bannerCompleteSetupBody")}</p>
           </Banner>
         ) : null}
 
         {fetcher.data &&
         "ok" in fetcher.data &&
         fetcher.data.ok &&
+        (!("intent" in fetcher.data) ||
+          fetcher.data.intent !== "saveAdminLanguage") &&
         !dismissedSuccessBanner ? (
           <Banner
             tone="success"
-            title="App embed enabled"
+            title={t("home.bannerEmbedOnTitle")}
             onDismiss={() => setDismissedSuccessBanner(true)}
           >
-            <p>
-              Offrefy (global) is on. Hard-refresh a product page
-              (Ctrl+Shift+R) to see quantity breaks.
-            </p>
+            <p>{t("home.bannerEmbedOnBody")}</p>
           </Banner>
         ) : null}
 
         {fetcher.data &&
         "ok" in fetcher.data &&
         !fetcher.data.ok &&
+        (!("intent" in fetcher.data) ||
+          fetcher.data.intent !== "saveAdminLanguage") &&
         !dismissedErrorBanner ? (
           <Banner
             tone="critical"
-            title="Could not enable app embed automatically"
+            title={t("home.bannerEmbedFailTitle")}
             onDismiss={() => setDismissedErrorBanner(true)}
           >
             <p>
-              {fetcher.data.error || "Unknown error"}. Use Theme editor → App
-              embeds → turn on Offrefy (global) → Save.
+              {fetcher.data.error || t("common.unknownError")}.{" "}
+              {t("home.bannerEmbedFailBody")}
             </p>
           </Banner>
         ) : null}
@@ -562,64 +694,99 @@ export default function AppHomePage() {
                   onDismiss={dismissGuide}
                   onStepComplete={onStepComplete}
                   items={setupItems}
-                  description="Five steps to go live with quantity breaks and checkout discounts."
+                  title={t("home.setupGuideTitle")}
+                  description={t("home.setupGuideDescription")}
                 />
               ) : (
                 <Card>
                   <InlineStack align="space-between" blockAlign="center">
                     <Text as="p" variant="bodyMd">
-                      Setup guide dismissed.
+                      {t("home.setupDismissed")}
                     </Text>
-                    <Button onClick={restoreGuide}>Show setup guide</Button>
+                    <Button onClick={restoreGuide}>
+                      {t("home.showSetupGuide")}
+                    </Button>
                   </InlineStack>
                 </Card>
               )}
+
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingMd">
+                    {t("home.quickLinks")}
+                  </Text>
+                  <InlineStack gap="200" wrap>
+                    <Button url={offersHref} size="slim">
+                      {t("home.offers")}
+                    </Button>
+                    <Button url={analyticsHref} size="slim">
+                      {t("home.analytics")}
+                    </Button>
+                    <Button url={settingsHref} size="slim">
+                      {t("home.settings")}
+                    </Button>
+                  </InlineStack>
+                </BlockStack>
+              </Card>
             </BlockStack>
           </Layout.Section>
 
           <Layout.Section variant="oneThird">
             <BlockStack gap="400">
               <Card>
-                <BlockStack gap="400">
+                <BlockStack gap="300">
                   <Text as="h2" variant="headingMd">
-                    Details
+                    {t("home.adminLanguage")}
                   </Text>
-                  <BlockStack gap="300">
-                    <DetailRow label="Shop">{status.shop}</DetailRow>
-                    <DetailRow label="App embed">
-                      {embedReady ? "On" : "Off"}
-                    </DetailRow>
-                    <DetailRow label="Storefront widget">
-                      {status.storefrontReady
-                        ? embedReady
-                          ? "Ready (app embed)"
-                          : "Ready (script fallback)"
-                        : "Needs setup"}
-                    </DetailRow>
-                    <DetailRow label="Extension">Offrefy — Storefront</DetailRow>
-                    <DetailRow label="Blocks">
-                      Quantity breaks · Offrefy (global)
-                    </DetailRow>
-                  </BlockStack>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    {t("home.adminLanguageHelp")}
+                  </Text>
+                  <AdminLanguageDropdown
+                    label={t("common.language")}
+                    options={languageOptions}
+                    value={adminLanguageDraft}
+                    onChange={onAdminLanguageSelect}
+                  />
+                  <InlineStack align="end">
+                    <Button
+                      variant="primary"
+                      onClick={saveAdminLanguagePreference}
+                      loading={savingAdminLanguage}
+                      disabled={
+                        adminLanguageDraft ===
+                        normalizeAdminLanguage(liveAdminLanguage)
+                      }
+                    >
+                      {t("common.save")}
+                    </Button>
+                  </InlineStack>
                 </BlockStack>
               </Card>
 
               <Card>
-                <BlockStack gap="300">
+                <BlockStack gap="400">
                   <Text as="h2" variant="headingMd">
-                    Quick links
+                    {t("home.details")}
                   </Text>
-                  <InlineStack gap="200" wrap>
-                    <Button url={offersHref} size="slim">
-                      Offers
-                    </Button>
-                    <Button url={analyticsHref} size="slim">
-                      Analytics
-                    </Button>
-                    <Button url={settingsHref} size="slim">
-                      Settings
-                    </Button>
-                  </InlineStack>
+                  <BlockStack gap="300">
+                    <DetailRow label={t("home.shop")}>{status.shop}</DetailRow>
+                    <DetailRow label={t("home.appEmbed")}>
+                      {embedReady ? t("common.on") : t("common.off")}
+                    </DetailRow>
+                    <DetailRow label={t("home.storefrontWidget")}>
+                      {status.storefrontReady
+                        ? embedReady
+                          ? t("home.widgetReadyEmbed")
+                          : t("home.widgetReadyScript")
+                        : t("home.widgetNeedsSetup")}
+                    </DetailRow>
+                    <DetailRow label={t("home.extension")}>
+                      Offrefy — Storefront
+                    </DetailRow>
+                    <DetailRow label={t("home.blocks")}>
+                      {t("home.blocksValue")}
+                    </DetailRow>
+                  </BlockStack>
                 </BlockStack>
               </Card>
 

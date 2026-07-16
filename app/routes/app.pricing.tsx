@@ -27,8 +27,10 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { useEffect, useRef } from "react";
 
 import { APP_DISPLAY_NAME } from "../branding";
+import { useAdminI18n } from "../components/AdminI18nProvider";
 import { PricingTable } from "../components/PricingTable";
 import { authenticate } from "../shopify.server";
+import type { AdminUiMessageKey } from "../utils/adminUiMessages";
 import {
   FEATURE_COMPARE_ROWS,
   PLANS,
@@ -42,7 +44,7 @@ import {
   billingIsTest,
   pricingPlanFromBillingName,
 } from "../utils/billingPlans";
-import { resolveShopPlan, setShopPlan } from "../utils/shopPlan.server";
+import { resolveShopPlan, setShopPlan, ensureDefaultFreePlanOnInstall } from "../utils/shopPlan.server";
 import { scheduleVolumeDiscountShopSync } from "../services/deferredShopSync.server";
 import {
   cancelActiveAppSubscriptions,
@@ -87,7 +89,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const preferredRaw = url.searchParams.get("plan");
   const preferredPlan = isPricingPlanId(preferredRaw) ? preferredRaw : null;
 
-  let currentPlan = await resolveShopPlan(session.shop);
+  let currentPlan = await ensureDefaultFreePlanOnInstall(session.shop, admin);
   let justActivated: PricingPlanId | null = null;
 
   if (billingSuccess) {
@@ -153,17 +155,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     const max = PLANS[plan].maxCampaigns;
-    const demoteNote =
-      enforce.draftedIds.length > 0 && max != null
-        ? ` Kept ${enforce.keptActiveIds.length} active (plan max ${max}); moved ${enforce.draftedIds.length} to draft.`
-        : "";
 
     return {
       ok: true as const,
       plan,
       draftedCount: enforce.draftedIds.length,
       keptActiveCount: enforce.keptActiveIds.length,
-      message: `Switched to ${PLANS[plan].title}.${demoteNote}`.trim(),
+      maxCampaigns: max,
+      message: "switched",
     };
   }
 
@@ -182,7 +181,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       ok: true as const,
       plan,
       confirmationUrl,
-      message: `Redirecting to Shopify to approve ${PLANS[plan].title}…`,
+      message: "redirecting",
     };
   } catch (error) {
     return {
@@ -229,7 +228,47 @@ const tdPlanStyle: CSSProperties = {
   verticalAlign: "middle",
 };
 
-function CellValue({ value }: { value: PlanFlag }) {
+const PLAN_TITLE_KEY: Record<PricingPlanId, AdminUiMessageKey> = {
+  free: "pricing.plan.free",
+  standard: "pricing.plan.standard",
+  premium: "pricing.plan.premium",
+};
+
+const COMPARE_FEATURE_KEY: Record<string, AdminUiMessageKey> = {
+  activeCampaigns: "pricing.compare.activeCampaigns",
+  quantityBreaks: "pricing.compare.quantityBreaks",
+  volumeDiscount: "pricing.compare.volumeDiscount",
+  appearanceTemplates: "pricing.compare.appearanceTemplates",
+  productPageWidget: "pricing.compare.productPageWidget",
+  automaticCheckout: "pricing.compare.automaticCheckout",
+  discountTypes: "pricing.compare.discountTypes",
+  productCollectionTargeting: "pricing.compare.productCollectionTargeting",
+  customerTargeting: "pricing.compare.customerTargeting",
+  countdownTimers: "pricing.compare.countdownTimers",
+  offerScheduling: "pricing.compare.offerScheduling",
+  campaignAnalytics: "pricing.compare.campaignAnalytics",
+  storefrontTranslations: "pricing.compare.storefrontTranslations",
+  schedulingAutomation: "pricing.compare.schedulingAutomation",
+  importExport: "pricing.compare.importExport",
+  customCss: "pricing.compare.customCss",
+  setupGuide: "pricing.compare.setupGuide",
+  emailSupport: "pricing.compare.emailSupport",
+};
+
+const FLAG_VALUE_KEY: Record<string, AdminUiMessageKey> = {
+  Unlimited: "pricing.value.unlimited",
+  Basic: "pricing.value.basic",
+  Advanced: "pricing.value.advanced",
+  Priority: "pricing.value.priority",
+};
+
+function CellValue({
+  value,
+  translateFlag,
+}: {
+  value: PlanFlag;
+  translateFlag: (raw: string) => string;
+}) {
   if (value === true) {
     return (
       <span
@@ -260,12 +299,19 @@ function CellValue({ value }: { value: PlanFlag }) {
   }
   return (
     <Text as="span" variant="bodyMd" alignment="center">
-      {value}
+      {translateFlag(value)}
     </Text>
   );
 }
 
 function FeatureCompareTable() {
+  const { t } = useAdminI18n();
+
+  const translateFlag = (raw: string) => {
+    const key = FLAG_VALUE_KEY[raw];
+    return key ? t(key) : raw;
+  };
+
   return (
     <div style={{ overflowX: "auto" }}>
       <table style={tableStyle}>
@@ -273,42 +319,42 @@ function FeatureCompareTable() {
           <tr>
             <th style={thFeatureStyle}>
               <Text as="span" variant="headingSm">
-                Feature
+                {t("pricing.compare.feature")}
               </Text>
             </th>
             <th style={thPlanStyle}>
               <Text as="span" variant="headingSm" alignment="center">
-                Free
+                {t("pricing.plan.free")}
               </Text>
             </th>
             <th style={thPlanStyle}>
               <Text as="span" variant="headingSm" alignment="center">
-                Standard
+                {t("pricing.plan.standard")}
               </Text>
             </th>
             <th style={thPlanStyle}>
               <Text as="span" variant="headingSm" alignment="center">
-                Premium
+                {t("pricing.plan.premium")}
               </Text>
             </th>
           </tr>
         </thead>
         <tbody>
           {FEATURE_COMPARE_ROWS.map((row) => (
-            <tr key={row.feature}>
+            <tr key={row.id}>
               <td style={tdFeatureStyle}>
                 <Text as="span" variant="bodyMd">
-                  {row.feature}
+                  {t(COMPARE_FEATURE_KEY[row.id] ?? "pricing.compare.feature")}
                 </Text>
               </td>
               <td style={tdPlanStyle}>
-                <CellValue value={row.free} />
+                <CellValue value={row.free} translateFlag={translateFlag} />
               </td>
               <td style={tdPlanStyle}>
-                <CellValue value={row.standard} />
+                <CellValue value={row.standard} translateFlag={translateFlag} />
               </td>
               <td style={tdPlanStyle}>
-                <CellValue value={row.premium} />
+                <CellValue value={row.premium} translateFlag={translateFlag} />
               </td>
             </tr>
           ))}
@@ -320,6 +366,7 @@ function FeatureCompareTable() {
 
 export default function PricingPage() {
   const { currentPlan, justActivated } = useLoaderData<typeof loader>();
+  const { t } = useAdminI18n();
   const shopify = useAppBridge();
   const fetcher = useFetcher<typeof action>();
   const revalidator = useRevalidator();
@@ -328,16 +375,22 @@ export default function PricingPage() {
   const wasSubmitting = useRef(false);
   const shownActivationToast = useRef(false);
 
+  const planTitle = (plan: PricingPlanId) => t(PLAN_TITLE_KEY[plan]);
+
   useEffect(() => {
     if (!justActivated || shownActivationToast.current) return;
     shownActivationToast.current = true;
-    shopify.toast.show(`Activated ${PLANS[justActivated].title} plan`);
+    shopify.toast.show(
+      t("pricing.toast.activated", {
+        plan: t(PLAN_TITLE_KEY[justActivated]),
+      }),
+    );
     if (hasEphemeralBillingParams(search)) {
       navigate(`${pathname}${stripEphemeralBillingSearch(search)}`, {
         replace: true,
       });
     }
-  }, [justActivated, navigate, pathname, search, shopify]);
+  }, [justActivated, navigate, pathname, search, shopify, t]);
 
   useEffect(() => {
     if (fetcher.state !== "idle") {
@@ -354,12 +407,25 @@ export default function PricingPage() {
         window.open(data.confirmationUrl, "_top");
         return;
       }
-      shopify.toast.show(data.message);
+      const title = t(PLAN_TITLE_KEY[data.plan]);
+      let message = t("pricing.toast.switched", { plan: title });
+      if (
+        "draftedCount" in data &&
+        data.draftedCount > 0 &&
+        data.maxCampaigns != null
+      ) {
+        message += t("pricing.toast.switchedDemote", {
+          kept: data.keptActiveCount,
+          max: data.maxCampaigns,
+          drafted: data.draftedCount,
+        });
+      }
+      shopify.toast.show(message.trim());
       revalidator.revalidate();
     } else {
       shopify.toast.show(data.error);
     }
-  }, [fetcher.state, fetcher.data, revalidator, shopify]);
+  }, [fetcher.state, fetcher.data, revalidator, shopify, t]);
 
   const selectPlan = (plan: PricingPlanId, interval: PricingInterval) => {
     if (plan === currentPlan) return;
@@ -370,7 +436,10 @@ export default function PricingPage() {
   };
 
   return (
-    <Page title="Pricing" subtitle="Choose the plan that fits your store.">
+    <Page
+      title={t("pricing.title")}
+      subtitle={t("pricing.subtitle")}
+    >
       <Layout>
         <Layout.Section>
           <BlockStack gap="400">
@@ -378,12 +447,13 @@ export default function PricingPage() {
               <BlockStack gap="400">
                 <BlockStack gap="100">
                   <Text as="h2" variant="headingMd">
-                    Plans
+                    {t("pricing.plansHeading")}
                   </Text>
                   <Text as="p" variant="bodyMd" tone="subdued">
-                    Free for 5 campaigns · Standard for 25 · Premium unlimited.
-                    Save {YEARLY_DISCOUNT_PERCENT}% yearly. Current plan:{" "}
-                    {currentPlan}.
+                    {t("pricing.plansIntro", {
+                      percent: YEARLY_DISCOUNT_PERCENT,
+                      plan: planTitle(currentPlan),
+                    })}
                   </Text>
                 </BlockStack>
                 <PricingTable
@@ -399,13 +469,13 @@ export default function PricingPage() {
                 <InlineStack align="space-between" blockAlign="center" wrap>
                   <BlockStack gap="100">
                     <Text as="h2" variant="headingMd">
-                      What’s included
+                      {t("pricing.whatsIncluded")}
                     </Text>
                     <Text as="p" variant="bodyMd" tone="subdued">
-                      Compare features across Free, Standard, and Premium.
+                      {t("pricing.whatsIncludedSubtitle")}
                     </Text>
                   </BlockStack>
-                  <Badge tone="info">All plans</Badge>
+                  <Badge tone="info">{t("pricing.allPlans")}</Badge>
                 </InlineStack>
 
                 <FeatureCompareTable />
@@ -415,11 +485,10 @@ export default function PricingPage() {
             <Card>
               <BlockStack gap="300">
                 <Text as="h2" variant="headingMd">
-                  Checkout & cart
+                  {t("pricing.checkoutTitle")}
                 </Text>
                 <Text as="p" variant="bodyMd" tone="subdued">
-                  Automatic discounts at cart and checkout · No codes needed ·
-                  Powered by Shopify Discount Functions
+                  {t("pricing.checkoutBody")}
                 </Text>
               </BlockStack>
             </Card>

@@ -4,7 +4,7 @@
   "scripts": {
     "postinstall": "prisma generate",
     "build": "react-router build",
-    "dev": "shopify app dev",
+    "dev": "node scripts/free-shopify-ports.mjs && shopify app:dev",
     "config:link": "shopify app config link",
     "generate": "shopify app generate",
     "deploy": "shopify app deploy",
@@ -19,7 +19,8 @@
     "graphql-codegen": "graphql-codegen",
     "vite": "vite",
     "typecheck": "react-router typegen && tsc --noEmit",
-    "build:storefront-widget": "esbuild extensions/volume-discount-theme/assets/volume-discount-storefront.src.js --minify --bundle --platform=browser --target=es2015 --legal-comments=none --outfile=extensions/volume-discount-theme/assets/volume-discount-storefront.js"
+    "build:storefront-widget": "esbuild extensions/volume-discount-theme/assets/volume-discount-storefront.src.js --minify --bundle --platform=browser --target=es2015 --legal-comments=none --outfile=extensions/volume-discount-theme/assets/volume-discount-storefront.js",
+    "dev:raw": "shopify app:dev"
   },
   "type": "module",
   "engines": {

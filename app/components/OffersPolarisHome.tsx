@@ -48,12 +48,9 @@ import {
   adminEmbeddedPath,
 } from "../utils/adminEmbeddedPath";
 import {
-  campaignTypeLabel,
-  discountTypeLabel,
   formatCreatedAt,
   productScopeLabel,
   statusBadgeTone,
-  statusLabel,
   truncateCampaignDisplayName,
 } from "../utils/offers-display";
 import type { VolumeDiscountWidgetPresentation } from "../utils/widgetDisplay";
@@ -62,6 +59,8 @@ import {
   OFFERS_SAMPLE_CSV_FILENAME,
 } from "../utils/offersCsvSample";
 import { preloadVolumeDiscountEditor } from "../utils/preloadVolumeDiscountEditor.client";
+import { useAdminI18n } from "./AdminI18nProvider";
+import type { AdminUiMessageKey } from "../utils/adminUiMessages";
 
 export type OfferTab = "all" | "active" | "draft" | "scheduled";
 
@@ -135,69 +134,22 @@ export type OffersPolarisHomeProps = {
   onCreateOffer?: () => void;
 };
 
-const offerTabs: TabProps[] = [
-  { id: "all", content: "All", isLocked: true },
-  { id: "active", content: "Active", isLocked: true },
-  { id: "scheduled", content: "Scheduled", isLocked: true },
-  { id: "draft", content: "Draft", isLocked: true },
-];
-
 const PAGE_SIZE = 50;
 
-const sortOptions: NonNullable<IndexFiltersProps["sortOptions"]> = [
-  { label: "Campaign name", value: "name asc", directionLabel: "A–Z" },
-  { label: "Campaign name", value: "name desc", directionLabel: "Z–A" },
-  { label: "Discount type", value: "discount asc", directionLabel: "A–Z" },
-  { label: "Discount type", value: "discount desc", directionLabel: "Z–A" },
-  { label: "Campaign type", value: "type asc", directionLabel: "A–Z" },
-  { label: "Campaign type", value: "type desc", directionLabel: "Z–A" },
-  { label: "Apply to", value: "apply asc", directionLabel: "A–Z" },
-  { label: "Apply to", value: "apply desc", directionLabel: "Z–A" },
-  {
-    label: "Impression",
-    value: "impression asc",
-    directionLabel: "Low to high",
-  },
-  {
-    label: "Impression",
-    value: "impression desc",
-    directionLabel: "High to low",
-  },
-  { label: "CR", value: "cr asc", directionLabel: "Low to high" },
-  { label: "CR", value: "cr desc", directionLabel: "High to low" },
-  {
-    label: "Order applied",
-    value: "orders asc",
-    directionLabel: "Low to high",
-  },
-  {
-    label: "Order applied",
-    value: "orders desc",
-    directionLabel: "High to low",
-  },
-  {
-    label: "Last modified",
-    value: "modified desc",
-    directionLabel: "Newest first",
-  },
-  {
-    label: "Last modified",
-    value: "modified asc",
-    directionLabel: "Oldest first",
-  },
-  {
-    label: "Created at",
-    value: "created desc",
-    directionLabel: "Newest first",
-  },
-  {
-    label: "Created at",
-    value: "created asc",
-    directionLabel: "Oldest first",
-  },
-  { label: "Status", value: "status asc", directionLabel: "A–Z" },
-  { label: "Status", value: "status desc", directionLabel: "Z–A" },
-];
+const STATUS_KEYS: Record<string, AdminUiMessageKey> = {
+  active: "offers.status.active",
+  draft: "offers.status.draft",
+  scheduled: "offers.status.scheduled",
+  archived: "offers.status.archived",
+};
+
+const SCOPE_KEYS: Record<string, AdminUiMessageKey> = {
+  all: "offers.scope.all",
+  "specific-products": "offers.scope.specificProducts",
+  variants: "offers.scope.variants",
+  collections: "offers.scope.collections",
+  "group-products": "offers.scope.groupProducts",
+};
 
 function SortableColumnHeader({
   columnKey,
@@ -205,16 +157,18 @@ function SortableColumnHeader({
   sortSelected,
   onSort,
   defaultDir = "asc",
-  ascLabel = "A to Z",
-  descLabel = "Z to A",
+  ascLabel,
+  descLabel,
+  sortAria,
 }: {
   columnKey: string;
   label: string;
   sortSelected: string[];
   onSort: (value: string[]) => void;
   defaultDir?: "asc" | "desc";
-  ascLabel?: string;
-  descLabel?: string;
+  ascLabel: string;
+  descLabel: string;
+  sortAria: (label: string, dir: string) => string;
 }) {
   const sort = sortSelected[0] ?? "modified desc";
   const parts = sort.trim().split(/\s+/);
@@ -245,9 +199,7 @@ function SortableColumnHeader({
           size="micro"
           icon={ArrowUpIcon}
           accessibilityLabel={
-            isDesc
-              ? `Sort ${label} ${descLabel}`
-              : `Sort ${label} ${ascLabel}`
+            isDesc ? sortAria(label, descLabel) : sortAria(label, ascLabel)
           }
           pressed={isActive}
           onClick={toggleSort}
@@ -292,6 +244,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
   createOfferBlockedMessage = "You’ve reached your plan’s offer limit. Upgrade to create more.",
   onCreateOffer,
 }: OffersPolarisHomeProps) {
+  const { t } = useAdminI18n();
   const { search } = useLocation();
   const listIndexAction = adminEmbeddedIndexActionPath(search);
   const listFetcher = useFetcher<OfferListActionData>();
@@ -309,6 +262,71 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
 
   const { mode, setMode } = useSetIndexFiltersMode(IndexFiltersMode.Default);
   const [pageIndex, setPageIndex] = useState(0);
+
+  const offerTabs: TabProps[] = useMemo(
+    () => [
+      { id: "all", content: t("offers.tab.all"), isLocked: true },
+      { id: "active", content: t("offers.tab.active"), isLocked: true },
+      { id: "scheduled", content: t("offers.tab.scheduled"), isLocked: true },
+      { id: "draft", content: t("offers.tab.draft"), isLocked: true },
+    ],
+    [t],
+  );
+
+  const sortOptions: NonNullable<IndexFiltersProps["sortOptions"]> = useMemo(
+    () => [
+      { label: t("offers.col.campaignName"), value: "name asc", directionLabel: t("offers.sort.az") },
+      { label: t("offers.col.campaignName"), value: "name desc", directionLabel: t("offers.sort.za") },
+      { label: t("offers.col.discountType"), value: "discount asc", directionLabel: t("offers.sort.az") },
+      { label: t("offers.col.discountType"), value: "discount desc", directionLabel: t("offers.sort.za") },
+      { label: t("offers.col.campaignType"), value: "type asc", directionLabel: t("offers.sort.az") },
+      { label: t("offers.col.campaignType"), value: "type desc", directionLabel: t("offers.sort.za") },
+      { label: t("offers.col.applyTo"), value: "apply asc", directionLabel: t("offers.sort.az") },
+      { label: t("offers.col.applyTo"), value: "apply desc", directionLabel: t("offers.sort.za") },
+      { label: t("offers.col.impression"), value: "impression asc", directionLabel: t("offers.sort.lowHigh") },
+      { label: t("offers.col.impression"), value: "impression desc", directionLabel: t("offers.sort.highLow") },
+      { label: t("offers.col.cr"), value: "cr asc", directionLabel: t("offers.sort.lowHigh") },
+      { label: t("offers.col.cr"), value: "cr desc", directionLabel: t("offers.sort.highLow") },
+      { label: t("offers.col.orderApplied"), value: "orders asc", directionLabel: t("offers.sort.lowHigh") },
+      { label: t("offers.col.orderApplied"), value: "orders desc", directionLabel: t("offers.sort.highLow") },
+      { label: t("offers.col.lastModified"), value: "modified desc", directionLabel: t("offers.sort.newest") },
+      { label: t("offers.col.lastModified"), value: "modified asc", directionLabel: t("offers.sort.oldest") },
+      { label: t("offers.col.createdAt"), value: "created desc", directionLabel: t("offers.sort.newest") },
+      { label: t("offers.col.createdAt"), value: "created asc", directionLabel: t("offers.sort.oldest") },
+      { label: t("offers.col.status"), value: "status asc", directionLabel: t("offers.sort.az") },
+      { label: t("offers.col.status"), value: "status desc", directionLabel: t("offers.sort.za") },
+    ],
+    [t],
+  );
+
+  const sortAria = useCallback(
+    (label: string, dir: string) => t("offers.sortAscAria", { label, dir }),
+    [t],
+  );
+
+  const translateStatus = useCallback(
+    (status: string) => {
+      const key = STATUS_KEYS[status.toLowerCase()];
+      return key ? t(key) : status;
+    },
+    [t],
+  );
+
+  const translateScope = useCallback(
+    (scope: string) => {
+      const key = SCOPE_KEYS[scope];
+      return key ? t(key) : productScopeLabel(scope);
+    },
+    [t],
+  );
+
+  const translateCampaignType = useCallback(
+    (presentation?: VolumeDiscountWidgetPresentation) => {
+      if (presentation === "volume_table") return t("offers.type.volumeDiscount");
+      return t("offers.type.quantityBreaks");
+    },
+    [t],
+  );
 
   useEffect(() => {
     preloadVolumeDiscountEditor();
@@ -448,21 +466,31 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     if (!d) return;
     if (d.ok) {
       if (d.intent === "duplicate") {
-        notify(
-          "Offer duplicated as draft — open it to publish discounts",
-        );
+        notify(t("offers.toast.duplicated"));
       } else if (d.intent === "delete") {
         const n = d.count ?? 1;
-        notify(n > 1 ? `${n} offers removed` : "Offer removed");
+        notify(
+          n > 1
+            ? t("offers.toast.removedPlural", { n })
+            : t("offers.toast.removed"),
+        );
         setPendingDeleteIds(null);
         clearSelection();
       } else if (d.intent === "bulkActivate") {
         const n = d.count ?? 1;
-        notify(n > 1 ? `${n} offers set to active` : "Offer set to active");
+        notify(
+          n > 1
+            ? t("offers.toast.activatedPlural", { n })
+            : t("offers.toast.activated"),
+        );
         clearSelection();
       } else if (d.intent === "bulkDeactivate") {
         const n = d.count ?? 1;
-        notify(n > 1 ? `${n} offers set to draft` : "Offer set to draft");
+        notify(
+          n > 1
+            ? t("offers.toast.draftedPlural", { n })
+            : t("offers.toast.drafted"),
+        );
         clearSelection();
       }
       onCampaignsMutated();
@@ -475,6 +503,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     notify,
     onCampaignsMutated,
     clearSelection,
+    t,
   ]);
 
   useEffect(() => {
@@ -487,12 +516,12 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     const d = syncAllFetcher.data;
     if (!d) return;
     if (d.ok && d.intent === "syncAll") {
-      notify("All active discounts synced to Shopify");
+      notify(t("offers.toast.synced"));
       onCampaignsMutated();
     } else if (!d.ok) {
       notify(d.error);
     }
-  }, [syncAllFetcher.state, syncAllFetcher.data, notify, onCampaignsMutated]);
+  }, [syncAllFetcher.state, syncAllFetcher.data, notify, onCampaignsMutated, t]);
 
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importOverwriteCampaign, setImportOverwriteCampaign] = useState(false);
@@ -513,29 +542,38 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     const d = csvImportFetcher.data;
     if (!d) return;
     if (d.ok) {
-      const errParts = d.errors.slice(0, 5).map(
-        (e) => `Row ${e.row}: ${e.message}`,
+      const errParts = d.errors.slice(0, 5).map((e) =>
+        t("offers.toast.rowError", { row: e.row, message: e.message }),
       );
       const errMore =
         d.errors.length > 5
-          ? ` …and ${d.errors.length - 5} more`
+          ? t("offers.toast.rowErrorsMore", { n: d.errors.length - 5 })
           : "";
       const errMsg =
         d.errors.length > 0
-          ? ` ${d.errors.length} row error(s). ${errParts.join(" · ")}${errMore}`
+          ? t("offers.toast.rowErrorsCount", {
+              n: d.errors.length,
+              details: `${errParts.join(" · ")}${errMore}`,
+            })
           : "";
       const summaryParts: string[] = [];
-      if (d.imported > 0) summaryParts.push(`created ${d.imported}`);
-      if (d.updated > 0) summaryParts.push(`updated ${d.updated}`);
-      if (d.skipped > 0) summaryParts.push(`skipped ${d.skipped} existing`);
+      if (d.imported > 0) {
+        summaryParts.push(t("offers.toast.importCreated", { n: d.imported }));
+      }
+      if (d.updated > 0) {
+        summaryParts.push(t("offers.toast.importUpdated", { n: d.updated }));
+      }
+      if (d.skipped > 0) {
+        summaryParts.push(t("offers.toast.importSkipped", { n: d.skipped }));
+      }
       const summary =
         summaryParts.length > 0
           ? summaryParts.join(", ")
-          : "no offers imported";
+          : t("offers.toast.importNone");
       if (d.activationNotice) {
         notify(`${d.activationNotice}${errMsg}`);
       } else {
-        notify(`Import: ${summary}.${errMsg}`);
+        notify(t("offers.toast.importSummary", { summary }) + errMsg);
       }
       if (d.imported > 0 || d.updated > 0) {
         onCampaignsMutated();
@@ -550,6 +588,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     notify,
     onCampaignsMutated,
     resetImportModal,
+    t,
   ]);
 
   useEffect(() => {
@@ -574,11 +613,11 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
       a.click();
       a.remove();
       URL.revokeObjectURL(href);
-      notify("Excel CSV downloaded — edit columns and Import when ready");
+      notify(t("offers.toast.exported"));
     } else if (!d.ok) {
       notify(d.error);
     }
-  }, [csvExportFetcher.state, csvExportFetcher.data, notify]);
+  }, [csvExportFetcher.state, csvExportFetcher.data, notify, t]);
 
   const listMutationPending =
     listFetcher.state !== "idle" || syncAllFetcher.state !== "idle";
@@ -628,12 +667,10 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
   const offersTableBulkActions = useMemo(
     () => [
       {
-        content: "Active",
+        content: t("offers.bulk.active"),
         onAction: () => {
           if (atCampaignCap) {
-            notify(
-              "You’ve reached your plan’s active campaign limit. Upgrade to activate more.",
-            );
+            notify(t("offers.toast.activeCap"));
             return;
           }
           submitBulkStatus("bulkActivate");
@@ -641,18 +678,18 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
         disabled: listMutationPending || atCampaignCap,
       },
       {
-        content: "Draft",
+        content: t("offers.bulk.draft"),
         onAction: () => submitBulkStatus("bulkDeactivate"),
         disabled: listMutationPending,
       },
       {
-        content: "Delete",
+        content: t("offers.bulk.delete"),
         onAction: () => setPendingDeleteIds([...selectedResources]),
         destructive: true,
         disabled: listMutationPending,
       },
     ],
-    [atCampaignCap, listMutationPending, notify, selectedResources],
+    [atCampaignCap, listMutationPending, notify, selectedResources, t],
   );
 
   const csvImportAction = adminEmbeddedPath("/app/offers/import", search);
@@ -667,9 +704,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
   const submitExportCsv = useCallback(() => {
     if (csvExportPending || !canExportOffers) {
       if (!canImportExport) {
-        notify(
-          "Import & export is available on Premium. Upgrade to unlock.",
-        );
+        notify(t("offers.toast.importPremium"));
       }
       return;
     }
@@ -681,12 +716,15 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     csvExportFetcher.submit(fd, { method: "post", action: listIndexAction });
   }, [
     canExportOffers,
+    canImportExport,
     csvExportFetcher,
     csvExportPending,
     exportSearchQuery,
     listIndexAction,
+    notify,
     offerTab,
     sortSelected,
+    t,
   ]);
 
   const submitCsvImport = () => {
@@ -713,8 +751,8 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
 
   const handleImportCsvDropRejected = useCallback(() => {
     setImportFile(null);
-    notify("Choose a .csv file (max 5 MB)");
-  }, [notify]);
+    notify(t("offers.toast.csvOnly"));
+  }, [notify, t]);
 
   const downloadSampleCsv = useCallback(() => {
     const blob = new Blob([buildOffersSampleCsv()], {
@@ -737,14 +775,15 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
         {importFile.name}
       </Text>
       <Text as="p" variant="bodySm" tone="subdued">
-        {(importFile.size / 1024).toFixed(1)} KB — drop another file or click to
-        replace
+        {t("offers.import.replaceHint", {
+          size: (importFile.size / 1024).toFixed(1),
+        })}
       </Text>
     </BlockStack>
   ) : (
     <DropZone.FileUpload
-      actionTitle="Add CSV file"
-      actionHint="or drop file to upload"
+      actionTitle={t("offers.import.addCsv")}
+      actionHint={t("offers.import.dropHint")}
     />
   );
 
@@ -761,7 +800,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
 
   const pagePrimaryAction = useMemo(
     () => ({
-      content: "Create offer",
+      content: t("offers.createOffer"),
       onAction: () => {
         if (onCreateOffer) {
           onCreateOffer();
@@ -781,6 +820,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
       notify,
       onCreateOffer,
       setScreen,
+      t,
       warmEditorChunk,
     ],
   );
@@ -797,10 +837,10 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
         loading: isReloading,
         disabled: isReloading,
         onAction: () => revalidator.revalidate(),
-        accessibilityLabel: "Reload",
+        accessibilityLabel: t("common.reload"),
       },
       {
-        content: "Sync all",
+        content: t("offers.syncAll"),
         loading: syncAllPending,
         disabled:
           campaigns.length === 0 ||
@@ -809,18 +849,16 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
         onAction: submitSyncAll,
       },
       {
-        content: "Export",
+        content: t("common.export"),
         loading: csvExportPending,
         disabled: csvExportPending || !canExportOffers,
         onAction: submitExportCsv,
       },
       {
-        content: "Import",
+        content: t("common.import"),
         onAction: () => {
           if (!canImportExport) {
-            notify(
-              "Import & export is available on Premium. Upgrade to unlock.",
-            );
+            notify(t("offers.toast.importPremium"));
             return;
           }
           setImportModalOpen(true);
@@ -840,6 +878,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
       submitExportCsv,
       submitSyncAll,
       syncAllPending,
+      t,
     ],
   );
 
@@ -851,12 +890,10 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
         </Box>
         <BlockStack gap="200" inlineAlign="center">
           <Text variant="headingMd" as="h2">
-            First up: Create An Offer
+            {t("offers.emptyTitle")}
           </Text>
           <Text tone="subdued" alignment="center" as="p">
-            Your discount campaigns will appear here once created. Choose from
-            our templates to launch your first revenue-boosting offer in under 2
-            minutes.
+            {t("offers.emptyBody")}
           </Text>
         </BlockStack>
         <Button
@@ -874,7 +911,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
             setScreen("select");
           }}
         >
-          Create offer
+          {t("offers.createOffer")}
         </Button>
       </BlockStack>
     </Card>
@@ -887,7 +924,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
           sortOptions={sortOptions}
           sortSelected={sortSelected}
           queryValue={searchQuery}
-          queryPlaceholder="Searching in all"
+          queryPlaceholder={t("offers.searchPlaceholder")}
           onQueryChange={setSearchQuery}
           onQueryClear={() => setSearchQuery("")}
           onSort={setSortSelected}
@@ -906,14 +943,17 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
         {filteredCampaigns.length === 0 ? (
           <Box padding="600">
             <Text tone="subdued" as="p">
-              No offers match your filters. Try another tab or search.
+              {t("offers.emptyFilter")}
             </Text>
           </Box>
         ) : (
           <Fragment>
           <div className={styles.tableWrap}>
             <IndexTable
-              resourceName={{ singular: "offer", plural: "offers" }}
+              resourceName={{
+                singular: t("offers.resource.singular"),
+                plural: t("offers.resource.plural"),
+              }}
               itemCount={filteredCampaigns.length}
               hasMoreItems={false}
               selectedItemsCount={selectedItemsCountForTable}
@@ -926,9 +966,12 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                   title: (
                     <SortableColumnHeader
                       columnKey="name"
-                      label="Campaign name"
+                      label={t("offers.col.campaignName")}
                       sortSelected={sortSelected}
                       onSort={setSortSelected}
+                      ascLabel={t("offers.sort.az")}
+                      descLabel={t("offers.sort.za")}
+                      sortAria={sortAria}
                     />
                   ),
                 },
@@ -937,9 +980,12 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                   title: (
                     <SortableColumnHeader
                       columnKey="discount"
-                      label="Discount type"
+                      label={t("offers.col.discountType")}
                       sortSelected={sortSelected}
                       onSort={setSortSelected}
+                      ascLabel={t("offers.sort.az")}
+                      descLabel={t("offers.sort.za")}
+                      sortAria={sortAria}
                     />
                   ),
                 },
@@ -948,9 +994,12 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                   title: (
                     <SortableColumnHeader
                       columnKey="type"
-                      label="Campaign type"
+                      label={t("offers.col.campaignType")}
                       sortSelected={sortSelected}
                       onSort={setSortSelected}
+                      ascLabel={t("offers.sort.az")}
+                      descLabel={t("offers.sort.za")}
+                      sortAria={sortAria}
                     />
                   ),
                 },
@@ -959,9 +1008,12 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                   title: (
                     <SortableColumnHeader
                       columnKey="apply"
-                      label="Apply to"
+                      label={t("offers.col.applyTo")}
                       sortSelected={sortSelected}
                       onSort={setSortSelected}
+                      ascLabel={t("offers.sort.az")}
+                      descLabel={t("offers.sort.za")}
+                      sortAria={sortAria}
                     />
                   ),
                 },
@@ -970,11 +1022,12 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                   title: (
                     <SortableColumnHeader
                       columnKey="impression"
-                      label="Impression"
+                      label={t("offers.col.impression")}
                       sortSelected={sortSelected}
                       onSort={setSortSelected}
-                      ascLabel="low to high"
-                      descLabel="high to low"
+                      ascLabel={t("offers.sort.lowHigh")}
+                      descLabel={t("offers.sort.highLow")}
+                      sortAria={sortAria}
                     />
                   ),
                 },
@@ -983,11 +1036,12 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                   title: (
                     <SortableColumnHeader
                       columnKey="cr"
-                      label="CR"
+                      label={t("offers.col.cr")}
                       sortSelected={sortSelected}
                       onSort={setSortSelected}
-                      ascLabel="low to high"
-                      descLabel="high to low"
+                      ascLabel={t("offers.sort.lowHigh")}
+                      descLabel={t("offers.sort.highLow")}
+                      sortAria={sortAria}
                     />
                   ),
                 },
@@ -996,11 +1050,12 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                   title: (
                     <SortableColumnHeader
                       columnKey="orders"
-                      label="Order applied"
+                      label={t("offers.col.orderApplied")}
                       sortSelected={sortSelected}
                       onSort={setSortSelected}
-                      ascLabel="low to high"
-                      descLabel="high to low"
+                      ascLabel={t("offers.sort.lowHigh")}
+                      descLabel={t("offers.sort.highLow")}
+                      sortAria={sortAria}
                     />
                   ),
                 },
@@ -1009,12 +1064,13 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                   title: (
                     <SortableColumnHeader
                       columnKey="modified"
-                      label="Last modified"
+                      label={t("offers.col.lastModified")}
                       sortSelected={sortSelected}
                       onSort={setSortSelected}
                       defaultDir="desc"
-                      ascLabel="oldest first"
-                      descLabel="newest first"
+                      ascLabel={t("offers.sort.oldest")}
+                      descLabel={t("offers.sort.newest")}
+                      sortAria={sortAria}
                     />
                   ),
                 },
@@ -1023,12 +1079,13 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                   title: (
                     <SortableColumnHeader
                       columnKey="created"
-                      label="Created at"
+                      label={t("offers.col.createdAt")}
                       sortSelected={sortSelected}
                       onSort={setSortSelected}
                       defaultDir="desc"
-                      ascLabel="oldest first"
-                      descLabel="newest first"
+                      ascLabel={t("offers.sort.oldest")}
+                      descLabel={t("offers.sort.newest")}
+                      sortAria={sortAria}
                     />
                   ),
                 },
@@ -1037,13 +1094,16 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                   title: (
                     <SortableColumnHeader
                       columnKey="status"
-                      label="Status"
+                      label={t("offers.col.status")}
                       sortSelected={sortSelected}
                       onSort={setSortSelected}
+                      ascLabel={t("offers.sort.az")}
+                      descLabel={t("offers.sort.za")}
+                      sortAria={sortAria}
                     />
                   ),
                 },
-                { title: "Actions", id: "offers-actions-col" },
+                { title: t("offers.col.actions"), id: "offers-actions-col" },
               ]}
               lastColumnSticky
             >
@@ -1061,7 +1121,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                       prefetch="intent"
                       className={styles.nameEditButton}
                       title={c.campaignName}
-                      aria-label={`Edit ${c.campaignName}`}
+                      aria-label={t("offers.editAria", { name: c.campaignName })}
                       onMouseEnter={warmEditorChunk}
                       onFocus={warmEditorChunk}
                       onClick={(e) => {
@@ -1073,15 +1133,15 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                     </Link>
                   </IndexTable.Cell>
                   <IndexTable.Cell>
-                    <Text as="span">{discountTypeLabel()}</Text>
+                    <Text as="span">{t("offers.discountType.product")}</Text>
                   </IndexTable.Cell>
                   <IndexTable.Cell>
                     <Text as="span">
-                      {campaignTypeLabel(c.widgetPresentation)}
+                      {translateCampaignType(c.widgetPresentation)}
                     </Text>
                   </IndexTable.Cell>
                   <IndexTable.Cell>
-                    <Text as="span">{productScopeLabel(c.productScope)}</Text>
+                    <Text as="span">{translateScope(c.productScope)}</Text>
                   </IndexTable.Cell>
                   <IndexTable.Cell>
                     <Text tone="subdued" as="span">
@@ -1106,7 +1166,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                   </IndexTable.Cell>
                   <IndexTable.Cell>
                     <Badge tone={statusBadgeTone(c.status)}>
-                      {statusLabel(c.status)}
+                      {translateStatus(c.status)}
                     </Badge>
                   </IndexTable.Cell>
                   <IndexTable.Cell>
@@ -1115,7 +1175,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                         to={offerEditTo(c.id)}
                         prefetch="intent"
                         className={styles.editIconLink}
-                        aria-label="Edit"
+                        aria-label={t("common.edit")}
                         onMouseEnter={warmEditorChunk}
                         onFocus={warmEditorChunk}
                         onClick={(e) => {
@@ -1128,7 +1188,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                       <Button
                         variant="tertiary"
                         icon={DuplicateIcon}
-                        accessibilityLabel="Duplicate"
+                        accessibilityLabel={t("common.duplicate")}
                         disabled={listMutationPending || atOfferCap}
                         onPointerDown={(
                           e: ReactPointerEvent<HTMLButtonElement>,
@@ -1139,7 +1199,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                         variant="tertiary"
                         tone="critical"
                         icon={DeleteIcon}
-                        accessibilityLabel="Delete"
+                        accessibilityLabel={t("common.delete")}
                         disabled={listMutationPending}
                         onPointerDown={(
                           e: ReactPointerEvent<HTMLButtonElement>,
@@ -1164,7 +1224,11 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
               hasNext={hasNext}
               onPrevious={() => setPageIndex((p) => Math.max(0, p - 1))}
               onNext={() => setPageIndex((p) => p + 1)}
-              label={`${rangeStart}-${rangeEnd} of ${total.toLocaleString()} offers`}
+              label={t("offers.pagination", {
+                start: rangeStart,
+                end: rangeEnd,
+                total: total.toLocaleString(),
+              })}
             />
           </Box>
           </Fragment>
@@ -1177,7 +1241,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     <div className={styles.offersPageShell}>
     <Page
       fullWidth
-      title="Offers"
+      title={t("offers.title")}
       primaryAction={pagePrimaryAction}
       secondaryActions={pageSecondaryActions}
     >
@@ -1194,18 +1258,21 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
         onClose={() => setPendingDeleteIds(null)}
         title={
           deleteCount > 1
-            ? `Delete ${deleteCount} offers?`
-            : "Delete this offer?"
+            ? t("offers.delete.titlePlural", { n: deleteCount })
+            : t("offers.delete.title")
         }
         primaryAction={{
-          content: deleteCount > 1 ? "Delete offers" : "Delete offer",
+          content:
+            deleteCount > 1
+              ? t("offers.delete.confirmPlural")
+              : t("offers.delete.confirm"),
           destructive: true,
           loading: listMutationSubmitting,
           onAction: confirmDelete,
         }}
         secondaryActions={[
           {
-            content: "Cancel",
+            content: t("common.cancel"),
             disabled: listMutationPending,
             onAction: () => setPendingDeleteIds(null),
           },
@@ -1214,8 +1281,8 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
         <Modal.Section>
           <Text as="p">
             {deleteCount > 1
-              ? "This removes the selected offers from the app and deletes their automatic discounts in Shopify. This cannot be undone."
-              : "This removes the offer from the app and deletes its automatic discounts in Shopify. This cannot be undone."}
+              ? t("offers.delete.bodyPlural")
+              : t("offers.delete.body")}
           </Text>
         </Modal.Section>
       </Modal>
@@ -1226,16 +1293,16 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
           if (csvImportPending) return;
           resetImportModal();
         }}
-        title="Import offers (Excel / CSV)"
+        title={t("offers.import.title")}
         primaryAction={{
-          content: "Import",
+          content: t("common.import"),
           loading: csvImportPending,
           disabled: !importFile || csvImportPending,
           onAction: submitCsvImport,
         }}
         secondaryActions={[
           {
-            content: "Cancel",
+            content: t("common.cancel"),
             disabled: csvImportPending,
             onAction: resetImportModal,
           },
@@ -1245,8 +1312,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
           <BlockStack gap="300">
             <BlockStack gap="200">
               <Text as="p" tone="subdued">
-                Download the template, edit in Excel, save as CSV, then upload.
-                All allowed values are in the template’s OPTIONS row.
+                {t("offers.import.body")}
               </Text>
               <InlineStack>
                 <Button
@@ -1254,7 +1320,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                   onClick={downloadSampleCsv}
                   disabled={csvImportPending}
                 >
-                  Download template
+                  {t("offers.import.downloadTemplate")}
                 </Button>
               </InlineStack>
             </BlockStack>
@@ -1279,8 +1345,8 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
               {importCsvDropZone}
             </DropZone>
             <Checkbox
-              label="Overwrite existing campaigns"
-              helpText="Update matching names instead of skipping them."
+              label={t("offers.import.overwrite")}
+              helpText={t("offers.import.overwriteHelp")}
               checked={importOverwriteCampaign}
               disabled={csvImportPending}
               onChange={setImportOverwriteCampaign}

@@ -1,5 +1,7 @@
 import type { ComponentProps, CSSProperties } from "react";
 
+import { useAdminI18n } from "./AdminI18nProvider";
+
 type PricingButton = {
   content: string;
   props?: ComponentProps<"s-button">;
@@ -14,6 +16,8 @@ export type PricingCardProps = {
   frequency: string;
   features: string[];
   featuredText?: string;
+  /** Merchant's active plan — highlight as selected. */
+  selected?: boolean;
   button: PricingButton;
 };
 
@@ -24,9 +28,12 @@ export function PricingCard({
   comparePrice,
   features,
   featuredText,
+  selected = false,
   button,
   frequency,
 }: PricingCardProps) {
+  const { t } = useAdminI18n();
+
   const cardStyle: CSSProperties = {
     width: "100%",
     height: "100%",
@@ -35,17 +42,31 @@ export function PricingCard({
     gridTemplateRows: "auto auto 1fr auto",
     gap: "1.25rem",
     padding: "1rem",
-    boxShadow: featuredText ? "0px 0px 15px 4px #CDFEE1" : "none",
+    boxShadow: featuredText && !selected ? "0px 0px 15px 4px #CDFEE1" : "none",
     borderRadius: "0.75rem",
     background: "var(--p-color-bg-surface, #fff)",
-    border: "1px solid var(--p-color-border, #e1e3e5)",
+    border: selected
+      ? "2px solid var(--p-color-border-success, #29845a)"
+      : "1px solid var(--p-color-border, #e1e3e5)",
     position: "relative",
     zIndex: 0,
   };
 
   return (
     <div style={cardStyle}>
-      {featuredText ? (
+      {selected ? (
+        <div
+          style={{
+            position: "absolute",
+            top: "-15px",
+            left: "6px",
+            zIndex: 100,
+          }}
+        >
+          <s-badge tone="success">{t("pricing.selected")}</s-badge>
+        </div>
+      ) : null}
+      {featuredText && !selected ? (
         <div
           style={{
             position: "absolute",

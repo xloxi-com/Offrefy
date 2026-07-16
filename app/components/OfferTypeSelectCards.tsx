@@ -8,6 +8,7 @@ import {
 } from "@shopify/polaris";
 
 import styles from "./OfferTypeSelectCards.module.css";
+import { useAdminI18n } from "./AdminI18nProvider";
 
 export type OfferTypeCardFooterProps = {
   title: string;
@@ -22,6 +23,7 @@ function OfferTypeCardFooter({
   onLearnMore,
   onCreate,
 }: OfferTypeCardFooterProps) {
+  const { t } = useAdminI18n();
   return (
     <div className={styles.cardFooter}>
       <BlockStack gap="300">
@@ -31,14 +33,14 @@ function OfferTypeCardFooter({
         <InlineStack align="space-between" blockAlign="center" wrap gap="200">
           <InlineStack gap="100" wrap>
             <Button variant="tertiary" onClick={onPreview}>
-              Preview
+              {t("common.preview")}
             </Button>
             <Button variant="tertiary" onClick={onLearnMore}>
-              Learn more
+              {t("common.learnMore")}
             </Button>
           </InlineStack>
           <Button variant="primary" onClick={onCreate}>
-            Create
+            {t("common.create")}
           </Button>
         </InlineStack>
       </BlockStack>

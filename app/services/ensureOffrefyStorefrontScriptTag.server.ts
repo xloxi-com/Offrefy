@@ -39,6 +39,16 @@ function loaderSrc(appUrl: string): string {
   return `${appUrl.replace(/\/$/, "")}/vd-loader.js`;
 }
 
+/** True when ScriptTag was ensured recently (no Admin API call). */
+export function isOffrefyStorefrontScriptTagRecentlyEnsured(
+  shop?: string,
+): boolean {
+  const appUrl = (process.env.SHOPIFY_APP_URL || "").replace(/\/$/, "");
+  const cacheKey = shop || appUrl;
+  if (!cacheKey) return false;
+  return (ensuredUntil.get(cacheKey) ?? 0) > Date.now();
+}
+
 /**
  * Registers a storefront ScriptTag that loads Offrefy widget assets even when
  * Theme App Embed is disabled (common on custom / newly installed apps).

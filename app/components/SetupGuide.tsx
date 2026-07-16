@@ -24,6 +24,7 @@ import {
   XIcon,
 } from "@shopify/polaris-icons";
 
+import { useAdminI18n } from "./AdminI18nProvider";
 import styles from "./SetupGuide.module.css";
 
 export type SetupGuideButton = {
@@ -65,9 +66,13 @@ export function SetupGuide({
   items,
   onDismiss,
   onStepComplete,
-  title = "Setup Guide",
-  description = "Use this personalized guide to get your app up and running.",
+  title,
+  description,
 }: SetupGuideProps) {
+  const { t } = useAdminI18n();
+  const resolvedTitle = title ?? t("home.setupGuideTitle");
+  const resolvedDescription =
+    description ?? t("home.setupGuideDescription");
   const firstIncompleteId =
     items.find((item) => !item.complete)?.id ?? items[0]?.id ?? null;
   const [expanded, setExpanded] = useState<SetupGuideItem["id"] | null>(
@@ -84,7 +89,7 @@ export function SetupGuide({
         <BlockStack>
           <InlineStack align="space-between" blockAlign="center">
             <Text as="h3" variant="headingMd">
-              {title}
+              {resolvedTitle}
             </Text>
             <ButtonGroup gap="tight" noWrap>
               <Popover
@@ -95,7 +100,7 @@ export function SetupGuide({
                     onClick={() => setPopoverActive((prev) => !prev)}
                     variant="tertiary"
                     icon={MenuHorizontalIcon}
-                    accessibilityLabel="Setup guide options"
+                    accessibilityLabel={t("setup.options")}
                   />
                 }
               >
@@ -103,7 +108,7 @@ export function SetupGuide({
                   actionRole="menuitem"
                   items={[
                     {
-                      content: "Dismiss",
+                      content: t("setup.dismiss"),
                       onAction: onDismiss,
                       prefix: (
                         <div
@@ -125,7 +130,7 @@ export function SetupGuide({
                 variant="tertiary"
                 icon={isGuideOpen ? ChevronUpIcon : ChevronDownIcon}
                 accessibilityLabel={
-                  isGuideOpen ? "Collapse setup guide" : "Expand setup guide"
+                  isGuideOpen ? t("setup.collapse") : t("setup.expand")
                 }
                 onClick={() => {
                   setIsGuideOpen((prev) => {
@@ -144,7 +149,7 @@ export function SetupGuide({
             </ButtonGroup>
           </InlineStack>
           <Text as="p" variant="bodyMd">
-            {description}
+            {resolvedDescription}
           </Text>
           <div style={{ marginTop: ".8rem" }}>
             <InlineStack blockAlign="center" gap="200">
@@ -154,16 +159,19 @@ export function SetupGuide({
                     <Icon
                       source={CheckIcon}
                       tone="subdued"
-                      accessibilityLabel="Check icon to indicate completion of Setup Guide"
+                      accessibilityLabel={t("setup.checkComplete")}
                     />
                     <Text as="p" variant="bodySm" tone="subdued">
-                      Done
+                      {t("setup.done")}
                     </Text>
                   </InlineStack>
                 </div>
               ) : (
                 <Text as="span" variant="bodySm">
-                  {`${completedItemsLength} / ${items.length} completed`}
+                  {t("setup.completed", {
+                    done: completedItemsLength,
+                    total: items.length,
+                  })}
                 </Text>
               )}
 
@@ -204,7 +212,7 @@ export function SetupGuide({
           padding="300"
         >
           <InlineStack align="end">
-            <Button onClick={onDismiss}>Dismiss Guide</Button>
+            <Button onClick={onDismiss}>{t("setup.dismissGuide")}</Button>
           </InlineStack>
         </Box>
       ) : null}
@@ -230,6 +238,7 @@ function SetupItem({
   secondaryButton,
   id,
 }: SetupItemProps) {
+  const { t } = useAdminI18n();
   const [loading, setLoading] = useState(false);
   const collapseId = `setup-item-${id}`;
 
@@ -252,14 +261,16 @@ function SetupItem({
       >
         <InlineStack gap="200" align="start" blockAlign="start" wrap={false}>
           <Tooltip
-            content={complete ? "Mark as not done" : "Mark as done"}
+            content={complete ? t("setup.markNotDone") : t("setup.markDone")}
             activatorWrapper="div"
           >
             <button
               type="button"
               onClick={completeItem}
               className={styles.completeTrigger}
-              aria-label={complete ? "Mark as not done" : "Mark as done"}
+              aria-label={
+                complete ? t("setup.markNotDone") : t("setup.markDone")
+              }
             >
               <div className={styles.completeButton}>
                 {loading ? (

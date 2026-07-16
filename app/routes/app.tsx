@@ -10,26 +10,38 @@ import type {
 } from "react-router";
 import {
   Outlet,
+  data,
   redirect,
   useLoaderData,
   useLocation,
   useNavigate,
   useRouteError,
 } from "react-router";
-import { useEffect } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { AppProvider as PolarisAppProvider } from "@shopify/polaris";
 import en from "@shopify/polaris/locales/en.json";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
+import { useAppBridge } from "@shopify/app-bridge-react";
 
 import { APP_DISPLAY_NAME } from "../branding";
 import { CrispChat } from "../components/CrispChat";
+import {
+  AdminI18nProvider,
+  useAdminI18n,
+} from "../components/AdminI18nProvider";
 import {
   adminEmbeddedPath,
   hasEphemeralBillingParams,
   stripEphemeralBillingSearch,
 } from "../utils/adminEmbeddedPath";
 import { withShopFromEmbeddedHost } from "../utils/embeddedShop.server";
+import {
+  adminLanguageCookieHeader,
+  readAdminLanguageCookie,
+  type AdminLanguageCode,
+} from "../utils/adminLanguage";
+import { resolveAdminLanguage } from "../utils/adminLanguage.server";
 
 /**
  * Re-register critical CSS for the embedded admin shell so SPA transitions
@@ -53,9 +65,26 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (url.toString() !== request.url) {
     throw redirect(`${url.pathname}?${url.searchParams.toString()}`);
   }
-  /* Child routes call authenticate.admin — skip a second Prisma session round-trip here. */
+
+  const cookieLang = readAdminLanguageCookie(request.headers.get("Cookie"));
+  const shop = url.searchParams.get("shop");
+  // Cookie is refreshed on every /app response + language save — prefer it to
+  // skip a DB round-trip on the shared layout (biggest win for all /app/*).
+  const adminLanguage: AdminLanguageCode =
+    cookieLang ?? (shop ? await resolveAdminLanguage(shop) : "auto");
+
   // eslint-disable-next-line no-undef
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  return data(
+    {
+      apiKey: process.env.SHOPIFY_API_KEY || "",
+      adminLanguage,
+    },
+    {
+      headers: {
+        "Set-Cookie": adminLanguageCookieHeader(adminLanguage),
+      },
+    },
+  );
 };
 
 /** apiKey is static — skip re-auth on every /app/* child navigation (Create/Edit). */
@@ -77,17 +106,68 @@ export function shouldRevalidate({
   return defaultShouldRevalidate;
 }
 
-export default function App() {
-  const { apiKey } = useLoaderData<typeof loader>();
-  const { pathname, search } = useLocation();
-  const navigate = useNavigate();
-  // Keep one-shot billing return params out of nav so they don't re-fire toasts.
+function PolarisLocaleBridge({ children }: { children: ReactNode }) {
+  const shopify = useAppBridge();
+  const { adminLanguage } = useAdminI18n();
+  const [i18n, setI18n] = useState(en);
+
+  useEffect(() => {
+    let cancelled = false;
+    let shopifyLocale: string | null = null;
+    try {
+      const locale = shopify?.config?.locale;
+      shopifyLocale = typeof locale === "string" ? locale : null;
+    } catch {
+      shopifyLocale = null;
+    }
+
+    void import("../utils/polarisLocale.client")
+      .then(({ loadPolarisI18n }) =>
+        loadPolarisI18n(adminLanguage, shopifyLocale),
+      )
+      .then((next) => {
+        if (!cancelled) setI18n(next as typeof en);
+      })
+      .catch(() => {
+        /* keep English fallback */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [adminLanguage, shopify]);
+
+  return <PolarisAppProvider i18n={i18n}>{children}</PolarisAppProvider>;
+}
+
+function AppNav() {
+  const { t, localeKey } = useAdminI18n();
+  const { search } = useLocation();
   const navSearch = stripEphemeralBillingSearch(search);
   const homeHref = adminEmbeddedPath("/app", navSearch);
   const offersHref = adminEmbeddedPath("/app/offers", navSearch);
   const analyticsHref = adminEmbeddedPath("/app/analytics", navSearch);
   const pricingHref = adminEmbeddedPath("/app/pricing", navSearch);
   const settingsHref = adminEmbeddedPath("/app/settings", navSearch);
+
+  // rel="home" sets the app-name click target to /app and hides that link from the sidebar.
+  return (
+    <s-app-nav key={localeKey}>
+      <s-link href={homeHref} rel="home">
+        {t("nav.home")}
+      </s-link>
+      <s-link href={analyticsHref}>{t("nav.analytics")}</s-link>
+      <s-link href={offersHref}>{t("nav.offers")}</s-link>
+      <s-link href={pricingHref}>{t("nav.pricing")}</s-link>
+      <s-link href={settingsHref}>{t("nav.settings")}</s-link>
+    </s-app-nav>
+  );
+}
+
+export default function App() {
+  const { apiKey, adminLanguage } = useLoaderData<typeof loader>();
+  const { pathname, search } = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!hasEphemeralBillingParams(search)) return;
@@ -99,21 +179,15 @@ export default function App() {
   }, [navigate, pathname, search]);
 
   return (
-    <PolarisAppProvider i18n={en}>
-      <AppProvider embedded apiKey={apiKey}>
-        <s-app-nav>
-          <s-link href={homeHref} rel="home">
-            Home
-          </s-link>
-          <s-link href={analyticsHref}>Analytics</s-link>
-          <s-link href={offersHref}>Offers</s-link>
-          <s-link href={pricingHref}>Pricing</s-link>
-          <s-link href={settingsHref}>Settings</s-link>
-        </s-app-nav>
-        <Outlet />
-        <CrispChat />
-      </AppProvider>
-    </PolarisAppProvider>
+    <AppProvider embedded apiKey={apiKey}>
+      <AdminI18nProvider initialAdminLanguage={adminLanguage}>
+        <PolarisLocaleBridge>
+          <AppNav />
+          <Outlet />
+          <CrispChat />
+        </PolarisLocaleBridge>
+      </AdminI18nProvider>
+    </AppProvider>
   );
 }
 

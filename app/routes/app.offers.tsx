@@ -53,6 +53,7 @@ import {
   getMaxActiveCampaigns,
   upgradeMessage,
 } from "../utils/pricingPlans";
+import { useAdminI18n } from "../components/AdminI18nProvider";
 
 const OfferTypePreviewModal = lazy(() =>
   import("../components/OfferTypePreviewModal").then((m) => ({
@@ -417,6 +418,7 @@ export default function Index() {
     maxActiveCampaigns,
     plan,
   } = useLoaderData<typeof loader>();
+  const { t } = useAdminI18n();
   const { search } = useLocation();
   const shopify = useAppBridge();
   const navigate = useNavigate();
@@ -441,15 +443,15 @@ export default function Index() {
   }, [atOfferCap, plan, shopify]);
 
   const nextDefaultCampaignName = useMemo(
-    () => `Offer ${campaigns.length + 1}`,
-    [campaigns.length],
+    () => t("offers.defaultName", { n: campaigns.length + 1 }),
+    [campaigns.length, t],
   );
 
   const toastSoon = useCallback(
     (label: string) => {
-      shopify.toast.show(`${label} — coming soon`);
+      shopify.toast.show(t("offers.comingSoon", { label }));
     },
-    [shopify],
+    [shopify, t],
   );
 
   const filteredCampaigns = useMemo(
@@ -488,10 +490,10 @@ export default function Index() {
         </Suspense>
         <Page
           fullWidth
-          title="Select offer type"
-          subtitle="Choose how volume pricing appears on product pages."
+          title={t("offers.selectTypeTitle")}
+          subtitle={t("offers.selectTypeSubtitle")}
           backAction={{
-            content: "Offers",
+            content: t("offers.back"),
             onAction: () => setScreen("home"),
           }}
         >
@@ -506,9 +508,9 @@ export default function Index() {
               <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
                 <Suspense fallback={null}>
                   <QuantityBreaksSelectCard
-                    title="Quantity breaks"
+                    title={t("offers.quantityBreaks")}
                     onPreview={() => setOfferPreviewModal("quantity")}
-                    onLearnMore={() => toastSoon("Learn more")}
+                    onLearnMore={() => toastSoon(t("common.learnMore"))}
                     onCreate={() => {
                       if (atOfferCap) {
                         shopify.toast.show(createOfferBlockedMessage(plan));
@@ -529,9 +531,9 @@ export default function Index() {
                     }}
                   />
                   <VolumeDiscountComingSoonCard
-                    title="Volume discount"
+                    title={t("offers.volumeDiscount")}
                     onPreview={() => setOfferPreviewModal("volume")}
-                    onLearnMore={() => toastSoon("Learn more")}
+                    onLearnMore={() => toastSoon(t("common.learnMore"))}
                     onCreate={() => {
                       if (atOfferCap) {
                         shopify.toast.show(createOfferBlockedMessage(plan));
