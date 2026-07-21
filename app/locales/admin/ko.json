@@ -237,7 +237,7 @@
   "home.stepEnableEmbedDesc": "테마 설정 → 앱 임베드 → Offrefy(전역)를 켜거나 앱 임베드 활성화를 사용하세요. 제품 페이지에서 안정적인 수량 할인 표시에 필요합니다.",
   "home.stepEnableEmbedAlt": "스토어프론트 연동 활성화 일러스트",
   "home.stepAddBlockTitle": "제품 페이지에 위젯 추가",
-  "home.stepAddBlockDesc": "선택 사항: 제품 템플릿 → 블록 추가 → 수량 할인. 전역 임베드는 이미 장바구니에 담기 근처에 위젯을 배치합니다.",
+  "home.stepAddBlockDesc": "테마 편집기를 열고 제품 템플릿의 지금 구매 위에 수량 할인을 배치합니다. 게시하려면 편집기에서 저장하세요.",
   "home.stepAddBlockAlt": "제품 페이지 레이아웃 일러스트",
   "home.stepCreateOfferTitle": "오퍼 만들기",
   "home.stepCreateOfferDesc": "단계, 제품, 위젯 스타일을 설정하세요. 활성 오퍼는 자동 할인으로 동기화됩니다.",

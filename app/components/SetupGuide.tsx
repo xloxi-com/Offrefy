@@ -12,9 +12,7 @@ import {
   InlineStack,
   Popover,
   ProgressBar,
-  Spinner,
   Text,
-  Tooltip,
 } from "@shopify/polaris";
 import {
   CheckIcon,
@@ -57,7 +55,6 @@ export type SetupGuideItem = {
 type SetupGuideProps = {
   items: SetupGuideItem[];
   onDismiss: () => void;
-  onStepComplete: (id: SetupGuideItem["id"]) => void | Promise<void>;
   title?: string;
   description?: string;
 };
@@ -65,7 +62,6 @@ type SetupGuideProps = {
 export function SetupGuide({
   items,
   onDismiss,
-  onStepComplete,
   title,
   description,
 }: SetupGuideProps) {
@@ -197,7 +193,6 @@ export function SetupGuide({
                 key={item.id}
                 expanded={expanded === item.id}
                 setExpanded={() => setExpanded(item.id)}
-                onComplete={onStepComplete}
                 {...item}
               />
             ))}
@@ -223,12 +218,10 @@ export function SetupGuide({
 type SetupItemProps = SetupGuideItem & {
   expanded: boolean;
   setExpanded: () => void;
-  onComplete: (id: SetupGuideItem["id"]) => void | Promise<void>;
 };
 
 function SetupItem({
   complete,
-  onComplete,
   expanded,
   setExpanded,
   title,
@@ -239,17 +232,7 @@ function SetupItem({
   id,
 }: SetupItemProps) {
   const { t } = useAdminI18n();
-  const [loading, setLoading] = useState(false);
   const collapseId = `setup-item-${id}`;
-
-  const completeItem = async () => {
-    setLoading(true);
-    try {
-      await onComplete(id);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <Box
@@ -260,40 +243,29 @@ function SetupItem({
         className={`${styles.setupItem} ${expanded ? styles.setupItemExpanded : ""}`}
       >
         <InlineStack gap="200" align="start" blockAlign="start" wrap={false}>
-          <Tooltip
-            content={complete ? t("setup.markNotDone") : t("setup.markDone")}
-            activatorWrapper="div"
+          <div
+            className={styles.completeButton}
+            aria-label={complete ? t("setup.checkComplete") : undefined}
+            aria-hidden={!complete}
+            role="img"
           >
-            <button
-              type="button"
-              onClick={completeItem}
-              className={styles.completeTrigger}
-              aria-label={
-                complete ? t("setup.markNotDone") : t("setup.markDone")
-              }
-            >
-              <div className={styles.completeButton}>
-                {loading ? (
-                  <Spinner size="small" />
-                ) : complete ? (
-                  <CheckIcon
-                    style={{
-                      width: "1.25rem",
-                      height: "1.25rem",
-                      borderRadius: "100%",
-                      background: "#303030",
-                      display: "flex",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      fill: "white",
-                    }}
-                  />
-                ) : (
-                  outlineSvg
-                )}
-              </div>
-            </button>
-          </Tooltip>
+            {complete ? (
+              <CheckIcon
+                style={{
+                  width: "1.25rem",
+                  height: "1.25rem",
+                  borderRadius: "100%",
+                  background: "#303030",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  fill: "white",
+                }}
+              />
+            ) : (
+              outlineSvg
+            )}
+          </div>
           <div
             className={styles.itemContent}
             onClick={expanded ? undefined : setExpanded}

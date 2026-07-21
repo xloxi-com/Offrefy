@@ -39,9 +39,7 @@ import {
   type SetupGuideItem,
 } from "../components/SetupGuide";
 import {
-  ensureThemeAppEmbedEnabled,
   getMainThemeAppEmbedStatus,
-  invalidateThemeAppEmbedStatusCache,
   peekMainThemeAppEmbedStatus,
 } from "../services/themeAppEmbed.server";
 import { ensureQuantityBreaksBlockInLiveTheme } from "../services/themeProductBlock.server";
@@ -67,6 +65,7 @@ import {
 export const meta: MetaFunction = () => [{ title: APP_DISPLAY_NAME }];
 
 const SETUP_GUIDE_DISMISSED_KEY = "offrefy-setup-guide-dismissed";
+/** Legacy key — manual checkbox overrides are no longer used. */
 const SETUP_GUIDE_MANUAL_KEY = "offrefy-setup-guide-manual";
 
 type SetupStatus = {
@@ -133,11 +132,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         const embed = await getMainThemeAppEmbedStatus(admin, session.shop);
 
         if (!embed.enabled && hasWriteThemes) {
-          const result = await ensureThemeAppEmbedEnabled(admin);
-          if (result.ok) {
-            invalidateThemeAppEmbedStatusCache(session.shop);
-            await getMainThemeAppEmbedStatus(admin, session.shop);
-          }
+          // Automatic settings_data write needs a Shopify themeFilesUpsert
+          // exemption. Skip the failing API call — merchants enable via Theme editor.
+          // (Deep link is on the home Setup Guide.)
         }
 
         if (hasWriteThemes) {
@@ -192,26 +189,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { admin, scopes, session } = await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");
-
-  if (intent === "enableAppEmbed") {
-    const grantedScopes = parseSessionScopes(session.scope);
-    if (!grantedScopes.includes("write_themes")) {
-      await scopes.request(["write_themes", "write_script_tags", "read_script_tags"]);
-    } else if (!grantedScopes.includes("write_script_tags")) {
-      await scopes.request(["write_script_tags", "read_script_tags"]);
-    }
-    const result = await ensureThemeAppEmbedEnabled(admin);
-    const tag = await ensureOffrefyStorefrontScriptTag(admin, session.shop);
-    return {
-      ok: result.ok || tag.ok,
-      alreadyEnabled: result.alreadyEnabled,
-      error:
-        [...result.errors, ...tag.errors].filter(Boolean).join("; ") || null,
-    };
-  }
 
   if (intent === "saveAdminLanguage") {
     const raw = String(formData.get("adminLanguage") ?? "");
@@ -270,23 +250,6 @@ function DetailRow({
   );
 }
 
-function readManualComplete(): Record<string, boolean> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(SETUP_GUIDE_MANUAL_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as Record<string, boolean>;
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeManualComplete(value: Record<string, boolean>) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(SETUP_GUIDE_MANUAL_KEY, JSON.stringify(value));
-}
-
 export default function AppHomePage() {
   const { status } = useLoaderData<typeof loader>();
   const { search } = useLocation();
@@ -332,24 +295,16 @@ export default function AppHomePage() {
     status.hasOffers &&
     status.hasActiveOffers &&
     hasSynced;
-  const enabling =
-    fetcher.state !== "idle" &&
-    String(fetcher.formData?.get("intent") ?? "") === "enableAppEmbed";
 
   const [showGuide, setShowGuide] = useState(true);
-  const [manualComplete, setManualComplete] = useState<Record<string, boolean>>(
-    {},
-  );
   const [dismissedSetupBanner, setDismissedSetupBanner] = useState(false);
-  const [dismissedSuccessBanner, setDismissedSuccessBanner] = useState(false);
-  const [dismissedErrorBanner, setDismissedErrorBanner] = useState(false);
-  const [dismissedWarningBanner, setDismissedWarningBanner] = useState(false);
 
   useEffect(() => {
     setShowGuide(
       window.localStorage.getItem(SETUP_GUIDE_DISMISSED_KEY) !== "1",
     );
-    setManualComplete(readManualComplete());
+    // Drop legacy manual overrides so Done only reflects live status.
+    window.localStorage.removeItem(SETUP_GUIDE_MANUAL_KEY);
   }, []);
 
   // After deferred Admin API fills the embed cache, soft-revalidate once.
@@ -366,11 +321,6 @@ export default function AppHomePage() {
   useEffect(() => {
     setAdminLanguageDraft(liveAdminLanguage);
   }, [liveAdminLanguage]);
-
-  useEffect(() => {
-    setDismissedSuccessBanner(false);
-    setDismissedErrorBanner(false);
-  }, [fetcher.data]);
 
   useEffect(() => {
     if (!fetcher.data || !("intent" in fetcher.data)) return;
@@ -416,28 +366,11 @@ export default function AppHomePage() {
     [embedReady, hasSynced, status.hasActiveOffers, status.hasOffers],
   );
 
-  const onStepComplete = useCallback(
-    async (id: SetupGuideItem["id"]) => {
-      const key = String(id);
-      await new Promise((resolve) => setTimeout(resolve, 250));
-      setManualComplete((prev) => {
-        // Status-driven steps stay complete; only toggle soft overrides.
-        if (statusById[key as keyof typeof statusById]) return prev;
-        const next = { ...prev };
-        if (next[key]) delete next[key];
-        else next[key] = true;
-        writeManualComplete(next);
-        return next;
-      });
-    },
-    [statusById],
-  );
-
   const enableWidget = useCallback(() => {
-    const fd = new FormData();
-    fd.set("intent", "enableAppEmbed");
-    fetcher.submit(fd, { method: "post" });
-  }, [fetcher]);
+    // themeFilesUpsert needs a Shopify exemption most apps don't have.
+    // Deep-link into Theme editor → App embeds with Offrefy pre-selected instead.
+    window.open(themeEmbedHref, "_blank", "noopener,noreferrer");
+  }, [themeEmbedHref]);
 
   const onAdminLanguageSelect = useCallback(
     (value: string) => {
@@ -457,8 +390,8 @@ export default function AppHomePage() {
   }, [adminLanguageDraft, fetcher]);
 
   const setupItems = useMemo((): SetupGuideItem[] => {
-    const isDone = (id: keyof typeof statusById) =>
-      Boolean(statusById[id] || manualComplete[id]);
+    // Done only when live status is true — never from manual checkbox toggles.
+    const isDone = (id: keyof typeof statusById) => Boolean(statusById[id]);
 
     const limitSuffix =
       status.maxActiveCampaigns == null
@@ -481,20 +414,12 @@ export default function AppHomePage() {
               props: { url: themeEmbedHref, external: true },
             }
           : {
-              content: enabling
-                ? t("home.bannerEnabling")
-                : t("home.bannerEnableEmbed"),
+              content: t("home.bannerEnableEmbed"),
               props: {
                 onClick: enableWidget,
-                loading: enabling,
               },
             },
-        secondaryButton: embedReady
-          ? undefined
-          : {
-              content: t("home.themeEditor"),
-              props: { url: themeEmbedHref, external: true },
-            },
+        secondaryButton: undefined,
       },
       {
         id: "add-block",
@@ -571,9 +496,7 @@ export default function AppHomePage() {
   }, [
     embedReady,
     enableWidget,
-    enabling,
     localeKey,
-    manualComplete,
     newOfferHref,
     offersHref,
     settingsHref,
@@ -618,32 +541,7 @@ export default function AppHomePage() {
       ]}
     >
       <BlockStack gap="500">
-        {!embedReady && !status.setupStatusStale && !dismissedWarningBanner ? (
-          <Banner
-            tone="warning"
-            title={t("home.bannerEmbedOffTitle")}
-            onDismiss={() => setDismissedWarningBanner(true)}
-            action={{
-              content: enabling
-                ? t("home.bannerEnabling")
-                : t("home.bannerEnableEmbed"),
-              onAction: enableWidget,
-              loading: enabling,
-            }}
-            secondaryAction={{
-              content: t("home.bannerOpenThemeEditor"),
-              url: themeEmbedHref,
-            }}
-          >
-            <p>
-              {t("home.bannerEmbedOffBody")}
-              {status.scriptTagOk ? t("home.bannerEmbedOffScript") : ""}
-              {status.appEmbedErrors.length > 0
-                ? ` (${status.appEmbedErrors[0]})`
-                : ""}
-            </p>
-          </Banner>
-        ) : !setupComplete && showGuide && !dismissedSetupBanner ? (
+        {!setupComplete && showGuide && !dismissedSetupBanner ? (
           <Banner
             tone="info"
             title={t("home.bannerCompleteSetupTitle")}
@@ -653,46 +551,12 @@ export default function AppHomePage() {
           </Banner>
         ) : null}
 
-        {fetcher.data &&
-        "ok" in fetcher.data &&
-        fetcher.data.ok &&
-        (!("intent" in fetcher.data) ||
-          fetcher.data.intent !== "saveAdminLanguage") &&
-        !dismissedSuccessBanner ? (
-          <Banner
-            tone="success"
-            title={t("home.bannerEmbedOnTitle")}
-            onDismiss={() => setDismissedSuccessBanner(true)}
-          >
-            <p>{t("home.bannerEmbedOnBody")}</p>
-          </Banner>
-        ) : null}
-
-        {fetcher.data &&
-        "ok" in fetcher.data &&
-        !fetcher.data.ok &&
-        (!("intent" in fetcher.data) ||
-          fetcher.data.intent !== "saveAdminLanguage") &&
-        !dismissedErrorBanner ? (
-          <Banner
-            tone="critical"
-            title={t("home.bannerEmbedFailTitle")}
-            onDismiss={() => setDismissedErrorBanner(true)}
-          >
-            <p>
-              {fetcher.data.error || t("common.unknownError")}.{" "}
-              {t("home.bannerEmbedFailBody")}
-            </p>
-          </Banner>
-        ) : null}
-
         <Layout>
           <Layout.Section>
             <BlockStack gap="400">
               {showGuide ? (
                 <SetupGuide
                   onDismiss={dismissGuide}
-                  onStepComplete={onStepComplete}
                   items={setupItems}
                   title={t("home.setupGuideTitle")}
                   description={t("home.setupGuideDescription")}

@@ -4,7 +4,7 @@ api_version = "2026-01"
 name = "Offrefy — Quantity breaks"
 handle = "volume-discount-fn"
 type = "function"
-uid = "765ae274-2507-da32-0bc8-186fd0ef0505e19418b4"
+uid = "6bc754c3-c3e6-d925-c287-63fc84a8c6167d1e061d"
 description = "One automatic Product Discount reads unlimited campaigns from discount metafields (saves Shopify's ~25 discount slot cap)."
 
   [[extensions.targeting]]

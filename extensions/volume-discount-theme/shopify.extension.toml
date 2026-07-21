@@ -1,9 +1,9 @@
 # Theme app extension: section app block (Product information → Add block → Apps)
-# + optional app embed (Theme settings → App embeds).
+# + required app embed (Theme settings → App embeds) to load storefront scripts.
 api_version = "2026-01"
 
 [[extensions]]
 name = "Offrefy — Storefront"
 handle = "volume-discount-theme"
-uid = "019f469b-9c3e-742f-82ba-53cdb7f1d129"
+uid = "bf69e48e-bed3-2f4e-10f1-fa992f1fd7a3642c6510"
 type = "theme"

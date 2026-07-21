@@ -2089,8 +2089,8 @@
   function effectiveWidgetHeaderLayout(d) {
     var explicit = pickWidgetHeaderLayout(d.widgetHeaderLayout);
     if (explicit === "stacked") return "stacked";
-    var ha = pickWidgetHeaderTextAlign(d.widgetHeadingAlign, "start");
-    var ca = pickWidgetHeaderTextAlign(d.countdownAlign, "end");
+    var ha = pickWidgetHeaderTextAlign(d.widgetHeadingAlign, "center");
+    var ca = pickWidgetHeaderTextAlign(d.countdownAlign, "center");
     if (ha === "center" && ca === "center") return "stacked";
     return explicit;
   }
@@ -2101,8 +2101,8 @@
    */
   function effectiveWidgetHeaderSwapOrder(d) {
     var layout = effectiveWidgetHeaderLayout(d);
-    var ha = pickWidgetHeaderTextAlign(d.widgetHeadingAlign, "start");
-    var ca = pickWidgetHeaderTextAlign(d.countdownAlign, "end");
+    var ha = pickWidgetHeaderTextAlign(d.widgetHeadingAlign, "center");
+    var ca = pickWidgetHeaderTextAlign(d.countdownAlign, "center");
     if (layout === "split" && ha === "end" && ca === "start") {
       return true;
     }
@@ -2110,7 +2110,7 @@
   }
 
   function pickWidgetHeaderTextAlign(v, fallback) {
-    var s = String(v != null ? v : fallback || "start").trim();
+    var s = String(v != null ? v : fallback || "center").trim();
     if (s === "center" || s === "end") return s;
     return "start";
   }
@@ -2153,8 +2153,8 @@
     } else {
       root.removeAttribute("data-vd-header-swap");
     }
-    var ha = pickWidgetHeaderTextAlign(d.widgetHeadingAlign, "start");
-    var ca = pickWidgetHeaderTextAlign(d.countdownAlign, "end");
+    var ha = pickWidgetHeaderTextAlign(d.widgetHeadingAlign, "center");
+    var ca = pickWidgetHeaderTextAlign(d.countdownAlign, "center");
     root.style.setProperty("--vd-heading-text-align", ha);
     root.style.setProperty("--vd-countdown-justify", countdownAlignToJustify(ca));
   }
@@ -2186,10 +2186,10 @@
 
   var WD_DEFAULT = {
     widgetHeading: "",
-    showCountdown: true,
+    showCountdown: false,
     widgetHeaderLayout: "split",
-    widgetHeadingAlign: "start",
-    countdownAlign: "end",
+    widgetHeadingAlign: "center",
+    countdownAlign: "center",
     widgetHeaderSwapOrder: false,
     widgetHeaderMobileStack: true,
     widgetPresentation: "tier_cards",
@@ -2483,8 +2483,14 @@
       WD_DEFAULT.volumeTablePriceColPaddingEndPx,
     );
     d.widgetHeaderLayout = pickWidgetHeaderLayout(d.widgetHeaderLayout);
-    d.widgetHeadingAlign = pickWidgetHeaderTextAlign(d.widgetHeadingAlign, "start");
-    d.countdownAlign = pickWidgetHeaderTextAlign(d.countdownAlign, "end");
+    d.widgetHeadingAlign = pickWidgetHeaderTextAlign(
+      d.widgetHeadingAlign,
+      WD_DEFAULT.widgetHeadingAlign,
+    );
+    d.countdownAlign = pickWidgetHeaderTextAlign(
+      d.countdownAlign,
+      WD_DEFAULT.countdownAlign,
+    );
     d.widgetHeaderSwapOrder = d.widgetHeaderSwapOrder === true;
     d.widgetHeaderMobileStack = d.widgetHeaderMobileStack === true;
     d.badgeSizeScalePercent = clampBadgeSizeScalePct(d.badgeSizeScalePercent);
@@ -2680,7 +2686,7 @@
     return {
       title: h || String(themeHeading || "").trim() || "Quantity breaks",
       widgetPresentation: pres === "volume_table" ? "volume_table" : "tier_cards",
-      showCountdown: d.showCountdown !== false,
+      showCountdown: d.showCountdown === true,
       countdownLabel: String(d.countdownLabel || WD_DEFAULT.countdownLabel).trim() ||
         WD_DEFAULT.countdownLabel,
       countdownTimeUnit: pickCountdownTimeUnit(d.countdownTimeUnit),
@@ -3810,7 +3816,7 @@
     trackImpression(campaign, root.getAttribute("data-product-id"));
     window.VolumeDiscount = window.VolumeDiscount || {};
     window.VolumeDiscount.embed = window.VolumeDiscount.embed || {};
-    window.VolumeDiscount.embed.version = "1.26.0";
+    window.VolumeDiscount.embed.version = "1.27.2";
 
     /**
      * Remove the body app-embed fallback only after a section "Quantity breaks" widget
@@ -4053,8 +4059,21 @@
     var scriptEl = configId ? document.getElementById(configId) : null;
     if (!mount) return;
 
+    var designModeEarly = root.getAttribute("data-design-mode") === "true";
     var productId = root.getAttribute("data-product-id");
     if (!productId) {
+      /* Theme editor on Home / non-product: still show a preview so Apps picker works. */
+      if (designModeEarly) {
+        root.setAttribute("data-product-id", "0");
+        root.setAttribute("data-variant-id", "0");
+        root.setAttribute("data-unit-price-cents", "2500");
+        root.setAttribute(
+          "data-currency",
+          root.getAttribute("data-currency") || "USD",
+        );
+        runWidget(root);
+        return;
+      }
       hydrateRootProductDataFromJson(root).then(function (ok) {
         if (ok) runWidget(root);
         else mount.hidden = true;
@@ -4256,51 +4275,31 @@
   }
 
   /**
-   * When App Embed / section block is not enabled, theme Liquid never outputs a
-   * widget root. Autoinject so ScriptTag / hosted JS can still mount on PDPs.
+   * Autoinject disabled: widget only mounts where the merchant added the
+   * “Quantity breaks” theme block. App embed loads scripts/CSS only.
    */
   function ensureAutoinjectRoot() {
-    if (document.querySelector(".vd-storefront-root")) return null;
-    if (!isLikelyProductPage()) return null;
+    return null;
+  }
 
-    ensureHostedStorefrontCss();
-
-    var root = document.createElement("div");
-    root.className = "vd-storefront-root volume-discount-embed";
-    root.id = "vd-shopify-autoinject";
-    root.setAttribute("data-vd-embed-fallback", "true");
-    root.setAttribute("data-config-id", "vd-json-autoinject");
-    root.setAttribute("data-heading", "Get more, save more");
-    root.setAttribute("data-section-heading", "");
-    try {
-      if (window.Shopify && window.Shopify.currency && window.Shopify.currency.active) {
-        root.setAttribute("data-currency", String(window.Shopify.currency.active));
-      }
-    } catch (e3) {
-      void e3;
-    }
-
-    var cfg = document.createElement("script");
-    cfg.type = "application/json";
-    cfg.id = "vd-json-autoinject";
-    cfg.textContent = '{"version":1,"campaigns":[]}';
-
-    var mount = document.createElement("div");
-    mount.className = "volume-discount-embed__inner vd-mount";
-    mount.setAttribute("data-vd-mount", "");
-    mount.hidden = true;
-
-    root.appendChild(cfg);
-    root.appendChild(mount);
-    (document.body || document.documentElement).appendChild(root);
-    return root;
+  function hideAllWidgetRoots() {
+    document.querySelectorAll(".vd-storefront-root").forEach(function (el) {
+      el.style.display = "none";
+      el.removeAttribute("data-vd-inited");
+      var mount = el.querySelector("[data-vd-mount]");
+      if (mount) mount.hidden = true;
+    });
   }
 
   function scan(options) {
     var opts = options || {};
     var syncCartSideEffects = opts.syncCart !== false;
 
-    ensureAutoinjectRoot();
+    /* App embed off → never mount (block markup alone must not show the widget). */
+    if (!window.__vdAppEmbedActive) {
+      hideAllWidgetRoots();
+      return;
+    }
 
     /* Widget first — never wait on cart network before mounting. */
     document.querySelectorAll(".vd-storefront-root").forEach(function (el) {

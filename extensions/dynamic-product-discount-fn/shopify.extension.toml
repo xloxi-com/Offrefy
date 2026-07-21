@@ -4,7 +4,7 @@ api_version = "2026-01"
 name = "Dynamic product discount (metafield DB)"
 handle = "dynamic-product-discount-fn"
 type = "function"
-uid = "b8c9d0e1-f2a3-4567-8901-23456789abcd"
+uid = "acbdde62-b731-be4e-56bb-33f0e3ef6aa3adf4f89d"
 description = "Applies up to 25 per-product discounts from discount.custom.discounts JSON metafield (no Admin API)."
 
   [[extensions.targeting]]

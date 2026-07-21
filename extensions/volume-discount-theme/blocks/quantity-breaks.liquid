@@ -1,6 +1,8 @@
 {% comment %}
-  Section app block — appears in Product information → Add block → Apps.
-  Horizon nests this under theme blocks — product comes from `closest.product`.
+  App block — Theme editor → Add section → Apps, or Product information → Add block → Apps.
+  Available on all templates (not product-only) so reviewers/merchants find it from Home too.
+  Product comes from closest.product or the template product (no theme-editor settings).
+  Requires Offrefy (global) app embed to be enabled — this block is markup only.
 {% endcomment %}
 {% liquid
   if closest.product != blank
@@ -15,35 +17,7 @@
 {
   "name": "t:volume_discount.blocks.quantity_breaks.name",
   "target": "section",
-  "enabled_on": {
-    "templates": ["product"]
-  },
-  "settings": [
-    {
-      "type": "paragraph",
-      "content": "t:volume_discount.blocks.quantity_breaks.paragraph"
-    },
-    {
-      "type": "checkbox",
-      "id": "show_section_heading",
-      "label": "t:volume_discount.settings.show_section_heading",
-      "info": "t:volume_discount.settings.show_section_heading_info",
-      "default": false
-    },
-    {
-      "type": "text",
-      "id": "section_heading",
-      "label": "t:volume_discount.settings.section_heading",
-      "default": "Offers",
-      "info": "t:volume_discount.settings.section_heading_info"
-    },
-    {
-      "type": "text",
-      "id": "heading",
-      "label": "t:volume_discount.settings.heading",
-      "default": "Get more, save more 🥳",
-      "info": "t:volume_discount.settings.heading_info"
-    }
-  ]
+  "stylesheet": "volume-discount-storefront.css",
+  "settings": []
 }
 {% endschema %}

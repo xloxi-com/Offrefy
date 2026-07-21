@@ -34,7 +34,26 @@ type AdminI18nContextValue = {
   setAdminLanguage: (next: AdminLanguageCode) => void;
 };
 
-const AdminI18nContext = createContext<AdminI18nContextValue | null>(null);
+const ADMIN_I18N_CONTEXT_KEY = "__offrefyAdminI18nContext__";
+
+/**
+ * Vite HMR can evaluate this module twice (e.g. `/@fs/...` vs relative), which
+ * would create two React contexts and make `useAdminI18n` always see `null`.
+ * Pin the context on globalThis so provider + consumers share one instance.
+ */
+function getAdminI18nContext() {
+  const g = globalThis as typeof globalThis & {
+    [ADMIN_I18N_CONTEXT_KEY]?: ReturnType<
+      typeof createContext<AdminI18nContextValue | null>
+    >;
+  };
+  if (!g[ADMIN_I18N_CONTEXT_KEY]) {
+    g[ADMIN_I18N_CONTEXT_KEY] = createContext<AdminI18nContextValue | null>(null);
+  }
+  return g[ADMIN_I18N_CONTEXT_KEY];
+}
+
+const AdminI18nContext = getAdminI18nContext();
 
 function readShopifyAdminLocale(shopify: ReturnType<typeof useAppBridge>): string | null {
   try {
@@ -166,4 +185,9 @@ export function useAdminI18n(): AdminI18nContextValue {
     throw new Error("useAdminI18n must be used within AdminI18nProvider");
   }
   return ctx;
+}
+
+/** Soft read for shells that may race during HMR / App Bridge boot. */
+export function useAdminI18nOptional(): AdminI18nContextValue | null {
+  return useContext(AdminI18nContext);
 }

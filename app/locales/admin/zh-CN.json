@@ -237,7 +237,7 @@
   "home.stepEnableEmbedDesc": "主题设置 → 应用嵌入 → 开启 Offrefy（全局），或使用启用应用嵌入。产品页可靠显示数量折扣所必需。",
   "home.stepEnableEmbedAlt": "启用店面集成示意图",
   "home.stepAddBlockTitle": "在产品页添加小组件",
-  "home.stepAddBlockDesc": "可选：产品模板 → 添加区块 → 数量折扣。全局嵌入已将小组件放在“加入购物车”附近。",
+  "home.stepAddBlockDesc": "打开主题编辑器，并将数量折扣放在产品模板“立即购买”上方。在编辑器中保存以发布。",
   "home.stepAddBlockAlt": "产品页布局示意图",
   "home.stepCreateOfferTitle": "创建优惠",
   "home.stepCreateOfferDesc": "设置阶梯、产品和小组件样式。有效优惠会同步为自动折扣。",

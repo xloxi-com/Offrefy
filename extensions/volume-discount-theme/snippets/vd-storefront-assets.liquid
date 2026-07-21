@@ -35,7 +35,7 @@
 %}
 <script>
 (function () {
-  var VD_ASSET_VERSION = "1.26.0";
+  var VD_ASSET_VERSION = "1.27.2";
   var APP_ORIGIN = "https://offrey.xloxi.com";
   window.__vdStorefrontLocale = {{ request.locale.iso_code | json }};
   window.__vdAssetVersion = VD_ASSET_VERSION;
@@ -55,8 +55,12 @@
   {% endif %}
 
   {% if vd_is_product and vd_product != blank %}
-  /* Start widget-config before the main bundle parses — biggest TTI win on product pages. */
+  /* Start widget-config before the main bundle parses — biggest TTI win on product pages.
+     Skip in theme editor to keep preview iframe stable. */
   (function prefetchVdConfig() {
+    try {
+      if (window.Shopify && window.Shopify.designMode) return;
+    } catch (e) {}
     var shop = {{ shop.permanent_domain | json }};
     var pid = {{ vd_product.id | json }};
     var vid = {{ vd_product.selected_or_first_available_variant.id | json }};
@@ -89,8 +93,12 @@
   })();
   {% endif %}
 
-  /* Cart locale sync is non-critical — never compete with widget boot. */
+  /* Cart locale sync is non-critical — never compete with widget boot.
+     Skip in theme editor to avoid preview iframe load / redirect issues. */
   function syncVdCartLocaleAttribute() {
+    try {
+      if (window.Shopify && window.Shopify.designMode) return;
+    } catch (e) {}
     var loc = window.__vdStorefrontLocale;
     if (!loc && document.documentElement) {
       var lang = document.documentElement.getAttribute("lang");

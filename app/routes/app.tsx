@@ -29,6 +29,7 @@ import { CrispChat } from "../components/CrispChat";
 import {
   AdminI18nProvider,
   useAdminI18n,
+  useAdminI18nOptional,
 } from "../components/AdminI18nProvider";
 import {
   adminEmbeddedPath,
@@ -106,9 +107,16 @@ export function shouldRevalidate({
   return defaultShouldRevalidate;
 }
 
-function PolarisLocaleBridge({ children }: { children: ReactNode }) {
+function PolarisLocaleBridge({
+  fallbackAdminLanguage,
+  children,
+}: {
+  fallbackAdminLanguage: AdminLanguageCode;
+  children: ReactNode;
+}) {
   const shopify = useAppBridge();
-  const { adminLanguage } = useAdminI18n();
+  const i18nCtx = useAdminI18nOptional();
+  const adminLanguage = i18nCtx?.adminLanguage ?? fallbackAdminLanguage;
   const [i18n, setI18n] = useState(en);
 
   useEffect(() => {
@@ -181,7 +189,7 @@ export default function App() {
   return (
     <AppProvider embedded apiKey={apiKey}>
       <AdminI18nProvider initialAdminLanguage={adminLanguage}>
-        <PolarisLocaleBridge>
+        <PolarisLocaleBridge fallbackAdminLanguage={adminLanguage}>
           <AppNav />
           <Outlet />
           <CrispChat />

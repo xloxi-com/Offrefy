@@ -237,7 +237,7 @@
   "home.stepEnableEmbedDesc": "主題設定 → 應用程式嵌入 → 開啟 Offrefy（全域），或使用啟用應用程式嵌入。產品頁可靠顯示數量折扣所必需。",
   "home.stepEnableEmbedAlt": "啟用店面整合示意圖",
   "home.stepAddBlockTitle": "在產品頁新增小工具",
-  "home.stepAddBlockDesc": "選用：產品範本 → 新增區塊 → 數量折扣。全域嵌入已將小工具放在「加入購物車」附近。",
+  "home.stepAddBlockDesc": "開啟佈景主題編輯器，並將數量折扣放在產品範本「立即購買」上方。在編輯器中儲存以發佈。",
   "home.stepAddBlockAlt": "產品頁版面示意圖",
   "home.stepCreateOfferTitle": "建立優惠",
   "home.stepCreateOfferDesc": "設定階梯、產品和小工具樣式。有效優惠會同步為自動折扣。",

@@ -973,8 +973,8 @@ export const VOLUME_DISCOUNT_APPEARANCE_PRESETS: VolumeDiscountAppearancePresetR
         controlBorderRadiusPx: 10,
         badgePosition: "after_label",
         widgetHeaderLayout: "split",
-        widgetHeadingAlign: "start",
-        countdownAlign: "end",
+        widgetHeadingAlign: "center",
+        countdownAlign: "center",
         widgetHeaderSwapOrder: false,
       },
     },
@@ -1029,9 +1029,9 @@ export const VOLUME_DISCOUNT_APPEARANCE_PRESETS: VolumeDiscountAppearancePresetR
         controlBorderRadiusPx: 8,
         badgePosition: "after_label",
         widgetHeaderLayout: "split",
-        widgetHeadingAlign: "end",
-        countdownAlign: "start",
-        widgetHeaderSwapOrder: true,
+        widgetHeadingAlign: "center",
+        countdownAlign: "center",
+        widgetHeaderSwapOrder: false,
       },
     },
     {
@@ -1057,8 +1057,8 @@ export const VOLUME_DISCOUNT_APPEARANCE_PRESETS: VolumeDiscountAppearancePresetR
         controlBorderRadiusPx: 12,
         badgePosition: "below_label",
         widgetHeaderLayout: "split",
-        widgetHeadingAlign: "start",
-        countdownAlign: "end",
+        widgetHeadingAlign: "center",
+        countdownAlign: "center",
         widgetHeaderSwapOrder: false,
       },
     },
@@ -1085,8 +1085,8 @@ export const VOLUME_DISCOUNT_APPEARANCE_PRESETS: VolumeDiscountAppearancePresetR
         controlBorderRadiusPx: 10,
         badgePosition: "after_subtext",
         widgetHeaderLayout: "split",
-        widgetHeadingAlign: "start",
-        countdownAlign: "end",
+        widgetHeadingAlign: "center",
+        countdownAlign: "center",
         widgetHeaderSwapOrder: false,
       },
     },
@@ -1113,8 +1113,8 @@ export const VOLUME_DISCOUNT_APPEARANCE_PRESETS: VolumeDiscountAppearancePresetR
         controlBorderRadiusPx: 6,
         badgePosition: "top_left",
         widgetHeaderLayout: "stacked",
-        widgetHeadingAlign: "start",
-        countdownAlign: "start",
+        widgetHeadingAlign: "center",
+        countdownAlign: "center",
         widgetHeaderSwapOrder: false,
       },
     },
@@ -1141,8 +1141,8 @@ export const VOLUME_DISCOUNT_APPEARANCE_PRESETS: VolumeDiscountAppearancePresetR
         controlBorderRadiusPx: 12,
         badgePosition: "top_right",
         widgetHeaderLayout: "split",
-        widgetHeadingAlign: "start",
-        countdownAlign: "end",
+        widgetHeadingAlign: "center",
+        countdownAlign: "center",
         widgetHeaderSwapOrder: false,
       },
     },
@@ -1169,8 +1169,8 @@ export const VOLUME_DISCOUNT_APPEARANCE_PRESETS: VolumeDiscountAppearancePresetR
         controlBorderRadiusPx: 4,
         badgePosition: "after_label",
         widgetHeaderLayout: "split",
-        widgetHeadingAlign: "start",
-        countdownAlign: "end",
+        widgetHeadingAlign: "center",
+        countdownAlign: "center",
         widgetHeaderSwapOrder: false,
       },
     },
@@ -1197,8 +1197,8 @@ export const VOLUME_DISCOUNT_APPEARANCE_PRESETS: VolumeDiscountAppearancePresetR
         controlBorderRadiusPx: 10,
         badgePosition: "price_column",
         widgetHeaderLayout: "split",
-        widgetHeadingAlign: "start",
-        countdownAlign: "end",
+        widgetHeadingAlign: "center",
+        countdownAlign: "center",
         widgetHeaderSwapOrder: false,
       },
     },
@@ -1225,8 +1225,8 @@ export const VOLUME_DISCOUNT_APPEARANCE_PRESETS: VolumeDiscountAppearancePresetR
         controlBorderRadiusPx: 10,
         badgePosition: "top_center",
         widgetHeaderLayout: "split",
-        widgetHeadingAlign: "start",
-        countdownAlign: "end",
+        widgetHeadingAlign: "center",
+        countdownAlign: "center",
         widgetHeaderSwapOrder: false,
       },
     },
@@ -1409,7 +1409,7 @@ const VOLUME_TABLE_APPEARANCE_COLOR_PATCHES: Record<
 /**
  * Ten one-click looks for Volume discount (pricing table). Same preset ids and
  * layout/radii as Quantity breaks, but **colors** are table-tuned via
- * `VOLUME_TABLE_APPEARANCE_COLOR_PATCHES`. Stacked QB presets → centered header rows.
+ * `VOLUME_TABLE_APPEARANCE_COLOR_PATCHES`. Heading + timer default to center.
  */
 export const VOLUME_TABLE_APPEARANCE_PRESETS: VolumeDiscountAppearancePresetRow[] =
   VOLUME_DISCOUNT_APPEARANCE_PRESETS.map((row) => {
@@ -1424,12 +1424,8 @@ export const VOLUME_TABLE_APPEARANCE_PRESETS: VolumeDiscountAppearancePresetRow[
         ...p,
         ...colors,
         widgetHeaderLayout: stacked ? "stacked" : "split",
-        widgetHeadingAlign: stacked
-          ? "center"
-          : (p.widgetHeadingAlign ?? "center"),
-        countdownAlign: stacked
-          ? "center"
-          : (p.countdownAlign ?? "end"),
+        widgetHeadingAlign: "center",
+        countdownAlign: "center",
       },
     };
   });
@@ -1475,10 +1471,10 @@ function pickAppearanceTemplateId(
 export const DEFAULT_WIDGET_DISPLAY: VolumeDiscountWidgetDisplay = {
   widgetHeading: "",
   widgetPresentation: "tier_cards",
-  showCountdown: true,
+  showCountdown: false,
   widgetHeaderLayout: "split",
-  widgetHeadingAlign: "start",
-  countdownAlign: "end",
+  widgetHeadingAlign: "center",
+  countdownAlign: "center",
   widgetHeaderSwapOrder: false,
   widgetHeaderMobileStack: true,
   countdownLabel: "Sale end in",

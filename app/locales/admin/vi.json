@@ -237,7 +237,7 @@
   "home.stepEnableEmbedDesc": "Cài đặt giao diện → Nhúng ứng dụng → bật Offrefy (toàn cục), hoặc dùng Bật nhúng ứng dụng. Cần thiết để giảm giá theo số lượng ổn định trên trang sản phẩm.",
   "home.stepEnableEmbedAlt": "Minh họa bật tích hợp cửa hàng",
   "home.stepAddBlockTitle": "Thêm tiện ích trên trang sản phẩm",
-  "home.stepAddBlockDesc": "Tùy chọn: Mẫu sản phẩm → Thêm khối → Giảm giá theo số lượng. Nhúng toàn cục đã đặt tiện ích gần Thêm vào giỏ hàng.",
+  "home.stepAddBlockDesc": "Mở trình chỉnh sửa giao diện và đặt Giảm giá theo số lượng phía trên Mua ngay trên mẫu sản phẩm. Lưu trong trình chỉnh sửa để xuất bản.",
   "home.stepAddBlockAlt": "Minh họa bố cục trang sản phẩm",
   "home.stepCreateOfferTitle": "Tạo ưu đãi",
   "home.stepCreateOfferDesc": "Đặt các mức, sản phẩm và kiểu tiện ích. Ưu đãi đang hoạt động đồng bộ thành giảm giá tự động.",

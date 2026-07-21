@@ -338,7 +338,20 @@ export async function ensureThemeAppEmbedEnabled(
   );
   const allErrors = [...errors, ...userErrors];
   if (allErrors.length) {
-    return { ok: false, alreadyEnabled: false, errors: allErrors };
+    // Apps without Shopify's themeFilesUpsert exemption always hit this —
+    // return a short, actionable message (no Google Form wall of text).
+    const accessDenied = allErrors.some((msg) =>
+      /access denied|exemption|themeFilesUpsert/i.test(msg),
+    );
+    return {
+      ok: false,
+      alreadyEnabled: false,
+      errors: accessDenied
+        ? [
+            "Open Theme editor → App embeds → turn on Offrefy (global) → Save.",
+          ]
+        : allErrors,
+    };
   }
 
   invalidateThemeAppEmbedStatusCache();

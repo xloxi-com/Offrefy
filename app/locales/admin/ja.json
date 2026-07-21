@@ -237,7 +237,7 @@
   "home.stepEnableEmbedDesc": "テーマ設定 → アプリ埋め込み → Offrefy（グローバル）をオンにするか、「アプリ埋め込みを有効化」を使用してください。商品ページで安定して数量割引を表示するために必要です。",
   "home.stepEnableEmbedAlt": "ストアフロント連携を有効化するイラスト",
   "home.stepAddBlockTitle": "商品ページにウィジェットを追加",
-  "home.stepAddBlockDesc": "任意：商品テンプレート → ブロックを追加 → 数量割引。グローバル埋め込みはすでにカートに追加の近くにウィジェットを配置します。",
+  "home.stepAddBlockDesc": "テーマエディタを開き、商品テンプレートの今すぐ購入の上に数量割引を配置します。公開するにはエディタで保存してください。",
   "home.stepAddBlockAlt": "商品ページレイアウトのイラスト",
   "home.stepCreateOfferTitle": "オファーを作成",
   "home.stepCreateOfferDesc": "段階、商品、ウィジェットのスタイルを設定します。アクティブなオファーは自動割引として同期されます。",

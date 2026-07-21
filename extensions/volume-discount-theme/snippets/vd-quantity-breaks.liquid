@@ -14,8 +14,13 @@
     assign vd_section_heading = ''
     assign vd_id_suffix = 'app-embed'
   else
-    assign vd_heading = block.settings.heading | default: 'Get more, save more 🥳'
-    if block.settings.show_section_heading == true
+    # No theme-editor settings; soft-read legacy values if previously saved.
+    if block and block.settings.heading != blank
+      assign vd_heading = block.settings.heading
+    else
+      assign vd_heading = 'Get more, save more 🥳'
+    endif
+    if block and block.settings.show_section_heading == true and block.settings.section_heading != blank
       assign vd_section_heading = block.settings.section_heading | strip
     else
       assign vd_section_heading = ''
@@ -43,7 +48,10 @@
     endif
   endif
 %}
-{% render 'vd-storefront-assets', vd_product: vd_product %}
+{%- comment -%}
+  Markup only. Storefront JS/CSS load from the Offrefy (global) app embed.
+  If the embed is off, this block must not boot the widget on its own.
+{%- endcomment -%}
 <div
   class="vd-storefront-root volume-discount-embed"
   id="vd-shopify-{{ vd_id_suffix }}"
@@ -67,6 +75,11 @@
       data-variant-gid="{{ vd_product.selected_or_first_available_variant.admin_graphql_api_id | escape }}"
     {% endif %}
     data-unit-price-cents="{{ vd_product.selected_or_first_available_variant.price }}"
+    data-currency="{% if cart.currency.iso_code %}{{ cart.currency.iso_code }}{% elsif shop.currency.iso_code %}{{ shop.currency.iso_code }}{% else %}USD{% endif %}"
+  {% elsif request.design_mode %}
+    data-product-id="0"
+    data-variant-id="0"
+    data-unit-price-cents="2500"
     data-currency="{% if cart.currency.iso_code %}{{ cart.currency.iso_code }}{% elsif shop.currency.iso_code %}{{ shop.currency.iso_code }}{% else %}USD{% endif %}"
   {% endif %}
   {% if request.design_mode %}

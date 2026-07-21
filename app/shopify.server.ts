@@ -88,12 +88,8 @@ const shopify = shopifyApp({
       await ensureOffrefyAnalyticsPixel(admin).catch((error) => {
         console.warn("[Offrefy] afterAuth pixel setup", error);
       });
-      const { ensureThemeAppEmbedEnabled } = await import(
-        "./services/themeAppEmbed.server"
-      );
-      await ensureThemeAppEmbedEnabled(admin).catch((error) => {
-        console.warn("[Offrefy] afterAuth theme embed enable", error);
-      });
+      // Skip ensureThemeAppEmbedEnabled — themeFilesUpsert needs a Shopify
+      // exemption. Merchants turn on Offrefy via Theme editor deep link.
       const { ensureQuantityBreaksBlockInLiveTheme } = await import(
         "./services/themeProductBlock.server"
       );

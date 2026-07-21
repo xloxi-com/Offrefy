@@ -149,7 +149,6 @@ export function getOfferTypePreviewWidgetDisplay(
       ...DEFAULT_WIDGET_DISPLAY,
       widgetHeading: "Buy more save more",
       widgetPresentation: "volume_table",
-      showCountdown: true,
       ctaLabel: "Add to cart",
       ctaButtonAction: "add_to_cart",
       footnote: "Set quantity, then add to cart.",
