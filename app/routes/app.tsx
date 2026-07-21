@@ -17,7 +17,7 @@ import {
   useNavigate,
   useRouteError,
 } from "react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode, Fragment } from "react";
 import { AppProvider as PolarisAppProvider } from "@shopify/polaris";
 import en from "@shopify/polaris/locales/en.json";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -159,16 +159,20 @@ function AppNav() {
   const settingsHref = adminEmbeddedPath("/app/settings", navSearch);
 
   // rel="home" sets the app-name click target to /app and hides that link from the sidebar.
+  // Remount when locale changes so sidebar labels refresh (key on Fragment — s-app-nav types omit key).
   return (
-    <s-app-nav key={localeKey}>
-      <s-link href={homeHref} rel="home">
-        {t("nav.home")}
-      </s-link>
-      <s-link href={analyticsHref}>{t("nav.analytics")}</s-link>
-      <s-link href={offersHref}>{t("nav.offers")}</s-link>
-      <s-link href={pricingHref}>{t("nav.pricing")}</s-link>
-      <s-link href={settingsHref}>{t("nav.settings")}</s-link>
-    </s-app-nav>
+    <Fragment key={localeKey}>
+      <s-app-nav>
+        {/* @ts-expect-error App Bridge s-link accepts rel="home" for the app home target */}
+        <s-link href={homeHref} rel="home">
+          {t("nav.home")}
+        </s-link>
+        <s-link href={analyticsHref}>{t("nav.analytics")}</s-link>
+        <s-link href={offersHref}>{t("nav.offers")}</s-link>
+        <s-link href={pricingHref}>{t("nav.pricing")}</s-link>
+        <s-link href={settingsHref}>{t("nav.settings")}</s-link>
+      </s-app-nav>
+    </Fragment>
   );
 }
 

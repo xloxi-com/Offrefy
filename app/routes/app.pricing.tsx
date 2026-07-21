@@ -411,6 +411,7 @@ export default function PricingPage() {
       let message = t("pricing.toast.switched", { plan: title });
       if (
         "draftedCount" in data &&
+        typeof data.draftedCount === "number" &&
         data.draftedCount > 0 &&
         data.maxCampaigns != null
       ) {

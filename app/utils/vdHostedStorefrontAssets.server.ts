@@ -13,8 +13,8 @@ function assetPath(fileName: string) {
   );
 }
 
-function readAsset(fileName: string): Buffer {
-  return readFileSync(assetPath(fileName));
+function readAsset(fileName: string): string {
+  return readFileSync(assetPath(fileName), "utf8");
 }
 
 export function vdStorefrontJsResponse() {

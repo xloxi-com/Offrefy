@@ -1190,9 +1190,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                         icon={DuplicateIcon}
                         accessibilityLabel={t("common.duplicate")}
                         disabled={listMutationPending || atOfferCap}
-                        onPointerDown={(
-                          e: ReactPointerEvent<HTMLButtonElement>,
-                        ) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
                         onClick={() => submitDuplicate(c.id)}
                       />
                       <Button
@@ -1201,9 +1199,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                         icon={DeleteIcon}
                         accessibilityLabel={t("common.delete")}
                         disabled={listMutationPending}
-                        onPointerDown={(
-                          e: ReactPointerEvent<HTMLButtonElement>,
-                        ) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
                         onClick={() => setPendingDeleteIds([c.id])}
                       />
                     </InlineStack>

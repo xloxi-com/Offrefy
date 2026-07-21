@@ -687,46 +687,62 @@ export default function SettingsPage() {
   // Listen to fetcher actions and trigger toast notifications
   useEffect(() => {
     if (settingsFetcher.data && settingsFetcher.state === "idle") {
-      if (settingsFetcher.data.ok) {
-        shopify.toast.show(
-          settingsFetcher.data.message || t("settings.toast.settingsSaved"),
-        );
-        if (settingsFetcher.data.warning) {
-          shopify.toast.show(settingsFetcher.data.warning);
+      const result = settingsFetcher.data;
+      if (result.ok) {
+        const message =
+          "message" in result && typeof result.message === "string"
+            ? result.message
+            : t("settings.toast.settingsSaved");
+        shopify.toast.show(message);
+        if ("warning" in result && typeof result.warning === "string") {
+          shopify.toast.show(result.warning);
         }
-      } else if (settingsFetcher.data.error) {
-        shopify.toast.show(`Error: ${settingsFetcher.data.error}`);
+      } else if ("error" in result && result.error) {
+        shopify.toast.show(`Error: ${result.error}`);
       }
     }
   }, [settingsFetcher.data, settingsFetcher.state, shopify, t]);
 
   useEffect(() => {
     if (syncFetcher.data && syncFetcher.state === "idle") {
-      if (syncFetcher.data.ok) {
-        shopify.toast.show(
-          syncFetcher.data.message || t("settings.toast.syncComplete"),
-        );
-        if (syncFetcher.data.lastSynced) {
-          setLastSynced(syncFetcher.data.lastSynced);
+      const result = syncFetcher.data;
+      if (result.ok) {
+        const message =
+          "message" in result && typeof result.message === "string"
+            ? result.message
+            : t("settings.toast.syncComplete");
+        shopify.toast.show(message);
+        if (
+          "lastSynced" in result &&
+          typeof result.lastSynced === "string" &&
+          result.lastSynced
+        ) {
+          setLastSynced(result.lastSynced);
         }
-      } else if (syncFetcher.data.error) {
-        shopify.toast.show(`Sync Error: ${syncFetcher.data.error}`);
+      } else if ("error" in result && result.error) {
+        shopify.toast.show(`Sync Error: ${result.error}`);
       }
     }
   }, [syncFetcher.data, syncFetcher.state, shopify, t]);
 
   useEffect(() => {
     if (translateFetcher.data && translateFetcher.state === "idle") {
-      if (translateFetcher.data.ok) {
-        if (translateFetcher.data.translations) {
-          setTranslations(translateFetcher.data.translations);
+      const result = translateFetcher.data;
+      if (result.ok) {
+        if (
+          "translations" in result &&
+          result.translations &&
+          typeof result.translations === "object"
+        ) {
+          setTranslations(result.translations);
         }
-        shopify.toast.show(
-          translateFetcher.data.message ||
-            t("settings.toast.autoTranslateComplete"),
-        );
-      } else if (translateFetcher.data.error) {
-        shopify.toast.show(`Auto-translate error: ${translateFetcher.data.error}`);
+        const message =
+          "message" in result && typeof result.message === "string"
+            ? result.message
+            : t("settings.toast.autoTranslateComplete");
+        shopify.toast.show(message);
+      } else if ("error" in result && result.error) {
+        shopify.toast.show(`Auto-translate error: ${result.error}`);
       }
     }
   }, [translateFetcher.data, translateFetcher.state, shopify, t]);
