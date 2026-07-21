@@ -1,4 +1,4 @@
-import { useId, useState, type ComponentProps } from "react";
+import { useEffect, useId, useRef, useState, type ComponentProps } from "react";
 import {
   ActionList,
   BlockStack,
@@ -19,6 +19,7 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   MenuHorizontalIcon,
+  RefreshIcon,
   XIcon,
 } from "@shopify/polaris-icons";
 
@@ -55,6 +56,8 @@ export type SetupGuideItem = {
 type SetupGuideProps = {
   items: SetupGuideItem[];
   onDismiss: () => void;
+  onRefresh?: () => void;
+  refreshing?: boolean;
   title?: string;
   description?: string;
 };
@@ -62,6 +65,8 @@ type SetupGuideProps = {
 export function SetupGuide({
   items,
   onDismiss,
+  onRefresh,
+  refreshing = false,
   title,
   description,
 }: SetupGuideProps) {
@@ -78,6 +83,19 @@ export function SetupGuide({
   const [popoverActive, setPopoverActive] = useState(false);
   const accessId = useId();
   const completedItemsLength = items.filter((item) => item.complete).length;
+  const prevCompleted = useRef(completedItemsLength);
+
+  // When a step flips to complete (live revalidate), advance to the next open step.
+  useEffect(() => {
+    if (completedItemsLength === prevCompleted.current) return;
+    prevCompleted.current = completedItemsLength;
+    const next =
+      items.find((item) => !item.complete)?.id ?? items[0]?.id ?? null;
+    setExpanded(next);
+    if (completedItemsLength === items.length) {
+      setIsGuideOpen(true);
+    }
+  }, [completedItemsLength, items]);
 
   return (
     <Card padding="0">
@@ -88,6 +106,15 @@ export function SetupGuide({
               {resolvedTitle}
             </Text>
             <ButtonGroup gap="tight" noWrap>
+              {onRefresh ? (
+                <Button
+                  variant="tertiary"
+                  icon={RefreshIcon}
+                  loading={refreshing}
+                  onClick={onRefresh}
+                  accessibilityLabel={t("setup.reload")}
+                />
+              ) : null}
               <Popover
                 active={popoverActive}
                 onClose={() => setPopoverActive((prev) => !prev)}
@@ -103,6 +130,29 @@ export function SetupGuide({
                 <ActionList
                   actionRole="menuitem"
                   items={[
+                    ...(onRefresh
+                      ? [
+                          {
+                            content: t("setup.reload"),
+                            onAction: () => {
+                              setPopoverActive(false);
+                              onRefresh();
+                            },
+                            disabled: refreshing,
+                            prefix: (
+                              <div
+                                style={{
+                                  height: "1rem",
+                                  width: "1rem",
+                                  paddingTop: ".05rem",
+                                }}
+                              >
+                                <Icon tone="subdued" source={RefreshIcon} />
+                              </div>
+                            ),
+                          },
+                        ]
+                      : []),
                     {
                       content: t("setup.dismiss"),
                       onAction: onDismiss,

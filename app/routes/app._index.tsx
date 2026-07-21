@@ -6,7 +6,6 @@ import {
   useLocation,
   useRevalidator,
 } from "react-router";
-import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Prisma } from "@prisma/client";
 import {
@@ -18,14 +17,18 @@ import {
   InlineStack,
   Button,
   Banner,
+  Divider,
 } from "@shopify/polaris";
 import { SettingsIcon } from "@shopify/polaris-icons";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { APP_DISPLAY_NAME } from "../branding";
 import { prisma } from "../db.server";
 import { authenticate } from "../shopify.server";
-import { resolveShopLastSyncedAt } from "../utils/shopSyncState.server";
-import { adminEmbeddedPath } from "../utils/adminEmbeddedPath";
+import { resolveShopLastSyncedAt, touchShopLastSyncedAt } from "../utils/shopSyncState.server";
+import {
+  adminEmbeddedPath,
+  adminEmbeddedPathWithQuery,
+} from "../utils/adminEmbeddedPath";
 import {
   themeAppBlockEditorUrl,
   themeAppEmbedEditorUrl,
@@ -40,14 +43,22 @@ import {
 } from "../components/SetupGuide";
 import {
   getMainThemeAppEmbedStatus,
+  invalidateThemeAppEmbedStatusCache,
   peekMainThemeAppEmbedStatus,
 } from "../services/themeAppEmbed.server";
-import { ensureQuantityBreaksBlockInLiveTheme } from "../services/themeProductBlock.server";
+import {
+  getQuantityBreaksBlockStatus,
+  invalidateQuantityBreaksBlockStatusCache,
+  isQuantityBreaksBlockInLiveTheme,
+  peekQuantityBreaksBlockInLiveTheme,
+} from "../services/themeProductBlock.server";
 import {
   ensureOffrefyStorefrontScriptTag,
 } from "../services/ensureOffrefyStorefrontScriptTag.server";
-import { pushStorefrontWidgetToShop } from "../services/refreshStorefrontWidget.server";
+import { pushStorefrontWidgetToShop, refreshStorefrontWidgetForShop } from "../services/refreshStorefrontWidget.server";
 import { runAfterResponse } from "../services/deferredShopSync.server";
+import { syncVolumeDiscountShop } from "../services/volumeDiscountFunctionSync.server";
+import { invalidateMemoryCachePrefix } from "../utils/memoryCache.server";
 import { parseSessionScopes } from "../utils/shopPublishedLocales.server";
 import {
   ADMIN_LANGUAGE_OPTIONS,
@@ -74,12 +85,13 @@ type SetupStatus = {
   shop: string;
   mainThemeId: string | null;
   productPreviewPath: string | null;
-  productSectionId: string | null;
   apiKey: string;
   campaignCount: number;
   activeCount: number;
   maxActiveCampaigns: number | null;
   appEmbedEnabled: boolean;
+  /** Quantity breaks block present on live product template (manual Add block). */
+  productBlockPresent: boolean;
   scriptTagOk: boolean;
   storefrontReady: boolean;
   appEmbedErrors: string[];
@@ -90,6 +102,8 @@ type SetupStatus = {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, admin } = await authenticate.admin(request);
+  const url = new URL(request.url);
+  const forceSetupRefresh = url.searchParams.get("setupRefresh") === "1";
 
   const grantedScopes = parseSessionScopes(session.scope);
   const hasWriteThemes = grantedScopes.includes("write_themes");
@@ -116,30 +130,57 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const activeCount = Number(counts[0]?.activeCount ?? 0);
   const maxActiveCampaigns = planCtx.capabilities.maxActiveCampaigns;
 
-  const embedCached = peekMainThemeAppEmbedStatus(session.shop);
-  const appEmbedEnabled = embedCached?.enabled ?? false;
-  const appEmbedErrors = embedCached?.errors ?? [];
-  const mainThemeId = mainThemeIdFromGid(embedCached?.themeId ?? null);
+  if (forceSetupRefresh) {
+    invalidateThemeAppEmbedStatusCache(session.shop);
+    invalidateQuantityBreaksBlockStatusCache(session.shop);
+  }
+
+  const embedCached = forceSetupRefresh
+    ? null
+    : peekMainThemeAppEmbedStatus(session.shop);
+  const blockCached = forceSetupRefresh
+    ? null
+    : peekQuantityBreaksBlockInLiveTheme(session.shop);
+  let appEmbedEnabled = embedCached?.enabled ?? false;
+  let appEmbedErrors = embedCached?.errors ?? [];
+  let mainThemeId = mainThemeIdFromGid(embedCached?.themeId ?? null);
+  let productBlockPresent = blockCached ?? false;
+  let setupStatusStale = !embedCached || blockCached === null;
+
+  // Live Setup Guide: when forced (tab focus) or cache miss, fetch theme status now.
+  if (forceSetupRefresh || !embedCached || blockCached === null) {
+    try {
+      const [embed, blockPresent] = await Promise.all([
+        getMainThemeAppEmbedStatus(admin, session.shop, {
+          force: true,
+        }),
+        isQuantityBreaksBlockInLiveTheme(admin, session.shop, {
+          force: true,
+        }),
+      ]);
+      appEmbedEnabled = embed.enabled;
+      appEmbedErrors = embed.errors;
+      mainThemeId = mainThemeIdFromGid(embed.themeId) ?? mainThemeId;
+      productBlockPresent = blockPresent;
+      setupStatusStale = false;
+    } catch (error) {
+      console.warn("[Offrefy] home setup status", error);
+      setupStatusStale = true;
+    }
+  }
+
   const scriptTagOk = false;
-  const setupStatusStale = !embedCached;
   // Widget JS loads only from Theme App Embed (Shopify CDN after deploy).
   const storefrontReady = appEmbedEnabled;
 
   runAfterResponse(
     (async () => {
       try {
-        const embed = await getMainThemeAppEmbedStatus(admin, session.shop);
-
-        if (!embed.enabled && hasWriteThemes) {
-          // Automatic settings_data write needs a Shopify themeFilesUpsert
-          // exemption. Skip the failing API call — merchants enable via Theme editor.
-          // (Deep link is on the home Setup Guide.)
-        }
-
-        if (hasWriteThemes) {
-          await ensureQuantityBreaksBlockInLiveTheme(admin).catch((error) => {
-            console.warn("[Offrefy] home quantity-breaks block", error);
-          });
+        if (!forceSetupRefresh) {
+          await Promise.all([
+            getMainThemeAppEmbedStatus(admin, session.shop),
+            isQuantityBreaksBlockInLiveTheme(admin, session.shop),
+          ]);
         }
 
         if (hasWriteScriptTags) {
@@ -171,13 +212,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       shop: session.shop,
       mainThemeId,
       productPreviewPath: null,
-      productSectionId: null,
       // eslint-disable-next-line no-undef
       apiKey: process.env.SHOPIFY_API_KEY || "",
       campaignCount,
       activeCount,
       maxActiveCampaigns,
       appEmbedEnabled,
+      productBlockPresent,
       scriptTagOk,
       storefrontReady,
       appEmbedErrors,
@@ -188,9 +229,87 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");
+
+  if (intent === "refreshSetupStatus") {
+    invalidateThemeAppEmbedStatusCache(session.shop);
+    invalidateQuantityBreaksBlockStatusCache(session.shop);
+
+    const checkOnce = async () => {
+      const [embed, block] = await Promise.all([
+        getMainThemeAppEmbedStatus(admin, session.shop, { force: true }),
+        getQuantityBreaksBlockStatus(admin, session.shop, { force: true }),
+      ]);
+      return { embed, block };
+    };
+
+    let { embed, block } = await checkOnce();
+    // Theme editor saves can lag briefly behind Admin API — retry once.
+    if (!embed.enabled || !block.present) {
+      await new Promise((r) => setTimeout(r, 900));
+      invalidateThemeAppEmbedStatusCache(session.shop);
+      invalidateQuantityBreaksBlockStatusCache(session.shop);
+      ({ embed, block } = await checkOnce());
+    }
+
+    return {
+      ok: true as const,
+      intent,
+      appEmbedEnabled: embed.enabled,
+      productBlockPresent: block.present,
+      checkedFiles: block.checkedFiles,
+      blockErrors: block.errors,
+      embedErrors: embed.errors,
+    };
+  }
+
+  if (intent === "syncStorefront") {
+    try {
+      const activeCount = await prisma.volumeDiscountCampaign.count({
+        where: { shop: session.shop, status: "active" },
+      });
+      const { errors, discountIds } = await syncVolumeDiscountShop(
+        admin,
+        session.shop,
+        { purgeLegacy: true, force: true },
+      );
+      if (errors.length) {
+        return {
+          ok: false as const,
+          intent,
+          error: errors.join(", "),
+        };
+      }
+      if (activeCount > 0 && discountIds.length === 0) {
+        return {
+          ok: false as const,
+          intent,
+          error:
+            "Active offers exist but Shopify did not create the automatic discount. Deploy the Offrefy function extension, then sync again.",
+        };
+      }
+
+      invalidateMemoryCachePrefix(`widget:${session.shop}:`);
+      invalidateMemoryCachePrefix(`cart-rules:${session.shop}:`);
+      await refreshStorefrontWidgetForShop(admin, session.shop);
+
+      const syncedAt = new Date();
+      await touchShopLastSyncedAt(session.shop, syncedAt);
+      return {
+        ok: true as const,
+        intent,
+        lastSyncedAt: syncedAt.toISOString(),
+      };
+    } catch (e) {
+      return {
+        ok: false as const,
+        intent,
+        error: e instanceof Error ? e.message : "Sync failed",
+      };
+    }
+  }
 
   if (intent === "saveAdminLanguage") {
     const raw = String(formData.get("adminLanguage") ?? "");
@@ -224,35 +343,25 @@ function formatSyncedAt(
 ): string {
   if (!iso) return notSyncedLabel;
   try {
-    return new Date(iso).toLocaleString(locale);
+    return new Date(iso).toLocaleString(locale || undefined, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    });
   } catch {
     return notSyncedLabel;
   }
-}
-
-function DetailRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
-  return (
-    <BlockStack gap="050">
-      <Text as="span" variant="bodySm" tone="subdued">
-        {label}
-      </Text>
-      <Text as="span" variant="bodySm">
-        {children}
-      </Text>
-    </BlockStack>
-  );
 }
 
 export default function AppHomePage() {
   const { status } = useLoaderData<typeof loader>();
   const { search } = useLocation();
   const fetcher = useFetcher<typeof action>();
+  const setupFetcher = useFetcher<typeof action>();
   const revalidator = useRevalidator();
   const shopify = useAppBridge();
   const {
@@ -263,7 +372,10 @@ export default function AppHomePage() {
   } = useAdminI18n();
 
   const offersHref = adminEmbeddedPath("/app/offers", search);
-  const newOfferHref = adminEmbeddedPath("/app/volume-discount/new", search);
+  /** Opens Offers → Select offer type (not the editor directly). */
+  const newOfferHref = adminEmbeddedPathWithQuery("/app/offers", search, {
+    selectType: "1",
+  });
   const settingsHref = adminEmbeddedPath("/app/settings", search);
   const analyticsHref = adminEmbeddedPath("/app/analytics", search);
 
@@ -271,9 +383,19 @@ export default function AppHomePage() {
     useState<AdminLanguageCode>(() =>
       normalizeAdminLanguage(liveAdminLanguage),
     );
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(
+    status.lastSyncedAt,
+  );
+  useEffect(() => {
+    setLastSyncedAt(status.lastSyncedAt);
+  }, [status.lastSyncedAt]);
+
   const savingAdminLanguage =
     fetcher.state !== "idle" &&
     String(fetcher.formData?.get("intent") ?? "") === "saveAdminLanguage";
+  const syncingStorefront =
+    fetcher.state !== "idle" &&
+    String(fetcher.formData?.get("intent") ?? "") === "syncStorefront";
   const themeEmbedHref = themeAppEmbedEditorUrl(
     status.shop,
     status.apiKey,
@@ -282,20 +404,28 @@ export default function AppHomePage() {
   const themeBlockHref = themeAppBlockEditorUrl(status.shop, status.apiKey, {
     themeId: status.mainThemeId,
     previewPath: status.productPreviewPath,
-    productSectionId: status.productSectionId,
   });
 
-  // Checklist Done only after merchant finishes that step (real app embed).
-  const embedReady = status.appEmbedEnabled;
-  const hasSynced = Boolean(status.lastSyncedAt);
+  // Checklist Done only after merchant finishes that step (real app embed / block).
+  // Refresh action returns live theme status immediately (don't wait on loader race).
+  const [liveEmbed, setLiveEmbed] = useState<boolean | null>(null);
+  const [liveBlock, setLiveBlock] = useState<boolean | null>(null);
+
+  const embedReady = liveEmbed ?? status.appEmbedEnabled;
+  const blockReady = liveBlock ?? status.productBlockPresent;
+  const hasSynced = Boolean(lastSyncedAt);
   const setupComplete =
     embedReady &&
+    blockReady &&
     status.hasOffers &&
     status.hasActiveOffers &&
     hasSynced;
 
   const [showGuide, setShowGuide] = useState(true);
   const [dismissedSetupBanner, setDismissedSetupBanner] = useState(false);
+  const setupRefreshing = setupFetcher.state !== "idle";
+  const pendingSetupRefresh = useRef(false);
+  const lastSetupRefreshData = useRef<unknown>(null);
 
   useEffect(() => {
     setShowGuide(
@@ -305,23 +435,119 @@ export default function AppHomePage() {
     window.localStorage.removeItem(SETUP_GUIDE_MANUAL_KEY);
   }, []);
 
-  // After deferred Admin API fills the embed cache, soft-revalidate once.
+  const requestSetupRefresh = useCallback(() => {
+    // Dedicated fetcher — never blocked by language/sync or revalidator.
+    // If a poll is in flight, queue one more refresh after it settles.
+    if (setupFetcher.state !== "idle") {
+      pendingSetupRefresh.current = true;
+      return;
+    }
+    pendingSetupRefresh.current = false;
+    const fd = new FormData();
+    fd.set("intent", "refreshSetupStatus");
+    setupFetcher.submit(fd, { method: "post" });
+  }, [setupFetcher]);
+
+  // Flush queued reload after an in-flight setup check finishes.
+  useEffect(() => {
+    if (setupFetcher.state !== "idle" || !pendingSetupRefresh.current) return;
+    pendingSetupRefresh.current = false;
+    const fd = new FormData();
+    fd.set("intent", "refreshSetupStatus");
+    setupFetcher.submit(fd, { method: "post" });
+  }, [setupFetcher, setupFetcher.state]);
+
+  // After deferred Admin API fills the embed cache, soft-check once.
   const softRefreshDone = useRef(false);
   useEffect(() => {
     if (!status.setupStatusStale || softRefreshDone.current) return;
     softRefreshDone.current = true;
     const id = window.setTimeout(() => {
-      revalidator.revalidate();
-    }, 2000);
+      requestSetupRefresh();
+    }, 1200);
     return () => window.clearTimeout(id);
-  }, [status.setupStatusStale, revalidator]);
+  }, [status.setupStatusStale, requestSetupRefresh]);
+
+  // Live update: when merchant returns from Theme editor (or periodically).
+  useEffect(() => {
+    if (setupComplete) return;
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        requestSetupRefresh();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+
+    const pollId = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        requestSetupRefresh();
+      }
+    }, 15_000);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+      window.clearInterval(pollId);
+    };
+  }, [setupComplete, requestSetupRefresh]);
 
   useEffect(() => {
-    setAdminLanguageDraft(liveAdminLanguage);
-  }, [liveAdminLanguage]);
+    if (!setupFetcher.data || !("intent" in setupFetcher.data)) return;
+    if (setupFetcher.state !== "idle") return;
+    if (setupFetcher.data.intent !== "refreshSetupStatus") return;
+    // Avoid re-applying the same response (e.g. effect re-run).
+    if (lastSetupRefreshData.current === setupFetcher.data) return;
+    lastSetupRefreshData.current = setupFetcher.data;
+    if (!setupFetcher.data.ok) {
+      shopify.toast.show(
+        "error" in setupFetcher.data && setupFetcher.data.error
+          ? String(setupFetcher.data.error)
+          : t("common.unknownError"),
+        { isError: true },
+      );
+      return;
+    }
+    if ("appEmbedEnabled" in setupFetcher.data) {
+      setLiveEmbed(Boolean(setupFetcher.data.appEmbedEnabled));
+    }
+    if ("productBlockPresent" in setupFetcher.data) {
+      setLiveBlock(Boolean(setupFetcher.data.productBlockPresent));
+    }
+    revalidator.revalidate();
+  }, [setupFetcher.data, setupFetcher.state, revalidator, shopify, t]);
+
+  // Drop local overrides only when loader confirms the same value.
+  useEffect(() => {
+    if (liveEmbed != null && status.appEmbedEnabled === liveEmbed) {
+      setLiveEmbed(null);
+    }
+  }, [status.appEmbedEnabled, liveEmbed]);
+
+  useEffect(() => {
+    if (liveBlock != null && status.productBlockPresent === liveBlock) {
+      setLiveBlock(null);
+    }
+  }, [status.productBlockPresent, liveBlock]);
 
   useEffect(() => {
     if (!fetcher.data || !("intent" in fetcher.data)) return;
+    if (fetcher.data.intent === "syncStorefront") {
+      if (!fetcher.data.ok) {
+        shopify.toast.show(
+          fetcher.data.error || t("settings.syncFailed"),
+          { isError: true },
+        );
+        return;
+      }
+      if ("lastSyncedAt" in fetcher.data && fetcher.data.lastSyncedAt) {
+        setLastSyncedAt(fetcher.data.lastSyncedAt);
+      }
+      shopify.toast.show(t("home.syncSuccess"));
+      revalidator.revalidate();
+      return;
+    }
     if (fetcher.data.intent !== "saveAdminLanguage") return;
     if (!fetcher.data.ok) {
       shopify.toast.show(
@@ -340,7 +566,18 @@ export default function AppHomePage() {
         ? String(fetcher.data.message)
         : t("home.adminLanguageSaved"),
     );
-  }, [fetcher.data, setAdminLanguage, shopify, t]);
+  }, [fetcher.data, setAdminLanguage, shopify, t, revalidator]);
+
+  const syncStorefront = useCallback(() => {
+    if (fetcher.state !== "idle") return;
+    const fd = new FormData();
+    fd.set("intent", "syncStorefront");
+    fetcher.submit(fd, { method: "post" });
+  }, [fetcher]);
+
+  useEffect(() => {
+    setAdminLanguageDraft(liveAdminLanguage);
+  }, [liveAdminLanguage]);
 
   const dismissGuide = useCallback(() => {
     window.localStorage.setItem(SETUP_GUIDE_DISMISSED_KEY, "1");
@@ -356,12 +593,12 @@ export default function AppHomePage() {
     () =>
       ({
         "enable-widget": embedReady,
-        "add-block": embedReady,
+        "add-block": blockReady,
         "create-offer": status.hasOffers,
         "activate-offers": status.hasActiveOffers,
         "sync-storefront": hasSynced,
       }) as const,
-    [embedReady, hasSynced, status.hasActiveOffers, status.hasOffers],
+    [blockReady, embedReady, hasSynced, status.hasActiveOffers, status.hasOffers],
   );
 
   const enableWidget = useCallback(() => {
@@ -479,31 +716,36 @@ export default function AppHomePage() {
         title: t("home.stepSyncTitle"),
         description: t("home.stepSyncDesc", {
           synced: formatSyncedAt(
-            status.lastSyncedAt,
+            lastSyncedAt,
             localeKey,
             t("home.notSyncedYet"),
           ),
         }),
         complete: isDone("sync-storefront"),
         primaryButton: {
-          content: t("home.settings"),
-          props: { url: settingsHref },
+          content: t("settings.syncNow"),
+          props: {
+            onClick: syncStorefront,
+            loading: syncingStorefront,
+            disabled: syncingStorefront,
+          },
         },
       },
     ];
   }, [
     embedReady,
     enableWidget,
+    lastSyncedAt,
     localeKey,
     newOfferHref,
     offersHref,
-    settingsHref,
     status.activeCount,
     status.campaignCount,
     status.maxActiveCampaigns,
     status.hasOffers,
-    status.lastSyncedAt,
     statusById,
+    syncStorefront,
+    syncingStorefront,
     t,
     themeBlockHref,
     themeEmbedHref,
@@ -555,6 +797,8 @@ export default function AppHomePage() {
               {showGuide ? (
                 <SetupGuide
                   onDismiss={dismissGuide}
+                  onRefresh={requestSetupRefresh}
+                  refreshing={setupRefreshing}
                   items={setupItems}
                   title={t("home.setupGuideTitle")}
                   description={t("home.setupGuideDescription")}
@@ -628,25 +872,56 @@ export default function AppHomePage() {
               <Card>
                 <BlockStack gap="400">
                   <Text as="h2" variant="headingMd">
-                    {t("home.details")}
+                    {t("settings.manualActions")}
                   </Text>
-                  <BlockStack gap="300">
-                    <DetailRow label={t("home.shop")}>{status.shop}</DetailRow>
-                    <DetailRow label={t("home.appEmbed")}>
-                      {embedReady ? t("common.on") : t("common.off")}
-                    </DetailRow>
-                    <DetailRow label={t("home.storefrontWidget")}>
-                      {status.storefrontReady
-                        ? t("home.widgetReadyEmbed")
-                        : t("home.widgetNeedsSetup")}
-                    </DetailRow>
-                    <DetailRow label={t("home.extension")}>
-                      Offrefy — Storefront
-                    </DetailRow>
-                    <DetailRow label={t("home.blocks")}>
-                      {t("home.blocksValue")}
-                    </DetailRow>
-                  </BlockStack>
+                  <Text as="p" tone="subdued">
+                    {t("settings.manualActionsHelp")}
+                  </Text>
+                  <Divider />
+                  {fetcher.data &&
+                  "intent" in fetcher.data &&
+                  fetcher.data.intent === "syncStorefront" &&
+                  !fetcher.data.ok ? (
+                    <Banner title={t("settings.syncFailed")} tone="critical">
+                      <p>
+                        {"error" in fetcher.data && fetcher.data.error
+                          ? String(fetcher.data.error)
+                          : t("common.unknownError")}
+                      </p>
+                    </Banner>
+                  ) : null}
+                  <InlineStack align="space-between" blockAlign="center">
+                    <Button
+                      onClick={syncStorefront}
+                      loading={syncingStorefront}
+                      variant="primary"
+                    >
+                      {t("settings.syncNow")}
+                    </Button>
+                    <BlockStack gap="050">
+                      <Text
+                        as="p"
+                        variant="bodyMd"
+                        fontWeight="semibold"
+                        tone="subdued"
+                      >
+                        {t("settings.lastSynced")}
+                      </Text>
+                      <Text
+                        as="p"
+                        variant="bodyMd"
+                        tone={lastSyncedAt ? "success" : "subdued"}
+                      >
+                        {lastSyncedAt
+                          ? formatSyncedAt(
+                              lastSyncedAt,
+                              localeKey,
+                              t("settings.neverSynced"),
+                            )
+                          : t("settings.neverSynced")}
+                      </Text>
+                    </BlockStack>
+                  </InlineStack>
                 </BlockStack>
               </Card>
 

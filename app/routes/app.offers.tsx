@@ -4,6 +4,7 @@ import {
   Suspense,
   useCallback,
   useDeferredValue,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -423,13 +424,33 @@ export default function Index() {
   const shopify = useAppBridge();
   const navigate = useNavigate();
   const revalidator = useRevalidator();
-  const [screen, setScreen] = useState<Screen>("home");
+  const [screen, setScreen] = useState<Screen>(() => {
+    const params = new URLSearchParams(
+      search.startsWith("?") ? search.slice(1) : search,
+    );
+    return params.get("selectType") === "1" ? "select" : "home";
+  });
   const [offerPreviewModal, setOfferPreviewModal] =
     useState<OfferTypePreviewPreset | null>(null);
   const [offerTab, setOfferTab] = useState<OfferTab>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortSelected, setSortSelected] = useState<string[]>(["modified desc"]);
   const deferredSearchQuery = useDeferredValue(searchQuery);
+
+  // Deep link from Setup Guide / home "Create offer" → Select offer type.
+  useEffect(() => {
+    const params = new URLSearchParams(
+      search.startsWith("?") ? search.slice(1) : search,
+    );
+    if (params.get("selectType") !== "1") return;
+    setScreen("select");
+    params.delete("selectType");
+    const next = params.toString();
+    navigate(
+      next ? `/app/offers?${next}` : "/app/offers",
+      { replace: true },
+    );
+  }, [navigate, search]);
 
   const atOfferCap =
     maxActiveCampaigns != null && offerCount >= maxActiveCampaigns;

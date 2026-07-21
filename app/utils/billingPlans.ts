@@ -7,6 +7,7 @@ import {
 
 /** Shopify Billing plan keys (also used as AppSubscription `name`). */
 export const BILLING_PLAN = {
+  freeMonthly: "Offrefy Free",
   standardMonthly: "Offrefy Standard",
   standardYearly: "Offrefy Standard (Yearly)",
   premiumMonthly: "Offrefy Premium",
@@ -23,9 +24,12 @@ export const PAID_BILLING_PLAN_KEYS: BillingPlanKey[] = [
 ];
 
 export function billingPlanKeyFor(
-  plan: Exclude<PricingPlanId, "free">,
+  plan: PricingPlanId,
   interval: PricingInterval,
 ): BillingPlanKey {
+  if (plan === "free") {
+    return BILLING_PLAN.freeMonthly;
+  }
   if (plan === "standard") {
     return interval === "yearly"
       ? BILLING_PLAN.standardYearly
@@ -40,6 +44,9 @@ export function pricingPlanFromBillingName(
   name: string | null | undefined,
 ): PricingPlanId | null {
   if (!name) return null;
+  if (name === BILLING_PLAN.freeMonthly) {
+    return "free";
+  }
   if (
     name === BILLING_PLAN.premiumMonthly ||
     name === BILLING_PLAN.premiumYearly
@@ -57,9 +64,10 @@ export function pricingPlanFromBillingName(
 
 /** Recurring amount in dollars for Shopify Billing line item. */
 export function billingAmountDollars(
-  plan: Exclude<PricingPlanId, "free">,
+  plan: PricingPlanId,
   interval: PricingInterval,
 ): number {
+  if (plan === "free") return 0;
   const cents =
     interval === "yearly"
       ? yearlyTotalCents(PLANS[plan].monthlyCents)

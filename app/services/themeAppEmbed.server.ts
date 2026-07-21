@@ -8,7 +8,13 @@ type AdminGraphql = {
 };
 
 /** Theme extension UID from `extensions/volume-discount-theme/shopify.extension.toml`. */
-export const THEME_EXTENSION_UID = "019f469b-9c3e-742f-82ba-53cdb7f1d129";
+export const THEME_EXTENSION_UID = "bf69e48e-bed3-2f4e-10f1-fa992f1fd7a3642c6510";
+
+/** Previous UIDs still present in merchant themes after redeploys. */
+export const THEME_EXTENSION_UID_LEGACY = [
+  THEME_EXTENSION_UID,
+  "019f469b-9c3e-742f-82ba-53cdb7f1d129",
+] as const;
 
 const MAIN_THEME_SETTINGS_QUERY = `#graphql
   query OffrefyMainThemeSettings {
@@ -22,6 +28,12 @@ const MAIN_THEME_SETTINGS_QUERY = `#graphql
             body {
               ... on OnlineStoreThemeFileBodyText {
                 content
+              }
+              ... on OnlineStoreThemeFileBodyBase64 {
+                contentBase64
+              }
+              ... on OnlineStoreThemeFileBodyUrl {
+                url
               }
             }
           }
@@ -57,7 +69,7 @@ type ThemeEmbedStatus = {
   themeId: string | null;
   themeName: string | null;
   appHandle: string | null;
-  /** True only when embed is ON and points at the current extension UID. */
+  /** True when embed is ON in Theme editor (any known Offrefy embed UID). */
   enabled: boolean;
   /** True when any Offrefy embed block exists (even stale UID / disabled). */
   present: boolean;
@@ -94,21 +106,64 @@ function stripJsonComments(raw: string): string {
   return raw.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
+type ThemeFileBody = {
+  content?: string | null;
+  contentBase64?: string | null;
+  url?: string | null;
+};
+
+function decodeThemeFileBody(body: ThemeFileBody | null | undefined): string | null {
+  if (!body || typeof body !== "object") return null;
+  if (typeof body.content === "string" && body.content.trim()) {
+    return body.content;
+  }
+  if (typeof body.contentBase64 === "string" && body.contentBase64.trim()) {
+    try {
+      return Buffer.from(body.contentBase64, "base64").toString("utf8");
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+async function resolveThemeFileBody(
+  body: ThemeFileBody | null | undefined,
+): Promise<string | null> {
+  const direct = decodeThemeFileBody(body);
+  if (direct) return direct;
+  const url = body?.url;
+  if (typeof url === "string" && url.trim()) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const text = await res.text();
+      return text?.trim() ? text : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 function isOurEmbedType(type: unknown, appHandle: string | null): boolean {
   if (typeof type !== "string") return false;
-  const t = type.toLowerCase();
-  if (!t.includes(`/blocks/${THEME_APP_EMBED_HANDLE}/`)) return false;
-  if (t.includes(THEME_EXTENSION_UID.toLowerCase())) return true;
+  const t = type.toLowerCase().replace(/\\+/g, "");
+  if (!t.includes(`/blocks/${THEME_APP_EMBED_HANDLE}`)) return false;
+  for (const uid of THEME_EXTENSION_UID_LEGACY) {
+    if (t.includes(uid.toLowerCase())) return true;
+  }
   if (appHandle && t.includes(`/apps/${appHandle.toLowerCase()}/`)) return true;
   // Match even if app handle slug differs slightly (e.g. Offrefy vs offrefy).
-  return t.includes("offrefy") || t.includes(THEME_APP_EMBED_HANDLE);
+  if (t.includes("offrefy") || t.includes("volume-discount")) return true;
+  // Client-id style app block URI from Theme editor.
+  return t.startsWith("shopify://apps/");
 }
 
 function hasCurrentExtensionUid(type: unknown): boolean {
-  return (
-    typeof type === "string" &&
-    type.toLowerCase().includes(THEME_EXTENSION_UID.toLowerCase())
-  );
+  if (typeof type !== "string") return false;
+  const t = type.toLowerCase();
+  return THEME_EXTENSION_UID_LEGACY.some((uid) => t.includes(uid.toLowerCase()));
 }
 
 export function buildThemeAppEmbedBlockType(appHandle: string): string {
@@ -117,7 +172,26 @@ export function buildThemeAppEmbedBlockType(appHandle: string): string {
 }
 
 type SettingsData = {
-  current?: {
+  current?:
+    | string
+    | {
+        blocks?: Record<
+          string,
+          { type?: string; disabled?: boolean; settings?: Record<string, unknown> }
+        >;
+        [key: string]: unknown;
+      };
+  presets?: Record<
+    string,
+    {
+      blocks?: Record<
+        string,
+        { type?: string; disabled?: boolean; settings?: Record<string, unknown> }
+      >;
+      [key: string]: unknown;
+    }
+  >;
+  platform_customizations?: {
     blocks?: Record<
       string,
       { type?: string; disabled?: boolean; settings?: Record<string, unknown> }
@@ -128,11 +202,56 @@ type SettingsData = {
 };
 
 function parseSettingsData(raw: string): SettingsData | null {
+  const cleaned = stripJsonComments(raw);
   try {
-    return JSON.parse(stripJsonComments(raw)) as SettingsData;
+    return JSON.parse(cleaned) as SettingsData;
   } catch {
-    return null;
+    try {
+      // Theme JSON from Admin API can include trailing commas.
+      return JSON.parse(cleaned.replace(/,\s*([}\]])/g, "$1")) as SettingsData;
+    } catch {
+      return null;
+    }
   }
+}
+
+type EmbedBlock = {
+  type?: string;
+  disabled?: boolean;
+  settings?: Record<string, unknown>;
+};
+
+/** Resolve app-embed blocks whether `current` is an object or a preset name. */
+function extractEmbedBlocks(parsed: SettingsData | null): Record<string, EmbedBlock> {
+  if (!parsed || typeof parsed !== "object") return {};
+  const out: Record<string, EmbedBlock> = {};
+
+  const take = (blocks: unknown) => {
+    if (!blocks || typeof blocks !== "object") return;
+    for (const [id, block] of Object.entries(
+      blocks as Record<string, EmbedBlock>,
+    )) {
+      if (block && typeof block === "object") out[id] = block;
+    }
+  };
+
+  const current = parsed.current;
+  if (current && typeof current === "object") {
+    take((current as { blocks?: unknown }).blocks);
+  } else if (typeof current === "string") {
+    const presets = parsed.presets;
+    if (presets && typeof presets === "object") {
+      const preset = (presets as Record<string, { blocks?: unknown }>)[current];
+      take(preset?.blocks);
+    }
+  }
+
+  const platform = parsed.platform_customizations;
+  if (platform && typeof platform === "object") {
+    take((platform as { blocks?: unknown }).blocks);
+  }
+
+  return out;
 }
 
 async function adminJson<T>(
@@ -160,8 +279,9 @@ async function adminJson<T>(
 export async function getMainThemeAppEmbedStatus(
   admin: AdminGraphql,
   shopCacheKey?: string,
+  options?: { force?: boolean },
 ): Promise<ThemeEmbedStatus> {
-  if (shopCacheKey) {
+  if (shopCacheKey && !options?.force) {
     const hit = embedStatusCache.get(shopCacheKey);
     if (hit && hit.expiresAt > Date.now()) {
       return hit.status;
@@ -170,9 +290,11 @@ export async function getMainThemeAppEmbedStatus(
 
   const status = await fetchMainThemeAppEmbedStatus(admin);
   if (shopCacheKey && status.errors.length === 0) {
+    // Shorter TTL while disabled so Setup Guide picks up Theme editor saves faster.
+    const ttl = status.enabled ? EMBED_STATUS_TTL_MS : 20 * 1000;
     embedStatusCache.set(shopCacheKey, {
       status,
-      expiresAt: Date.now() + EMBED_STATUS_TTL_MS,
+      expiresAt: Date.now() + ttl,
     });
   }
   return status;
@@ -189,7 +311,7 @@ async function fetchMainThemeAppEmbedStatus(
         files?: {
           nodes?: Array<{
             filename?: string;
-            body?: { content?: string };
+            body?: ThemeFileBody | null;
           }>;
         };
       }>;
@@ -212,7 +334,7 @@ async function fetchMainThemeAppEmbedStatus(
 
   const theme = data?.themes?.nodes?.[0] ?? null;
   const appHandle = data?.currentAppInstallation?.app?.handle ?? null;
-  const settingsRaw = theme?.files?.nodes?.[0]?.body?.content ?? null;
+  const settingsRaw = await resolveThemeFileBody(theme?.files?.nodes?.[0]?.body);
   if (!theme?.id || !settingsRaw) {
     return {
       themeId: theme?.id ?? null,
@@ -227,18 +349,40 @@ async function fetchMainThemeAppEmbedStatus(
   }
 
   const parsed = parseSettingsData(settingsRaw);
-  const blocks = parsed?.current?.blocks ?? {};
+  const blocks = extractEmbedBlocks(parsed);
   let present = false;
   let enabled = false;
   let staleUid = false;
+
   for (const block of Object.values(blocks)) {
     if (!isOurEmbedType(block?.type, appHandle)) continue;
     present = true;
     const currentUid = hasCurrentExtensionUid(block?.type);
     if (!currentUid) staleUid = true;
-    if (block?.disabled !== true && currentUid) {
+    // Merchant turned the embed ON in Theme editor — count as enabled even if
+    // the published extension UID is from an older deploy (staleUid).
+    if (block?.disabled !== true) {
       enabled = true;
       break;
+    }
+  }
+
+  // Fallback when JSON shape is unexpected but the file clearly references our embed.
+  if (!present || !enabled) {
+    const rawLower = settingsRaw.toLowerCase().replace(/\\+/g, "");
+    const handleHit =
+      rawLower.includes(`/blocks/${THEME_APP_EMBED_HANDLE}`) ||
+      rawLower.includes("volume-discount-embed");
+    if (handleHit) {
+      present = true;
+      // Prefer ON unless this embed entry explicitly has disabled:true nearby.
+      const explicitlyDisabled = new RegExp(
+        `${THEME_APP_EMBED_HANDLE}[^\\]{]{0,200}"disabled"\\s*:\\s*true`,
+        "i",
+      ).test(settingsRaw.replace(/\\+/g, ""));
+      if (!explicitlyDisabled) {
+        enabled = true;
+      }
     }
   }
 
@@ -286,6 +430,7 @@ export async function ensureThemeAppEmbedEnabled(
     };
   }
 
+  // Ensure we write into an object-shaped `current` (not a preset name string).
   if (!parsed.current || typeof parsed.current !== "object") {
     parsed.current = { blocks: {} };
   }

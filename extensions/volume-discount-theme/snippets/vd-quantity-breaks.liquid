@@ -9,24 +9,18 @@
     assign vd_product = product
   endif
 
-  if vd_from_embed
-    assign vd_heading = 'Get more, save more 🥳'
-    assign vd_section_heading = ''
-    assign vd_id_suffix = 'app-embed'
+  # No theme-editor settings; soft-read legacy values if previously saved.
+  if block and block.settings.heading != blank
+    assign vd_heading = block.settings.heading
   else
-    # No theme-editor settings; soft-read legacy values if previously saved.
-    if block and block.settings.heading != blank
-      assign vd_heading = block.settings.heading
-    else
-      assign vd_heading = 'Get more, save more 🥳'
-    endif
-    if block and block.settings.show_section_heading == true and block.settings.section_heading != blank
-      assign vd_section_heading = block.settings.section_heading | strip
-    else
-      assign vd_section_heading = ''
-    endif
-    assign vd_id_suffix = block.id
+    assign vd_heading = 'Get more, save more 🥳'
   endif
+  if block and block.settings.show_section_heading == true and block.settings.section_heading != blank
+    assign vd_section_heading = block.settings.section_heading | strip
+  else
+    assign vd_section_heading = ''
+  endif
+  assign vd_id_suffix = block.id | default: 'quantity-breaks'
 
   assign locale_base = request.locale.iso_code | split: '-' | first | downcase
   assign vd_trans_buy = 'Buy'
@@ -60,9 +54,6 @@
   data-vd-trans-buy="{{ vd_trans_buy | escape }}"
   data-vd-trans-you-save="{{ vd_trans_you_save | escape }}"
   data-vd-trans-add="{{ vd_trans_add | escape }}"
-  {% if vd_from_embed %}
-    data-vd-embed-fallback="true"
-  {% endif %}
   data-heading="{{ vd_heading | escape }}"
   data-section-heading="{{ vd_section_heading | escape }}"
   {% if vd_product != blank %}

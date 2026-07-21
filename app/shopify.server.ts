@@ -34,6 +34,7 @@ const shopify = shopifyApp({
     connectionRetryIntervalMs: 500,
   }),
   distribution: AppDistribution.AppStore,
+  // Free is not a Shopify Billing plan (amount must be > 0).
   billing: {
     [BILLING_PLAN.standardMonthly]: {
       lineItems: [
@@ -90,12 +91,8 @@ const shopify = shopifyApp({
       });
       // Skip ensureThemeAppEmbedEnabled — themeFilesUpsert needs a Shopify
       // exemption. Merchants turn on Offrefy via Theme editor deep link.
-      const { ensureQuantityBreaksBlockInLiveTheme } = await import(
-        "./services/themeProductBlock.server"
-      );
-      await ensureQuantityBreaksBlockInLiveTheme(admin).catch((error) => {
-        console.warn("[Offrefy] afterAuth quantity-breaks block", error);
-      });
+      // Do not auto-insert the product Quantity breaks block — merchants add it
+      // manually via Theme editor → Add block.
       const { ensureOffrefyStorefrontScriptTag } = await import(
         "./services/ensureOffrefyStorefrontScriptTag.server"
       );

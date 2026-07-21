@@ -110,30 +110,39 @@ export async function cancelActiveAppSubscriptions(
 
 /**
  * Creates a recurring app subscription and returns Shopify's approval URL.
- * Merchant must approve the charge before billing (and plan unlock) is active.
+ * Paid plans only — Free must cancel subscriptions + setShopPlan locally
+ * (Shopify rejects price amount 0).
  */
 export async function createPlanSubscriptionConfirmationUrl(
   admin: GraphqlAdmin,
   options: {
-    plan: Exclude<PricingPlanId, "free">;
+    plan: PricingPlanId;
     interval: PricingInterval;
     returnUrl: string;
     isTest?: boolean;
   },
 ): Promise<{ confirmationUrl: string; billingPlan: BillingPlanKey }> {
   const { plan, interval, returnUrl } = options;
+  if (plan === "free") {
+    throw new Error(
+      "Free plan does not use Shopify billing — cancel subscriptions instead",
+    );
+  }
   const isTest = options.isTest ?? billingIsTest();
   const billingPlan = billingPlanKeyFor(plan, interval);
   const amount = billingAmountDollars(plan, interval);
   const shopifyInterval =
-    interval === "yearly" ? "ANNUAL" : "EVERY_30_DAYS";
+    interval === "monthly" ? "EVERY_30_DAYS" : "ANNUAL";
+  const trialDays = PAID_PLAN_TRIAL_DAYS;
 
   const response = await admin.graphql(APP_SUBSCRIPTION_CREATE, {
     variables: {
       name: billingPlan,
       returnUrl,
       test: isTest,
-      trialDays: PAID_PLAN_TRIAL_DAYS,
+      trialDays,
+      // Always replace immediately so upgrade + downgrade both show approve UI,
+      // then swap the active subscription after merchant confirms.
       replacementBehavior: "APPLY_IMMEDIATELY",
       lineItems: [
         {

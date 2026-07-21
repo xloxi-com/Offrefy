@@ -28,24 +28,20 @@ export function themeAppEmbedEditorUrl(
 export type ThemeEditorLinkOptions = {
   themeId?: string | null;
   previewPath?: string | null;
-  /** Section id from the live theme's product.json (Product information). */
-  productSectionId?: string | null;
 };
 
 /**
- * Deep link to Product template → Product information / product details → Add block → Apps.
- * Uses the live theme's product.json section when available; falls back to mainSection.
+ * Deep link to the Product template in the theme editor.
+ * Merchants add the Quantity breaks block themselves via Add block / Add section → Apps.
+ * Do not use `addAppBlockId` here — that auto-inserts the block.
  */
 export function themeAppBlockEditorUrl(
   shop: string,
-  apiKey: string,
+  _apiKey: string,
   options?: ThemeEditorLinkOptions,
 ): string {
-  const sectionId = options?.productSectionId?.trim();
   const params = new URLSearchParams({
     template: "product",
-    addAppBlockId: `${apiKey}/${THEME_APP_BLOCK_HANDLE}`,
-    target: sectionId ? `sectionId:${sectionId}` : "mainSection",
   });
 
   const preview = options?.previewPath?.trim();

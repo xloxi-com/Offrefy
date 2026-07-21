@@ -1,8 +1,7 @@
 {% comment %}
   App embed (body) — Theme settings → App embeds.
-  Loads storefront JS/CSS. On product pages also mounts a fallback Quantity breaks
-  widget (moved near Add to cart). If a section “Quantity breaks” block is present,
-  that block wins and the fallback is removed by storefront JS.
+  Loads storefront JS/CSS only. The Quantity breaks widget UI is rendered solely by
+  the “Quantity breaks” app block (Product information → Add block → Apps).
 {% endcomment %}
 {% liquid
   if product != blank
@@ -13,13 +12,6 @@
 %}
 <script>window.__vdAppEmbedActive = true;</script>
 {% render 'vd-storefront-assets', vd_product: vd_product %}
-{% if vd_product != blank %}
-  {% comment %}
-    Product-page fallback widget when the merchant has not added the Quantity breaks
-    section block. Section blocks still take priority (JS removes this fallback).
-  {% endcomment %}
-  {% render 'vd-quantity-breaks', vd_product: vd_product, vd_from_embed: true %}
-{% endif %}
 
 {% schema %}
 {

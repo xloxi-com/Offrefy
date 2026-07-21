@@ -102,7 +102,8 @@ export function PricingTable({
             currentPlan === "standard"
               ? ("secondary" as const)
               : ("primary" as const),
-          disabled: currentPlan === "standard" || selecting,
+          // Keep enabled so monthly ↔ yearly still opens Shopify approve.
+          disabled: selecting,
           onClick: () => onSelectPlan?.("standard", interval),
         },
       };
@@ -114,7 +115,7 @@ export function PricingTable({
           currentPlan === "premium"
             ? ("secondary" as const)
             : ("primary" as const),
-        disabled: currentPlan === "premium" || selecting,
+        disabled: selecting,
         onClick: () => onSelectPlan?.("premium", interval),
       },
     };

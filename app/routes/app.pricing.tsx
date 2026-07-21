@@ -33,8 +33,8 @@ import { authenticate } from "../shopify.server";
 import type { AdminUiMessageKey } from "../utils/adminUiMessages";
 import {
   FEATURE_COMPARE_ROWS,
-  PLANS,
   YEARLY_DISCOUNT_PERCENT,
+  getMaxActiveCampaigns,
   isPricingPlanId,
   type PlanFlag,
   type PricingInterval,
@@ -96,8 +96,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     currentPlan = await syncPlanFromActiveSubscription(
       session.shop,
       admin,
-      preferredPlan === "free" ? null : preferredPlan,
+      preferredPlan,
     );
+    // Enforce free-plan campaign caps after merchant approved the charge.
+    if (currentPlan === "free" || preferredPlan === "free") {
+      const enforce = await setShopPlan(session.shop, "free");
+      currentPlan = "free";
+      if (enforce.draftedIds.length > 0) {
+        scheduleVolumeDiscountShopSync(admin, session.shop, {
+          changedCampaignIds: [
+            ...enforce.keptActiveIds,
+            ...enforce.draftedIds,
+          ],
+          skipScheduleTransitions: true,
+        });
+      }
+    }
     justActivated = currentPlan;
   }
 
@@ -129,44 +143,41 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       ? `https://admin.shopify.com/store/${shopHandle}/apps/${apiKey}/app/pricing?billing=success&plan=${plan}`
       : `${appUrl}/app/pricing?billing=success&plan=${plan}`;
 
-  // Free: cancel Shopify subscriptions, then apply free locks.
+  // Free is $0 — Shopify rejects appSubscriptionCreate with amount 0.
+  // Downgrade locally: cancel paid charges, then persist Free.
   if (plan === "free") {
     try {
-      await cancelActiveAppSubscriptions(admin, { prorate: true });
+      await cancelActiveAppSubscriptions(admin);
+      const enforce = await setShopPlan(session.shop, "free");
+      if (enforce.draftedIds.length > 0) {
+        scheduleVolumeDiscountShopSync(admin, session.shop, {
+          changedCampaignIds: [
+            ...enforce.keptActiveIds,
+            ...enforce.draftedIds,
+          ],
+          skipScheduleTransitions: true,
+        });
+      }
+      return {
+        ok: true as const,
+        plan,
+        draftedCount: enforce.draftedIds.length,
+        keptActiveCount: enforce.keptActiveIds.length,
+        maxCampaigns: getMaxActiveCampaigns("free"),
+        message: "switched",
+      };
     } catch (error) {
       return {
         ok: false as const,
         error:
           error instanceof Error
             ? error.message
-            : "Could not cancel the current subscription",
+            : "Could not switch to Free",
       };
     }
-
-    const enforce = await setShopPlan(session.shop, plan);
-    if (enforce.draftedIds.length > 0) {
-      scheduleVolumeDiscountShopSync(admin, session.shop, {
-        changedCampaignIds: [
-          ...enforce.keptActiveIds,
-          ...enforce.draftedIds,
-        ],
-        skipScheduleTransitions: true,
-      });
-    }
-
-    const max = PLANS[plan].maxCampaigns;
-
-    return {
-      ok: true as const,
-      plan,
-      draftedCount: enforce.draftedIds.length,
-      keptActiveCount: enforce.keptActiveIds.length,
-      maxCampaigns: max,
-      message: "switched",
-    };
   }
 
-  // Paid: create recurring charge and send merchant to Shopify approve page.
+  // Paid plans go through Shopify approval via appSubscriptionCreate.
   try {
     const { confirmationUrl } = await createPlanSubscriptionConfirmationUrl(
       admin,
@@ -403,8 +414,17 @@ export default function PricingPage() {
     if (!data) return;
     if (data.ok) {
       if ("confirmationUrl" in data && data.confirmationUrl) {
-        // Leave the embedded iframe and open Shopify charge approval.
-        window.open(data.confirmationUrl, "_top");
+        // Break out of the embedded iframe to Shopify's charge approval page.
+        const url = data.confirmationUrl;
+        try {
+          if (window.top) {
+            window.top.location.href = url;
+          } else {
+            window.location.href = url;
+          }
+        } catch {
+          window.open(url, "_top");
+        }
         return;
       }
       const title = t(PLAN_TITLE_KEY[data.plan]);
@@ -429,7 +449,9 @@ export default function PricingPage() {
   }, [fetcher.state, fetcher.data, revalidator, shopify, t]);
 
   const selectPlan = (plan: PricingPlanId, interval: PricingInterval) => {
-    if (plan === currentPlan) return;
+    // Already on Free — nothing to approve. Paid → allow re-select to change
+    // monthly/yearly or re-open Shopify billing.
+    if (plan === currentPlan && plan === "free") return;
     const fd = new FormData();
     fd.set("plan", plan);
     fd.set("interval", interval);
