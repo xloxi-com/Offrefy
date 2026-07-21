@@ -223,7 +223,7 @@
   "home.adminLanguageSaveError": "Could not save admin language",
   "home.bannerEmbedOffTitle": "App embed is off",
   "home.bannerEmbedOffBody": "Turn on Offrefy (global) under Theme settings → App embeds → Save, or click Enable app embed.",
-  "home.bannerEmbedOffScript": " Script fallback can still show the widget until embed is on.",
+  "home.bannerEmbedOffScript": "",
   "home.bannerEnableEmbed": "Enable app embed",
   "home.bannerEnabling": "Enabling…",
   "home.bannerOpenThemeEditor": "Open theme editor",

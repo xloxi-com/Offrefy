@@ -17,21 +17,6 @@ const SCRIPT_TAGS_QUERY = `#graphql
   }
 `;
 
-const SCRIPT_TAG_CREATE = `#graphql
-  mutation OffrefyScriptTagCreate($input: ScriptTagInput!) {
-    scriptTagCreate(input: $input) {
-      scriptTag {
-        id
-        src
-      }
-      userErrors {
-        field
-        message
-      }
-    }
-  }
-`;
-
 const SCRIPT_TAG_DELETE = `#graphql
   mutation OffrefyScriptTagDelete($id: ID!) {
     scriptTagDelete(id: $id) {
@@ -44,31 +29,35 @@ const SCRIPT_TAG_DELETE = `#graphql
   }
 `;
 
-const ensuredUntil = new Map<string, number>();
-const ENSURE_TTL_MS = 30 * 60 * 1000;
+const cleanedUntil = new Map<string, number>();
+const CLEAN_TTL_MS = 30 * 60 * 1000;
 
-function loaderSrc(appUrl: string): string {
-  return `${appUrl.replace(/\/$/, "")}/vd-loader.js`;
-}
-
-/** True when this ScriptTag is one of ours (loads the Offrefy widget loader). */
+/** True when this ScriptTag is one of ours (legacy /vd-loader.js bootstrap). */
 function isOffrefyLoaderScriptTag(src: unknown): boolean {
   return typeof src === "string" && src.includes("/vd-loader.js");
 }
 
-/** True when ScriptTag was ensured recently (no Admin API call). */
+/**
+ * True when legacy ScriptTags were cleaned recently (no Admin API call).
+ * Kept for callers that still check the old “script fallback ready” cache.
+ */
 export function isOffrefyStorefrontScriptTagRecentlyEnsured(
   shop?: string,
 ): boolean {
   const appUrl = (process.env.SHOPIFY_APP_URL || "").replace(/\/$/, "");
   const cacheKey = shop || appUrl;
   if (!cacheKey) return false;
-  return (ensuredUntil.get(cacheKey) ?? 0) > Date.now();
+  return (cleanedUntil.get(cacheKey) ?? 0) > Date.now();
 }
 
 /**
- * Registers a storefront ScriptTag that loads Offrefy widget assets even when
- * Theme App Embed is disabled (common on custom / newly installed apps).
+ * Removes legacy Offrefy `/vd-loader.js` ScriptTags.
+ *
+ * Widget JS must load only from the Theme App Embed (Shopify CDN after
+ * `shopify app deploy`). The old ScriptTag pointed at the hosted app URL and
+ * often served a stale bundle — so local `shopify app dev` looked correct while
+ * the live storefront kept old behavior.
+ *
  * Requires read_script_tags + write_script_tags.
  */
 export async function ensureOffrefyStorefrontScriptTag(
@@ -76,17 +65,11 @@ export async function ensureOffrefyStorefrontScriptTag(
   shop?: string,
 ): Promise<{ ok: boolean; errors: string[] }> {
   const appUrl = (process.env.SHOPIFY_APP_URL || "").replace(/\/$/, "");
-  if (!appUrl) {
-    return { ok: false, errors: ["Missing SHOPIFY_APP_URL"] };
-  }
-
-  const cacheKey = shop || appUrl;
+  const cacheKey = shop || appUrl || "default";
   const now = Date.now();
-  if ((ensuredUntil.get(cacheKey) ?? 0) > now) {
+  if ((cleanedUntil.get(cacheKey) ?? 0) > now) {
     return { ok: true, errors: [] };
   }
-
-  const desired = loaderSrc(appUrl);
 
   try {
     const listRes = await admin.graphql(SCRIPT_TAGS_QUERY);
@@ -101,78 +84,33 @@ export async function ensureOffrefyStorefrontScriptTag(
     }
 
     const nodes = listJson.data?.scriptTags?.nodes ?? [];
+    const legacyLoaders = nodes.filter((n) => isOffrefyLoaderScriptTag(n.src));
 
-    /*
-     * `shopify app dev` creates a loader ScriptTag pointing at the temporary
-     * cloudflare/ngrok tunnel (SHOPIFY_APP_URL). After the tunnel dies the
-     * storefront can no longer load the widget JS, so the widget silently
-     * disappears while the discount Function (runs on Shopify) keeps working.
-     * Only treat the current (desired) URL as "already ensured"; remove any
-     * stale/foreign loader tags so production self-heals to the deployed URL.
-     */
-    const staleLoaderTags = nodes.filter(
-      (n) => isOffrefyLoaderScriptTag(n.src) && n.src !== desired,
-    );
-    const alreadyCorrect = nodes.some((n) => n.src === desired);
-
-    for (const stale of staleLoaderTags) {
-      if (!stale.id) continue;
+    for (const tag of legacyLoaders) {
+      if (!tag.id) continue;
       try {
         await admin.graphql(SCRIPT_TAG_DELETE, {
-          variables: { id: stale.id },
+          variables: { id: tag.id },
         });
       } catch (e) {
         if (e instanceof Response && e.status >= 300 && e.status < 400) throw e;
         console.warn(
-          "[Offrefy] failed to remove stale storefront ScriptTag",
-          stale.src,
+          "[Offrefy] failed to remove legacy storefront ScriptTag",
+          tag.src,
           e,
         );
       }
     }
 
-    if (alreadyCorrect) {
-      ensuredUntil.set(cacheKey, now + ENSURE_TTL_MS);
-      return { ok: true, errors: [] };
-    }
-
-    const createRes = await admin.graphql(SCRIPT_TAG_CREATE, {
-      variables: {
-        input: {
-          src: desired,
-          displayScope: "ONLINE_STORE",
-        },
-      },
-    });
-    const createJson = (await createRes.json()) as {
-      data?: {
-        scriptTagCreate?: {
-          userErrors?: Array<{ message: string }>;
-        };
-      };
-      errors?: Array<{ message: string }>;
-    };
-
-    const userErrors = (
-      createJson.data?.scriptTagCreate?.userErrors ?? []
-    ).map((e) => e.message);
-    const gqlErrors = (createJson.errors ?? []).map((e) => e.message);
-    const messages = [...gqlErrors, ...userErrors];
-    const alreadyExists = messages.some((m) =>
-      /already|taken|exists/i.test(m),
-    );
-
-    if (messages.length && !alreadyExists) {
-      return { ok: false, errors: messages };
-    }
-
-    ensuredUntil.set(cacheKey, now + ENSURE_TTL_MS);
+    cleanedUntil.set(cacheKey, now + CLEAN_TTL_MS);
     return { ok: true, errors: [] };
   } catch (e) {
     if (e instanceof Response && e.status >= 300 && e.status < 400) throw e;
     return {
       ok: false,
-      errors: [e instanceof Error ? e.message : "ScriptTag ensure failed"],
+      errors: [
+        e instanceof Error ? e.message : "ScriptTag cleanup failed",
+      ],
     };
   }
 }

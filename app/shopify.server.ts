@@ -101,7 +101,7 @@ const shopify = shopifyApp({
       );
       await ensureOffrefyStorefrontScriptTag(admin, session.shop).catch(
         (error) => {
-          console.warn("[Offrefy] afterAuth storefront ScriptTag", error);
+          console.warn("[Offrefy] afterAuth storefront ScriptTag cleanup", error);
         },
       );
       const { pushStorefrontWidgetToShop } = await import(

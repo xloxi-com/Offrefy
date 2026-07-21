@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-const ASSET_VERSION = "1.26.0";
+/** Keep in sync with `vd-storefront-assets.liquid` + storefront embed.version. */
+const ASSET_VERSION = "1.27.3";
 
 function assetPath(fileName: string) {
   return path.join(
@@ -39,7 +40,11 @@ export function vdStorefrontCssResponse() {
   });
 }
 
-/** Tiny ScriptTag bootstrap — injects CSS + main widget when App Embed is off. */
+/**
+ * Legacy ScriptTag bootstrap — intentionally a no-op.
+ * Live widget assets come from the Theme App Embed after `shopify app deploy`.
+ * Keeping this route avoids 404s for any ScriptTag not yet deleted.
+ */
 export function vdLoaderJsResponse(appOrigin: string) {
   const origin = (appOrigin || "https://offrey.xloxi.com").replace(/\/$/, "");
   const body = `(function(){
@@ -47,20 +52,7 @@ export function vdLoaderJsResponse(appOrigin: string) {
   var V=${JSON.stringify(ASSET_VERSION)};
   try { window.__vdAppOrigin = window.__vdAppOrigin || O; } catch (e) {}
   try { window.__vdAssetVersion = window.__vdAssetVersion || V; } catch (e2) {}
-  if (!document.querySelector('link[data-vd-hosted-css="1"],link[href*="volume-discount-storefront.css"],link[href*="/vd-storefront.css"]')) {
-    var l = document.createElement("link");
-    l.rel = "stylesheet";
-    l.href = O + "/vd-storefront.css?v=" + encodeURIComponent(V);
-    l.setAttribute("data-vd-hosted-css", "1");
-    (document.head || document.documentElement).appendChild(l);
-  }
-  if (!document.querySelector('script[data-vd-main="1"],script[src*="volume-discount-storefront.js"],script[src*="/vd-storefront.js"]')) {
-    var s = document.createElement("script");
-    s.src = O + "/vd-storefront.js?v=" + encodeURIComponent(V);
-    s.defer = true;
-    s.setAttribute("data-vd-main", "1");
-    (document.head || document.documentElement).appendChild(s);
-  }
+  /* No hosted widget inject — App Embed (theme extension) owns storefront JS. */
 })();`;
   return new Response(body, {
     headers: {

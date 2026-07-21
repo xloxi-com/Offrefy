@@ -3816,7 +3816,7 @@
     trackImpression(campaign, root.getAttribute("data-product-id"));
     window.VolumeDiscount = window.VolumeDiscount || {};
     window.VolumeDiscount.embed = window.VolumeDiscount.embed || {};
-    window.VolumeDiscount.embed.version = "1.27.2";
+    window.VolumeDiscount.embed.version = "1.27.3";
 
     /**
      * Remove the body app-embed fallback only after a section "Quantity breaks" widget

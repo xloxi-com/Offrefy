@@ -45,7 +45,6 @@ import {
 import { ensureQuantityBreaksBlockInLiveTheme } from "../services/themeProductBlock.server";
 import {
   ensureOffrefyStorefrontScriptTag,
-  isOffrefyStorefrontScriptTagRecentlyEnsured,
 } from "../services/ensureOffrefyStorefrontScriptTag.server";
 import { pushStorefrontWidgetToShop } from "../services/refreshStorefrontWidget.server";
 import { runAfterResponse } from "../services/deferredShopSync.server";
@@ -96,7 +95,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const hasWriteThemes = grantedScopes.includes("write_themes");
   const hasWriteScriptTags = grantedScopes.includes("write_script_tags");
 
-  // Fast path: DB only. Theme/ScriptTag Admin API work runs after the response.
+  // Fast path: DB only. Theme / legacy ScriptTag cleanup runs after the response.
   const [counts, lastSyncedAt, planCtx] = await Promise.all([
     prisma.$queryRaw<Array<{ campaignCount: bigint; activeCount: bigint }>>(
       Prisma.sql`
@@ -121,10 +120,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const appEmbedEnabled = embedCached?.enabled ?? false;
   const appEmbedErrors = embedCached?.errors ?? [];
   const mainThemeId = mainThemeIdFromGid(embedCached?.themeId ?? null);
-  const scriptTagOk = isOffrefyStorefrontScriptTagRecentlyEnsured(session.shop);
+  const scriptTagOk = false;
   const setupStatusStale = !embedCached;
-  // ScriptTag alone is enough for the widget to show without App Embed.
-  const storefrontReady = appEmbedEnabled || scriptTagOk;
+  // Widget JS loads only from Theme App Embed (Shopify CDN after deploy).
+  const storefrontReady = appEmbedEnabled;
 
   runAfterResponse(
     (async () => {
@@ -146,7 +145,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         if (hasWriteScriptTags) {
           await ensureOffrefyStorefrontScriptTag(admin, session.shop).catch(
             (error) => {
-              console.warn("[Offrefy] home storefront ScriptTag", error);
+              console.warn("[Offrefy] home storefront ScriptTag cleanup", error);
             },
           );
         }
@@ -287,7 +286,6 @@ export default function AppHomePage() {
   });
 
   // Checklist Done only after merchant finishes that step (real app embed).
-  // Script-tag fallback can keep the widget live but must not fake Done.
   const embedReady = status.appEmbedEnabled;
   const hasSynced = Boolean(status.lastSyncedAt);
   const setupComplete =
@@ -639,9 +637,7 @@ export default function AppHomePage() {
                     </DetailRow>
                     <DetailRow label={t("home.storefrontWidget")}>
                       {status.storefrontReady
-                        ? embedReady
-                          ? t("home.widgetReadyEmbed")
-                          : t("home.widgetReadyScript")
+                        ? t("home.widgetReadyEmbed")
                         : t("home.widgetNeedsSetup")}
                     </DetailRow>
                     <DetailRow label={t("home.extension")}>
