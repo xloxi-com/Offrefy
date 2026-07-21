@@ -1,5 +1,4 @@
-# Fetch target: only when metafield rule_source.mode = "api" (catalog exceeds metafield shards).
-# Requires network_access capability (Shopify Plus / approved custom apps).
+# Fetch only builds a network request when rule_source.mode = "api".
 query FetchInput {
   cart {
     vdLockedProductsAttr: attribute(key: "vd_locked_products") {
@@ -17,9 +16,6 @@ query FetchInput {
   }
   discount {
     ruleSource: metafield(namespace: "volume_discount", key: "rule_source") {
-      jsonValue
-    }
-    campaignsFrag0: metafield(namespace: "volume_discount", key: "campaigns") {
       jsonValue
     }
   }

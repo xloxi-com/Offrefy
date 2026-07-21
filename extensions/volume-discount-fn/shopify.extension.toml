@@ -17,11 +17,6 @@ description = "One automatic Product Discount reads unlimited campaigns from dis
   input_query = "src/fetch.graphql"
   export = "cart-lines-discounts-generate-fetch"
 
-  # Populates $customerSegmentTags from discount metafield volume_discount.input_variables
-  [extensions.input.variables]
-  namespace = "volume_discount"
-  key = "input_variables"
-
   [extensions.capabilities]
   network_access = true
 

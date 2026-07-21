@@ -770,11 +770,17 @@ export async function syncVolumeDiscountShop(
       namespace: MF_NS,
       key: MF_KEY_RULE_SOURCE,
       type: "json",
-      value: JSON.stringify({
-        mode: "api",
-        apiPath: "/apps/volume-discount/cart-rules",
-        shopDomain: shop,
-      }),
+      value: JSON.stringify(
+        needsRemoteLookup
+          ? {
+              mode: "api",
+              apiPath: "/apps/volume-discount/cart-rules",
+              shopDomain: shop,
+            }
+          : {
+              mode: "metafield",
+            },
+      ),
     },
   ];
 

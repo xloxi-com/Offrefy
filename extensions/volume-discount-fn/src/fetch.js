@@ -38,16 +38,19 @@ function parseLockedProductIds(raw) {
  */
 export function cartLinesDiscountsGenerateFetch(input) {
   const ruleSource = input.discount?.ruleSource?.jsonValue;
+  if (!ruleSource || typeof ruleSource !== "object") {
+    return { request: undefined };
+  }
+  // Product metafields cover most carts — only hit the network when sync said so.
+  if (String(ruleSource.mode ?? "") !== "api") {
+    return { request: undefined };
+  }
 
   const shopDomain =
-    ruleSource &&
-    typeof ruleSource === "object" &&
     typeof ruleSource.shopDomain === "string"
       ? String(ruleSource.shopDomain).trim()
       : "";
   const apiPath =
-    ruleSource &&
-    typeof ruleSource === "object" &&
     typeof ruleSource.apiPath === "string"
       ? String(ruleSource.apiPath).trim()
       : "/apps/volume-discount/cart-rules";

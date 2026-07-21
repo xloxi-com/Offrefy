@@ -1,45 +1,15 @@
-# Product Discount function input query (cart.lines.discounts.generate.run).
-#
-# Rules source: discount metafields namespace "volume_discount", keys campaigns…campaigns_4.
-# The app admin sync writes sharded JSON there (unlimited campaigns/products across shards).
-#
-# Metafield size: each JSON value is capped (~64–128 KB). This app shards across 5 keys
-# (~500 KB+ total). Shopify also caps input-query complexity (30); only 5 metafield()
-# reads fit alongside cart lines + buyerIdentity + fetchResult. rule_source is read
-# in fetch.graphql (separate target), not here.
-#
-# Alternative (not used here): shop metafield volume_discounts.rules — discount functions
-# cannot read shop metafields in the input query; you would need network access or store
-# rules on the discount owner (as below).
-query CartInput($customerSegmentTags: [String!]!) {
+# Slim input — product tiers metafields only. Avoid loading large discount
+# campaign JSON here (that alone can push a 25-line cart over the instruction budget).
+query CartInput {
   cart {
-    vdLocaleAttr: attribute(key: "vd_locale") {
-      value
-    }
     vdLockedProductsAttr: attribute(key: "vd_locked_products") {
       value
-    }
-    buyerIdentity {
-      isAuthenticated
-      customer {
-        hasTags(tags: $customerSegmentTags) {
-          tag
-          hasTag
-        }
-      }
     }
     lines {
       id
       quantity
-      cost {
-        subtotalAmount {
-          amount
-          currencyCode
-        }
-      }
       merchandise {
         ... on ProductVariant {
-          id
           product {
             id
             tiersMetafield: metafield(namespace: "volume_discount", key: "tiers") {
@@ -54,15 +24,7 @@ query CartInput($customerSegmentTags: [String!]!) {
     status
     body
   }
-  localization {
-    language {
-      isoCode
-    }
-  }
   discount {
     discountClasses
-    campaignsFrag0: metafield(namespace: "volume_discount", key: "campaigns") {
-      jsonValue
-    }
   }
 }

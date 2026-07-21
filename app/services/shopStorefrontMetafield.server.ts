@@ -342,7 +342,19 @@ export async function syncShopStorefrontWidgetMetafield(
         }
       }
     } catch (e) {
+      // Retry without fingerprint if the DB column is missing on older deploys.
       console.warn("[Offrefy] storefront DB cache:", e);
+      try {
+        if (existingRow?.payload !== cacheValue) {
+          await prisma.volumeDiscountStorefrontPayload.upsert({
+            where: { shop },
+            create: { shop, payload: cacheValue },
+            update: { payload: cacheValue },
+          });
+        }
+      } catch (e2) {
+        console.warn("[Offrefy] storefront DB cache retry:", e2);
+      }
     }
   } else {
     const [, , shopRes] = await Promise.all([
