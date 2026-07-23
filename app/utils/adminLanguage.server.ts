@@ -54,8 +54,12 @@ export async function setAdminLanguage(
   `;
 }
 
+/** Process-lifetime memo — avoid ALTER on every language save. */
+let adminLanguageColumnEnsured = false;
+
 /** Ensure the column exists (safe for deploys that lag migrate). */
 export async function ensureAdminLanguageColumn(): Promise<void> {
+  if (adminLanguageColumnEnsured) return;
   try {
     await prisma.$executeRaw(
       Prisma.sql`
@@ -63,6 +67,7 @@ export async function ensureAdminLanguageColumn(): Promise<void> {
         ADD COLUMN IF NOT EXISTS "adminLanguage" TEXT NOT NULL DEFAULT 'auto'
       `,
     );
+    adminLanguageColumnEnsured = true;
   } catch (error) {
     console.warn("[Offrefy] ensureAdminLanguageColumn", error);
   }

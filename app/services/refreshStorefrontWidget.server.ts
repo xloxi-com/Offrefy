@@ -321,10 +321,13 @@ export async function pushStorefrontWidgetToShop(
   shop: string,
 ): Promise<{ errors: string[] }> {
   const cached = await getVolumeDiscountStorefrontPayload(shop).catch(() => null);
-  const storefrontErrors = cached?.payload
-    ? (await refreshStorefrontTranslationsForShop(admin, shop)).errors
-    : (await refreshStorefrontWidgetForShop(admin, shop)).errors;
+  // Translations path already patches discount metafields — avoid a second GraphQL round-trip.
+  if (cached?.payload) {
+    return refreshStorefrontTranslationsForShop(admin, shop);
+  }
 
+  const storefrontErrors = (await refreshStorefrontWidgetForShop(admin, shop))
+    .errors;
   const discountErrors = (
     await patchDiscountMetafieldStorefrontTranslations(admin, shop)
   ).errors;

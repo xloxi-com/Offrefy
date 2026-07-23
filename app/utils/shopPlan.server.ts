@@ -16,8 +16,12 @@ type GraphqlAdmin = {
   ) => Promise<Response>;
 };
 
+/** Process-lifetime memo — avoid ALTER on every Home / plan hit. */
+let postInstallPricingColumnEnsured = false;
+
 /** Ensure the column exists (safe for deploys that lag migrate). */
 export async function ensurePostInstallPricingColumn(): Promise<void> {
+  if (postInstallPricingColumnEnsured) return;
   try {
     await prisma.$executeRaw(
       Prisma.sql`
@@ -25,6 +29,7 @@ export async function ensurePostInstallPricingColumn(): Promise<void> {
         ADD COLUMN IF NOT EXISTS "postInstallPricingPending" BOOLEAN NOT NULL DEFAULT false
       `,
     );
+    postInstallPricingColumnEnsured = true;
   } catch (error) {
     console.warn("[Offrefy] ensurePostInstallPricingColumn", error);
   }

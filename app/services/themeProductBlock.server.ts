@@ -206,7 +206,8 @@ const productBlockCache = new Map<
   string,
   { present: boolean; expiresAt: number }
 >();
-const PRODUCT_BLOCK_TTL_MS = 20 * 1000;
+/** Match embed status TTL — fewer cold Admin reads on Home / soft navigation. */
+const PRODUCT_BLOCK_TTL_MS = 2 * 60 * 1000;
 
 export function invalidateQuantityBreaksBlockStatusCache(shop?: string): void {
   if (!shop) {
@@ -277,7 +278,16 @@ export async function getQuantityBreaksBlockStatus(
     const checkedFiles: string[] = [];
     let present = false;
 
-    for (const node of fileNodes) {
+    // Prefer default product template first — usually enough; skip decoding the rest.
+    const orderedNodes = [...fileNodes].sort((a, b) => {
+      const af = a?.filename ?? "";
+      const bf = b?.filename ?? "";
+      if (af === "templates/product.json") return -1;
+      if (bf === "templates/product.json") return 1;
+      return 0;
+    });
+
+    for (const node of orderedNodes) {
       if (!node) continue;
       const filename = node.filename ?? "unknown";
       const content = await resolveThemeFileBody(node.body);

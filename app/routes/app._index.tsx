@@ -56,7 +56,7 @@ import {
 import {
   ensureOffrefyStorefrontScriptTag,
 } from "../services/ensureOffrefyStorefrontScriptTag.server";
-import { pushStorefrontWidgetToShop, refreshStorefrontWidgetForShop } from "../services/refreshStorefrontWidget.server";
+import { refreshStorefrontWidgetForShop } from "../services/refreshStorefrontWidget.server";
 import { runAfterResponse } from "../services/deferredShopSync.server";
 import { syncVolumeDiscountShop } from "../services/volumeDiscountFunctionSync.server";
 import { invalidateMemoryCachePrefix } from "../utils/memoryCache.server";
@@ -185,6 +185,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   runAfterResponse(
     (async () => {
       try {
+        // Warm theme caches only — widget/discount push runs on Sync / offer save.
         if (!forceSetupRefresh) {
           await Promise.all([
             getMainThemeAppEmbedStatus(admin, session.shop),
@@ -196,14 +197,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           await ensureOffrefyStorefrontScriptTag(admin, session.shop).catch(
             (error) => {
               console.warn("[Offrefy] home storefront ScriptTag cleanup", error);
-            },
-          );
-        }
-
-        if (activeCount > 0) {
-          await pushStorefrontWidgetToShop(admin, session.shop).catch(
-            (error) => {
-              console.warn("[Offrefy] home storefront widget refresh", error);
             },
           );
         }
@@ -255,8 +248,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     };
 
     let { embed, block } = await checkOnce();
-    // Theme editor saves can lag briefly behind Admin API — retry once.
-    if (!embed.enabled || !block.present) {
+    // Theme editor saves can lag briefly — retry only when client asks (focus return).
+    const allowRetry = String(formData.get("retry") ?? "") === "1";
+    if (allowRetry && (!embed.enabled || !block.present)) {
       await new Promise((r) => setTimeout(r, 900));
       invalidateThemeAppEmbedStatusCache(session.shop);
       invalidateQuantityBreaksBlockStatusCache(session.shop);
@@ -434,6 +428,7 @@ export default function AppHomePage() {
   const [dismissedSetupBanner, setDismissedSetupBanner] = useState(false);
   const setupRefreshing = setupFetcher.state !== "idle";
   const pendingSetupRefresh = useRef(false);
+  const pendingSetupRetry = useRef(false);
   const lastSetupRefreshData = useRef<unknown>(null);
 
   useEffect(() => {
@@ -444,16 +439,18 @@ export default function AppHomePage() {
     window.localStorage.removeItem(SETUP_GUIDE_MANUAL_KEY);
   }, []);
 
-  const requestSetupRefresh = useCallback(() => {
+  const requestSetupRefresh = useCallback((opts?: { retry?: boolean }) => {
     // Dedicated fetcher — never blocked by language/sync or revalidator.
     // If a poll is in flight, queue one more refresh after it settles.
     if (setupFetcher.state !== "idle") {
       pendingSetupRefresh.current = true;
+      pendingSetupRetry.current = Boolean(opts?.retry);
       return;
     }
     pendingSetupRefresh.current = false;
     const fd = new FormData();
     fd.set("intent", "refreshSetupStatus");
+    if (opts?.retry) fd.set("retry", "1");
     setupFetcher.submit(fd, { method: "post" });
   }, [setupFetcher]);
 
@@ -461,8 +458,11 @@ export default function AppHomePage() {
   useEffect(() => {
     if (setupFetcher.state !== "idle" || !pendingSetupRefresh.current) return;
     pendingSetupRefresh.current = false;
+    const retry = pendingSetupRetry.current;
+    pendingSetupRetry.current = false;
     const fd = new FormData();
     fd.set("intent", "refreshSetupStatus");
+    if (retry) fd.set("retry", "1");
     setupFetcher.submit(fd, { method: "post" });
   }, [setupFetcher, setupFetcher.state]);
 
@@ -477,28 +477,21 @@ export default function AppHomePage() {
     return () => window.clearTimeout(id);
   }, [status.setupStatusStale, requestSetupRefresh]);
 
-  // Live update: when merchant returns from Theme editor (or periodically).
+  // Live update when merchant returns from Theme editor (no interval spam).
   useEffect(() => {
     if (setupComplete) return;
 
     const onVisible = () => {
       if (document.visibilityState === "visible") {
-        requestSetupRefresh();
+        requestSetupRefresh({ retry: true });
       }
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
 
-    const pollId = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        requestSetupRefresh();
-      }
-    }, 15_000);
-
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
-      window.clearInterval(pollId);
     };
   }, [setupComplete, requestSetupRefresh]);
 
@@ -524,8 +517,8 @@ export default function AppHomePage() {
     if ("productBlockPresent" in setupFetcher.data) {
       setLiveBlock(Boolean(setupFetcher.data.productBlockPresent));
     }
-    revalidator.revalidate();
-  }, [setupFetcher.data, setupFetcher.state, revalidator, shopify, t]);
+    // Action already returned live status — skip full Home loader revalidate.
+  }, [setupFetcher.data, setupFetcher.state, shopify, t]);
 
   // Drop local overrides only when loader confirms the same value.
   useEffect(() => {

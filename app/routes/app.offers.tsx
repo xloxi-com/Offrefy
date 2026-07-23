@@ -125,7 +125,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         createdAt: Date;
         updatedAt: Date;
         tierCount: bigint;
-        widgetDisplay: unknown;
+        widgetPresentation: string | null;
       }>
     >(Prisma.sql`
       SELECT
@@ -136,7 +136,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         c."status",
         c."createdAt",
         c."updatedAt",
-        c."widgetDisplay",
+        c."widgetDisplay"->>'widgetPresentation' AS "widgetPresentation",
         CASE
           WHEN jsonb_typeof(c."tiers") = 'array' THEN jsonb_array_length(c."tiers")
           ELSE 0
@@ -178,7 +178,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       createdAt: c.createdAt.toISOString(),
       updatedAt: c.updatedAt.toISOString(),
       tierCount: Number(c.tierCount),
-      widgetPresentation: widgetPresentationFromStoredJson(c.widgetDisplay),
+      widgetPresentation: widgetPresentationFromStoredJson(
+        c.widgetPresentation
+          ? { widgetPresentation: c.widgetPresentation }
+          : null,
+      ),
     })),
   };
 };

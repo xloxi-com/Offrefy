@@ -52,15 +52,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     .map((scope) => scope.trim())
     .filter(Boolean);
 
-  const analytics = await loadAnalyticsDashboard(
-    session.shop,
-    rangeSelection,
-    admin,
-    { grantedScopes },
-  );
-
-  const { resolveShopPlanContext } = await import("../utils/shopPlan.server");
-  const { plan, capabilities } = await resolveShopPlanContext(session.shop);
+  const [planCtx, analytics] = await Promise.all([
+    import("../utils/shopPlan.server").then((m) =>
+      m.resolveShopPlanContext(session.shop),
+    ),
+    loadAnalyticsDashboard(session.shop, rangeSelection, admin, {
+      grantedScopes,
+    }),
+  ]);
+  const { plan, capabilities } = planCtx;
 
   return {
     analytics,
