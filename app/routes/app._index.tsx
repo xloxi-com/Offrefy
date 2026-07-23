@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import {
   data,
+  redirect,
   useFetcher,
   useLoaderData,
   useLocation,
@@ -104,6 +105,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, admin } = await authenticate.admin(request);
   const url = new URL(request.url);
   const forceSetupRefresh = url.searchParams.get("setupRefresh") === "1";
+
+  // App Store install (or reinstall): send merchants to Pricing once, then normal home.
+  const { consumePostInstallPricingRedirect } = await import(
+    "../utils/shopPlan.server"
+  );
+  if (await consumePostInstallPricingRedirect(session.shop)) {
+    throw redirect(adminEmbeddedPath("/app/pricing", url.search));
+  }
 
   const grantedScopes = parseSessionScopes(session.scope);
   const hasWriteThemes = grantedScopes.includes("write_themes");

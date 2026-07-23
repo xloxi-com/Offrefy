@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../db.server";
 import { pricingPlanFromBillingName } from "./billingPlans";
 import {
@@ -14,6 +15,65 @@ type GraphqlAdmin = {
     options?: { variables?: Record<string, unknown> },
   ) => Promise<Response>;
 };
+
+/** Ensure the column exists (safe for deploys that lag migrate). */
+export async function ensurePostInstallPricingColumn(): Promise<void> {
+  try {
+    await prisma.$executeRaw(
+      Prisma.sql`
+        ALTER TABLE "VolumeDiscountSettings"
+        ADD COLUMN IF NOT EXISTS "postInstallPricingPending" BOOLEAN NOT NULL DEFAULT false
+      `,
+    );
+  } catch (error) {
+    console.warn("[Offrefy] ensurePostInstallPricingColumn", error);
+  }
+}
+
+/**
+ * Mark Pricing redirect for the next app open (uninstall → reinstall, or explicit).
+ * No-op if settings row is missing.
+ */
+export async function markPostInstallPricingPending(
+  shop: string,
+): Promise<void> {
+  await ensurePostInstallPricingColumn();
+  try {
+    await prisma.$executeRaw`
+      UPDATE "VolumeDiscountSettings"
+      SET
+        "postInstallPricingPending" = true,
+        "updatedAt" = NOW()
+      WHERE "shop" = ${shop}
+    `;
+  } catch (error) {
+    console.warn("[Offrefy] markPostInstallPricingPending", error);
+  }
+}
+
+/**
+ * Atomically clear the one-shot install flag.
+ * @returns true when this request should redirect to Pricing.
+ */
+export async function consumePostInstallPricingRedirect(
+  shop: string,
+): Promise<boolean> {
+  await ensurePostInstallPricingColumn();
+  try {
+    const updated = await prisma.$executeRaw`
+      UPDATE "VolumeDiscountSettings"
+      SET
+        "postInstallPricingPending" = false,
+        "updatedAt" = NOW()
+      WHERE "shop" = ${shop}
+        AND "postInstallPricingPending" = true
+    `;
+    return Number(updated) > 0;
+  } catch (error) {
+    console.warn("[Offrefy] consumePostInstallPricingRedirect", error);
+    return false;
+  }
+}
 
 /** Read shop plan from settings; default free. */
 export async function resolveShopPlan(shop: string): Promise<PricingPlanId> {
@@ -146,12 +206,14 @@ export async function setShopPlan(
   shop: string,
   plan: PricingPlanId,
 ): Promise<PlanDowngradeEnforceResult> {
+  await ensurePostInstallPricingColumn();
   await prisma.$executeRaw`
     INSERT INTO "VolumeDiscountSettings" (
       "shop",
       "syncInterval",
       "translationsString",
       "plan",
+      "postInstallPricingPending",
       "createdAt",
       "updatedAt"
     )
@@ -160,6 +222,7 @@ export async function setShopPlan(
       'disabled',
       '{}',
       ${plan},
+      true,
       NOW(),
       NOW()
     )

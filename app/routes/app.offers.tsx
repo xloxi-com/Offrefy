@@ -33,6 +33,7 @@ import { applyDueCampaignScheduleTransitions } from "../services/scheduledVolume
 import { syncVolumeDiscountShop } from "../services/volumeDiscountFunctionSync.server";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
+import { OfferLimitUpgradeModal } from "../components/OfferLimitUpgradeModal";
 import { OffersPolarisHome, type OfferTab } from "../components/OffersPolarisHome";
 import {
   adminEmbeddedPath,
@@ -454,14 +455,20 @@ export default function Index() {
 
   const atOfferCap =
     maxActiveCampaigns != null && offerCount >= maxActiveCampaigns;
+  const offerLimitMessage = createOfferBlockedMessage(plan);
+  const [offerLimitModalOpen, setOfferLimitModalOpen] = useState(false);
+
+  const showOfferLimitUpgrade = useCallback(() => {
+    setOfferLimitModalOpen(true);
+  }, []);
 
   const tryOpenCreate = useCallback(() => {
     if (atOfferCap) {
-      shopify.toast.show(createOfferBlockedMessage(plan));
+      showOfferLimitUpgrade();
       return;
     }
     setScreen("select");
-  }, [atOfferCap, plan, shopify]);
+  }, [atOfferCap, showOfferLimitUpgrade]);
 
   const nextDefaultCampaignName = useMemo(
     () => t("offers.defaultName", { n: campaigns.length + 1 }),
@@ -534,7 +541,7 @@ export default function Index() {
                     onLearnMore={() => toastSoon(t("common.learnMore"))}
                     onCreate={() => {
                       if (atOfferCap) {
-                        shopify.toast.show(createOfferBlockedMessage(plan));
+                        showOfferLimitUpgrade();
                         return;
                       }
                       navigate(
@@ -557,7 +564,7 @@ export default function Index() {
                     onLearnMore={() => toastSoon(t("common.learnMore"))}
                     onCreate={() => {
                       if (atOfferCap) {
-                        shopify.toast.show(createOfferBlockedMessage(plan));
+                        showOfferLimitUpgrade();
                         return;
                       }
                       navigate(
@@ -579,33 +586,46 @@ export default function Index() {
             </div>
           </Box>
         </Page>
+        <OfferLimitUpgradeModal
+          open={offerLimitModalOpen}
+          onClose={() => setOfferLimitModalOpen(false)}
+          message={offerLimitMessage}
+        />
       </>
     );
   }
 
   return (
-    <OffersPolarisHome
-      campaigns={campaigns}
-      filteredCampaigns={filteredCampaigns}
-      offerTab={offerTab}
-      setOfferTab={setOfferTab}
-      searchQuery={searchQuery}
-      setSearchQuery={setSearchQuery}
-      sortSelected={sortSelected}
-      setSortSelected={setSortSelected}
-      exportSearchQuery={deferredSearchQuery}
-      toastSoon={toastSoon}
-      setScreen={setScreen}
-      offerEditTo={offerEditTo}
-      onCampaignsMutated={onCampaignsMutated}
-      notify={notify}
-      canImportExport={planCapabilities.importExport}
-      activeCount={activeCount}
-      maxActiveCampaigns={maxActiveCampaigns}
-      atOfferCap={atOfferCap}
-      createOfferBlockedMessage={createOfferBlockedMessage(plan)}
-      onCreateOffer={tryOpenCreate}
-    />
+    <>
+      <OffersPolarisHome
+        campaigns={campaigns}
+        filteredCampaigns={filteredCampaigns}
+        offerTab={offerTab}
+        setOfferTab={setOfferTab}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        sortSelected={sortSelected}
+        setSortSelected={setSortSelected}
+        exportSearchQuery={deferredSearchQuery}
+        toastSoon={toastSoon}
+        setScreen={setScreen}
+        offerEditTo={offerEditTo}
+        onCampaignsMutated={onCampaignsMutated}
+        notify={notify}
+        canImportExport={planCapabilities.importExport}
+        activeCount={activeCount}
+        maxActiveCampaigns={maxActiveCampaigns}
+        atOfferCap={atOfferCap}
+        createOfferBlockedMessage={offerLimitMessage}
+        onCreateOffer={tryOpenCreate}
+        onOfferLimitReached={showOfferLimitUpgrade}
+      />
+      <OfferLimitUpgradeModal
+        open={offerLimitModalOpen}
+        onClose={() => setOfferLimitModalOpen(false)}
+        message={offerLimitMessage}
+      />
+    </>
   );
 }
 

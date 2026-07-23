@@ -132,6 +132,8 @@ export type OffersPolarisHomeProps = {
   atOfferCap?: boolean;
   createOfferBlockedMessage?: string;
   onCreateOffer?: () => void;
+  /** Prefer over toast when Create / Duplicate hit the plan cap. */
+  onOfferLimitReached?: () => void;
 };
 
 const PAGE_SIZE = 50;
@@ -243,6 +245,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
   atOfferCap = false,
   createOfferBlockedMessage = "You’ve reached your plan’s offer limit. Upgrade to create more.",
   onCreateOffer,
+  onOfferLimitReached,
 }: OffersPolarisHomeProps) {
   const { t } = useAdminI18n();
   const { search } = useLocation();
@@ -630,9 +633,17 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     syncAllFetcher.submit(fd, { method: "post", action: listIndexAction });
   }, [campaigns.length, listIndexAction, syncAllFetcher]);
 
+  const showOfferLimitReached = useCallback(() => {
+    if (onOfferLimitReached) {
+      onOfferLimitReached();
+      return;
+    }
+    notify(createOfferBlockedMessage);
+  }, [createOfferBlockedMessage, notify, onOfferLimitReached]);
+
   const submitDuplicate = (campaignId: string) => {
     if (atOfferCap) {
-      notify(createOfferBlockedMessage);
+      showOfferLimitReached();
       return;
     }
     const fd = new FormData();
@@ -802,12 +813,12 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     () => ({
       content: t("offers.createOffer"),
       onAction: () => {
-        if (onCreateOffer) {
-          onCreateOffer();
+        if (atOfferCap) {
+          showOfferLimitReached();
           return;
         }
-        if (atOfferCap) {
-          notify(createOfferBlockedMessage);
+        if (onCreateOffer) {
+          onCreateOffer();
           return;
         }
         warmEditorChunk();
@@ -816,10 +827,9 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     }),
     [
       atOfferCap,
-      createOfferBlockedMessage,
-      notify,
       onCreateOffer,
       setScreen,
+      showOfferLimitReached,
       t,
       warmEditorChunk,
     ],
@@ -899,12 +909,12 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
         <Button
           variant="primary"
           onClick={() => {
-            if (onCreateOffer) {
-              onCreateOffer();
+            if (atOfferCap) {
+              showOfferLimitReached();
               return;
             }
-            if (atOfferCap) {
-              notify(createOfferBlockedMessage);
+            if (onCreateOffer) {
+              onCreateOffer();
               return;
             }
             warmEditorChunk();

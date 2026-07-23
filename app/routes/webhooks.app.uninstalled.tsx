@@ -1,5 +1,6 @@
 import type { ActionFunctionArgs } from "react-router";
 import { prisma as db } from "../db.server";
+import { markPostInstallPricingPending } from "../utils/shopPlan.server";
 import { authenticateShopifyWebhook } from "../utils/webhookAuth.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -12,6 +13,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (session) {
     await db.session.deleteMany({ where: { shop } });
   }
+
+  // Next App Store install should land on Pricing once (settings row may remain).
+  await markPostInstallPricingPending(shop).catch((error) => {
+    console.warn("[Offrefy] uninstall post-install pricing flag", error);
+  });
 
   return new Response(null, { status: 200 });
 };
