@@ -188,6 +188,58 @@ export async function buildStorefrontWidgetJsonString(
   });
 }
 
+function readMaxDiscountProductsFromPayload(
+  payload: string | null | undefined,
+): number | null {
+  if (!payload) return null;
+  try {
+    const parsed = JSON.parse(payload) as { maxDiscountProducts?: number };
+    if (
+      typeof parsed.maxDiscountProducts === "number" &&
+      parsed.maxDiscountProducts > 0
+    ) {
+      return parsed.maxDiscountProducts;
+    }
+  } catch {
+    void 0;
+  }
+  return null;
+}
+
+/** Stamp cart discount product cap used by storefront locked-slot logic. */
+export function stampStorefrontMaxDiscountProducts(
+  fullWidgetJson: string,
+  maxDiscountProducts: number,
+): string {
+  const n = Math.max(1, maxDiscountProducts | 0);
+  try {
+    const parsed = JSON.parse(fullWidgetJson) as Record<string, unknown>;
+    parsed.maxDiscountProducts = n;
+    return JSON.stringify(parsed);
+  } catch {
+    return fullWidgetJson;
+  }
+}
+
+async function stampWidgetJsonWithShopCap(
+  widgetJson: string,
+  admin: AdminGraphql | null,
+  fallbackPayload?: string | null,
+): Promise<string> {
+  const fromPayload = readMaxDiscountProductsFromPayload(fallbackPayload);
+  if (fromPayload != null) {
+    return stampStorefrontMaxDiscountProducts(widgetJson, fromPayload);
+  }
+  if (admin) {
+    const { resolveShopifyShopPlanCap } = await import(
+      "./cartDiscountTargetCap.server"
+    );
+    const planCap = await resolveShopifyShopPlanCap(admin);
+    return stampStorefrontMaxDiscountProducts(widgetJson, planCap.maxTargets);
+  }
+  return widgetJson;
+}
+
 /** Max shop metafield JSON embedded in Liquid before switching to per-product API mode. */
 export const STOREFRONT_WIDGET_INLINE_MAX_CHARS = 180_000;
 
@@ -243,14 +295,22 @@ export function compactStorefrontShopMetafieldPayload(fullWidgetJson: string): s
     const parsed = JSON.parse(fullWidgetJson) as {
       translations?: StorefrontTranslationsMap;
       rev?: string | number;
+      maxDiscountProducts?: number;
     };
-    return JSON.stringify({
+    const compact: Record<string, unknown> = {
       version: 1,
       mode: "per_product",
       campaigns: [],
       translations: parsed.translations ?? {},
       rev: parsed.rev ?? Date.now(),
-    });
+    };
+    if (
+      typeof parsed.maxDiscountProducts === "number" &&
+      parsed.maxDiscountProducts > 0
+    ) {
+      compact.maxDiscountProducts = parsed.maxDiscountProducts;
+    }
+    return JSON.stringify(compact);
   } catch {
     return JSON.stringify({
       version: 1,
@@ -303,13 +363,18 @@ function buildSingleCampaignWidgetPayload(
   campaign: StorefrontWidgetCampaign,
   translations: StorefrontTranslationsMap,
   rev?: string | number | null,
+  maxDiscountProducts?: number | null,
 ): string {
-  return JSON.stringify({
+  const body: Record<string, unknown> = {
     version: 1,
     campaigns: [campaign],
     translations,
     rev: rev ?? Date.now(),
-  });
+  };
+  if (typeof maxDiscountProducts === "number" && maxDiscountProducts > 0) {
+    body.maxDiscountProducts = maxDiscountProducts;
+  }
+  return JSON.stringify(body);
 }
 
 async function resolveStorefrontTranslationsForWidget(
@@ -423,13 +488,28 @@ export async function buildStorefrontWidgetForProduct(
         fullPayload,
       );
       let rev: string | number | null = null;
+      let maxDiscountProducts: number | null = null;
       try {
-        const parsed = JSON.parse(fullPayload) as { rev?: string | number };
+        const parsed = JSON.parse(fullPayload) as {
+          rev?: string | number;
+          maxDiscountProducts?: number;
+        };
         rev = parsed.rev ?? null;
+        if (
+          typeof parsed.maxDiscountProducts === "number" &&
+          parsed.maxDiscountProducts > 0
+        ) {
+          maxDiscountProducts = parsed.maxDiscountProducts;
+        }
       } catch {
         void 0;
       }
-      return buildSingleCampaignWidgetPayload(camp, translations, rev);
+      return buildSingleCampaignWidgetPayload(
+        camp,
+        translations,
+        rev,
+        maxDiscountProducts,
+      );
     }
   }
 
@@ -479,7 +559,11 @@ export async function buildStorefrontWidgetForProduct(
         productKey || variantKey || undefined,
       );
       if (builtDirect) {
-        return await buildStorefrontWidgetJsonString([directRow], [builtDirect]);
+        return await stampWidgetJsonWithShopCap(
+          await buildStorefrontWidgetJsonString([directRow], [builtDirect]),
+          admin,
+          fullPayload,
+        );
       }
     }
     return JSON.stringify({ version: 1, campaigns: [] });
@@ -510,7 +594,11 @@ export async function buildStorefrontWidgetForProduct(
     matchedKey,
   );
   if (builtFromDb) {
-    return await buildStorefrontWidgetJsonString([row], [builtFromDb]);
+    return await stampWidgetJsonWithShopCap(
+      await buildStorefrontWidgetJsonString([row], [builtFromDb]),
+      admin,
+      fullPayload,
+    );
   }
 
   if (!admin) {
@@ -534,7 +622,12 @@ export async function buildStorefrontWidgetForProduct(
           shop,
           fallbackPayload,
         );
-        return buildSingleCampaignWidgetPayload(camp, translations);
+        return buildSingleCampaignWidgetPayload(
+          camp,
+          translations,
+          null,
+          readMaxDiscountProductsFromPayload(fallbackPayload),
+        );
       }
     }
     return JSON.stringify({ version: 1, campaigns: [] });
@@ -559,7 +652,11 @@ export async function buildStorefrontWidgetForProduct(
     shop,
   );
 
-  return await buildStorefrontWidgetJsonString([row], campaigns);
+  return await stampWidgetJsonWithShopCap(
+    await buildStorefrontWidgetJsonString([row], campaigns),
+    admin,
+    fullPayload,
+  );
 }
 
 export async function buildStorefrontWidgetValue(

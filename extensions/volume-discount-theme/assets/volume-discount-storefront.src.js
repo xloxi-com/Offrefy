@@ -111,11 +111,13 @@
   }
 
   function isUsableWidgetConfig(body) {
-    return !!(
+    var ok = !!(
       body &&
       Array.isArray(body.campaigns) &&
       body.campaigns.length > 0
     );
+    if (ok) rememberMaxDiscountProducts(body);
+    return ok;
   }
 
   /** Resolve first successful config among parallel candidates. */
@@ -325,6 +327,13 @@
     if (cfg && cfg.mode) {
       result.mode = cfg.mode;
     }
+    if (
+      cfg &&
+      typeof cfg.maxDiscountProducts === "number" &&
+      cfg.maxDiscountProducts > 0
+    ) {
+      result.maxDiscountProducts = cfg.maxDiscountProducts;
+    }
     return result;
   }
 
@@ -363,6 +372,7 @@
 
   function sanitizeWidgetConfig(cfg, designMode) {
     if (!cfg || typeof cfg !== "object") return { version: 1, campaigns: [] };
+    rememberMaxDiscountProducts(cfg);
     var list = Array.isArray(cfg.campaigns) ? cfg.campaigns : [];
     if (designMode) {
       return copyWidgetConfigMeta(cfg, { version: cfg.version || 1, campaigns: list });
@@ -1013,11 +1023,41 @@
 
   var VD_CART_LOCALE_ATTR = "vd_locale";
   var VD_LOCKED_PRODUCTS_ATTR = "vd_locked_products";
-  var VD_MAX_DISCOUNT_PRODUCTS = 25;
+  var VD_MAX_DISCOUNT_PRODUCTS_STANDARD = 500;
   var vdLastSyncedCartLocale = "";
   var vdLastSyncedLockedProducts = "";
+  var vdCachedMaxDiscountProducts = VD_MAX_DISCOUNT_PRODUCTS_STANDARD;
 
-  function parseLockedProductIds(raw) {
+  function resolveMaxDiscountProducts(cfg) {
+    if (
+      cfg &&
+      typeof cfg.maxDiscountProducts === "number" &&
+      cfg.maxDiscountProducts > 0
+    ) {
+      return cfg.maxDiscountProducts | 0;
+    }
+    if (typeof window.__vdMaxDiscountProducts === "number" && window.__vdMaxDiscountProducts > 0) {
+      return window.__vdMaxDiscountProducts | 0;
+    }
+    return vdCachedMaxDiscountProducts > 0
+      ? vdCachedMaxDiscountProducts
+      : VD_MAX_DISCOUNT_PRODUCTS_STANDARD;
+  }
+
+  function rememberMaxDiscountProducts(cfg) {
+    var n = resolveMaxDiscountProducts(cfg);
+    if (n > 0) {
+      vdCachedMaxDiscountProducts = n;
+      window.__vdMaxDiscountProducts = n;
+    }
+    return n;
+  }
+
+  function parseLockedProductIds(raw, maxProducts) {
+    var max =
+      typeof maxProducts === "number" && maxProducts > 0
+        ? maxProducts
+        : resolveMaxDiscountProducts(null);
     var s = String(raw || "").trim();
     if (!s) return [];
     var out = [];
@@ -1030,8 +1070,9 @@
       if (!n || seen[n]) continue;
       seen[n] = true;
       out.push(n);
+      if (out.length >= max) break;
     }
-    return out.slice(0, VD_MAX_DISCOUNT_PRODUCTS);
+    return out;
   }
 
   function productIdFromCartItem(item) {
@@ -1039,10 +1080,15 @@
     return String(item.product_id);
   }
 
-  function computeLockedProductIds(cart) {
+  function computeLockedProductIds(cart, maxProducts) {
+    var max =
+      typeof maxProducts === "number" && maxProducts > 0
+        ? maxProducts
+        : resolveMaxDiscountProducts(null);
     if (!cart || !Array.isArray(cart.items)) return [];
     var locked = parseLockedProductIds(
       cart.attributes && cart.attributes[VD_LOCKED_PRODUCTS_ATTR],
+      max,
     );
     var inCart = {};
     for (var i = 0; i < cart.items.length; i++) {
@@ -1057,7 +1103,7 @@
       lockedSet[locked[j]] = true;
     }
     for (var k = 0; k < cart.items.length; k++) {
-      if (locked.length >= VD_MAX_DISCOUNT_PRODUCTS) break;
+      if (locked.length >= max) break;
       var nextPid = productIdFromCartItem(cart.items[k]);
       if (!nextPid || lockedSet[nextPid]) continue;
       locked.push(nextPid);
@@ -1320,39 +1366,662 @@
       });
   }
 
-  function getThemeCartSectionsParam() {
+  function findThemeCartDrawerEl() {
+    return (
+      document.querySelector("cart-drawer") ||
+      document.querySelector("cart-notification") ||
+      document.getElementById("CartDrawer") ||
+      document.querySelector("cart-drawer-component") ||
+      document.querySelector("[id*='CartDrawer']") ||
+      document.querySelector("[id*='cart-drawer']")
+    );
+  }
+
+  /** Same IDs Dawn ProductForm sends — must match renderContents lookup keys (section.id). */
+  function getThemeCartSectionIds() {
     try {
-      var drawer = document.querySelector("cart-drawer");
+      var drawer = findThemeCartDrawerEl();
       if (drawer && typeof drawer.getSectionsToRender === "function") {
         return drawer
           .getSectionsToRender()
           .map(function (section) {
-            return section.section || section.id;
+            return section.id || section.section;
           })
-          .join(",");
+          .filter(Boolean);
       }
     } catch (e) {
       void e;
     }
-    return "cart-drawer,cart-icon-bubble";
+    return ["cart-drawer", "cart-icon-bubble"];
+  }
+
+  function getThemeCartSectionsParam() {
+    return getThemeCartSectionIds().join(",");
+  }
+
+  function cartResponseHasSectionHtml(sections) {
+    if (!sections || typeof sections !== "object") return false;
+    var ids = getThemeCartSectionIds();
+    for (var i = 0; i < ids.length; i++) {
+      if (sections[ids[i]]) return true;
+    }
+    var keys = Object.keys(sections);
+    for (var k = 0; k < keys.length; k++) {
+      if (sections[keys[k]]) return true;
+    }
+    return false;
+  }
+
+  function clickHeaderCartIcon() {
+    var selectors = [
+      "#cart-icon-bubble",
+      "a#cart-icon-bubble",
+      "cart-icon-bubble a",
+      "cart-icon-bubble",
+      ".header__icon--cart",
+      "a.header__icon--cart",
+      "button.header__icon--cart",
+      "[data-cart-drawer-trigger]",
+      "[data-action='open-cart']",
+      "a[href='/cart']",
+      "a[href$='/cart']",
+    ];
+    for (var i = 0; i < selectors.length; i++) {
+      var el = document.querySelector(selectors[i]);
+      if (el && typeof el.click === "function") {
+        try {
+          el.click();
+          return true;
+        } catch (eClick) {
+          void eClick;
+        }
+      }
+    }
+    return false;
+  }
+
+  function isThemeCartDrawerOpen() {
+    var drawer =
+      document.querySelector("cart-drawer") ||
+      document.querySelector("cart-notification") ||
+      document.querySelector("cart-drawer-component");
+    if (!drawer) return false;
+    return !!(
+      drawer.hasAttribute("open") ||
+      drawer.classList.contains("active") ||
+      drawer.classList.contains("is-open") ||
+      drawer.classList.contains("animate")
+    );
+  }
+
+  /**
+   * Open theme cart drawer. Prefer drawer.open(); if that does not stick,
+   * click the header cart icon (do NOT fake active/open classes first — that
+   * previously skipped the icon click and left the drawer closed).
+   */
+  function openThemeCartDrawer() {
+    try {
+      var drawer = document.querySelector("cart-drawer");
+      if (drawer) {
+        try {
+          drawer.classList.remove("is-empty");
+        } catch (eEmpty) {
+          void eEmpty;
+        }
+        if (typeof drawer.open === "function") {
+          try {
+            drawer.open();
+          } catch (eOpen) {
+            void eOpen;
+          }
+          if (isThemeCartDrawerOpen()) return true;
+        }
+      }
+
+      var notif = document.querySelector("cart-notification");
+      if (notif && typeof notif.open === "function") {
+        try {
+          notif.open();
+        } catch (eN) {
+          void eN;
+        }
+        if (isThemeCartDrawerOpen()) return true;
+      }
+
+      var component = document.querySelector("cart-drawer-component");
+      if (component && typeof component.open === "function") {
+        try {
+          component.open();
+        } catch (eC) {
+          void eC;
+        }
+        if (isThemeCartDrawerOpen()) return true;
+      }
+
+      return clickHeaderCartIcon();
+    } catch (e) {
+      return clickHeaderCartIcon();
+    }
+  }
+
+  function forceOpenThemeCartDrawer() {
+    openThemeCartDrawer();
+    setTimeout(function () {
+      if (!isThemeCartDrawerOpen()) clickHeaderCartIcon();
+    }, 100);
+    setTimeout(function () {
+      if (!isThemeCartDrawerOpen()) clickHeaderCartIcon();
+    }, 350);
+  }
+
+  function publishThemeCartUpdate(cartData) {
+    try {
+      if (
+        typeof window.publish === "function" &&
+        window.PUB_SUB_EVENTS &&
+        window.PUB_SUB_EVENTS.cartUpdate
+      ) {
+        window.publish(window.PUB_SUB_EVENTS.cartUpdate, {
+          source: "offrefy-volume-discount",
+          cartData: cartData || {},
+        });
+      }
+    } catch (e) {
+      void e;
+    }
+    try {
+      document.documentElement.dispatchEvent(
+        new CustomEvent("cart:updated", {
+          bubbles: true,
+          detail: { cart: cartData },
+        }),
+      );
+      document.dispatchEvent(
+        new CustomEvent("cart:change", {
+          bubbles: true,
+          detail: { cart: cartData },
+        }),
+      );
+    } catch (e2) {
+      void e2;
+    }
+  }
+
+  function findVdLiquidProductForm(root) {
+    var el = root || document.querySelector(".vd-storefront-root");
+    if (el) {
+      var id = el.getAttribute("data-vd-product-form-id");
+      if (id) {
+        var byId = document.getElementById(id);
+        if (byId) return byId;
+      }
+      var inRoot =
+        el.querySelector("form[data-vd-liquid-product-form]") ||
+        el.querySelector("form.vd-liquid-product-form");
+      if (inRoot) return inRoot;
+    }
+    return (
+      document.querySelector("form[data-vd-liquid-product-form]") ||
+      document.querySelector("form.vd-liquid-product-form")
+    );
+  }
+
+  function syncVdLiquidProductForm(form, variantId, quantity, attribution) {
+    if (!form) return false;
+    var vid = String(variantId || "");
+    var qty = parseInt(String(quantity), 10) || 1;
+    qty = Math.min(VD_MAX_LINE_QTY, Math.max(1, qty));
+    var idInput =
+      form.querySelector("[data-vd-liquid-variant-id]") ||
+      form.querySelector('input[name="id"]');
+    if (idInput && vid) idInput.value = vid;
+    var qtyInput =
+      form.querySelector("[data-vd-liquid-qty]") ||
+      form.querySelector('input[name="quantity"]');
+    if (qtyInput) qtyInput.value = String(qty);
+    applyOffrefyPropertiesToForm(form, attribution);
+    return true;
   }
 
   function findThemeProductAddForm() {
-    var forms = document.querySelectorAll('form[action*="/cart/add"]');
+    var forms = document.querySelectorAll(
+      'form[action*="/cart/add"], form[action*="cart/add"], form[data-type="add-to-cart-form"], form.product-form, product-form form, form#product_form, form#AddToCartForm, form[id*="product-form"], form[id*="ProductForm"]',
+    );
+    var widget = document.querySelector(".vd-storefront-root");
+    var widgetScope = widget
+      ? widget.closest(
+          "product-info, .product, [id^='MainProduct'], .shopify-section, .product__info, .product-single, .product-details",
+        )
+      : null;
+    var best = null;
+    var bestScore = -1;
+
     for (var i = 0; i < forms.length; i++) {
-      if (!forms[i].closest(".vd-storefront-root")) return forms[i];
+      var form = forms[i];
+      if (!form) continue;
+      /* Skip our Liquid bridge form — theme ATC must be the theme's own form. */
+      if (
+        form.hasAttribute("data-vd-liquid-product-form") ||
+        (form.classList && form.classList.contains("vd-liquid-product-form"))
+      ) {
+        continue;
+      }
+      if (form.closest(".vd-storefront-root")) continue;
+      if (
+        form.closest(
+          "cart-drawer, cart-notification, #CartDrawer, .cart-drawer, cart-items, #main-cart-items",
+        )
+      ) {
+        continue;
+      }
+
+      var score = 0;
+      if (form.querySelector('[name="id"]')) score += 4;
+      if (
+        form.querySelector(
+          'button[name="add"], input[name="add"], button.product-form__submit, [data-add-to-cart], [data-action="add-to-cart"]',
+        )
+      ) {
+        score += 4;
+      }
+      if (
+        form.closest(
+          "product-info, .product, [id^='MainProduct'], .product-form, .product__info, .product-single",
+        )
+      ) {
+        score += 3;
+      }
+      if (widgetScope && widgetScope.contains(form)) score += 8;
+      if (form.querySelector('[name="quantity"]')) score += 1;
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = form;
+      }
+    }
+
+    if (best) return best;
+
+    var all = document.querySelectorAll('form[action*="/cart/add"]');
+    for (var j = 0; j < all.length; j++) {
+      if (
+        all[j].hasAttribute("data-vd-liquid-product-form") ||
+        (all[j].classList && all[j].classList.contains("vd-liquid-product-form"))
+      ) {
+        continue;
+      }
+      if (!all[j].closest(".vd-storefront-root")) return all[j];
     }
     return null;
   }
 
+  function isThemeBuyItNowButton(el) {
+    if (!el) return true;
+    if (el.closest(".shopify-payment-button, [data-shopify='payment-button']")) {
+      return true;
+    }
+    var name = String(el.getAttribute("name") || "").toLowerCase();
+    if (name === "checkout" || name === "goto_checkout") return true;
+    var label = String(el.textContent || el.value || "")
+      .trim()
+      .toLowerCase();
+    if (!label) return false;
+    if (
+      label.indexOf("buy it now") !== -1 ||
+      label.indexOf("buy now") !== -1 ||
+      label.indexOf("acheter maintenant") !== -1 ||
+      label.indexOf("jetzt kaufen") !== -1
+    ) {
+      /* Allow if it also clearly says add to cart */
+      if (
+        label.indexOf("add to cart") === -1 &&
+        label.indexOf("add to bag") === -1 &&
+        label.indexOf("ajouter") === -1
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   function findThemeAddToCartButton(form) {
     if (!form) return null;
-    return (
-      form.querySelector('button[name="add"]') ||
-      form.querySelector('input[type="submit"][name="add"]') ||
-      form.querySelector("button.product-form__submit") ||
-      form.querySelector('button[type="submit"]')
-    );
+
+    var selectors = [
+      'button[name="add"]',
+      'button[name="add"][type="submit"]',
+      'input[type="submit"][name="add"]',
+      "button.product-form__submit",
+      'button[data-add-to-cart]',
+      '[data-add-to-cart]',
+      '[data-action="add-to-cart"]',
+      'button[data-action="add-to-cart"]',
+      ".product-form__cart-submit",
+      ".product-form--atc-button",
+      ".btn--add-to-cart",
+      ".add-to-cart",
+      ".AddToCart",
+      "#AddToCart",
+      "#add-to-cart",
+      'button[type="submit"]',
+      'input[type="submit"]',
+    ];
+
+    for (var s = 0; s < selectors.length; s++) {
+      var nodes = form.querySelectorAll(selectors[s]);
+      for (var i = 0; i < nodes.length; i++) {
+        var el = nodes[i];
+        if (el.closest(".vd-storefront-root")) continue;
+        if (isThemeBuyItNowButton(el)) continue;
+        return el;
+      }
+    }
+
+    /* Some themes put ATC outside the <form> but linked via form= id */
+    var formId = form.getAttribute("id");
+    if (formId) {
+      var linked = document.querySelectorAll(
+        'button[name="add"][form], button.product-form__submit[form], [data-add-to-cart][form], button[type="submit"][form]',
+      );
+      for (var li = 0; li < linked.length; li++) {
+        if (linked[li].getAttribute("form") === formId) {
+          if (!isThemeBuyItNowButton(linked[li])) return linked[li];
+        }
+      }
+    }
+
+    /* Section-scoped search near the form */
+    var scope =
+      form.closest("product-info, .product, [id^='MainProduct'], .shopify-section, .product__info") ||
+      form.parentElement;
+    if (scope) {
+      var ext = scope.querySelector(
+        'button[name="add"], button.product-form__submit, [data-add-to-cart], .product-form__cart-submit, #AddToCart',
+      );
+      if (ext && !ext.closest(".vd-storefront-root") && !isThemeBuyItNowButton(ext)) {
+        return ext;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Make theme ATC clickable even when merchant hid it via widget settings,
+   * then fire a real click / requestSubmit so theme JS (drawer) runs.
+   */
+  function triggerThemeAtcClick(form, btn) {
+    if (!form || !btn) return false;
+
+    var restoreHide =
+      document.documentElement.getAttribute("data-vd-hide-theme-atc") === "1" ||
+      window.getComputedStyle(btn).display === "none" ||
+      btn.getAttribute("aria-hidden") === "true";
+
+    var prev = {
+      disabled: !!btn.disabled,
+      ariaDisabled: btn.getAttribute("aria-disabled"),
+      display: btn.style.getPropertyValue("display"),
+      visibility: btn.style.getPropertyValue("visibility"),
+      pointerEvents: btn.style.getPropertyValue("pointer-events"),
+      position: btn.style.getPropertyValue("position"),
+      left: btn.style.getPropertyValue("left"),
+      opacity: btn.style.getPropertyValue("opacity"),
+      ariaHidden: btn.getAttribute("aria-hidden"),
+    };
+
+    try {
+      btn.disabled = false;
+      btn.removeAttribute("disabled");
+      btn.removeAttribute("aria-disabled");
+      if (restoreHide) {
+        btn.style.setProperty("display", "block", "important");
+        btn.style.setProperty("visibility", "visible", "important");
+        btn.style.setProperty("pointer-events", "auto", "important");
+        btn.style.setProperty("position", "fixed", "important");
+        btn.style.setProperty("left", "-9999px", "important");
+        btn.style.setProperty("opacity", "0", "important");
+        btn.removeAttribute("aria-hidden");
+      }
+
+      /* Prefer requestSubmit so themes listening on form submit still run. */
+      if (typeof form.requestSubmit === "function" && btn.tagName === "BUTTON") {
+        form.requestSubmit(btn);
+      } else if (typeof btn.click === "function") {
+        btn.click();
+      } else if (typeof form.requestSubmit === "function") {
+        form.requestSubmit();
+      } else {
+        form.submit();
+      }
+      return true;
+    } catch (e) {
+      try {
+        if (typeof btn.click === "function") btn.click();
+        return true;
+      } catch (e2) {
+        return false;
+      }
+    } finally {
+      /* Restore after theme handlers have started (next tick). */
+      setTimeout(function () {
+        try {
+          btn.disabled = prev.disabled;
+          if (prev.disabled) btn.setAttribute("disabled", "");
+          else btn.removeAttribute("disabled");
+          if (prev.ariaDisabled != null) {
+            btn.setAttribute("aria-disabled", prev.ariaDisabled);
+          } else {
+            btn.removeAttribute("aria-disabled");
+          }
+          if (prev.display) btn.style.setProperty("display", prev.display);
+          else btn.style.removeProperty("display");
+          if (prev.visibility) btn.style.setProperty("visibility", prev.visibility);
+          else btn.style.removeProperty("visibility");
+          if (prev.pointerEvents) {
+            btn.style.setProperty("pointer-events", prev.pointerEvents);
+          } else {
+            btn.style.removeProperty("pointer-events");
+          }
+          if (prev.position) btn.style.setProperty("position", prev.position);
+          else btn.style.removeProperty("position");
+          if (prev.left) btn.style.setProperty("left", prev.left);
+          else btn.style.removeProperty("left");
+          if (prev.opacity) btn.style.setProperty("opacity", prev.opacity);
+          else btn.style.removeProperty("opacity");
+          if (prev.ariaHidden != null) btn.setAttribute("aria-hidden", prev.ariaHidden);
+          else if (restoreHide) btn.setAttribute("aria-hidden", "true");
+          if (document.documentElement.getAttribute("data-vd-hide-theme-atc") === "1") {
+            try {
+              hideThemeNativeAddToCartButtons();
+            } catch (eHide) {
+              void eHide;
+            }
+          }
+        } catch (eRest) {
+          void eRest;
+        }
+      }, 800);
+    }
+  }
+
+  /**
+   * Cross-theme ATC:
+   * 1) Theme native Add to Cart click (best drawer UX)
+   * 2) Liquid {% form 'product' %} bridge via /cart/add.js (all free/premium themes)
+   */
+  function addByClickingThemeAtc(variantId, quantity, attribution) {
+    var root = document.querySelector(".vd-storefront-root");
+    var liquidForm = findVdLiquidProductForm(root);
+    var themeForm = findThemeProductAddForm();
+    var themeBtn = findThemeAddToCartButton(themeForm);
+
+    if (liquidForm) {
+      syncVdLiquidProductForm(liquidForm, variantId, quantity, attribution);
+    }
+    if (themeForm) {
+      syncThemeProductFormFields(themeForm, variantId, quantity, attribution);
+    } else {
+      setThemeProductFormQuantity(quantity);
+    }
+
+    function waitForCartIncrease(prev) {
+      return new Promise(function (resolve, reject) {
+        var tries = 0;
+        var iv = setInterval(function () {
+          tries += 1;
+          fetchCartItemCount().then(function (cart) {
+            if (cart && cart.item_count > prev) {
+              clearInterval(iv);
+              resolve(cart);
+              return;
+            }
+            if (tries >= 24) {
+              clearInterval(iv);
+              reject(new Error("Theme ATC did not add"));
+            }
+          });
+        }, 250);
+      });
+    }
+
+    if (themeForm && themeBtn) {
+      return fetchCartItemCount().then(function (before) {
+        var prev = before ? before.item_count : 0;
+        if (!triggerThemeAtcClick(themeForm, themeBtn)) {
+          return Promise.reject(new Error("Theme ATC click failed"));
+        }
+        return waitForCartIncrease(prev);
+      }).catch(function () {
+        if (!liquidForm) {
+          return Promise.reject(new Error("No theme or liquid product form"));
+        }
+        return addVariantToCartViaFetch(
+          variantId,
+          quantity,
+          true,
+          attribution,
+        );
+      });
+    }
+
+    if (liquidForm) {
+      return addVariantToCartViaFetch(variantId, quantity, true, attribution);
+    }
+
+    return Promise.reject(new Error("No theme or liquid product form"));
+  }
+
+  /**
+   * Theme qty inputs are often outside form[action*="/cart/add"] (Dawn uses
+   * form="product-form-…" on quantity-input). Collect all product-page qty fields.
+   */
+  function collectThemeProductQuantityInputs(form) {
+    var list = [];
+    var seen =
+      typeof WeakSet !== "undefined"
+        ? new WeakSet()
+        : {
+            _a: [],
+            has: function (el) {
+              return this._a.indexOf(el) !== -1;
+            },
+            add: function (el) {
+              this._a.push(el);
+            },
+          };
+
+    function add(el) {
+      if (!el || (el.closest && el.closest(".vd-storefront-root"))) return;
+      if (String(el.getAttribute("type") || "").toLowerCase() === "hidden") return;
+      if (
+        el.closest &&
+        el.closest(
+          "cart-drawer, cart-notification, #CartDrawer, .cart-item, cart-items, #main-cart-items",
+        )
+      ) {
+        return;
+      }
+      if (seen.has(el)) return;
+      seen.add(el);
+      list.push(el);
+    }
+
+    function addFromRoot(root) {
+      if (!root || !root.querySelectorAll) return;
+      var nodes = root.querySelectorAll(
+        'input[name="quantity"], select[name="quantity"]',
+      );
+      for (var i = 0; i < nodes.length; i++) add(nodes[i]);
+    }
+
+    if (form) {
+      addFromRoot(form);
+      var formId = form.getAttribute("id");
+      if (formId) {
+        var linked = document.querySelectorAll(
+          'input[name="quantity"][form], select[name="quantity"][form]',
+        );
+        for (var j = 0; j < linked.length; j++) {
+          if (linked[j].getAttribute("form") === formId) add(linked[j]);
+        }
+      }
+      var scope =
+        form.closest("product-info") ||
+        form.closest("[id^='MainProduct']") ||
+        form.closest(".shopify-section--main-product") ||
+        form.closest(".shopify-section") ||
+        form.closest(".product") ||
+        form.parentElement;
+      if (scope) addFromRoot(scope);
+    } else {
+      var sections = document.querySelectorAll(
+        "product-info, [id^='MainProduct'], .shopify-section--main-product",
+      );
+      for (var s = 0; s < sections.length; s++) addFromRoot(sections[s]);
+    }
+
+    return list;
+  }
+
+  function setThemeProductFormQuantity(quantity) {
+    var qty = parseInt(String(quantity), 10) || 1;
+    qty = Math.min(VD_MAX_LINE_QTY, Math.max(1, qty));
+    var form = findThemeProductAddForm();
+    var inputs = collectThemeProductQuantityInputs(form);
+    var str = String(qty);
+    for (var i = 0; i < inputs.length; i++) {
+      var inp = inputs[i];
+      try {
+        inp.value = str;
+        if (typeof inp.setAttribute === "function") {
+          inp.setAttribute("value", str);
+        }
+        inp.dispatchEvent(new Event("input", { bubbles: true }));
+        inp.dispatchEvent(new Event("change", { bubbles: true }));
+      } catch (e) {
+        void e;
+      }
+    }
+    var liquid = findVdLiquidProductForm(null);
+    if (liquid) {
+      var lq =
+        liquid.querySelector("[data-vd-liquid-qty]") ||
+        liquid.querySelector('input[name="quantity"]');
+      if (lq) lq.value = str;
+    }
+    return inputs.length > 0 || !!liquid;
+  }
+
+  function readThemeProductFormQuantity(fallback) {
+    var form = findThemeProductAddForm();
+    var inputs = collectThemeProductQuantityInputs(form);
+    for (var i = 0; i < inputs.length; i++) {
+      var n = parseInt(String(inputs[i].value), 10);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    var fb = parseInt(String(fallback), 10);
+    return Number.isFinite(fb) && fb > 0 ? fb : 1;
   }
 
   function syncThemeProductFormFields(form, variantId, quantity, attribution) {
@@ -1378,14 +2047,7 @@
         }
       }
     }
-    var qty = parseInt(String(quantity), 10) || 1;
-    qty = Math.min(VD_MAX_LINE_QTY, Math.max(1, qty));
-    var qtyInput = form.querySelector('input[name="quantity"]');
-    if (qtyInput) {
-      qtyInput.value = String(qty);
-      qtyInput.dispatchEvent(new Event("input", { bubbles: true }));
-      qtyInput.dispatchEvent(new Event("change", { bubbles: true }));
-    }
+    setThemeProductFormQuantity(quantity);
     applyOffrefyPropertiesToForm(form, attribution);
     return true;
   }
@@ -1432,35 +2094,255 @@
       return Promise.reject(new Error("No theme product form"));
     }
     syncThemeProductFormFields(form, variantId, quantity, attribution);
-    var waitPromise = waitForThemeCartAdd(10000);
-    if (typeof btn.click === "function") {
-      btn.click();
-    } else if (typeof form.requestSubmit === "function") {
-      form.requestSubmit(btn);
-    } else {
-      form.submit();
+
+    /* Theme ATC may be visually hidden — keep it clickable off-screen so the
+       theme ProductForm submit runs (Shopify default add + cart drawer). */
+    var restoreHide =
+      document.documentElement.getAttribute("data-vd-hide-theme-atc") === "1";
+    var prev = {
+      display: btn.style.getPropertyValue("display"),
+      position: btn.style.getPropertyValue("position"),
+      left: btn.style.getPropertyValue("left"),
+      opacity: btn.style.getPropertyValue("opacity"),
+      pointerEvents: btn.style.getPropertyValue("pointer-events"),
+      zIndex: btn.style.getPropertyValue("z-index"),
+      ariaHidden: btn.getAttribute("aria-hidden"),
+    };
+    if (restoreHide) {
+      btn.style.setProperty("display", "block", "important");
+      btn.style.setProperty("position", "fixed", "important");
+      btn.style.setProperty("left", "-9999px", "important");
+      btn.style.setProperty("opacity", "0", "important");
+      btn.style.setProperty("pointer-events", "auto", "important");
+      btn.style.setProperty("z-index", "0", "important");
+      btn.removeAttribute("aria-hidden");
     }
-    return waitPromise;
+
+    function restoreBtn() {
+      if (!restoreHide) return;
+      if (prev.display) btn.style.setProperty("display", prev.display);
+      else btn.style.removeProperty("display");
+      if (prev.position) btn.style.setProperty("position", prev.position);
+      else btn.style.removeProperty("position");
+      if (prev.left) btn.style.setProperty("left", prev.left);
+      else btn.style.removeProperty("left");
+      if (prev.opacity) btn.style.setProperty("opacity", prev.opacity);
+      else btn.style.removeProperty("opacity");
+      if (prev.pointerEvents) {
+        btn.style.setProperty("pointer-events", prev.pointerEvents);
+      } else {
+        btn.style.removeProperty("pointer-events");
+      }
+      if (prev.zIndex) btn.style.setProperty("z-index", prev.zIndex);
+      else btn.style.removeProperty("z-index");
+      if (prev.ariaHidden != null) btn.setAttribute("aria-hidden", prev.ariaHidden);
+      else btn.setAttribute("aria-hidden", "true");
+      try {
+        hideThemeNativeAddToCartButtons();
+      } catch (e) {
+        void e;
+      }
+    }
+
+    var waitPromise = waitForThemeCartAdd(10000);
+    try {
+      if (typeof form.requestSubmit === "function") {
+        form.requestSubmit(btn);
+      } else if (typeof btn.click === "function") {
+        btn.click();
+      } else {
+        form.submit();
+      }
+    } catch (clickErr) {
+      restoreBtn();
+      return Promise.reject(clickErr);
+    }
+
+    return waitPromise.then(
+      function (detail) {
+        restoreBtn();
+        return detail;
+      },
+      function (err) {
+        restoreBtn();
+        return Promise.reject(err);
+      },
+    );
   }
 
   function applyThemeCartSectionsFromResponse(response, openDrawer) {
-    if (!response || !response.sections) return false;
+    if (!response || !cartResponseHasSectionHtml(response.sections)) return false;
     try {
-      var drawer = document.querySelector("cart-drawer");
+      var drawer =
+        document.querySelector("cart-drawer") ||
+        document.querySelector("cart-notification") ||
+        findThemeCartDrawerEl();
       if (drawer && typeof drawer.renderContents === "function") {
-        drawer.renderContents(response);
+        try {
+          /* Dawn renderContents updates HTML and opens the drawer. */
+          if (drawer.renderContents.length >= 2) {
+            drawer.renderContents(response, true);
+          } else {
+            drawer.renderContents(response);
+          }
+        } catch (eRender) {
+          try {
+            drawer.renderContents(response);
+          } catch (e2) {
+            void e2;
+            return manualApplyCartSections(response.sections, openDrawer);
+          }
+        }
+        try {
+          drawer.classList.remove("is-empty");
+        } catch (eEmpty) {
+          void eEmpty;
+        }
         scheduleCartDrawerDiscountLabelPatch();
+        if (openDrawer) {
+          setTimeout(function () {
+            if (!isThemeCartDrawerOpen() && typeof drawer.open === "function") {
+              try {
+                drawer.open();
+              } catch (eO) {
+                void eO;
+              }
+            }
+          }, 120);
+        }
         return true;
       }
-      if (openDrawer) {
-        void openDrawer;
-      }
+      return manualApplyCartSections(response.sections, openDrawer);
     } catch (e) {
       void e;
     }
     return false;
   }
 
+  function getSectionInnerHTML(html, selector) {
+    var div = document.createElement("div");
+    div.innerHTML = html;
+    if (selector) {
+      var node = div.querySelector(selector);
+      return node ? node.innerHTML : div.innerHTML;
+    }
+    return div.innerHTML;
+  }
+
+  /** Fallback when theme has no renderContents — patch section DOM then open(). */
+  function manualApplyCartSections(sections, openDrawer) {
+    if (!sections) return false;
+    var drawer =
+      document.querySelector("cart-drawer") ||
+      document.querySelector("cart-notification");
+    var list = [];
+    try {
+      if (drawer && typeof drawer.getSectionsToRender === "function") {
+        list = drawer.getSectionsToRender();
+      }
+    } catch (eList) {
+      void eList;
+    }
+    if (!list.length) {
+      list = [
+        { id: "cart-drawer", selector: "#CartDrawer" },
+        { id: "cart-icon-bubble" },
+      ];
+    }
+    var applied = false;
+    for (var i = 0; i < list.length; i++) {
+      var section = list[i];
+      var html = sections[section.id] || sections[section.section];
+      if (!html) continue;
+      var el = section.selector
+        ? document.querySelector(section.selector)
+        : document.getElementById(section.id);
+      if (!el && section.id) {
+        el = document.getElementById("shopify-section-" + section.id);
+      }
+      if (!el) continue;
+      try {
+        el.innerHTML = getSectionInnerHTML(html, section.selector);
+        applied = true;
+      } catch (eSet) {
+        void eSet;
+      }
+    }
+    if (applied && drawer) {
+      try {
+        drawer.classList.remove("is-empty");
+      } catch (eEmpty2) {
+        void eEmpty2;
+      }
+      if (openDrawer && typeof drawer.open === "function") {
+        try {
+          drawer.open();
+        } catch (eOpen2) {
+          void eOpen2;
+        }
+      }
+      scheduleCartDrawerDiscountLabelPatch();
+    }
+    return applied;
+  }
+
+  /**
+   * Re-fetch LIVE cart section HTML (with items), patch drawer, then open.
+   * Never open via cart-icon click alone — that shows a stale empty drawer.
+   */
+  function refreshThemeCartSectionsAndOpen(openDrawer) {
+    var sectionIds = getThemeCartSectionsParam();
+    if (!sectionIds) return Promise.resolve(null);
+    return fetch(shopifyRoutesRoot() + "cart/update.js", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        sections: sectionIds,
+        sections_url: storefrontSectionsUrl(),
+      }),
+    })
+      .then(function (res) {
+        return res.ok ? res.json() : null;
+      })
+      .then(function (body) {
+        if (body && body.sections) {
+          if (!applyThemeCartSectionsFromResponse(body, openDrawer)) {
+            manualApplyCartSections(body.sections, openDrawer);
+          }
+        }
+        scheduleCartDrawerDiscountLabelPatch();
+        return body;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  function fetchCartItemCount() {
+    return fetch(cartJsUrl(), {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    })
+      .then(function (r) {
+        return r.ok ? r.json() : null;
+      })
+      .then(function (cart) {
+        return cart && typeof cart.item_count === "number" ? cart : null;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  /**
+   * Fallback: /cart/add.js then refresh LIVE drawer sections before opening.
+   * Never open an empty/stale drawer via cart-icon click.
+   */
   function addVariantToCartViaFetch(variantId, quantity, openDrawer, attribution) {
     var id = parseInt(String(variantId), 10);
     var qty = parseInt(String(quantity), 10) || 1;
@@ -1468,17 +2350,59 @@
       return Promise.reject(new Error("Invalid variant"));
     }
     qty = Math.min(VD_MAX_LINE_QTY, Math.max(1, qty));
-    var item = { id: id, quantity: qty };
-    var props = offrefyCartProperties(attribution);
-    if (props) item.properties = props;
-    var payload = { items: [item] };
-    var sectionIds = getThemeCartSectionsParam();
-    if (sectionIds) {
-      payload.sections = sectionIds;
-      payload.sections_url = storefrontSectionsUrl();
+
+    var form = findThemeProductAddForm() || findVdLiquidProductForm(null);
+    if (form) {
+      if (form.hasAttribute("data-vd-liquid-product-form") || (form.classList && form.classList.contains("vd-liquid-product-form"))) {
+        syncVdLiquidProductForm(form, id, qty, attribution);
+      } else {
+        syncThemeProductFormFields(form, id, qty, attribution);
+      }
     }
-    return syncCartLocaleAttribute(true).then(function () {
-      return fetch(cartAddJsUrl(), {
+
+    var sectionIds = getThemeCartSectionIds();
+    var fetchOpts;
+    if (form) {
+      var formData = new FormData(form);
+      formData.set("id", String(id));
+      formData.set("quantity", String(qty));
+      try {
+        formData.delete("sections");
+        formData.delete("sections_url");
+      } catch (eDel) {
+        void eDel;
+      }
+      if (sectionIds.length) {
+        formData.append("sections", sectionIds.join(","));
+        formData.append("sections_url", storefrontSectionsUrl());
+      }
+      var props = offrefyCartProperties(attribution);
+      if (props) {
+        for (var pk in props) {
+          if (Object.prototype.hasOwnProperty.call(props, pk)) {
+            formData.set("properties[" + pk + "]", String(props[pk]));
+          }
+        }
+      }
+      fetchOpts = {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: formData,
+      };
+    } else {
+      var item = { id: id, quantity: qty };
+      var propsJson = offrefyCartProperties(attribution);
+      if (propsJson) item.properties = propsJson;
+      var payload = { items: [item] };
+      if (sectionIds.length) {
+        payload.sections = sectionIds.join(",");
+        payload.sections_url = storefrontSectionsUrl();
+      }
+      fetchOpts = {
         method: "POST",
         credentials: "same-origin",
         headers: {
@@ -1486,7 +2410,11 @@
           Accept: "application/json",
         },
         body: JSON.stringify(payload),
-      }).then(function (res) {
+      };
+    }
+
+    return syncCartLocaleAttribute(true).then(function () {
+      return fetch(cartAddJsUrl(), fetchOpts).then(function (res) {
         return res.json().then(function (body) {
           if (!res.ok) {
             var msg = "Could not add to cart";
@@ -1498,20 +2426,21 @@
             }
             throw new Error(msg);
           }
-          if (!applyThemeCartSectionsFromResponse(body, openDrawer)) {
-            return fetchCartAndRefresh().then(function () {
+
+          return fetchCartItemCount().then(function (cart) {
+            if (!cart || !(cart.item_count > 0)) {
+              throw new Error("Could not add to cart");
+            }
+            publishThemeCartUpdate(cart);
+            if (!openDrawer) return body;
+            /* Always re-fetch live section HTML so drawer is not empty. */
+            return refreshThemeCartSectionsAndOpen(true).then(function () {
               return body;
             });
-          }
-          return body;
+          });
         });
       });
     });
-  }
-
-  function shouldUseThemeNativeAdd(action) {
-    var act = String(action || "add_to_cart_open_drawer");
-    return act === "add_to_cart" || act === "add_to_cart_open_drawer";
   }
 
   function shouldOpenDrawerAfterAdd(action) {
@@ -1519,20 +2448,29 @@
   }
 
   function addVariantToCart(variantId, quantity, action, attribution) {
-    if (shouldUseThemeNativeAdd(action)) {
-      return submitThemeProductAddForm(variantId, quantity, attribution).catch(function () {
-        return addVariantToCartViaFetch(
-          variantId,
-          quantity,
-          shouldOpenDrawerAfterAdd(action),
-          attribution,
-        );
-      });
+    var openDrawer = shouldOpenDrawerAfterAdd(action);
+    /* Always prefer theme ATC for add / open-drawer CTAs — works across Shopify themes. */
+    var useThemeAtc =
+      !action ||
+      action === "add_to_cart" ||
+      action === "add_to_cart_open_drawer";
+
+    if (useThemeAtc) {
+      return addByClickingThemeAtc(variantId, quantity, attribution).catch(
+        function () {
+          return addVariantToCartViaFetch(
+            variantId,
+            quantity,
+            openDrawer,
+            attribution,
+          );
+        },
+      );
     }
     return addVariantToCartViaFetch(
       variantId,
       quantity,
-      shouldOpenDrawerAfterAdd(action),
+      openDrawer,
       attribution,
     );
   }
@@ -1579,6 +2517,8 @@
       if (href) window.location.href = href;
       return Promise.resolve();
     }
+    /* Drawer open is done by theme ATC or refreshThemeCartSectionsAndOpen.
+       Do not force-open here — that opened a stale empty drawer. */
     return Promise.resolve();
   }
 
@@ -3076,10 +4016,7 @@
           var vid =
             readThemeProductFormVariantId() || resolveActiveVariantIdForCart();
           if (!vid) return;
-          var qtyInput = form.querySelector('input[name="quantity"]');
-          var qty = qtyInput
-            ? parseInt(String(qtyInput.value), 10) || stateQty
-            : stateQty;
+          var qty = readThemeProductFormQuantity(stateQty);
           recordAddToCartAnalytics(qty, vid);
         },
         true,
@@ -3200,18 +4137,11 @@
     }
 
     function syncQtyToForm() {
-      var form = document.querySelector('form[action*="/cart/add"]');
-      if (!form) return;
-      var inp = form.querySelector('input[name="quantity"]');
-      if (inp) {
-        inp.value = String(stateQty);
-        inp.dispatchEvent(new Event("input", { bubbles: true }));
-        inp.dispatchEvent(new Event("change", { bubbles: true }));
-      }
+      setThemeProductFormQuantity(stateQty);
     }
 
     function syncFormVariant(vid) {
-      var form = document.querySelector('form[action*="/cart/add"]');
+      var form = findThemeProductAddForm();
       if (!form) return;
       var vs = form.querySelector('select[name="id"]');
       if (vs) {
@@ -3244,10 +4174,11 @@
         var fb = readThemeProductFormVariantId() || root.getAttribute("data-variant-id");
         if (fb) syncFormVariant(fb);
       }
-      var form = document.querySelector('form[action*="/cart/add"]');
+      var form = findThemeProductAddForm();
       if (form) {
         form.scrollIntoView({ behavior: "smooth", block: "center" });
         var btn =
+          findThemeAddToCartButton(form) ||
           form.querySelector('button[type="submit"]') ||
           form.querySelector('[name="add"]') ||
           form.querySelector("button");
@@ -3581,7 +4512,15 @@
     h.push('<p class="vd-footnote">' + esc(ui.footnote) + "</p>");
     h.push("</div>");
 
+    /* Keep Liquid ATC bridge form across re-mount (lives inside [data-vd-mount]
+       so it stays hidden until the widget paints — do not wipe it with innerHTML). */
+    var liquidBridge =
+      mountEl.querySelector("form[data-vd-liquid-product-form]") ||
+      mountEl.querySelector("form.vd-liquid-product-form");
     mountEl.innerHTML = h.join("");
+    if (liquidBridge) {
+      mountEl.insertBefore(liquidBridge, mountEl.firstChild);
+    }
 
     var cdEl = mountEl.querySelector("[data-vd-cd]");
     if (cdEl && cdLive) {
@@ -3816,7 +4755,7 @@
     trackImpression(campaign, root.getAttribute("data-product-id"));
     window.VolumeDiscount = window.VolumeDiscount || {};
     window.VolumeDiscount.embed = window.VolumeDiscount.embed || {};
-    window.VolumeDiscount.embed.version = "1.27.3";
+    window.VolumeDiscount.embed.version = "1.28.2";
 
   }
   /**

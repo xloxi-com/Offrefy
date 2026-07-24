@@ -9,12 +9,13 @@ import {
  */
 
 /**
- * Shopify hard-caps automatic product-discount targets at 25. Exceeding that
- * rejects the whole discount; exceeding the ~11M instruction budget fails the
- * function (InstructionCountLimitExceededError). Keep this file small and the
- * hot path allocation-free so 25 cart lines stay under budget.
+ * Per-cart product/target budget. Shopify’s “25” is active discount *functions*
+ * per store — not targets in one Function. Default/fallback is 500 (practical
+ * unlimited); rule_source.maxTargets from sync can override. Instruction
+ * budget (~11M) is still the hard runtime ceiling — keep this file small.
  */
-const MAX_TARGETS = 25;
+const MAX_TARGETS_STANDARD = 500;
+const MAX_TARGETS_PLUS_FALLBACK = 500;
 
 /** @param {unknown} gid */
 function productNum(gid) {
@@ -23,8 +24,33 @@ function productNum(gid) {
   return i >= 0 ? gid.slice(i + 1) : "";
 }
 
-/** @param {unknown} raw */
-function lockedIds(raw) {
+/**
+ * @param {unknown} ruleSource
+ * @returns {number}
+ */
+function resolveMaxTargets(ruleSource) {
+  if (ruleSource && typeof ruleSource === "object") {
+    const n = /** @type {{ maxTargets?: unknown; shopifyPlus?: unknown }} */ (
+      ruleSource
+    ).maxTargets;
+    if (typeof n === "number" && n > 0) {
+      return n | 0;
+    }
+    if (typeof n === "string" && n.trim() !== "") {
+      const parsed = parseInt(n, 10);
+      if (parsed > 0) return parsed;
+    }
+    if (
+      /** @type {{ shopifyPlus?: unknown }} */ (ruleSource).shopifyPlus === true
+    ) {
+      return MAX_TARGETS_PLUS_FALLBACK;
+    }
+  }
+  return MAX_TARGETS_STANDARD;
+}
+
+/** @param {unknown} raw @param {number} max */
+function lockedIds(raw, max) {
   const s = String(raw ?? "");
   if (!s) return [];
   /** @type {string[]} */
@@ -40,7 +66,7 @@ function lockedIds(raw) {
     if (!n || seen.has(n)) continue;
     seen.add(n);
     out.push(n);
-    if (out.length >= MAX_TARGETS) break;
+    if (out.length >= max) break;
   }
   return out;
 }
@@ -77,6 +103,18 @@ function ruleTiers(compact) {
 }
 
 /**
+ * Product metafield may be a cleared stub `{ t: [] }` — treat as missing so
+ * API fetch rules can fill the gap.
+ * @param {unknown} mf
+ */
+function usableRule(mf) {
+  if (!mf || typeof mf !== "object") return null;
+  const tiers = ruleTiers(mf);
+  if (!tiers || !tiers.length) return null;
+  return mf;
+}
+
+/**
  * Product metafields (`volume_discount.tiers`) are the primary rule source.
  * Optional fetch JSON body fills gaps when remote lookup mode is enabled.
  * @param {RunInput} input
@@ -91,12 +129,13 @@ export function cartLinesDiscountsGenerateRun(input) {
     return { operations: [] };
   }
 
-  const locked = lockedIds(input.cart?.vdLockedProductsAttr?.value);
+  const maxTargets = resolveMaxTargets(input.discount?.ruleSource?.jsonValue);
+  const locked = lockedIds(input.cart?.vdLockedProductsAttr?.value, maxTargets);
   /** @type {Map<string, number>} */
   const lockedRank = new Map();
   for (let i = 0; i < locked.length; i++) lockedRank.set(locked[i], i);
 
-  // Rank unique products: locked first, then cart order. Cap at 25 products.
+  // Rank unique products: locked first, then cart order. Cap by plan max.
   /** @type {{ pid: string, lineIndexes: number[], sortKey: number }[]} */
   const products = [];
   /** @type {Map<string, number>} */
@@ -116,12 +155,12 @@ export function cartLinesDiscountsGenerateRun(input) {
       lineIndexes: [i],
       sortKey: lockedRank.has(pid)
         ? /** @type {number} */ (lockedRank.get(pid))
-        : MAX_TARGETS + i,
+        : maxTargets + i,
     });
   }
 
   products.sort((a, b) => a.sortKey - b.sortKey || a.lineIndexes[0] - b.lineIndexes[0]);
-  if (products.length > MAX_TARGETS) products.length = MAX_TARGETS;
+  if (products.length > maxTargets) products.length = maxTargets;
 
   // Optional API rules (only when product metafield missing).
   /** @type {Record<string, unknown> | null} */
@@ -143,14 +182,14 @@ export function cartLinesDiscountsGenerateRun(input) {
   let targetCount = 0;
 
   for (let p = 0; p < products.length; p++) {
-    if (targetCount >= MAX_TARGETS) break;
+    if (targetCount >= maxTargets) break;
     const { pid, lineIndexes } = products[p];
 
     const firstLine = lines[lineIndexes[0]];
     const mf = firstLine?.merchandise?.product?.tiersMetafield?.jsonValue;
     const compact =
-      (mf && typeof mf === "object" ? mf : null) ||
-      (apiRules ? apiRules[pid] : null);
+      usableRule(mf) ||
+      (apiRules ? usableRule(apiRules[pid]) : null);
     if (!compact || typeof compact !== "object") continue;
 
     // everyone only on this hot path (logged-in filters are rare; skip to save fuel)
@@ -165,7 +204,7 @@ export function cartLinesDiscountsGenerateRun(input) {
 
     if (perVariant) {
       for (let li = 0; li < lineIndexes.length; li++) {
-        if (targetCount >= MAX_TARGETS) break;
+        if (targetCount >= maxTargets) break;
         const line = lines[lineIndexes[li]];
         const pct = bestPercentTier(tiers, line.quantity | 0);
         if (!pct) continue;
@@ -193,7 +232,7 @@ export function cartLinesDiscountsGenerateRun(input) {
     /** @type {{ cartLine: { id: string } }[]} */
     const targets = [];
     for (let li = 0; li < lineIndexes.length; li++) {
-      if (targetCount >= MAX_TARGETS) break;
+      if (targetCount >= maxTargets) break;
       targets.push({ cartLine: { id: lines[lineIndexes[li]].id } });
       targetCount++;
     }

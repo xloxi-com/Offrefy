@@ -1,4 +1,5 @@
-# Fetch only builds a network request when rule_source.mode = "api".
+# Fetch builds a network request whenever rule_source.shopDomain is set
+# (gap-fill for products whose volume_discount.tiers metafield is empty).
 query FetchInput {
   cart {
     vdLockedProductsAttr: attribute(key: "vd_locked_products") {

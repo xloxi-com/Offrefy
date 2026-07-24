@@ -12,10 +12,34 @@ function numericTailFromGid(gid) {
   return m ? m[1] : "";
 }
 
-const MAX_CART_DISCOUNT_PRODUCTS = 25;
+const MAX_CART_DISCOUNT_PRODUCTS_STANDARD = 500;
+const MAX_CART_DISCOUNT_PRODUCTS_PLUS = 500;
 
-/** @param {unknown} raw */
-function parseLockedProductIds(raw) {
+/**
+ * @param {unknown} ruleSource
+ * @returns {number}
+ */
+function resolveMaxCartProducts(ruleSource) {
+  if (ruleSource && typeof ruleSource === "object") {
+    const n = /** @type {{ maxTargets?: unknown; shopifyPlus?: unknown }} */ (
+      ruleSource
+    ).maxTargets;
+    if (typeof n === "number" && n > 0) return n | 0;
+    if (typeof n === "string" && n.trim() !== "") {
+      const parsed = parseInt(n, 10);
+      if (parsed > 0) return parsed;
+    }
+    if (
+      /** @type {{ shopifyPlus?: unknown }} */ (ruleSource).shopifyPlus === true
+    ) {
+      return MAX_CART_DISCOUNT_PRODUCTS_PLUS;
+    }
+  }
+  return MAX_CART_DISCOUNT_PRODUCTS_STANDARD;
+}
+
+/** @param {unknown} raw @param {number} max */
+function parseLockedProductIds(raw, max) {
   const s = String(raw ?? "").trim();
   if (!s) return [];
   /** @type {string[]} */
@@ -28,8 +52,9 @@ function parseLockedProductIds(raw) {
     if (!n || seen.has(n)) continue;
     seen.add(n);
     out.push(n);
+    if (out.length >= max) break;
   }
-  return out.slice(0, MAX_CART_DISCOUNT_PRODUCTS);
+  return out;
 }
 
 /**
@@ -39,10 +64,6 @@ function parseLockedProductIds(raw) {
 export function cartLinesDiscountsGenerateFetch(input) {
   const ruleSource = input.discount?.ruleSource?.jsonValue;
   if (!ruleSource || typeof ruleSource !== "object") {
-    return { request: undefined };
-  }
-  // Product metafields cover most carts — only hit the network when sync said so.
-  if (String(ruleSource.mode ?? "") !== "api") {
     return { request: undefined };
   }
 
@@ -55,26 +76,30 @@ export function cartLinesDiscountsGenerateFetch(input) {
       ? String(ruleSource.apiPath).trim()
       : "/apps/volume-discount/cart-rules";
 
+  // Gap-fill: always hit cart-rules when shopDomain is set (metafield stubs
+  // like `{ t: [] }` leave products undiscounted otherwise).
   if (!shopDomain) {
     return { request: undefined };
   }
 
+  const maxProducts = resolveMaxCartProducts(ruleSource);
   const lockedIds = parseLockedProductIds(
     input.cart?.vdLockedProductsAttr?.value,
+    maxProducts,
   );
   /** @type {string[]} */
   const productIds = [];
   const seen = new Set();
 
   for (const n of lockedIds) {
-    if (productIds.length >= MAX_CART_DISCOUNT_PRODUCTS) break;
+    if (productIds.length >= maxProducts) break;
     if (!n || seen.has(n)) continue;
     seen.add(n);
     productIds.push(n);
   }
 
   for (const line of input.cart?.lines ?? []) {
-    if (productIds.length >= MAX_CART_DISCOUNT_PRODUCTS) break;
+    if (productIds.length >= maxProducts) break;
     const m = line.merchandise;
     if (!m?.product?.id) continue;
     const n = numericTailFromGid(m.product.id);

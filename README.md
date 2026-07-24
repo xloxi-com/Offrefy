@@ -16,7 +16,10 @@ To support unlimited products and bypass metafield size caps (128KB Shopify limi
 1. **Small/Standard Catalogs (Metafield Mode):** Active rules are compressed and sharded across up to 5 discount metafield chunks (`campaigns` to `campaigns_4`).
 2. **Large Catalogs / Heavy Load (API Proxy Mode):** If rules exceed metafield limits, the app automatically switches to API mode.
 3. **Dynamic Fetching:** The Shopify Function's fetch hook (`cartLinesDiscountsGenerateFetch`) POSTs to the app proxy endpoint `/apps/volume-discount/cart-rules` to fetch exact discount rules for the products currently in the customer's cart.
-4. **Capped Cart Execution (Shopify Limit Compliance):** While you can have 1,000+ active rules, Shopify's checkout enforces a limit on the number of discount allocations returned. The app caps discount calculations to the first **25 distinct product IDs** in the cart.
+4. **Capped Cart Execution (plan-aware):** While you can have 1,000+ active rules, checkout still caps how many products get discount targets per cart:
+   - **Non-Plus:** first **25** distinct product IDs
+   - **Shopify Plus:** up to **500** (practical unlimited; Function instruction budget still applies)
+   Cap is written to `rule_source.maxTargets` on sync.
 
 ---
 

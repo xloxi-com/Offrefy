@@ -3,6 +3,42 @@
  * Fluid type + spacing: readable on small phones, balanced on desktop.
  */
 
+/* Liquid {% form 'product' %} ATC bridge — visually hidden, all themes.
+   Themes often force button[name="add"] { display:flex !important }, so we
+   hide the whole form + submit with !important (inline style is backup). */
+.vd-liquid-product-form {
+  position: absolute !important;
+  left: -9999px !important;
+  top: 0 !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.vd-liquid-product-form .vd-liquid-submit,
+.vd-liquid-product-form button[name="add"],
+.vd-liquid-product-form [data-vd-liquid-submit] {
+  display: none !important;
+  visibility: hidden !important;
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  border: 0 !important;
+  pointer-events: none !important;
+}
+
 .volume-discount-embed {
   box-sizing: border-box;
   /* Fill the theme product column — no inner max-width so CTA/cards align with form buttons */

@@ -322,7 +322,7 @@ export function computeUnlimitedDiscountPreview(
     customerMatches(row, loggedIn, tags),
   );
 
-  const MAX_DISCOUNT_CART_PRODUCTS = 25;
+  const MAX_DISCOUNT_CART_PRODUCTS = 500;
   const discountedProductIds = new Set<string>();
 
   const outItems: DiscountEngineCalcLineOut[] = [];

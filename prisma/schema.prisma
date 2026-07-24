@@ -32,6 +32,8 @@ model Session {
   refreshTokenExpires DateTime?
 
   @@index([shop])
+  /// Offline session listing for cron / analytics reconcile (isOnline + expiry filter).
+  @@index([isOnline, expires, shop])
 }
 
 /// One automatic app discount (Shopify Function) per shop — holds all tier rules in a metafield.
@@ -82,6 +84,10 @@ model VolumeDiscountCampaign {
   @@index([shop, createdAt(sort: Desc)])
   @@index([shop, status])
   @@index([shop, status, createdAt(sort: Desc)])
+  /// Cron: scheduled → active (status + countdownStartsAt due).
+  @@index([status, countdownStartsAt])
+  /// Cron: active → draft (status + countdownEndsAt due).
+  @@index([status, countdownEndsAt])
 }
 
 /// Flat per-product discount rules (source of truth for Function lookup). Rebuilt from active campaigns on sync.
@@ -126,6 +132,10 @@ model VolumeDiscountAnalyticsEvent {
   @@index([shop, campaignId, createdAt])
   @@index([shop, eventType, createdAt])
   @@index([shop, orderId])
+  /// Order attribution: match recent ATC/impression by product within time window.
+  @@index([shop, eventType, productId, createdAt])
+  /// Order attribution: match recent ATC/impression by variant within time window.
+  @@index([shop, eventType, variantId, createdAt])
 }
 
 model VolumeDiscountSettings {
@@ -151,4 +161,7 @@ model VolumeDiscountSettings {
 
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+
+  /// Cron: list shops with syncInterval <> 'disabled'.
+  @@index([syncInterval])
 }

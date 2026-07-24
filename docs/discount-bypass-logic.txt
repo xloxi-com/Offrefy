@@ -1,0 +1,293 @@
+================================================================================
+OFFREFY — DISCOUNT BYPASS LOGIC (TEXT DOCUMENT)
+================================================================================
+App: Offrefy Volume Discount
+Purpose: How we bypass Shopify's 25 automatic-discount limit
+Date reference: 2026
+
+--------------------------------------------------------------------------------
+1. WHAT "BYPASS" MEANS HERE
+--------------------------------------------------------------------------------
+
+"Discount bypass" in this project does NOT mean "exclude a product from
+discount" or "skip discount with a tag".
+
+It means:
+
+  Shopify allows only ~25 ACTIVE automatic discounts per store
+  (Basic / standard plans).
+
+  Offrefy registers ONLY ONE automatic discount:
+    Name: "Offrefy — Quantity breaks"
+
+  Inside that ONE slot, unlimited campaigns (1000+ products/rules) are
+  evaluated at cart/checkout time.
+
+So:
+  - Legacy way  = 1 campaign = 1 Shopify discount slot  → hits 25 fast
+  - Offrefy way = N campaigns = 1 Shopify discount slot → unlimited campaigns
+
+Shopify does NOT limit how many product rules one Function can evaluate.
+Per-cart TARGET count (practical unlimited for collection catalogs):
+  All plans → 500 targets (real ceiling is Function instruction budget)
+
+  Storefront mirrors the same value as maxDiscountProducts in the widget JSON
+  and window.__vdMaxDiscountProducts for vd_locked_products slot locking.
+
+  IMPORTANT: After deploying a cap change, open Offers (or run "Sync all") so
+  rule_source.maxTargets and the storefront widget pick up the new budget.
+
+
+--------------------------------------------------------------------------------
+2. HIGH-LEVEL ARCHITECTURE
+--------------------------------------------------------------------------------
+
+  Merchant creates campaigns in Admin UI
+           |
+           v
+  Sync service writes rules to:
+    - Database (DiscountRule index)
+    - Product metafield: volume_discount.tiers  (primary)
+    - Optional: discount metafield chunks / rule_source (api mode)
+           |
+           v
+  ONE Shopify Automatic Product Discount (Function)
+           |
+           +-- fetch.js  (optional network lookup)
+           +-- run.js    (applies % discounts to cart lines)
+           |
+           v
+  Checkout applies up to N product discount targets (default 500)
+
+
+Key files:
+  extensions/volume-discount-fn/src/run.js
+  extensions/volume-discount-fn/src/fetch.js
+  app/services/volumeDiscountFunctionSync.server.ts
+  app/utils/discountRules.server.ts
+  app/routes/apps.volume-discount.cart-rules.tsx
+  extensions/volume-discount-theme/assets/volume-discount-storefront.src.js
+
+
+--------------------------------------------------------------------------------
+3. TWO RULE MODES (METAFIELD vs API)
+--------------------------------------------------------------------------------
+
+A) METAFIELD MODE (small / standard catalogs)
+   - Compact rules stored on each product: volume_discount.tiers
+   - Also sharded across discount metafield chunks if needed
+     (campaigns … campaigns_4)
+   - Checkout Function reads metafields directly — no network call
+
+B) API / PROXY MODE (large catalogs — bypass 128KB metafield size cap)
+   - Sync sets rule_source.mode = "api"
+   - fetch.js POSTs cart product IDs to:
+       /apps/volume-discount/cart-rules
+   - Server returns rules for those products only
+   - run.js uses API body to fill gaps / apply rules
+
+Switch happens automatically when rules exceed metafield size limits.
+
+
+--------------------------------------------------------------------------------
+4. THE CART PRODUCT CAP
+--------------------------------------------------------------------------------
+
+Even with unlimited campaigns in the store, checkout Function output is capped
+per cart to stay under Shopify Function instruction budgets.
+
+  Cap (synced into discount metafield rule_source.maxTargets):
+    All plans → 500 products/targets (practical unlimited)
+
+  Note: Shopify’s “25” limit is active automatic *discount functions* per store,
+  not targets inside one Function. Offrefy uses one Function, so large
+  collection-scoped carts (100+ products) can all receive discounts.
+
+  Storefront mirrors the same value as maxDiscountProducts in the widget JSON
+  and window.__vdMaxDiscountProducts for vd_locked_products slot locking.
+
+  IMPORTANT: After a cap change, open Offers (or run "Sync all") so rule_source
+  and the storefront widget pick up the new budget.
+
+
+--------------------------------------------------------------------------------
+5. CHECKOUT EVALUATION FLOW (STEP BY STEP)
+--------------------------------------------------------------------------------
+
+STEP 1 — Cart is evaluated by Shopify Function
+
+STEP 2 — Does discount have Product class?
+          NO  → return empty operations
+          YES → continue
+
+STEP 3 — Parse vd_locked_products from cart attributes
+
+STEP 4 — Collect unique product IDs from cart lines
+          Sort: locked products first, then cart order
+          Keep only first N products (N = rule_source.maxTargets, default 500)
+
+STEP 5 — Rule source?
+          mode = "api"  → fetch.js POSTs product_ids to cart-rules API
+          otherwise     → skip network; use product metafields only
+
+STEP 6 — For each of the ≤N products (run.js):
+          a) Resolve compact rule from:
+               - product metafield volume_discount.tiers  OR
+               - API rules[productId]
+          b) No rule?                    → SKIP (no discount)
+          c) customerType not "everyone"? → SKIP
+             (logged-in / tag targeting is NOT applied on checkout
+              hot path — fuel/budget save)
+          d) Find best percentage tier for current qty
+             (only % tiers; fixed / fixed-price ignored at checkout)
+          e) qty below min OR percent <= 0? → SKIP
+          f) Else emit product discount candidate
+
+STEP 7 — Return productDiscountsAdd with selectionStrategy = All
+          (capped at N targets from rule_source.maxTargets)
+
+
+--------------------------------------------------------------------------------
+6. WHEN A PRODUCT GETS NO DISCOUNT (SKIP CONDITIONS)
+--------------------------------------------------------------------------------
+
+These are eligibility skips — NOT a merchant "bypass exclude" feature.
+
+  1. Empty cart
+  2. Discount not configured as Product discount class
+  3. Line has no product ID
+  4. Product is beyond the product ranking cap (default 500)
+  5. No rule on product metafield AND no API rule
+  6. Customer targeting is logged-in or tag-based (checkout skips these)
+  7. No tiers / empty tiers
+  8. Quantity does not meet any % tier with percent > 0
+  9. Tier percent <= 0 or > 100
+  10. Already emitted N targets (plan cap)
+  11. Campaign not active (scheduled start not due / end passed)
+  12. Product not in campaign scope
+      (specific products / variants / collections / groups)
+  13. Another campaign won the same product at sync time
+      (one winner per product — better score at qty 1)
+
+
+There is NO:
+  - product tag to exclude from discount
+  - cart attribute to opt out of Offrefy discount
+  - compare-at / sale-price eligibility gate at checkout
+
+
+--------------------------------------------------------------------------------
+7. STACKING / COMBINES WITH
+--------------------------------------------------------------------------------
+
+The single automatic discount is synced with:
+
+  combinesWith:
+    productDiscounts:  true   (can stack with other product discounts)
+    orderDiscounts:    false  (does NOT combine with order discounts)
+    shippingDiscounts: true   (can stack with shipping discounts)
+
+Notes:
+  - Multiple Offrefy campaigns do NOT stack on the same product line
+    at checkout — sync picks one compact rule per product.
+  - Preview/widget stacking uses stackPriority then createdAt; that is
+    display/preview logic, not the checkout Function.
+
+
+--------------------------------------------------------------------------------
+8. TIER TYPES AT CHECKOUT
+--------------------------------------------------------------------------------
+
+Supported by checkout Function (run.js):
+  - Percentage tiers only  ({ m, p } or { minQty, percent })
+
+Synced but NOT applied by checkout Function:
+  - Fixed amount (f)
+  - Fixed price  (fp)
+
+Customer type compact codes (in metafields):
+  e = everyone
+  l = logged-in
+  t = logged-in-tag-any
+
+Qty mode compact codes:
+  v = per-variant
+  p = per-product
+  a = total-all
+  c = per-collection
+
+Checkout hot path mainly treats non-variant modes as "sum qty for this
+product's lines". Collection / total-all are not fully modeled in WASM
+beyond that.
+
+
+--------------------------------------------------------------------------------
+9. STOREFRONT ROLE (WIDGET + SLOT LOCK)
+--------------------------------------------------------------------------------
+
+Theme extension / storefront JS:
+  - Shows quantity-break widgets
+  - Maintains vd_locked_products so discount slots stay stable
+  - Filters locked IDs when products leave the cart
+  - Preview calc may enforce customer tags more fully than checkout
+
+Checkout truth = Shopify Function (run.js).
+Widget / preview = approximate UX helper.
+
+
+--------------------------------------------------------------------------------
+10. SIMPLE MENTAL MODEL
+--------------------------------------------------------------------------------
+
+  Unlimited campaigns in Offrefy DB
+        ↓ (sync)
+  Rules attached to products (metafield) or fetched via API
+        ↓
+  ONE Shopify automatic discount Function
+        ↓
+  At most N products in THIS cart get a % discount applied
+  (N = rule_source.maxTargets, default 500)
+        ↓
+  Shopify checkout shows the discounted prices
+
+
+That is the "25-limit bypass":
+  unlimited merchant campaigns, one discount slot, large per-cart target budget.
+
+
+--------------------------------------------------------------------------------
+11. QUICK FAQ
+--------------------------------------------------------------------------------
+
+Q: Can I create more than 25 campaigns?
+A: Yes. Campaigns are unlimited. Only ONE Shopify automatic discount is used.
+
+Q: Why only some products discount when cart has very many unique products?
+A: App caps at 500 product targets per Function result (practical unlimited
+   for collection catalogs). Ranked by locked + cart order. Open Offers or
+   Sync all after a cap change so rule_source.maxTargets updates.
+
+Q: What is vd_locked_products?
+A: Cart attribute that keeps previously eligible products in the discount
+   slots so discounts do not jump around as the cart changes.
+
+Q: Is 500 truly unlimited?
+A: App-side cap is 500 products/targets per cart. Real ceiling is Shopify
+   Function instruction budget (~11M). Specific collections with 100+
+   products are within this budget.
+
+Q: Do logged-in / customer-tag campaigns work at checkout?
+A: Those rules are stored, but the checkout Function currently skips
+   non-"everyone" rules on the hot path. Preview calc may still show them.
+
+Q: Do fixed-amount / fixed-price tiers apply at checkout?
+A: Not in the current Function — only percentage tiers are applied.
+
+Q: Is there a merchant "exclude this product from discount" bypass?
+A: No. Exclude a product by not putting it in campaign scope, or by
+   deactivating / ending the campaign.
+
+
+================================================================================
+END OF DOCUMENT
+================================================================================

@@ -35,7 +35,7 @@
 %}
 <script>
 (function () {
-  var VD_ASSET_VERSION = "1.27.3";
+  var VD_ASSET_VERSION = "1.28.2";
   var APP_ORIGIN = "https://offrey.xloxi.com";
   window.__vdStorefrontLocale = {{ request.locale.iso_code | json }};
   window.__vdAssetVersion = VD_ASSET_VERSION;
@@ -44,6 +44,11 @@
   window.__vdConfigRev = {{ vd_widget.rev | json }};
   {% else %}
   window.__vdConfigRev = "";
+  {% endif %}
+  {% if vd_widget and vd_widget.maxDiscountProducts %}
+  window.__vdMaxDiscountProducts = {{ vd_widget.maxDiscountProducts | json }};
+  {% else %}
+  window.__vdMaxDiscountProducts = 500;
   {% endif %}
   window.__vdCartBadgeTemplates = {
     locale: {{ locale_base | json }},

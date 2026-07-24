@@ -1,5 +1,5 @@
 # Slim input — product tiers metafields only. Avoid loading large discount
-# campaign JSON here (that alone can push a 25-line cart over the instruction budget).
+# campaign JSON here (that alone can push a large cart over the instruction budget).
 query CartInput {
   cart {
     vdLockedProductsAttr: attribute(key: "vd_locked_products") {
@@ -26,5 +26,8 @@ query CartInput {
   }
   discount {
     discountClasses
+    ruleSource: metafield(namespace: "volume_discount", key: "rule_source") {
+      jsonValue
+    }
   }
 }

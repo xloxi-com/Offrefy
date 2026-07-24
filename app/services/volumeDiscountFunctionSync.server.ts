@@ -11,8 +11,10 @@ import { deleteAutomaticDiscounts } from "./volumeDiscountShopify.server";
 import {
   buildStorefrontWidgetJsonString,
   compactStorefrontShopMetafieldPayload,
+  stampStorefrontMaxDiscountProducts,
   storefrontWidgetPayloadHasCampaigns,
 } from "../utils/storefrontWidgetConfig.server";
+import { resolveShopifyShopPlanCap } from "../utils/cartDiscountTargetCap.server";
 import {
   ensureProductTiersStorefrontDefinition,
   resolveStorefrontWidgetShopGid,
@@ -49,6 +51,13 @@ export type SyncShopOptions = {
   /** Caller already ran schedule transitions — skip a second DB pass. */
   skipScheduleTransitions?: boolean;
 };
+
+type SyncShopResult = { discountIds: string[]; errors: string[] };
+
+/** Serialize syncs per shop so parallel Manual Sync / Import / cron cannot stampede Shopify. */
+const shopSyncTail = new Map<string, Promise<void>>();
+/** Coalesce concurrent identical full-shop syncs (same force/purgeLegacy) into one run. */
+const shopFullSyncInFlight = new Map<string, Promise<SyncShopResult>>();
 
 type AdminGraphql = {
   graphql: (
@@ -400,8 +409,55 @@ export async function ensureVolumeDiscountFunctionDiscount(
 /**
  * Keeps one automatic app discount per shop; metafield holds every active campaign + tiers.
  * Avoids Shopify’s ~25 automatic discount cap from one discount per tier.
+ *
+ * Per-shop: concurrent identical full syncs coalesce (single-flight); other syncs serialize.
+ * Recursive recovery (`recursionDepth > 0`) runs inline — already inside the outer lock.
  */
 export async function syncVolumeDiscountShop(
+  admin: AdminGraphql,
+  shop: string,
+  options: SyncShopOptions = {},
+): Promise<{ discountIds: string[]; errors: string[] }> {
+  if ((options.recursionDepth ?? 0) > 0) {
+    return syncVolumeDiscountShopImpl(admin, shop, options);
+  }
+
+  const coalesceable = !options.changedCampaignIds?.length;
+  const coalesceKey = coalesceable
+    ? `${shop}\0${options.force === true ? "1" : "0"}\0${options.purgeLegacy === true ? "1" : "0"}`
+    : null;
+
+  if (coalesceKey) {
+    const existing = shopFullSyncInFlight.get(coalesceKey);
+    if (existing) return existing;
+  }
+
+  const prev = shopSyncTail.get(shop) ?? Promise.resolve();
+  const work = prev
+    .catch(() => {})
+    .then(() => syncVolumeDiscountShopImpl(admin, shop, options));
+
+  shopSyncTail.set(
+    shop,
+    work.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+
+  if (coalesceKey) {
+    shopFullSyncInFlight.set(coalesceKey, work);
+    void work.finally(() => {
+      if (shopFullSyncInFlight.get(coalesceKey) === work) {
+        shopFullSyncInFlight.delete(coalesceKey);
+      }
+    });
+  }
+
+  return work;
+}
+
+async function syncVolumeDiscountShopImpl(
   admin: AdminGraphql,
   shop: string,
   options: SyncShopOptions = {},
@@ -415,7 +471,7 @@ export async function syncVolumeDiscountShop(
     await applyDueCampaignScheduleTransitions(shop);
   }
 
-  const [activeRows, stateRow] = await Promise.all([
+  const [activeRows, stateRow, shopPlanCap] = await Promise.all([
     prisma.volumeDiscountCampaign.findMany({
       where: { shop, status: "active" },
       orderBy: { createdAt: "asc" },
@@ -424,9 +480,11 @@ export async function syncVolumeDiscountShop(
     prisma.volumeDiscountShopState.findUnique({
       where: { shop },
     }),
+    resolveShopifyShopPlanCap(admin),
   ]);
 
   let state = stateRow;
+  const maxDiscountProducts = shopPlanCap.maxTargets;
 
   if (activeRows.length === 0) {
     if (state?.functionDiscountId) {
@@ -456,7 +514,11 @@ export async function syncVolumeDiscountShop(
     return { discountIds: [], errors: [] };
   }
 
-  const rowFp = rowSyncFingerprint(activeRows);
+  const rowFp = rowSyncFingerprint(activeRows, {
+    maxDiscountProducts,
+    // v2: rule_source always includes shopDomain for checkout gap-fill fetch
+    ruleSourceVersion: 2,
+  });
 
   if (!force && !incrementalIds?.length && recursionDepth === 0) {
     try {
@@ -617,19 +679,8 @@ export async function syncVolumeDiscountShop(
         ? purgeLegacyVolumeDiscountNodes(admin, shop, keepId)
         : Promise.resolve({ deleted: [] as string[], errors: [] as string[] }),
       Promise.resolve().then(async () => {
-        const oldRules = await prisma.discountRule.findMany({
-          where: { shop, status: "active" },
-          select: { productId: true },
-        });
-        const oldProductIds = new Set(
-          oldRules.map((r) => r.productId).filter((id) => id !== "*")
-        );
-
-        await rebuildDiscountRulesForShop(shop, rulesInput);
-
-        const newRules = await prisma.discountRule.findMany({
-          where: { shop, status: "active" },
-        });
+        const { activeRules, previousProductIds } =
+          await rebuildDiscountRulesForShop(shop, rulesInput);
 
         const metafieldsToSet: Array<{
           ownerId: string;
@@ -645,7 +696,7 @@ export async function syncVolumeDiscountShop(
           console.warn("[volume-discount] product tiers storefront definition", e);
         });
 
-        for (const row of newRules) {
+        for (const row of activeRules) {
           if (row.productId === "*") continue;
           newProductIds.add(row.productId);
 
@@ -687,7 +738,7 @@ export async function syncVolumeDiscountShop(
           });
         }
 
-        for (const oldId of oldProductIds) {
+        for (const oldId of previousProductIds) {
           if (!newProductIds.has(oldId)) {
             const productGid = `gid://shopify/Product/${oldId}`;
             metafieldsToSet.push({
@@ -702,20 +753,51 @@ export async function syncVolumeDiscountShop(
 
         if (metafieldsToSet.length > 0) {
           const BATCH_SIZE = 25;
-          for (let i = 0; i < metafieldsToSet.length; i += BATCH_SIZE) {
-            const chunk = metafieldsToSet.slice(i, i + BATCH_SIZE);
+          /** Shopify metafieldsSet max 25/call; limited waves cut wall-clock without stampeding. */
+          const WAVE_CONCURRENCY = 3;
+
+          const writeChunk = async (
+            chunk: (typeof metafieldsToSet)[number][],
+          ) => {
             try {
               const res = await admin.graphql(METAFIELDS_SET_MUTATION, {
                 variables: { metafields: chunk },
               });
-              const parsed = (await res.json()) as any;
+              const parsed = (await res.json()) as {
+                data?: {
+                  metafieldsSet?: {
+                    userErrors?: { message?: string }[];
+                  };
+                };
+              };
               const ue = parsed.data?.metafieldsSet?.userErrors ?? [];
               if (ue.length) {
-                console.warn("[volume-discount] product metafieldsSet userErrors:", JSON.stringify(ue));
+                console.warn(
+                  "[volume-discount] product metafieldsSet userErrors:",
+                  JSON.stringify(ue),
+                );
               }
             } catch (err) {
               console.error("[volume-discount] product metafieldsSet error:", err);
             }
+          };
+
+          for (
+            let i = 0;
+            i < metafieldsToSet.length;
+            i += BATCH_SIZE * WAVE_CONCURRENCY
+          ) {
+            const wave: Promise<void>[] = [];
+            for (let w = 0; w < WAVE_CONCURRENCY; w++) {
+              const start = i + w * BATCH_SIZE;
+              if (start >= metafieldsToSet.length) break;
+              wave.push(
+                writeChunk(
+                  metafieldsToSet.slice(start, start + BATCH_SIZE),
+                ),
+              );
+            }
+            await Promise.all(wave);
           }
         }
 
@@ -748,11 +830,23 @@ export async function syncVolumeDiscountShop(
     return { discountIds: [], errors: [msg] };
   }
 
-  const widgetJson = compactStorefrontShopMetafieldPayload(widgetJsonFull);
+  const widgetJsonFullWithCap = stampStorefrontMaxDiscountProducts(
+    widgetJsonFull,
+    maxDiscountProducts,
+  );
+  const widgetJson = compactStorefrontShopMetafieldPayload(widgetJsonFullWithCap);
 
   const inputVariables = JSON.stringify({
     customerSegmentTags: collectCustomerSegmentTags(activeRows),
   });
+  const ruleSourcePayload = {
+    mode: needsRemoteLookup ? ("api" as const) : ("metafield" as const),
+    // Always include shopDomain so Function fetch can gap-fill empty product metafields.
+    apiPath: "/apps/volume-discount/cart-rules",
+    shopDomain: shop,
+    shopifyPlus: shopPlanCap.shopifyPlus,
+    maxTargets: maxDiscountProducts,
+  };
   const metafields = [
     ...campaignMfEntries.map((entry) => ({
       namespace: MF_NS,
@@ -770,17 +864,7 @@ export async function syncVolumeDiscountShop(
       namespace: MF_NS,
       key: MF_KEY_RULE_SOURCE,
       type: "json",
-      value: JSON.stringify(
-        needsRemoteLookup
-          ? {
-              mode: "api",
-              apiPath: "/apps/volume-discount/cart-rules",
-              shopDomain: shop,
-            }
-          : {
-              mode: "metafield",
-            },
-      ),
+      value: JSON.stringify(ruleSourcePayload),
     },
   ];
 
@@ -793,13 +877,13 @@ export async function syncVolumeDiscountShop(
     const liveFp = fingerprintMetafieldEntries(liveMetafieldNodes);
     if (liveFp === metafieldFingerprint) {
       const cachedPayload = await getVolumeDiscountStorefrontPayload(shop);
-      if (cachedPayload?.payload === widgetJsonFull) {
+      if (cachedPayload?.payload === widgetJsonFullWithCap) {
         try {
           await prisma.volumeDiscountStorefrontPayload.upsert({
             where: { shop },
             create: {
               shop,
-              payload: widgetJsonFull,
+              payload: widgetJsonFullWithCap,
               syncRowFingerprint: rowFp,
             },
             update: { syncRowFingerprint: rowFp },
@@ -817,7 +901,7 @@ export async function syncVolumeDiscountShop(
     ]);
     if (
       liveFp === metafieldFingerprint &&
-      cachedPayload?.payload === widgetJsonFull
+      cachedPayload?.payload === widgetJsonFullWithCap
     ) {
       return { discountIds: [discountIdExisting], errors: [] };
     }
@@ -1070,7 +1154,7 @@ export async function syncVolumeDiscountShop(
       admin,
       activeRows,
       shop,
-      widgetJsonFull,
+      widgetJsonFullWithCap,
       gid ?? undefined,
       widgetJson,
       rowFp,

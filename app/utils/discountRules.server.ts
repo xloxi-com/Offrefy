@@ -84,15 +84,31 @@ type CampaignForRules = {
   tiers: FunctionTierConfig[];
 };
 
+export type DiscountRuleSyncRow = {
+  productId: string;
+  campaignId: string;
+  tiers: unknown;
+  quantityCondition: string;
+  customerType: string;
+  customerTags: unknown;
+  displayName: string | null;
+  campaignName: string | null;
+};
+
 /**
  * Expand campaigns into per-product rows and upsert `DiscountRule`.
  * Duplicate product ids across campaigns: keep the campaign with the better tier at qty 1.
  * Diffs against existing rows so unchanged catalogs skip delete+rewrite.
+ * Returns final desired rows + prior product ids so callers skip extra DiscountRule reads.
  */
 export async function rebuildDiscountRulesForShop(
   shop: string,
   campaigns: CampaignForRules[],
-): Promise<{ ruleCount: number }> {
+): Promise<{
+  ruleCount: number;
+  activeRules: DiscountRuleSyncRow[];
+  previousProductIds: string[];
+}> {
   /** productId → winning campaign payload */
   const winner = new Map<string, CampaignForRules>();
 
@@ -209,7 +225,30 @@ export async function rebuildDiscountRulesForShop(
     });
   }
 
-  return { ruleCount: desiredRows.length };
+  const previousProductIds = [
+    ...new Set(
+      existing
+        .map((row) => row.productId)
+        .filter((id): id is string => Boolean(id) && id !== "*"),
+    ),
+  ];
+
+  const activeRules: DiscountRuleSyncRow[] = desiredRows.map((row) => ({
+    productId: row.productId,
+    campaignId: row.campaignId,
+    tiers: row.tiers,
+    quantityCondition: row.quantityCondition,
+    customerType: row.customerType,
+    customerTags: row.customerTags,
+    displayName: row.displayName ?? null,
+    campaignName: row.campaignName ?? null,
+  }));
+
+  return {
+    ruleCount: desiredRows.length,
+    activeRules,
+    previousProductIds,
+  };
 }
 
 function discountRuleFingerprint(row: {
@@ -240,9 +279,10 @@ export async function lookupDiscountRulesForProducts(
   productIds: string[],
   options?: { maxProducts?: number },
 ): Promise<Record<string, ProductRulePayload>> {
+  const HARD_MAX = 500;
   const maxProducts = Math.min(
-    Math.max(1, options?.maxProducts ?? 25),
-    25,
+    Math.max(1, options?.maxProducts ?? 500),
+    HARD_MAX,
   );
   const keys = [
     ...new Set(

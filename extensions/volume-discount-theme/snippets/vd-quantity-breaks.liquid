@@ -45,7 +45,15 @@
 {%- comment -%}
   Markup only. Storefront JS/CSS load from the Offrefy (global) app embed.
   If the embed is off, this block must not boot the widget on its own.
+
+  Liquid product form (vd-atc-form-*) is the cross-theme ATC bridge:
+  Shopify {% form 'product' %} works on every free/premium theme. Widget JS
+  syncs qty/variant here and either clicks the theme ATC or submits this form
+  via /cart/add.js so drawers/notifications still work.
 {%- endcomment -%}
+{%- liquid
+  assign vd_product_form_id = 'vd-atc-form-' | append: vd_id_suffix
+-%}
 <div
   class="vd-storefront-root volume-discount-embed"
   id="vd-shopify-{{ vd_id_suffix }}"
@@ -56,6 +64,8 @@
   data-vd-trans-add="{{ vd_trans_add | escape }}"
   data-heading="{{ vd_heading | escape }}"
   data-section-heading="{{ vd_section_heading | escape }}"
+  data-vd-product-form-id="{{ vd_product_form_id }}"
+  data-vd-use-liquid-form="1"
   {% if vd_product != blank %}
     data-product-id="{{ vd_product.id }}"
     data-variant-id="{{ vd_product.selected_or_first_available_variant.id }}"
@@ -107,10 +117,46 @@
   {%- comment -%}
     Keep mount visible in the theme editor so Shopify does not mark the app block
     as "hidden" (red eye icon). Live storefront starts hidden until JS mounts tiers.
+    Liquid ATC bridge form lives INSIDE the mount so it stays hidden with the
+    mount until the widget paints (avoids a stray theme-styled “Add” button).
   {%- endcomment -%}
   <div
     class="volume-discount-embed__inner vd-mount"
     data-vd-mount
     {% unless request.design_mode %}hidden{% endunless %}
-  ></div>
+  >
+    {% if vd_product != blank %}
+      {%- comment -%}
+        Platform product form — valid on all Shopify themes (free + premium).
+        Always visually hidden; used by +Add / Grab This Deal when theme ATC is missing.
+      {%- endcomment -%}
+      {% form 'product', vd_product, id: vd_product_form_id, class: 'vd-liquid-product-form', data-vd-liquid-product-form: '1' %}
+        <input
+          type="hidden"
+          name="id"
+          value="{{ vd_product.selected_or_first_available_variant.id }}"
+          data-vd-liquid-variant-id
+        >
+        <input
+          type="hidden"
+          name="quantity"
+          value="1"
+          min="1"
+          data-vd-liquid-qty
+        >
+        <button
+          type="submit"
+          name="add"
+          class="vd-liquid-submit"
+          hidden
+          tabindex="-1"
+          aria-hidden="true"
+          data-vd-liquid-submit
+          style="display:none!important;visibility:hidden!important;position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;"
+        >
+          {{ vd_trans_add | escape }}
+        </button>
+      {% endform %}
+    {% endif %}
+  </div>
 </div>

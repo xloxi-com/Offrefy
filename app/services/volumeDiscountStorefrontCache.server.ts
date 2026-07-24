@@ -3,8 +3,10 @@ import { volumeDiscountCampaignSyncSelect } from "../utils/volumeDiscountCampaig
 import { prisma } from "../db.server";
 import {
   buildStorefrontWidgetValue,
+  stampStorefrontMaxDiscountProducts,
   stampStorefrontWidgetRev,
 } from "../utils/storefrontWidgetConfig.server";
+import { resolveShopifyShopPlanCap } from "../utils/cartDiscountTargetCap.server";
 
 type StorefrontPayloadDelegate = {
   findUnique(args: {
@@ -120,7 +122,9 @@ export async function rebuildAndPersistStorefrontPayload(
     rows.length === 0
       ? EMPTY_PAYLOAD
       : await buildStorefrontWidgetValue(rows, admin, shop);
-  const payload = stampStorefrontWidgetRev(raw, Date.now());
+  const planCap = await resolveShopifyShopPlanCap(admin);
+  const withCap = stampStorefrontMaxDiscountProducts(raw, planCap.maxTargets);
+  const payload = stampStorefrontWidgetRev(withCap, Date.now());
   await prisma.volumeDiscountStorefrontPayload.upsert({
     where: { shop },
     create: { shop, payload },
