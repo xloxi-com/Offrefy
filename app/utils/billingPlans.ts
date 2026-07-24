@@ -75,7 +75,18 @@ export function billingAmountDollars(
   return cents / 100;
 }
 
-/** Dev stores must use test charges. Set BILLING_TEST=false for live charges. */
+/**
+ * Shopify test charges (no real money).
+ * - BILLING_TEST=true  → always test (local / partner testing)
+ * - BILLING_TEST=false → always live billing
+ * - unset → live in production; test in development
+ *
+ * Live merchant stores must not default to test — that showed
+ * "You will not be billed for this test charge."
+ */
 export function billingIsTest(): boolean {
-  return process.env.BILLING_TEST !== "false";
+  const raw = process.env.BILLING_TEST?.trim().toLowerCase();
+  if (raw === "true" || raw === "1") return true;
+  if (raw === "false" || raw === "0") return false;
+  return process.env.NODE_ENV !== "production";
 }
