@@ -6,13 +6,11 @@ import {
   getMemoryCachedJson,
   setMemoryCachedJson,
 } from "../utils/memoryCache.server";
-import { compactTranslationsForDiscountFunction } from "../utils/storefrontTranslations";
-import { loadStorefrontTranslationsForShop } from "../utils/storefrontTranslations.server";
-
 /**
  * App proxy: POST /apps/volume-discount/cart-rules
  * Returns discount rules for specific cart product ids only (not the full 1000+ catalog).
  * Used when metafield storage exceeds shard limits and the Function uses network access.
+ * Keep the JSON tiny — Function JSON.parse burns instruction fuel on large bodies.
  */
 const jsonHeaders = {
   "Content-Type": "application/json; charset=utf-8",
@@ -85,20 +83,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   }
 
-  const [rules, storefrontTranslations] = await Promise.all([
-    lookupDiscountRulesForProducts(shop, productIds, {
-      maxProducts: productIds.length,
-    }),
-    loadStorefrontTranslationsForShop(shop)
-      .then((translations) =>
-        compactTranslationsForDiscountFunction(translations),
-      )
-      .catch((e) => {
-        console.warn("[volume-discount] cart-rules translations load failed", e);
-        return {};
-      }),
-  ]);
-  const responseJson = JSON.stringify({ ok: true, rules, storefrontTranslations });
+  const rules = await lookupDiscountRulesForProducts(shop, productIds, {
+    maxProducts: productIds.length,
+  });
+  // Rules only — do not attach storefrontTranslations (unused by Function, huge fuel cost).
+  const responseJson = JSON.stringify({ ok: true, rules });
 
   setMemoryCachedJson(memKey, responseJson, 30_000);
 

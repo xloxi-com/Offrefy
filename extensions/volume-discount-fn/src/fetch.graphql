@@ -1,5 +1,5 @@
-# Fetch builds a network request whenever rule_source.shopDomain is set
-# (gap-fill for products whose volume_discount.tiers metafield is empty).
+# Fetch only builds a network request for products missing usable tiers
+# metafields (gap-fill). Avoids fuel burn when metafields already cover the cart.
 query FetchInput {
   cart {
     vdLockedProductsAttr: attribute(key: "vd_locked_products") {
@@ -10,6 +10,9 @@ query FetchInput {
         ... on ProductVariant {
           product {
             id
+            tiersMetafield: metafield(namespace: "volume_discount", key: "tiers") {
+              jsonValue
+            }
           }
         }
       }

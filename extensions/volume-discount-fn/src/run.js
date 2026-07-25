@@ -9,10 +9,15 @@ import {
  */
 
 /**
- * Cap targets for instruction budget (~11M). Prefer locked products first.
- * rule_source.maxTargets can raise this (Shopify Plus / plan sync).
+ * Soft product/target cap so we return partial discounts instead of crashing
+ * the whole Function (fuel ~11M). Prefer locked products first.
+ * rule_source.maxTargets from sync can raise this (same on Basic + Plus).
  */
 const MAX_TARGETS_DEFAULT = 100;
+/** Hard ceiling — never attempt more than this in one run (fuel safety). */
+const MAX_TARGETS_HARD = 120;
+/** Skip JSON.parse of oversized fetch bodies (burns fuel). */
+const MAX_FETCH_BODY_CHARS = 80_000;
 
 /** @param {unknown} gid */
 function productNum(gid) {
@@ -23,15 +28,16 @@ function productNum(gid) {
 
 /** @param {unknown} ruleSource */
 function resolveMaxTargets(ruleSource) {
+  let n = MAX_TARGETS_DEFAULT;
   if (ruleSource && typeof ruleSource === "object") {
-    const n = /** @type {{ maxTargets?: unknown }} */ (ruleSource).maxTargets;
-    if (typeof n === "number" && n > 0) return n | 0;
-    if (typeof n === "string" && n.trim() !== "") {
-      const parsed = parseInt(n, 10);
-      if (parsed > 0) return parsed;
+    const raw = /** @type {{ maxTargets?: unknown }} */ (ruleSource).maxTargets;
+    if (typeof raw === "number" && raw > 0) n = raw | 0;
+    else if (typeof raw === "string" && raw.trim() !== "") {
+      const parsed = parseInt(raw, 10);
+      if (parsed > 0) n = parsed;
     }
   }
-  return MAX_TARGETS_DEFAULT;
+  return n > MAX_TARGETS_HARD ? MAX_TARGETS_HARD : n;
 }
 
 /** @param {unknown} raw @param {number} max */
@@ -143,7 +149,6 @@ function formatMessage(displayName, tier, sub, lineQty) {
     }
   }
 
-  // Fast path for the default admin template
   if (raw === "{{ discount }} OFF") return discountRepl + " OFF";
 
   let s = replaceLit(raw, "{{ discount }}", discountRepl);
@@ -207,6 +212,13 @@ function ruleDisplayName(compact) {
   return typeof m === "string" && m.length ? m : "Volume discount";
 }
 
+/** @param {unknown} mf */
+function compactFromMetafield(mf) {
+  return mf && typeof mf === "object" && Array.isArray(mf.t) && mf.t.length
+    ? mf
+    : null;
+}
+
 /**
  * @param {RunInput} input
  * @returns {CartLinesDiscountsGenerateRunResult}
@@ -220,9 +232,7 @@ export function cartLinesDiscountsGenerateRun(input) {
     return { operations: [] };
   }
 
-  // Hard fuel ceiling: never attempt more products than we can afford.
-  const configured = resolveMaxTargets(input.discount?.ruleSource?.jsonValue);
-  const maxTargets = configured > 80 ? 80 : configured;
+  const maxTargets = resolveMaxTargets(input.discount?.ruleSource?.jsonValue);
 
   const locked = lockedIds(input.cart?.vdLockedProductsAttr?.value, maxTargets);
   /** @type {Map<string, number>} */
@@ -257,10 +267,18 @@ export function cartLinesDiscountsGenerateRun(input) {
   );
   if (products.length > maxTargets) products.length = maxTargets;
 
+  /** Lazy-parse fetch body only if a product needs gap-fill. */
   /** @type {Record<string, unknown> | null} */
   let apiRules = null;
-  const body = input.fetchResult?.body;
-  if (typeof body === "string" && body.length > 2) {
+  let apiRulesLoaded = false;
+  function loadApiRules() {
+    if (apiRulesLoaded) return apiRules;
+    apiRulesLoaded = true;
+    const fr = input.fetchResult;
+    if (!fr || fr.status !== 200) return null;
+    const body = fr.body;
+    if (typeof body !== "string" || body.length < 3) return null;
+    if (body.length > MAX_FETCH_BODY_CHARS) return null;
     try {
       const parsed = JSON.parse(body);
       if (parsed?.rules && typeof parsed.rules === "object") {
@@ -269,6 +287,7 @@ export function cartLinesDiscountsGenerateRun(input) {
     } catch {
       /* ignore */
     }
+    return apiRules;
   }
 
   /** @type {import("../generated/api").ProductDiscountCandidate[]} */
@@ -280,18 +299,17 @@ export function cartLinesDiscountsGenerateRun(input) {
     const { pid, lineIndexes } = products[p];
 
     const firstLine = lines[lineIndexes[0]];
-    const mf = firstLine?.merchandise?.product?.tiersMetafield?.jsonValue;
-    let compact =
-      mf && typeof mf === "object" && Array.isArray(mf.t) && mf.t.length
-        ? mf
-        : null;
-    if (!compact && apiRules) {
-      const alt = apiRules[pid];
+    let compact = compactFromMetafield(
+      firstLine?.merchandise?.product?.tiersMetafield?.jsonValue,
+    );
+    if (!compact) {
+      const rules = loadApiRules();
+      const alt = rules ? rules[pid] : null;
       if (
         alt &&
         typeof alt === "object" &&
-        Array.isArray(alt.t) &&
-        alt.t.length
+        Array.isArray(/** @type {{ t?: unknown }} */ (alt).t) &&
+        /** @type {{ t: unknown[] }} */ (alt).t.length
       ) {
         compact = alt;
       }
