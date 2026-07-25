@@ -1,4 +1,11 @@
-/** Warm the editor JS chunk while the merchant is on the Offers list. */
+import { ensureDocumentHead } from "./documentHeadGuard.client";
+
+/** Warm the editor JS chunk (hover / focus on Offers — not on first paint). */
 export function preloadVolumeDiscountEditor(): void {
-  void import("../components/VolumeDiscountCreateView");
+  if (typeof document === "undefined") return;
+  if (!ensureDocumentHead()) return;
+
+  void import("../components/VolumeDiscountCreateView").catch(() => {
+    /* Prefetch is best-effort; never surface as an Application Error. */
+  });
 }

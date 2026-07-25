@@ -68,17 +68,11 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (!id.includes("node_modules")) {
-            if (
-              id.includes("VolumeDiscountCreateView") ||
-              id.includes("QuantityBreaksTailwindPreview") ||
-              id.includes("OfferTypePreviewModal") ||
-              id.includes("OfferTypeSelectCards")
-            ) {
-              return "admin-heavy";
-            }
-            return;
-          }
+          // Do not force app components into a shared "admin-heavy" chunk.
+          // That extracted one CSS file onto many routes; React Router then
+          // re-injects it via document.head.appendChild on every loader and can
+          // crash the embedded admin when head is briefly unavailable.
+          if (!id.includes("node_modules")) return;
           if (id.includes("@shopify/polaris-icons")) return "polaris-icons";
           if (id.includes("@shopify/polaris")) return "polaris";
           if (id.includes("@shopify/app-bridge")) return "app-bridge";

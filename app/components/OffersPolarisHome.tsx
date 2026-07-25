@@ -331,10 +331,8 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     [t],
   );
 
-  useEffect(() => {
-    preloadVolumeDiscountEditor();
-  }, []);
-
+  // Warm editor on hover/focus only — eager import raced React Router's
+  // document.head CSS injection and crashed Offers with appendChild on null.
   const warmEditorChunk = useCallback(() => {
     preloadVolumeDiscountEditor();
   }, []);
