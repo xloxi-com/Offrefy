@@ -10,6 +10,7 @@ import {
 } from "@shopify/polaris";
 
 import { PlanUpgradeBanner } from "./PlanUpgradeBanner";
+import { PlanUpgradeBadge } from "./PlanUpgradeBadge";
 import {
   COUNTDOWN_TIME_UNIT_OPTIONS,
   isVolumeDiscountCountdownTimeUnit,
@@ -54,9 +55,12 @@ export function CountdownTimerSettingsCard({
     <Card padding="400">
       <BlockStack gap="300">
         <BlockStack gap="100">
-          <Text as="h2" variant="headingSm">
-            Countdown timer
-          </Text>
+          <InlineStack gap="200" blockAlign="center" wrap>
+            <Text as="h2" variant="headingSm">
+              Countdown timer
+            </Text>
+            {locked ? <PlanUpgradeBadge /> : null}
+          </InlineStack>
           <Text as="p" variant="bodySm" tone="subdued">
             Label, duration, and end time (UTC). Pill colors in Appearance.
           </Text>

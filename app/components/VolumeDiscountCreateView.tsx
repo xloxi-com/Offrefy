@@ -42,6 +42,7 @@ import { useAdminI18n } from "./AdminI18nProvider";
 import { CampaignStatusScheduleCard } from "./CampaignStatusScheduleCard";
 import { CountdownTimerSettingsCard } from "./CountdownTimerSettingsCard";
 import { PlanUpgradeBanner, PlanUpgradeHint } from "./PlanUpgradeBanner";
+import { PlanUpgradeBadge } from "./PlanUpgradeBadge";
 import { WidgetDisplayColorField } from "./WidgetDisplayColorField";
 import {
   planCapabilities as defaultPlanCapabilities,
@@ -1929,9 +1930,12 @@ export function VolumeDiscountCreateView({
                   ) : (
                     <Card padding="400">
                       <BlockStack gap="300">
-                        <Text as="h2" variant="headingSm">
-                          {t("offerEditor.schedule")}
-                        </Text>
+                        <InlineStack gap="200" blockAlign="center" wrap>
+                          <Text as="h2" variant="headingSm">
+                            {t("offerEditor.schedule")}
+                          </Text>
+                          <PlanUpgradeBadge />
+                        </InlineStack>
                         <PlanUpgradeBanner feature="scheduling" />
                       </BlockStack>
                     </Card>
@@ -3482,9 +3486,12 @@ export function VolumeDiscountCreateView({
 
                         <Card padding="400">
                           <BlockStack gap="300">
-                            <Text as="h3" variant="headingSm">
-                              Custom CSS
-                            </Text>
+                            <InlineStack gap="200" blockAlign="center" wrap>
+                              <Text as="h3" variant="headingSm">
+                                Custom CSS
+                              </Text>
+                              {!planCaps.customCss ? <PlanUpgradeBadge /> : null}
+                            </InlineStack>
                             {!planCaps.customCss ? (
                               <PlanUpgradeBanner feature="customCss" />
                             ) : (

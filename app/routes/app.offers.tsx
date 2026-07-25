@@ -541,6 +541,7 @@ export default function Index() {
                 <Suspense fallback={null}>
                   <QuantityBreaksSelectCard
                     title={t("offers.quantityBreaks")}
+                    createLocked={atOfferCap}
                     onPreview={() => setOfferPreviewModal("quantity")}
                     onLearnMore={() => toastSoon(t("common.learnMore"))}
                     onCreate={() => {
@@ -564,6 +565,7 @@ export default function Index() {
                   />
                   <VolumeDiscountComingSoonCard
                     title={t("offers.volumeDiscount")}
+                    createLocked={atOfferCap}
                     onPreview={() => setOfferPreviewModal("volume")}
                     onLearnMore={() => toastSoon(t("common.learnMore"))}
                     onCreate={() => {

@@ -7,6 +7,7 @@ import {
   Text,
 } from "@shopify/polaris";
 
+import { PlanUpgradeBadge } from "./PlanUpgradeBadge";
 import styles from "./OfferTypeSelectCards.module.css";
 import { useAdminI18n } from "./AdminI18nProvider";
 
@@ -15,6 +16,8 @@ export type OfferTypeCardFooterProps = {
   onPreview: () => void;
   onLearnMore: () => void;
   onCreate: () => void;
+  /** Plan offer cap — disable Create and show Upgrade badge. */
+  createLocked?: boolean;
 };
 
 function OfferTypeCardFooter({
@@ -22,6 +25,7 @@ function OfferTypeCardFooter({
   onPreview,
   onLearnMore,
   onCreate,
+  createLocked = false,
 }: OfferTypeCardFooterProps) {
   const { t } = useAdminI18n();
   return (
@@ -39,9 +43,16 @@ function OfferTypeCardFooter({
               {t("common.learnMore")}
             </Button>
           </InlineStack>
-          <Button variant="primary" onClick={onCreate}>
-            {t("common.create")}
-          </Button>
+          <InlineStack gap="200" blockAlign="center" wrap={false}>
+            <Button
+              variant="primary"
+              disabled={createLocked}
+              onClick={onCreate}
+            >
+              {t("common.create")}
+            </Button>
+            {createLocked ? <PlanUpgradeBadge /> : null}
+          </InlineStack>
         </InlineStack>
       </BlockStack>
     </div>
@@ -58,6 +69,7 @@ export function QuantityBreaksSelectCard({
   onPreview,
   onLearnMore,
   onCreate,
+  createLocked = false,
 }: QuantityBreaksSelectCardProps) {
   return (
     <div className={styles.gridCell}>
@@ -84,6 +96,7 @@ export function QuantityBreaksSelectCard({
               onPreview={onPreview}
               onLearnMore={onLearnMore}
               onCreate={onCreate}
+              createLocked={createLocked}
             />
           </div>
         </Card>
@@ -93,7 +106,8 @@ export function QuantityBreaksSelectCard({
 }
 
 export function VolumeDiscountComingSoonCard(props: OfferTypeCardFooterProps) {
-  const { title, onPreview, onLearnMore, onCreate } = props;
+  const { title, onPreview, onLearnMore, onCreate, createLocked = false } =
+    props;
 
   return (
     <div className={styles.gridCell}>
@@ -120,6 +134,7 @@ export function VolumeDiscountComingSoonCard(props: OfferTypeCardFooterProps) {
               onPreview={onPreview}
               onLearnMore={onLearnMore}
               onCreate={onCreate}
+              createLocked={createLocked}
             />
           </div>
         </Card>

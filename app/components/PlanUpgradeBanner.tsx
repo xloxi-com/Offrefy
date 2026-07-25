@@ -5,6 +5,7 @@ import { adminEmbeddedPath } from "../utils/adminEmbeddedPath";
 import type { PlanFeatureKey } from "../utils/pricingPlans";
 import { upgradeMessage } from "../utils/pricingPlans";
 import { useAdminI18n } from "./AdminI18nProvider";
+import { PlanUpgradeBadge } from "./PlanUpgradeBadge";
 
 type PlanUpgradeBannerProps = {
   feature: PlanFeatureKey;
@@ -44,9 +45,12 @@ export function PlanUpgradeHint({
   const pricingHref = adminEmbeddedPath("/app/pricing", search);
 
   return (
-    <Text as="p" variant="bodySm" tone="caution">
-      {message ?? upgradeMessage(feature)}{" "}
-      <Link to={pricingHref}>{t("common.upgradePlan")}</Link>
-    </Text>
+    <InlineStack gap="200" blockAlign="center" wrap>
+      <PlanUpgradeBadge />
+      <Text as="p" variant="bodySm" tone="caution">
+        {message ?? upgradeMessage(feature)}{" "}
+        <Link to={pricingHref}>{t("common.upgradePlan")}</Link>
+      </Text>
+    </InlineStack>
   );
 }

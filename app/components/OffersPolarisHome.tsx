@@ -34,6 +34,10 @@ import type {
   TabProps,
 } from "@shopify/polaris";
 import {
+  PlanUpgradeBadge,
+  planLockedActionContent,
+} from "./PlanUpgradeBadge";
+import {
   ArrowUpIcon,
   DeleteIcon,
   DiscountIcon,
@@ -673,18 +677,21 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
   const atCampaignCap =
     maxActiveCampaigns != null && activeCount >= maxActiveCampaigns;
 
+  const upgradeLabel = t("common.upgradePlan");
+
   const offersTableBulkActions = useMemo(
     () => [
       {
         content: t("offers.bulk.active"),
+        disabled: listMutationPending || atCampaignCap,
+        suffix: atCampaignCap ? <PlanUpgradeBadge /> : undefined,
         onAction: () => {
           if (atCampaignCap) {
-            notify(t("offers.toast.activeCap"));
+            showOfferLimitReached();
             return;
           }
           submitBulkStatus("bulkActivate");
         },
-        disabled: listMutationPending || atCampaignCap,
       },
       {
         content: t("offers.bulk.draft"),
@@ -698,7 +705,13 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
         disabled: listMutationPending,
       },
     ],
-    [atCampaignCap, listMutationPending, notify, selectedResources, t],
+    [
+      atCampaignCap,
+      listMutationPending,
+      selectedResources,
+      showOfferLimitReached,
+      t,
+    ],
   );
 
   const csvImportAction = adminEmbeddedPath("/app/offers/import", search);
@@ -809,7 +822,12 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
 
   const pagePrimaryAction = useMemo(
     () => ({
-      content: t("offers.createOffer"),
+      content: planLockedActionContent(
+        t("offers.createOffer"),
+        atOfferCap,
+        upgradeLabel,
+      ),
+      disabled: atOfferCap,
       onAction: () => {
         if (atOfferCap) {
           showOfferLimitReached();
@@ -829,6 +847,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
       setScreen,
       showOfferLimitReached,
       t,
+      upgradeLabel,
       warmEditorChunk,
     ],
   );
@@ -857,13 +876,21 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
         onAction: submitSyncAll,
       },
       {
-        content: t("common.export"),
+        content: planLockedActionContent(
+          t("common.export"),
+          !canImportExport,
+          upgradeLabel,
+        ),
         loading: csvExportPending,
         disabled: csvExportPending || !canExportOffers,
         onAction: submitExportCsv,
       },
       {
-        content: t("common.import"),
+        content: planLockedActionContent(
+          t("common.import"),
+          !canImportExport,
+          upgradeLabel,
+        ),
         onAction: () => {
           if (!canImportExport) {
             notify(t("offers.toast.importPremium"));
@@ -887,6 +914,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
       submitSyncAll,
       syncAllPending,
       t,
+      upgradeLabel,
     ],
   );
 
@@ -904,23 +932,27 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
             {t("offers.emptyBody")}
           </Text>
         </BlockStack>
-        <Button
-          variant="primary"
-          onClick={() => {
-            if (atOfferCap) {
-              showOfferLimitReached();
-              return;
-            }
-            if (onCreateOffer) {
-              onCreateOffer();
-              return;
-            }
-            warmEditorChunk();
-            setScreen("select");
-          }}
-        >
-          {t("offers.createOffer")}
-        </Button>
+        <InlineStack gap="200" blockAlign="center">
+          <Button
+            variant="primary"
+            disabled={atOfferCap}
+            onClick={() => {
+              if (atOfferCap) {
+                showOfferLimitReached();
+                return;
+              }
+              if (onCreateOffer) {
+                onCreateOffer();
+                return;
+              }
+              warmEditorChunk();
+              setScreen("select");
+            }}
+          >
+            {t("offers.createOffer")}
+          </Button>
+          {atOfferCap ? <PlanUpgradeBadge /> : null}
+        </InlineStack>
       </BlockStack>
     </Card>
   );
@@ -1196,7 +1228,11 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
                       <Button
                         variant="tertiary"
                         icon={DuplicateIcon}
-                        accessibilityLabel={t("common.duplicate")}
+                        accessibilityLabel={
+                          atOfferCap
+                            ? `${t("common.duplicate")} — ${t("common.upgradePlan")}`
+                            : t("common.duplicate")
+                        }
                         disabled={listMutationPending || atOfferCap}
                         onPointerDown={(e) => e.stopPropagation()}
                         onClick={() => submitDuplicate(c.id)}

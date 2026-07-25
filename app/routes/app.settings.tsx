@@ -27,6 +27,7 @@ import { scheduleDueSyncForShopIfNeeded, applyShopCampaignScheduleTransitionsIfN
 import { reconcileOrderAnalyticsForShop } from "../services/orderAnalyticsReconcile.server";
 import { resolveShopPlanContext } from "../utils/shopPlan.server";
 import { PlanUpgradeBanner } from "../components/PlanUpgradeBanner";
+import { planLockedActionContent } from "../components/PlanUpgradeBadge";
 import { runAfterResponse } from "../services/deferredShopSync.server";
 import { invalidateMemoryCachePrefix } from "../utils/memoryCache.server";
 import {
@@ -784,7 +785,11 @@ export default function SettingsPage() {
       subtitle={t("settings.subtitle")}
       compactTitle
       primaryAction={{
-        content: t("settings.save"),
+        content: planLockedActionContent(
+          t("settings.save"),
+          !canEditTranslations,
+          t("common.upgradePlan"),
+        ),
         onAction: handleSave,
         loading: isSaving,
         disabled: !canEditTranslations,
