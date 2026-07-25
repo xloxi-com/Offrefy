@@ -46,7 +46,17 @@ export type FunctionCampaignConfig = {
 
 function jsonStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return value.filter((x): x is string => typeof x === "string");
+  const out: string[] = [];
+  for (const x of value) {
+    if (typeof x === "string" && x.trim()) {
+      out.push(x.trim());
+      continue;
+    }
+    if (typeof x === "number" && Number.isFinite(x)) {
+      out.push(String(Math.trunc(x)));
+    }
+  }
+  return out;
 }
 
 /** Same semantics as CSV / widget: accept "percent" etc., not only "%". */

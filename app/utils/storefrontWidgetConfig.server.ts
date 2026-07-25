@@ -321,6 +321,31 @@ export function compactStorefrontShopMetafieldPayload(fullWidgetJson: string): s
   }
 }
 
+function idMatchesCatalog(
+  raw: string,
+  productId: string,
+  variantId: string,
+): boolean {
+  const s = String(raw).trim();
+  if (!s) return false;
+  const p = productId.trim();
+  const v = variantId.trim();
+  if (p && (s === p || s.endsWith(`/Product/${p}`) || s.includes(`/Product/${p}`))) {
+    return true;
+  }
+  if (
+    v &&
+    (s === v ||
+      s.endsWith(`/ProductVariant/${v}`) ||
+      s.endsWith(`/Variant/${v}`) ||
+      s.includes(`/ProductVariant/${v}`) ||
+      s.includes(`/Variant/${v}`))
+  ) {
+    return true;
+  }
+  return false;
+}
+
 function storefrontProductMatch(
   campaign: StorefrontWidgetCampaign,
   productId: string,
@@ -331,10 +356,20 @@ function storefrontProductMatch(
   const v = variantId?.trim() ?? "";
   const ids = campaign.productIds ?? [];
   for (const raw of ids) {
-    const s = String(raw).trim();
-    if (!s) continue;
-    if (p && (s === p || s.includes(`/Product/${p}`))) return true;
-    if (v && (s === v || s.includes(`/Variant/${v}`))) return true;
+    if (idMatchesCatalog(String(raw), p, v)) return true;
+  }
+  const groups = (
+    campaign as StorefrontWidgetCampaign & {
+      collectionGroups?: { productIds?: unknown[] }[];
+    }
+  ).collectionGroups;
+  if (Array.isArray(groups)) {
+    for (const g of groups) {
+      const gids = Array.isArray(g?.productIds) ? g.productIds : [];
+      for (const raw of gids) {
+        if (idMatchesCatalog(String(raw), p, v)) return true;
+      }
+    }
   }
   return false;
 }
@@ -661,9 +696,12 @@ export async function buildStorefrontWidgetForProduct(
 
 export async function buildStorefrontWidgetValue(
   rows: VolumeDiscountCampaignStorefrontRow[],
-  admin: AdminGraphql,
+  admin: AdminGraphql | null,
   shop?: string,
 ): Promise<string> {
+  if (!admin) {
+    return buildStorefrontWidgetValueFromDbOnly(rows);
+  }
   const { campaigns } = await buildVolumeDiscountFunctionConfig(
     rows.map((r) => ({
       id: r.id,
@@ -682,4 +720,31 @@ export async function buildStorefrontWidgetValue(
   );
 
   return await buildStorefrontWidgetJsonString(rows, campaigns);
+}
+
+/**
+ * Build widget JSON from DB rows without Admin GraphQL (no collection expansion).
+ * Used by public `/widget-config` when app-proxy auth is missing so specific-product
+ * offers still paint after Sync all.
+ */
+export async function buildStorefrontWidgetValueFromDbOnly(
+  rows: VolumeDiscountCampaignStorefrontRow[],
+): Promise<string> {
+  const built: unknown[] = [];
+  for (const row of rows) {
+    const camp = buildCampaignConfigFromDbRow({
+      id: row.id,
+      campaignName: row.campaignName,
+      displayName: row.displayName,
+      productScope: row.productScope,
+      quantityCondition: row.quantityCondition,
+      customerType: row.customerType,
+      customerTags: row.customerTags,
+      productIds: row.productIds,
+      collectionIds: row.collectionIds,
+      tiers: row.tiers,
+    });
+    if (camp) built.push(camp);
+  }
+  return buildStorefrontWidgetJsonString(rows, built);
 }

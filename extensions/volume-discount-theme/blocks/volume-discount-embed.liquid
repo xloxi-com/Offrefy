@@ -1,7 +1,8 @@
 {% comment %}
   App embed (body) — Theme settings → App embeds.
-  Loads storefront JS/CSS only. The Quantity breaks widget UI is rendered solely by
-  the “Quantity breaks” app block (Product information → Add block → Apps).
+  Loads storefront JS/CSS for cart badge + global pages. Quantity breaks block also
+  boots assets on product templates so the widget still mounts if this embed is off
+  or the theme preview does not inject body embeds.
 {% endcomment %}
 {% liquid
   if product != blank

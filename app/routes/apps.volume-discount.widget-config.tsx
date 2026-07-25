@@ -1,5 +1,10 @@
-import type { LoaderFunctionArgs } from "react-router";
-
+import {
+  buildStorefrontWidgetForProduct,
+  buildStorefrontWidgetValueFromDbOnly,
+  stampStorefrontWidgetRev,
+  storefrontWidgetPayloadHasCampaigns,
+} from "../utils/storefrontWidgetConfig.server";
+import { invalidateMemoryCachePrefix } from "../utils/memoryCache.server";
 import { prisma } from "../db.server";
 import { authenticate } from "../shopify.server";
 import {
@@ -11,11 +16,22 @@ import {
 } from "../services/volumeDiscountStorefrontCache.server";
 import { cachedJsonResponse } from "../utils/httpCache.server";
 import { volumeDiscountCampaignSyncSelect } from "../utils/volumeDiscountCampaignSelect.server";
-import {
-  buildStorefrontWidgetForProduct,
-  stampStorefrontWidgetRev,
-  storefrontWidgetPayloadHasCampaigns,
-} from "../utils/storefrontWidgetConfig.server";
+import type { LoaderFunctionArgs } from "react-router";
+
+async function persistDbOnlyStorefrontPayload(
+  shop: string,
+  rows: Parameters<typeof buildStorefrontWidgetValueFromDbOnly>[0],
+): Promise<string> {
+  const raw = await buildStorefrontWidgetValueFromDbOnly(rows);
+  const payload = stampStorefrontWidgetRev(raw, Date.now());
+  invalidateMemoryCachePrefix(`widget:${shop}:`);
+  await prisma.volumeDiscountStorefrontPayload.upsert({
+    where: { shop },
+    create: { shop, payload },
+    update: { payload },
+  });
+  return payload;
+}
 
 /**
  * App Proxy: GET /apps/volume-discount/widget-config
@@ -105,6 +121,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         if (rows.length > 0) {
           if (admin) {
             await rebuildAndPersistStorefrontPayload(shop, rows, admin);
+          } else {
+            /* Direct APP_ORIGIN fetch has no app-proxy session — still rebuild from DB. */
+            await persistDbOnlyStorefrontPayload(shop, rows);
           }
           const rebuilt = await buildStorefrontWidgetForProduct(
             shop,
@@ -137,10 +156,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     );
   }
 
-  if (!admin) {
-    return emptyJson(request);
-  }
-
   try {
     const rows = await prisma.volumeDiscountCampaign.findMany({
       where: { shop, status: "active" },
@@ -153,8 +168,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       return emptyJson(request);
     }
 
-    const value = await rebuildAndPersistStorefrontPayload(shop, rows, admin);
-    return jsonBody(request, value);
+    if (admin) {
+      const value = await rebuildAndPersistStorefrontPayload(shop, rows, admin);
+      return jsonBody(request, value);
+    }
+
+    const dbOnly = await persistDbOnlyStorefrontPayload(shop, rows);
+    return jsonBody(request, dbOnly);
   } catch (e) {
     console.error("[volume-discount] widget-config", e);
     return cachedJsonResponse(STOREFRONT_EMPTY_PAYLOAD, {

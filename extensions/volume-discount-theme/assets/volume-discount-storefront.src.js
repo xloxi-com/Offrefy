@@ -66,7 +66,7 @@
     );
   }
 
-  /** Prefer direct app host (CORS) — usually faster than Shopify app-proxy hop. */
+  /** Prefer app-proxy first (signed shop session) then direct app host (CORS). */
   function widgetConfigCandidateUrls(productId, variantId) {
     var q = widgetConfigQuery(productId, variantId);
     var root = "/";
@@ -83,13 +83,6 @@
       void e;
     }
     var urls = [];
-    var abs =
-      typeof window.__vdAppOrigin === "string"
-        ? String(window.__vdAppOrigin).replace(/\/$/, "")
-        : "";
-    if (abs) {
-      urls.push(withRevQuery(withShopQuery(abs + "/widget-config" + q)));
-    }
     urls.push(
       withRevQuery(
         withShopQuery(root + "apps/volume-discount/widget-config" + q),
@@ -97,6 +90,13 @@
     );
     if (root !== "/") {
       urls.push(withRevQuery(withShopQuery(PROXY + q)));
+    }
+    var abs =
+      typeof window.__vdAppOrigin === "string"
+        ? String(window.__vdAppOrigin).replace(/\/$/, "")
+        : "";
+    if (abs) {
+      urls.push(withRevQuery(withShopQuery(abs + "/widget-config" + q)));
     }
     return urls;
   }
@@ -394,14 +394,30 @@
     var og = productGid ? String(productGid) : "";
     var vg = variantGid ? String(variantGid) : "";
     var ids = campaign.productIds || [];
-    for (var i = 0; i < ids.length; i++) {
-      var s = String(ids[i]);
+    function idHit(s) {
+      s = String(s || "");
+      if (!s) return false;
       if (og && s === og) return true;
       if (vg && s === vg) return true;
       if (p && s === p) return true;
       if (v && s === v) return true;
-      if (s.indexOf("/Product/" + p) !== -1) return true;
-      if (s.indexOf("/Variant/" + v) !== -1) return true;
+      if (p && s.indexOf("/Product/" + p) !== -1) return true;
+      if (v && (s.indexOf("/Variant/" + v) !== -1 || s.indexOf("/ProductVariant/" + v) !== -1)) {
+        return true;
+      }
+      return false;
+    }
+    for (var i = 0; i < ids.length; i++) {
+      if (idHit(ids[i])) return true;
+    }
+    var groups = campaign.collectionGroups;
+    if (groups && groups.length) {
+      for (var gi = 0; gi < groups.length; gi++) {
+        var gids = (groups[gi] && groups[gi].productIds) || [];
+        for (var gj = 0; gj < gids.length; gj++) {
+          if (idHit(gids[gj])) return true;
+        }
+      }
     }
     return false;
   }
@@ -4755,7 +4771,7 @@
     trackImpression(campaign, root.getAttribute("data-product-id"));
     window.VolumeDiscount = window.VolumeDiscount || {};
     window.VolumeDiscount.embed = window.VolumeDiscount.embed || {};
-    window.VolumeDiscount.embed.version = "1.28.2";
+    window.VolumeDiscount.embed.version = "1.28.3";
 
   }
   /**
