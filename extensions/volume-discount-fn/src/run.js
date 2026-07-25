@@ -9,11 +9,11 @@ import {
  */
 
 /**
- * Fuel-safe caps. Prefer partial discounts over Function RuntimeError
- * (instruction budget ~11M — crash removes ALL Offrefy discounts).
+ * 100% safe practical cap (lean metafield-only path). Prefer partial discounts
+ * over Function RuntimeError (fuel ~11M — crash removes ALL Offrefy discounts).
  */
-const MAX_TARGETS = 40;
-const MAX_LINES_SCAN = 250;
+const MAX_TARGETS = 80;
+const MAX_LINES_SCAN = 320;
 const MAX_TIERS_SCAN = 12;
 
 /** @param {unknown} gid */
