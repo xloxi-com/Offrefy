@@ -5,20 +5,16 @@ name = "Offrefy — Quantity breaks"
 handle = "volume-discount-fn"
 type = "function"
 uid = "6bc754c3-c3e6-d925-c287-63fc84a8c6167d1e061d"
-description = "One automatic Product Discount reads unlimited campaigns from discount metafields (saves Shopify's ~25 discount slot cap)."
+description = "One automatic Product Discount reads unlimited campaigns from product metafields (saves Shopify's ~25 discount slot cap)."
 
   [[extensions.targeting]]
   target = "cart.lines.discounts.generate.run"
   input_query = "src/input.graphql"
   export = "cart-lines-discounts-generate-run"
 
-  [[extensions.targeting]]
-  target = "cart.lines.discounts.generate.fetch"
-  input_query = "src/fetch.graphql"
-  export = "cart-lines-discounts-generate-fetch"
-
-  [extensions.capabilities]
-  network_access = true
+  # No network_access / fetch target — Discount Function network access is
+  # enterprise/Plus-limited; on Basic it errors and wipes all Remise discounts.
+  # Rules come from product volume_discount.tiers metafields (written on sync).
 
   [extensions.build]
   command = ""

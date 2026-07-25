@@ -9,8 +9,8 @@ import {
  */
 
 /**
- * 100% safe practical cap (lean metafield-only path). Prefer partial discounts
- * over Function RuntimeError (fuel ~11M — crash removes ALL Offrefy discounts).
+ * 100% safe practical cap (metafield-only, no network). Prefer partial
+ * discounts over Function RuntimeError (fuel ~11M).
  */
 const MAX_TARGETS = 80;
 const MAX_LINES_SCAN = 320;
@@ -129,13 +129,26 @@ function compactFromMetafield(mf) {
 }
 
 /**
- * Metafield-only run — ignore fetchResult (JSON.parse of cart-rules burned fuel
- * and crashed the whole cart). Product tiers metafields are written on sync.
+ * Metafield-only run. No fetch/network (Basic plan cannot use Discount
+ * Function network access — it errors and clears all Remise discounts).
  *
  * @param {RunInput} input
  * @returns {CartLinesDiscountsGenerateRunResult}
  */
 export function cartLinesDiscountsGenerateRun(input) {
+  try {
+    return runMetafieldDiscounts(input);
+  } catch {
+    // Never throw — empty ops beats Admin Function error + full Remise wipe.
+    return { operations: [] };
+  }
+}
+
+/**
+ * @param {RunInput} input
+ * @returns {CartLinesDiscountsGenerateRunResult}
+ */
+function runMetafieldDiscounts(input) {
   const lines = input?.cart?.lines;
   if (!lines || !lines.length) return { operations: [] };
 
