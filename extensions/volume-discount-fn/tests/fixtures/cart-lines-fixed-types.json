@@ -1,0 +1,109 @@
+{
+  "payload": {
+    "export": "cart-lines-discounts-generate-run",
+    "target": "cart.lines.discounts.generate.run",
+    "input": {
+      "cart": {
+        "vdLockedProductsAttr": null,
+        "lines": [
+          {
+            "id": "gid://shopify/CartLine/amount-each",
+            "quantity": 5,
+            "cost": {
+              "subtotalAmount": {
+                "amount": "50.0"
+              }
+            },
+            "merchandise": {
+              "product": {
+                "id": "gid://shopify/Product/1001",
+                "tiersMetafield": {
+                  "jsonValue": {
+                    "c": "camp-ae",
+                    "m": "Amount off",
+                    "q": "v",
+                    "ct": "e",
+                    "tg": [],
+                    "t": [{ "m": 3, "f": 2, "e": 1 }]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "id": "gid://shopify/CartLine/fixed-price",
+            "quantity": 4,
+            "cost": {
+              "subtotalAmount": {
+                "amount": "40.0"
+              }
+            },
+            "merchandise": {
+              "product": {
+                "id": "gid://shopify/Product/1002",
+                "tiersMetafield": {
+                  "jsonValue": {
+                    "c": "camp-fp",
+                    "m": "Fixed price",
+                    "q": "v",
+                    "ct": "e",
+                    "tg": [],
+                    "t": [{ "m": 2, "fp": 7 }]
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "fetchResult": null,
+      "discount": {
+        "discountClasses": ["PRODUCT"],
+        "ruleSource": null
+      }
+    },
+    "output": {
+      "operations": [
+        {
+          "productDiscountsAdd": {
+            "candidates": [
+              {
+                "message": "Amount off",
+                "targets": [
+                  {
+                    "cartLine": {
+                      "id": "gid://shopify/CartLine/amount-each"
+                    }
+                  }
+                ],
+                "value": {
+                  "fixedAmount": {
+                    "amount": "2",
+                    "appliesToEachItem": true
+                  }
+                }
+              },
+              {
+                "message": "Fixed price",
+                "targets": [
+                  {
+                    "cartLine": {
+                      "id": "gid://shopify/CartLine/fixed-price"
+                    }
+                  }
+                ],
+                "value": {
+                  "fixedAmount": {
+                    "amount": "12",
+                    "appliesToEachItem": false
+                  }
+                }
+              }
+            ],
+            "selectionStrategy": "ALL"
+          }
+        }
+      ]
+    }
+  }
+}

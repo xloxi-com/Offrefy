@@ -627,10 +627,10 @@
 
   function looksLikeVolumeDiscountBadge(text) {
     var s = String(text || "").trim();
+    // Only rewrite legacy auto labels from the Discount Function
+    // (e.g. "25% OFF" / "25% OFF (qty 10)"). Never touch custom Display names.
     if (s.length < 3 || s.length > 80) return false;
-    if (!/^\d+(?:\.\d+)?\s*%/.test(s)) return false;
-    if (/[€$£]/.test(s)) return false;
-    return true;
+    return /^\d+(?:\.\d+)?%\s*OFF(?:\s*\(\s*qty\s+\d+\s*\))?$/i.test(s);
   }
 
   function parseVolumeDiscountBadgeText(text) {

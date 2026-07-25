@@ -1550,6 +1550,9 @@ export function VolumeDiscountCreateView({
                           onChange={(e) =>
                             updateTier({ valueUnit: e.currentTarget.value })
                           }
+                          onInput={(e) =>
+                            updateTier({ valueUnit: e.currentTarget.value })
+                          }
                         >
                           <s-option value="%">%</s-option>
                           <s-option value="amount-each">

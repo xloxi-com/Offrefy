@@ -1,5 +1,5 @@
-# Slim input — product tiers metafields only. Avoid loading large discount
-# campaign JSON here (that alone can push a large cart over the instruction budget).
+# Slim input — product tiers metafields + line cost (needed for fixed-price /
+# amount-off calculations). Avoid loading large campaign JSON here.
 query CartInput {
   cart {
     vdLockedProductsAttr: attribute(key: "vd_locked_products") {
@@ -8,6 +8,11 @@ query CartInput {
     lines {
       id
       quantity
+      cost {
+        subtotalAmount {
+          amount
+        }
+      }
       merchandise {
         ... on ProductVariant {
           product {
