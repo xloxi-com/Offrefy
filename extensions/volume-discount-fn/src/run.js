@@ -9,15 +9,12 @@ import {
  */
 
 /**
- * Soft product/target cap so we return partial discounts instead of crashing
- * the whole Function (fuel ~11M). Prefer locked products first.
- * rule_source.maxTargets from sync can raise this (same on Basic + Plus).
+ * Fuel-safe caps. Prefer partial discounts over Function RuntimeError
+ * (instruction budget ~11M — crash removes ALL Offrefy discounts).
  */
-const MAX_TARGETS_DEFAULT = 100;
-/** Hard ceiling — never attempt more than this in one run (fuel safety). */
-const MAX_TARGETS_HARD = 120;
-/** Skip JSON.parse of oversized fetch bodies (burns fuel). */
-const MAX_FETCH_BODY_CHARS = 80_000;
+const MAX_TARGETS = 40;
+const MAX_LINES_SCAN = 250;
+const MAX_TIERS_SCAN = 12;
 
 /** @param {unknown} gid */
 function productNum(gid) {
@@ -26,51 +23,15 @@ function productNum(gid) {
   return i >= 0 ? gid.slice(i + 1) : "";
 }
 
-/** @param {unknown} ruleSource */
-function resolveMaxTargets(ruleSource) {
-  let n = MAX_TARGETS_DEFAULT;
-  if (ruleSource && typeof ruleSource === "object") {
-    const raw = /** @type {{ maxTargets?: unknown }} */ (ruleSource).maxTargets;
-    if (typeof raw === "number" && raw > 0) n = raw | 0;
-    else if (typeof raw === "string" && raw.trim() !== "") {
-      const parsed = parseInt(raw, 10);
-      if (parsed > 0) n = parsed;
-    }
-  }
-  return n > MAX_TARGETS_HARD ? MAX_TARGETS_HARD : n;
-}
-
-/** @param {unknown} raw @param {number} max */
-function lockedIds(raw, max) {
-  const s = String(raw ?? "");
-  if (!s) return [];
-  /** @type {string[]} */
-  const out = [];
-  const seen = new Set();
-  let start = 0;
-  for (let i = 0; i <= s.length; i++) {
-    if (i < s.length && s.charCodeAt(i) !== 44) continue;
-    const part = s.slice(start, i).trim();
-    start = i + 1;
-    if (!part) continue;
-    const n = productNum(part) || part;
-    if (!n || seen.has(n)) continue;
-    seen.add(n);
-    out.push(n);
-    if (out.length >= max) break;
-  }
-  return out;
-}
-
 /**
- * Compact metafield tiers only (`m`/`p`/`f`/`fp`/`e`) — keep hot path cheap.
  * @param {unknown[]} tiers
  * @param {number} qty
  */
 function bestTier(tiers, qty) {
   let best = null;
   let bestM = 0;
-  for (let i = 0; i < tiers.length; i++) {
+  const n = tiers.length < MAX_TIERS_SCAN ? tiers.length : MAX_TIERS_SCAN;
+  for (let i = 0; i < n; i++) {
     const t = tiers[i];
     if (!t || typeof t !== "object") continue;
     const min = (t.m | 0) > 0 ? t.m | 0 : 1;
@@ -103,59 +64,13 @@ function bestTier(tiers, qty) {
   return best;
 }
 
-/** Literal replace — no RegExp (regex burns Function fuel). */
-function replaceLit(s, find, repl) {
-  let out = s;
-  let i = out.indexOf(find);
-  while (i >= 0) {
-    out = out.slice(0, i) + repl + out.slice(i + find.length);
-    i = out.indexOf(find, i + repl.length);
+/** Cheap badge text — no template / replaceLit (fuel). */
+function shortMessage(tier, displayName) {
+  if (typeof displayName === "string" && displayName.length && displayName.indexOf("{{") < 0) {
+    return displayName.length > 40 ? displayName.slice(0, 40) : displayName;
   }
-  return out;
-}
-
-/**
- * Display name → cart/checkout message. Plain text as-is.
- * Optional `{{ discount }}` / `{{ amount }}` (no regex).
- * @param {string} displayName
- * @param {{ kind: string, p?: number, fp?: number, f?: number, each?: boolean }} tier
- * @param {number} sub
- * @param {number} lineQty
- */
-function formatMessage(displayName, tier, sub, lineQty) {
-  const raw = displayName || "Volume discount";
-  if (raw.indexOf("{{") < 0) return raw;
-
-  let discountRepl = "";
-  let amountRepl = "";
-
-  if (tier.kind === "p") {
-    discountRepl = tier.p + "%";
-    if (sub > 0) {
-      amountRepl = String(Math.round((sub * tier.p) / 100 * 100) / 100);
-    }
-  } else if (tier.kind === "fp" && sub > 0 && lineQty > 0) {
-    const d = sub - tier.fp * lineQty;
-    if (d > 0) {
-      amountRepl = String(Math.round(d * 100) / 100);
-      discountRepl = String(Math.round((d / sub) * 10000) / 100) + "%";
-    }
-  } else if (tier.kind === "f") {
-    const total = tier.each && lineQty > 0 ? tier.f * lineQty : tier.f;
-    amountRepl = String(Math.round(total * 100) / 100);
-    if (sub > 0 && total > 0) {
-      discountRepl =
-        String(Math.round((Math.min(total, sub) / sub) * 10000) / 100) + "%";
-    }
-  }
-
-  if (raw === "{{ discount }} OFF") return discountRepl + " OFF";
-
-  let s = replaceLit(raw, "{{ discount }}", discountRepl);
-  s = replaceLit(s, "{{discount}}", discountRepl);
-  s = replaceLit(s, "{{ amount }}", amountRepl);
-  s = replaceLit(s, "{{amount}}", amountRepl);
-  return s;
+  if (tier.kind === "p") return tier.p + "% OFF";
+  return "Volume discount";
 }
 
 /**
@@ -165,9 +80,7 @@ function formatMessage(displayName, tier, sub, lineQty) {
  */
 function tierCandidate(line, tier, displayName) {
   if (!tier) return null;
-  const lineQty = line.quantity | 0;
-  const sub = parseFloat(String(line.cost?.subtotalAmount?.amount ?? "0")) || 0;
-  const message = formatMessage(displayName, tier, sub, lineQty);
+  const message = shortMessage(tier, displayName);
 
   if (tier.kind === "p") {
     return {
@@ -177,6 +90,8 @@ function tierCandidate(line, tier, displayName) {
   }
 
   if (tier.kind === "fp") {
+    const lineQty = line.quantity | 0;
+    const sub = parseFloat(String(line.cost?.subtotalAmount?.amount ?? "0")) || 0;
     if (!(sub > 0) || lineQty <= 0) return null;
     const discountAmt = sub - tier.fp * lineQty;
     if (!(discountAmt > 0)) return null;
@@ -206,12 +121,6 @@ function tierCandidate(line, tier, displayName) {
   return null;
 }
 
-/** @param {unknown} compact */
-function ruleDisplayName(compact) {
-  const m = compact && compact.m;
-  return typeof m === "string" && m.length ? m : "Volume discount";
-}
-
 /** @param {unknown} mf */
 function compactFromMetafield(mf) {
   return mf && typeof mf === "object" && Array.isArray(mf.t) && mf.t.length
@@ -220,6 +129,9 @@ function compactFromMetafield(mf) {
 }
 
 /**
+ * Metafield-only run — ignore fetchResult (JSON.parse of cart-rules burned fuel
+ * and crashed the whole cart). Product tiers metafields are written on sync.
+ *
  * @param {RunInput} input
  * @returns {CartLinesDiscountsGenerateRunResult}
  */
@@ -232,19 +144,14 @@ export function cartLinesDiscountsGenerateRun(input) {
     return { operations: [] };
   }
 
-  const maxTargets = resolveMaxTargets(input.discount?.ruleSource?.jsonValue);
-
-  const locked = lockedIds(input.cart?.vdLockedProductsAttr?.value, maxTargets);
-  /** @type {Map<string, number>} */
-  const lockedRank = new Map();
-  for (let i = 0; i < locked.length; i++) lockedRank.set(locked[i], i);
-
-  /** @type {{ pid: string, lineIndexes: number[], sortKey: number }[]} */
+  /** @type {{ pid: string, lineIndexes: number[] }[]} */
   const products = [];
   /** @type {Map<string, number>} */
   const productIndex = new Map();
+  const lineLimit = lines.length < MAX_LINES_SCAN ? lines.length : MAX_LINES_SCAN;
 
-  for (let i = 0; i < lines.length; i++) {
+  for (let i = 0; i < lineLimit; i++) {
+    if (products.length >= MAX_TARGETS) break;
     const pid = productNum(lines[i]?.merchandise?.product?.id);
     if (!pid) continue;
     const existing = productIndex.get(pid);
@@ -253,41 +160,7 @@ export function cartLinesDiscountsGenerateRun(input) {
       continue;
     }
     productIndex.set(pid, products.length);
-    products.push({
-      pid,
-      lineIndexes: [i],
-      sortKey: lockedRank.has(pid)
-        ? /** @type {number} */ (lockedRank.get(pid))
-        : maxTargets + i,
-    });
-  }
-
-  products.sort(
-    (a, b) => a.sortKey - b.sortKey || a.lineIndexes[0] - b.lineIndexes[0],
-  );
-  if (products.length > maxTargets) products.length = maxTargets;
-
-  /** Lazy-parse fetch body only if a product needs gap-fill. */
-  /** @type {Record<string, unknown> | null} */
-  let apiRules = null;
-  let apiRulesLoaded = false;
-  function loadApiRules() {
-    if (apiRulesLoaded) return apiRules;
-    apiRulesLoaded = true;
-    const fr = input.fetchResult;
-    if (!fr || fr.status !== 200) return null;
-    const body = fr.body;
-    if (typeof body !== "string" || body.length < 3) return null;
-    if (body.length > MAX_FETCH_BODY_CHARS) return null;
-    try {
-      const parsed = JSON.parse(body);
-      if (parsed?.rules && typeof parsed.rules === "object") {
-        apiRules = parsed.rules;
-      }
-    } catch {
-      /* ignore */
-    }
-    return apiRules;
+    products.push({ pid, lineIndexes: [i] });
   }
 
   /** @type {import("../generated/api").ProductDiscountCandidate[]} */
@@ -295,38 +168,25 @@ export function cartLinesDiscountsGenerateRun(input) {
   let targetCount = 0;
 
   for (let p = 0; p < products.length; p++) {
-    if (targetCount >= maxTargets) break;
-    const { pid, lineIndexes } = products[p];
+    if (targetCount >= MAX_TARGETS) break;
+    const { lineIndexes } = products[p];
 
-    const firstLine = lines[lineIndexes[0]];
-    let compact = compactFromMetafield(
-      firstLine?.merchandise?.product?.tiersMetafield?.jsonValue,
+    const compact = compactFromMetafield(
+      lines[lineIndexes[0]]?.merchandise?.product?.tiersMetafield?.jsonValue,
     );
-    if (!compact) {
-      const rules = loadApiRules();
-      const alt = rules ? rules[pid] : null;
-      if (
-        alt &&
-        typeof alt === "object" &&
-        Array.isArray(/** @type {{ t?: unknown }} */ (alt).t) &&
-        /** @type {{ t: unknown[] }} */ (alt).t.length
-      ) {
-        compact = alt;
-      }
-    }
     if (!compact) continue;
 
     const ct = compact.ct;
     if (ct && ct !== "e") continue;
 
     const tiers = compact.t;
-    const displayName = ruleDisplayName(compact);
-    const qtyMode = compact.q || "v";
-    const perVariant = qtyMode === "v";
+    const displayName =
+      typeof compact.m === "string" && compact.m.length ? compact.m : "";
+    const perVariant = (compact.q || "v") === "v";
 
     if (perVariant) {
       for (let li = 0; li < lineIndexes.length; li++) {
-        if (targetCount >= maxTargets) break;
+        if (targetCount >= MAX_TARGETS) break;
         const line = lines[lineIndexes[li]];
         const tier = bestTier(tiers, line.quantity | 0);
         if (!tier) continue;
@@ -355,7 +215,7 @@ export function cartLinesDiscountsGenerateRun(input) {
       /** @type {{ cartLine: { id: string } }[]} */
       const targets = [];
       for (let li = 0; li < lineIndexes.length; li++) {
-        if (targetCount >= maxTargets) break;
+        if (targetCount >= MAX_TARGETS) break;
         targets.push({ cartLine: { id: lines[lineIndexes[li]].id } });
         targetCount++;
       }
@@ -370,7 +230,7 @@ export function cartLinesDiscountsGenerateRun(input) {
     }
 
     for (let li = 0; li < lineIndexes.length; li++) {
-      if (targetCount >= maxTargets) break;
+      if (targetCount >= MAX_TARGETS) break;
       const line = lines[lineIndexes[li]];
       const cand = tierCandidate(line, tier, displayName);
       if (!cand) continue;

@@ -1,23 +1,6 @@
-# Fetch only builds a network request for products missing usable tiers
-# metafields (gap-fill). Avoids fuel burn when metafields already cover the cart.
+# Fetch target kept for extension targeting; network access is intentionally
+# unused (see fetch.js). Slim query — no cart lines needed.
 query FetchInput {
-  cart {
-    vdLockedProductsAttr: attribute(key: "vd_locked_products") {
-      value
-    }
-    lines {
-      merchandise {
-        ... on ProductVariant {
-          product {
-            id
-            tiersMetafield: metafield(namespace: "volume_discount", key: "tiers") {
-              jsonValue
-            }
-          }
-        }
-      }
-    }
-  }
   discount {
     ruleSource: metafield(namespace: "volume_discount", key: "rule_source") {
       jsonValue
