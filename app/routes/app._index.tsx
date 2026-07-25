@@ -430,6 +430,7 @@ export default function AppHomePage() {
   const pendingSetupRefresh = useRef(false);
   const pendingSetupRetry = useRef(false);
   const lastSetupRefreshData = useRef<unknown>(null);
+  const lastHomeFetcherData = useRef<unknown>(null);
 
   useEffect(() => {
     setShowGuide(
@@ -535,6 +536,9 @@ export default function AppHomePage() {
 
   useEffect(() => {
     if (!fetcher.data || !("intent" in fetcher.data)) return;
+    // Same response re-applied after revalidate / effect re-run → toast would flash.
+    if (lastHomeFetcherData.current === fetcher.data) return;
+    lastHomeFetcherData.current = fetcher.data;
     if (fetcher.data.intent === "syncStorefront") {
       if (!fetcher.data.ok) {
         shopify.toast.show(
