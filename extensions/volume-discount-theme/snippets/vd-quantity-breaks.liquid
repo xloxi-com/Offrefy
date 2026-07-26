@@ -88,6 +88,13 @@
   {% endif %}
   {% if request.design_mode %}
     data-design-mode="true"
+  {% else %}
+    {%- comment -%}
+      Live storefront: hide root until JS finds a matching offer.
+      Prevents empty-block margin CLS / page shake on non-discount products.
+    {%- endcomment -%}
+    hidden
+    style="display:none;margin:0;padding:0;min-height:0;"
   {% endif %}
 >
   {% if vd_product != blank %}

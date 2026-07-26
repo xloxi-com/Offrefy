@@ -1284,9 +1284,13 @@
       : fetch(cartJsUrl(), {
           credentials: "same-origin",
           headers: { Accept: "application/json" },
-        }).then(function (r) {
-          return r.ok ? r.json() : null;
-        });
+        })
+          .then(function (r) {
+            return r.ok ? r.json() : null;
+          })
+          .catch(function () {
+            return null;
+          });
 
     var promise = work.then(function (c) {
       if (!c) return null;
@@ -1358,45 +1362,6 @@
     return isVdAttributeOnlyCartUpdate(init, VD_CART_LOCALE_ATTR);
   }
 
-  /** Sync locked discount slots immediately after any cart mutation (theme /cart/add.js, etc.). */
-  function installCartMutationInterceptor() {
-    if (offrefyNs().cartMutationHookBound) return;
-    offrefyNs().cartMutationHookBound = true;
-    var nativeFetch = window.fetch;
-    if (typeof nativeFetch !== "function") return;
-
-    window.fetch = function (input, init) {
-      var url =
-        typeof input === "string"
-          ? input
-          : input && typeof input === "object" && input.url
-            ? input.url
-            : "";
-      var isMutation =
-        isCartMutationUrl(url) &&
-        !isVdLockedProductsOnlyUpdate(init) &&
-        !isVdLocaleOnlyUpdate(init);
-      var promise = nativeFetch.apply(this, arguments);
-      if (!isMutation) return promise;
-
-      return promise.then(function (res) {
-        if (!res || !res.ok || vdCartAttrSyncBusy) return res;
-        vdCartAttrSyncBusy = true;
-        var prevLocked = vdLastSyncedLockedProducts;
-        return syncCartLockedProductsAttribute(null)
-          .then(function (cart) {
-            if (cart && vdLastSyncedLockedProducts !== prevLocked) {
-              dispatchCartRefresh(cart);
-            }
-            return res;
-          })
-          .finally(function () {
-            vdCartAttrSyncBusy = false;
-          });
-      });
-    };
-  }
-
   /** Persist active theme locale on the cart so the discount function badge matches /fr/, /de/, etc. */
   function syncCartLocaleAttribute(force) {
     var locale = resolveStorefrontLocale(null);
@@ -1421,10 +1386,6 @@
       },
       body: JSON.stringify({ attributes: attrs }),
     }).catch(function () {});
-  }
-
-  function cartAddJsUrl() {
-    return shopifyRoutesRoot() + "cart/add.js";
   }
 
   function cartJsUrl() {
@@ -1516,9 +1477,7 @@
         return res.ok ? res.json() : null;
       })
       .then(function (body) {
-        if (body && body.sections) {
-          applyThemeCartSectionsFromResponse(body, false);
-        }
+        /* Locale badge only — do not rewrite theme cart drawer HTML. */
         scheduleCartDrawerDiscountLabelPatch();
         return body;
       })
@@ -1589,141 +1548,6 @@
     return getThemeCartSectionIds().join(",");
   }
 
-  function cartResponseHasSectionHtml(sections) {
-    if (!sections || typeof sections !== "object") return false;
-    var ids = getThemeCartSectionIds();
-    for (var i = 0; i < ids.length; i++) {
-      if (sections[ids[i]]) return true;
-    }
-    var keys = Object.keys(sections);
-    for (var k = 0; k < keys.length; k++) {
-      if (sections[keys[k]]) return true;
-    }
-    return false;
-  }
-
-  function clickHeaderCartIcon() {
-    var selectors = [
-      ".valor-header__cart",
-      "a.valor-header__cart",
-      "#cart-icon-bubble",
-      "a#cart-icon-bubble",
-      "cart-icon-bubble a",
-      "cart-icon-bubble",
-      ".header__icon--cart",
-      "a.header__icon--cart",
-      "button.header__icon--cart",
-      "[data-cart-drawer-trigger]",
-      "[data-action='open-cart']",
-      "a[href='/cart']",
-      "a[href$='/cart']",
-    ];
-    for (var i = 0; i < selectors.length; i++) {
-      var el = document.querySelector(selectors[i]);
-      if (el && typeof el.click === "function") {
-        try {
-          el.click();
-          return true;
-        } catch (eClick) {
-          void eClick;
-        }
-      }
-    }
-    return false;
-  }
-
-  function isThemeCartDrawerOpen() {
-    var drawer =
-      document.querySelector("valor-cart-drawer") ||
-      document.querySelector("cart-drawer") ||
-      document.querySelector("cart-notification") ||
-      document.querySelector("cart-drawer-component");
-    if (!drawer) return false;
-    return !!(
-      drawer.hasAttribute("open") ||
-      drawer.hasAttribute("data-open") ||
-      drawer.classList.contains("active") ||
-      drawer.classList.contains("is-open")
-    );
-  }
-
-  /**
-   * Open theme cart drawer. Prefer drawer.open(); if that does not stick,
-   * click the header cart icon (do NOT fake active/open classes first — that
-   * previously skipped the icon click and left the drawer closed).
-   */
-  function openThemeCartDrawer() {
-    try {
-      var valor = document.querySelector("valor-cart-drawer");
-      if (valor) {
-        try {
-          valor.classList.remove("valor-cart-drawer--empty");
-        } catch (eEmptyV) {
-          void eEmptyV;
-        }
-        if (typeof valor.open === "function") {
-          try {
-            valor.open();
-          } catch (eOpenV) {
-            void eOpenV;
-          }
-          if (isThemeCartDrawerOpen()) return true;
-        }
-      }
-
-      var drawer = document.querySelector("cart-drawer");
-      if (drawer) {
-        try {
-          drawer.classList.remove("is-empty");
-        } catch (eEmpty) {
-          void eEmpty;
-        }
-        if (typeof drawer.open === "function") {
-          try {
-            drawer.open();
-          } catch (eOpen) {
-            void eOpen;
-          }
-          if (isThemeCartDrawerOpen()) return true;
-        }
-      }
-
-      var notif = document.querySelector("cart-notification");
-      if (notif && typeof notif.open === "function") {
-        try {
-          notif.open();
-        } catch (eN) {
-          void eN;
-        }
-        if (isThemeCartDrawerOpen()) return true;
-      }
-
-      var component = document.querySelector("cart-drawer-component");
-      if (component && typeof component.open === "function") {
-        try {
-          component.open();
-        } catch (eC) {
-          void eC;
-        }
-        if (isThemeCartDrawerOpen()) return true;
-      }
-
-      return clickHeaderCartIcon();
-    } catch (e) {
-      return clickHeaderCartIcon();
-    }
-  }
-
-  function forceOpenThemeCartDrawer() {
-    openThemeCartDrawer();
-    setTimeout(function () {
-      if (!isThemeCartDrawerOpen()) clickHeaderCartIcon();
-    }, 100);
-    setTimeout(function () {
-      if (!isThemeCartDrawerOpen()) clickHeaderCartIcon();
-    }, 350);
-  }
-
   function updateCartCountBubbles(cart) {
     var count =
       cart && typeof cart.item_count === "number" ? cart.item_count | 0 : 0;
@@ -1773,20 +1597,6 @@
       }
     } catch (eDawn) {
       void eDawn;
-    }
-  }
-
-  /** Valor theme listens for this after /cart/add.js (see cart-drawer.js). */
-  function dispatchValorCartAdded(detail) {
-    try {
-      document.dispatchEvent(
-        new CustomEvent("valor:cart:added", {
-          bubbles: true,
-          detail: detail || {},
-        }),
-      );
-    } catch (e) {
-      void e;
     }
   }
 
@@ -1871,23 +1681,17 @@
     return true;
   }
 
-  function findThemeProductAddForm() {
-    var forms = document.querySelectorAll(
-      'form[action*="/cart/add"], form[action*="cart/add"], form[data-type="add-to-cart-form"], form.product-form, product-form form, form#product_form, form#AddToCartForm, form[id*="product-form"], form[id*="ProductForm"]',
-    );
-    var widget = document.querySelector(".offrefy-root");
-    var widgetScope = widget
-      ? widget.closest(
-          "product-info, .product, [id^='MainProduct'], .shopify-section, .product__info, .product-single, .product-details",
-        )
-      : null;
+  /**
+   * Theme product form (not the Offrefy liquid bridge).
+   * Example: form[action*="/cart/add"]
+   */
+  function findThemeProductCartForm() {
+    var forms = document.querySelectorAll('form[action*="/cart/add"]');
     var best = null;
     var bestScore = -1;
-
     for (var i = 0; i < forms.length; i++) {
       var form = forms[i];
       if (!form) continue;
-      /* Skip our Liquid bridge form — theme ATC must be the theme's own form. */
       if (
         form.hasAttribute("data-offrefy-liquid-product-form") ||
         (form.classList && form.classList.contains("offrefy-liquid-product-form"))
@@ -1902,922 +1706,111 @@
       ) {
         continue;
       }
-
       var score = 0;
-      if (form.querySelector('[name="id"]')) score += 4;
+      if (form.querySelector('[name="id"]')) score += 3;
       if (
         form.querySelector(
-          'button[name="add"], input[name="add"], button.product-form__submit, [data-add-to-cart], [data-action="add-to-cart"]',
+          'button[type="submit"], [type="submit"], button[name="add"], input[name="add"]',
         )
       ) {
-        score += 4;
+        score += 5;
       }
       if (
         form.closest(
-          "product-info, .product, [id^='MainProduct'], .product-form, .product__info, .product-single",
+          "product-info, .product, [id^='MainProduct'], .product-form, .product__info",
         )
       ) {
-        score += 3;
+        score += 6;
       }
-      if (widgetScope && widgetScope.contains(form)) score += 8;
-      if (form.querySelector('[name="quantity"]')) score += 1;
-
       if (score > bestScore) {
         bestScore = score;
         best = form;
       }
     }
-
-    if (best) return best;
-
-    var all = document.querySelectorAll('form[action*="/cart/add"]');
-    for (var j = 0; j < all.length; j++) {
-      if (
-        all[j].hasAttribute("data-offrefy-liquid-product-form") ||
-        (all[j].classList && all[j].classList.contains("offrefy-liquid-product-form"))
-      ) {
-        continue;
-      }
-      if (!all[j].closest(".offrefy-root")) return all[j];
-    }
-    return null;
+    return best;
   }
 
-  function isThemeBuyItNowButton(el) {
-    if (!el) return true;
-    if (el.closest(".shopify-payment-button, [data-shopify='payment-button']")) {
-      return true;
-    }
-    var name = String(el.getAttribute("name") || "").toLowerCase();
-    if (name === "checkout" || name === "goto_checkout") return true;
-    var label = String(el.textContent || el.value || "")
-      .trim()
-      .toLowerCase();
-    if (!label) return false;
-    if (
-      label.indexOf("buy it now") !== -1 ||
-      label.indexOf("buy now") !== -1 ||
-      label.indexOf("acheter maintenant") !== -1 ||
-      label.indexOf("jetzt kaufen") !== -1
-    ) {
-      /* Allow if it also clearly says add to cart */
-      if (
-        label.indexOf("add to cart") === -1 &&
-        label.indexOf("add to bag") === -1 &&
-        label.indexOf("ajouter") === -1
-      ) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  function findThemeAddToCartButton(form) {
+  /** Example: form[action*="/cart/add"] [type="submit"] */
+  function findThemeCartAddSubmitButton(form) {
     if (!form) return null;
+    return (
+      form.querySelector('button[type="submit"][name="add"]') ||
+      form.querySelector('button[name="add"]') ||
+      form.querySelector('input[type="submit"][name="add"]') ||
+      form.querySelector("button.product-form__submit") ||
+      form.querySelector('button[type="submit"]') ||
+      form.querySelector('[type="submit"]')
+    );
+  }
 
-    var selectors = [
-      'button[name="add"]',
-      'button[name="add"][type="submit"]',
-      'input[type="submit"][name="add"]',
-      "button.product-form__submit",
-      'button[data-add-to-cart]',
-      '[data-add-to-cart]',
-      '[data-action="add-to-cart"]',
-      'button[data-action="add-to-cart"]',
-      ".product-form__cart-submit",
-      ".product-form--atc-button",
-      ".btn--add-to-cart",
-      ".add-to-cart",
-      ".AddToCart",
-      "#AddToCart",
-      "#add-to-cart",
-      'button[type="submit"]',
-      'input[type="submit"]',
-    ];
+  function syncThemeCartAddForm(form, variantId, quantity, attribution) {
+    if (!form) return false;
+    var vid = String(variantId || "");
+    var qty = parseInt(String(quantity), 10) || 1;
+    qty = Math.min(VD_MAX_LINE_QTY, Math.max(1, qty));
+    var strQty = String(qty);
 
-    for (var s = 0; s < selectors.length; s++) {
-      var nodes = form.querySelectorAll(selectors[s]);
-      for (var i = 0; i < nodes.length; i++) {
-        var el = nodes[i];
-        if (el.closest(".offrefy-root")) continue;
-        if (isThemeBuyItNowButton(el)) continue;
-        return el;
+    var idSelect = form.querySelector('select[name="id"]');
+    if (idSelect) {
+      idSelect.value = vid;
+      try {
+        idSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      } catch (e1) {
+        void e1;
+      }
+    }
+    var idInputs = form.querySelectorAll('input[name="id"]');
+    for (var ii = 0; ii < idInputs.length; ii++) {
+      idInputs[ii].value = vid;
+      try {
+        idInputs[ii].dispatchEvent(new Event("change", { bubbles: true }));
+      } catch (e2) {
+        void e2;
       }
     }
 
-    /* Some themes put ATC outside the <form> but linked via form= id */
+    var qtyNodes = form.querySelectorAll(
+      'input[name="quantity"], select[name="quantity"]',
+    );
+    for (var qi = 0; qi < qtyNodes.length; qi++) {
+      try {
+        qtyNodes[qi].value = strQty;
+        qtyNodes[qi].dispatchEvent(new Event("input", { bubbles: true }));
+        qtyNodes[qi].dispatchEvent(new Event("change", { bubbles: true }));
+      } catch (e3) {
+        void e3;
+      }
+    }
     var formId = form.getAttribute("id");
     if (formId) {
       var linked = document.querySelectorAll(
-        'button[name="add"][form], button.product-form__submit[form], [data-add-to-cart][form], button[type="submit"][form]',
+        'input[name="quantity"][form="' +
+          formId +
+          '"], select[name="quantity"][form="' +
+          formId +
+          '"]',
       );
       for (var li = 0; li < linked.length; li++) {
-        if (linked[li].getAttribute("form") === formId) {
-          if (!isThemeBuyItNowButton(linked[li])) return linked[li];
-        }
-      }
-    }
-
-    /* Section-scoped search near the form */
-    var scope =
-      form.closest("product-info, .product, [id^='MainProduct'], .shopify-section, .product__info") ||
-      form.parentElement;
-    if (scope) {
-      var ext = scope.querySelector(
-        'button[name="add"], button.product-form__submit, [data-add-to-cart], .product-form__cart-submit, #AddToCart',
-      );
-      if (ext && !ext.closest(".offrefy-root") && !isThemeBuyItNowButton(ext)) {
-        return ext;
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * Make theme ATC clickable even when merchant hid it via widget settings,
-   * then fire a real click / requestSubmit so theme JS (drawer) runs.
-   */
-  function triggerThemeAtcClick(form, btn) {
-    if (!form || !btn) return false;
-
-    var restoreHide =
-      document.documentElement.getAttribute("data-offrefy-hide-theme-atc") === "1" ||
-      window.getComputedStyle(btn).display === "none" ||
-      btn.getAttribute("aria-hidden") === "true";
-
-    var prev = {
-      disabled: !!btn.disabled,
-      ariaDisabled: btn.getAttribute("aria-disabled"),
-      display: btn.style.getPropertyValue("display"),
-      visibility: btn.style.getPropertyValue("visibility"),
-      pointerEvents: btn.style.getPropertyValue("pointer-events"),
-      position: btn.style.getPropertyValue("position"),
-      left: btn.style.getPropertyValue("left"),
-      opacity: btn.style.getPropertyValue("opacity"),
-      ariaHidden: btn.getAttribute("aria-hidden"),
-    };
-
-    try {
-      btn.disabled = false;
-      btn.removeAttribute("disabled");
-      btn.removeAttribute("aria-disabled");
-      if (restoreHide) {
-        btn.style.setProperty("display", "block", "important");
-        btn.style.setProperty("visibility", "visible", "important");
-        btn.style.setProperty("pointer-events", "auto", "important");
-        btn.style.setProperty("position", "fixed", "important");
-        btn.style.setProperty("left", "-9999px", "important");
-        btn.style.setProperty("opacity", "0", "important");
-        btn.removeAttribute("aria-hidden");
-      }
-
-      /* Prefer requestSubmit so themes listening on form submit still run. */
-      if (typeof form.requestSubmit === "function" && btn.tagName === "BUTTON") {
-        form.requestSubmit(btn);
-      } else if (typeof btn.click === "function") {
-        btn.click();
-      } else if (typeof form.requestSubmit === "function") {
-        form.requestSubmit();
-      } else {
-        form.submit();
-      }
-      return true;
-    } catch (e) {
-      try {
-        if (typeof btn.click === "function") btn.click();
-        return true;
-      } catch (e2) {
-        return false;
-      }
-    } finally {
-      /* Restore after theme handlers have started (next tick). */
-      setTimeout(function () {
         try {
-          btn.disabled = prev.disabled;
-          if (prev.disabled) btn.setAttribute("disabled", "");
-          else btn.removeAttribute("disabled");
-          if (prev.ariaDisabled != null) {
-            btn.setAttribute("aria-disabled", prev.ariaDisabled);
-          } else {
-            btn.removeAttribute("aria-disabled");
-          }
-          if (prev.display) btn.style.setProperty("display", prev.display);
-          else btn.style.removeProperty("display");
-          if (prev.visibility) btn.style.setProperty("visibility", prev.visibility);
-          else btn.style.removeProperty("visibility");
-          if (prev.pointerEvents) {
-            btn.style.setProperty("pointer-events", prev.pointerEvents);
-          } else {
-            btn.style.removeProperty("pointer-events");
-          }
-          if (prev.position) btn.style.setProperty("position", prev.position);
-          else btn.style.removeProperty("position");
-          if (prev.left) btn.style.setProperty("left", prev.left);
-          else btn.style.removeProperty("left");
-          if (prev.opacity) btn.style.setProperty("opacity", prev.opacity);
-          else btn.style.removeProperty("opacity");
-          if (prev.ariaHidden != null) btn.setAttribute("aria-hidden", prev.ariaHidden);
-          else if (restoreHide) btn.setAttribute("aria-hidden", "true");
-          if (document.documentElement.getAttribute("data-offrefy-hide-theme-atc") === "1") {
-            try {
-              hideThemeNativeAddToCartButtons();
-            } catch (eHide) {
-              void eHide;
-            }
-          }
-        } catch (eRest) {
-          void eRest;
-        }
-      }, 800);
-    }
-  }
-
-  /**
-   * Cross-theme ATC:
-   * 1) Theme native Add to Cart click (theme ATC button function only)
-   * 2) Liquid {% form 'product' %} bridge via /cart/add.js (fallback)
-   * Drawer open follows `openDrawer` (ctaButtonAction), never forced.
-   */
-  function addByClickingThemeAtc(variantId, quantity, attribution, openDrawer) {
-    var wantDrawer = !!openDrawer;
-    var root = document.querySelector(".offrefy-root");
-    var liquidForm = findVdLiquidProductForm(root);
-    var themeForm = findThemeProductAddForm();
-    var themeBtn = findThemeAddToCartButton(themeForm);
-
-    if (liquidForm) {
-      syncVdLiquidProductForm(liquidForm, variantId, quantity, attribution);
-    }
-    if (themeForm) {
-      syncThemeProductFormFields(themeForm, variantId, quantity, attribution);
-    } else {
-      setThemeProductFormQuantity(quantity);
-    }
-
-    function waitForCartIncrease(prev) {
-      return new Promise(function (resolve, reject) {
-        var tries = 0;
-        var iv = setInterval(function () {
-          tries += 1;
-          fetchCartItemCount().then(function (cart) {
-            if (cart && cart.item_count > prev) {
-              clearInterval(iv);
-              resolve(cart);
-              return;
-            }
-            if (tries >= 24) {
-              clearInterval(iv);
-              reject(new Error("Theme ATC did not add"));
-            }
-          });
-        }, 250);
-      });
-    }
-
-    if (themeForm && themeBtn) {
-      return fetchCartItemCount().then(function (before) {
-        var prev = before ? before.item_count : 0;
-        var prevVariantQty = cartLineQtyForVariant(before, variantId);
-        if (!triggerThemeAtcClick(themeForm, themeBtn)) {
-          return Promise.reject(new Error("Theme ATC click failed"));
-        }
-        return waitForCartIncrease(prev).then(function () {
-          /* Theme may have added only 1 — top-up to the widget tier qty. */
-          return ensureCartHasVariantQuantity(
-            variantId,
-            quantity,
-            attribution,
-          ).then(function (cart) {
-            var afterQty = cartLineQtyForVariant(cart, variantId);
-            if (afterQty <= prevVariantQty) {
-              return Promise.reject(new Error("Theme ATC qty mismatch"));
-            }
-            /*
-             * Theme ATC already opened/updated the drawer. Do NOT rewrite
-             * cart-drawer section HTML here — that destroys close-button
-             * listeners and leaves the drawer stuck open.
-             */
-            publishThemeCartUpdate(cart);
-            scheduleCartDrawerDiscountLabelPatch();
-            if (wantDrawer && !isThemeCartDrawerOpen()) {
-              openThemeCartDrawer();
-            }
-            return cart;
-          });
-        });
-      }).catch(function () {
-        if (!liquidForm) {
-          return Promise.reject(new Error("No theme or liquid product form"));
-        }
-        return addVariantToCartViaFetch(
-          variantId,
-          quantity,
-          wantDrawer,
-          attribution,
-        );
-      });
-    }
-
-    if (liquidForm) {
-      return addVariantToCartViaFetch(
-        variantId,
-        quantity,
-        wantDrawer,
-        attribution,
-      );
-    }
-
-    return Promise.reject(new Error("No theme or liquid product form"));
-  }
-
-  /**
-   * Theme qty inputs are often outside form[action*="/cart/add"] (Dawn uses
-   * form="product-form-…" on quantity-input). Collect all product-page qty fields.
-   */
-  function collectThemeProductQuantityInputs(form) {
-    var list = [];
-    var seen =
-      typeof WeakSet !== "undefined"
-        ? new WeakSet()
-        : {
-            _a: [],
-            has: function (el) {
-              return this._a.indexOf(el) !== -1;
-            },
-            add: function (el) {
-              this._a.push(el);
-            },
-          };
-
-    function add(el) {
-      if (!el || (el.closest && el.closest(".offrefy-root"))) return;
-      /* Include type=hidden — many themes keep qty only as a hidden input while
-         the visible stepper is custom JS (and may stay at 1 after we hide it). */
-      if (
-        el.closest &&
-        el.closest(
-          "cart-drawer, cart-notification, #CartDrawer, .cart-item, cart-items, #main-cart-items",
-        )
-      ) {
-        return;
-      }
-      if (seen.has(el)) return;
-      seen.add(el);
-      list.push(el);
-    }
-
-    function addFromRoot(root) {
-      if (!root || !root.querySelectorAll) return;
-      var nodes = root.querySelectorAll(
-        'input[name="quantity"], select[name="quantity"]',
-      );
-      for (var i = 0; i < nodes.length; i++) add(nodes[i]);
-    }
-
-    if (form) {
-      addFromRoot(form);
-      var formId = form.getAttribute("id");
-      if (formId) {
-        var linked = document.querySelectorAll(
-          'input[name="quantity"][form], select[name="quantity"][form]',
-        );
-        for (var j = 0; j < linked.length; j++) {
-          if (linked[j].getAttribute("form") === formId) add(linked[j]);
-        }
-      }
-      var scope =
-        form.closest("product-info") ||
-        form.closest("[id^='MainProduct']") ||
-        form.closest(".shopify-section--main-product") ||
-        form.closest(".shopify-section") ||
-        form.closest(".product") ||
-        form.parentElement;
-      if (scope) addFromRoot(scope);
-    } else {
-      var sections = document.querySelectorAll(
-        "product-info, [id^='MainProduct'], .shopify-section--main-product",
-      );
-      for (var s = 0; s < sections.length; s++) addFromRoot(sections[s]);
-    }
-
-    return list;
-  }
-
-  function setThemeProductFormQuantity(quantity) {
-    var qty = parseInt(String(quantity), 10) || 1;
-    qty = Math.min(VD_MAX_LINE_QTY, Math.max(1, qty));
-    var form = findThemeProductAddForm();
-    var inputs = collectThemeProductQuantityInputs(form);
-    var str = String(qty);
-    for (var i = 0; i < inputs.length; i++) {
-      var inp = inputs[i];
-      try {
-        /* Set property only — setAttribute("value") breaks Dawn/Horizon
-           quantity-input steppers (plus/minus stop updating). */
-        if (String(inp.value) === str) continue;
-        inp.value = str;
-        inp.dispatchEvent(new Event("input", { bubbles: true }));
-        inp.dispatchEvent(new Event("change", { bubbles: true }));
-      } catch (e) {
-        void e;
-      }
-    }
-    var liquid = findVdLiquidProductForm(null);
-    if (liquid) {
-      var lq =
-        liquid.querySelector("[data-offrefy-liquid-qty]") ||
-        liquid.querySelector('input[name="quantity"]');
-      if (lq) lq.value = str;
-    }
-    return inputs.length > 0 || !!liquid;
-  }
-
-  function readThemeProductFormQuantity(fallback) {
-    var form = findThemeProductAddForm();
-    var inputs = collectThemeProductQuantityInputs(form);
-    for (var i = 0; i < inputs.length; i++) {
-      var n = parseInt(String(inputs[i].value), 10);
-      if (Number.isFinite(n) && n > 0) return n;
-    }
-    var fb = parseInt(String(fallback), 10);
-    return Number.isFinite(fb) && fb > 0 ? fb : 1;
-  }
-
-  function syncThemeProductFormFields(form, variantId, quantity, attribution) {
-    if (!form) return false;
-    var vid = String(variantId || "");
-    if (vid) {
-      var vs = form.querySelector('select[name="id"]');
-      if (vs) {
-        vs.value = vid;
-        vs.dispatchEvent(new Event("change", { bubbles: true }));
-      }
-      var hid = form.querySelector('input[name="id"][type="hidden"]');
-      if (hid) {
-        hid.value = vid;
-        hid.dispatchEvent(new Event("change", { bubbles: true }));
-      }
-      var radios = form.querySelectorAll('input[type="radio"][name="id"]');
-      for (var ri = 0; ri < radios.length; ri++) {
-        var rad = radios[ri];
-        rad.checked = String(rad.value) === vid;
-        if (rad.checked) {
-          rad.dispatchEvent(new Event("change", { bubbles: true }));
+          linked[li].value = strQty;
+          linked[li].dispatchEvent(new Event("input", { bubbles: true }));
+          linked[li].dispatchEvent(new Event("change", { bubbles: true }));
+        } catch (e4) {
+          void e4;
         }
       }
     }
-    setThemeProductFormQuantity(quantity);
+
     applyOffrefyPropertiesToForm(form, attribution);
     return true;
   }
 
-  function waitForThemeCartAdd(timeoutMs) {
-    return new Promise(function (resolve, reject) {
-      var settled = false;
-      function finishOk(detail) {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        resolve(detail || null);
-      }
-      function finishErr(err) {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        reject(err || new Error("Theme add to cart did not complete"));
-      }
-      function onCartEvent(ev) {
-        finishOk(ev && ev.detail ? ev.detail : {});
-      }
-      function cleanup() {
-        clearTimeout(timer);
-        document.removeEventListener("cart:updated", onCartEvent, true);
-        document.documentElement.removeEventListener("cart:updated", onCartEvent, true);
-        document.removeEventListener("cart:change", onCartEvent, true);
-        document.documentElement.removeEventListener("cart:change", onCartEvent, true);
-      }
-      document.addEventListener("cart:updated", onCartEvent, true);
-      document.documentElement.addEventListener("cart:updated", onCartEvent, true);
-      document.addEventListener("cart:change", onCartEvent, true);
-      document.documentElement.addEventListener("cart:change", onCartEvent, true);
-      var timer = setTimeout(function () {
-        finishErr(new Error("Theme add to cart did not complete"));
-      }, timeoutMs || 2500);
-    });
-  }
-
-  function submitThemeProductAddForm(variantId, quantity, attribution) {
-    var form = findThemeProductAddForm();
-    var btn = findThemeAddToCartButton(form);
-    if (!form || !btn) {
-      return Promise.reject(new Error("No theme product form"));
-    }
-    syncThemeProductFormFields(form, variantId, quantity, attribution);
-
-    /* Theme ATC may be visually hidden — keep it clickable off-screen so the
-       theme ProductForm submit runs (Shopify default add + cart drawer). */
-    var restoreHide =
-      document.documentElement.getAttribute("data-offrefy-hide-theme-atc") === "1";
-    var prev = {
-      display: btn.style.getPropertyValue("display"),
-      position: btn.style.getPropertyValue("position"),
-      left: btn.style.getPropertyValue("left"),
-      opacity: btn.style.getPropertyValue("opacity"),
-      pointerEvents: btn.style.getPropertyValue("pointer-events"),
-      zIndex: btn.style.getPropertyValue("z-index"),
-      ariaHidden: btn.getAttribute("aria-hidden"),
-    };
-    if (restoreHide) {
-      btn.style.setProperty("display", "block", "important");
-      btn.style.setProperty("position", "fixed", "important");
-      btn.style.setProperty("left", "-9999px", "important");
-      btn.style.setProperty("opacity", "0", "important");
-      btn.style.setProperty("pointer-events", "auto", "important");
-      btn.style.setProperty("z-index", "0", "important");
-      btn.removeAttribute("aria-hidden");
-    }
-
-    function restoreBtn() {
-      if (!restoreHide) return;
-      if (prev.display) btn.style.setProperty("display", prev.display);
-      else btn.style.removeProperty("display");
-      if (prev.position) btn.style.setProperty("position", prev.position);
-      else btn.style.removeProperty("position");
-      if (prev.left) btn.style.setProperty("left", prev.left);
-      else btn.style.removeProperty("left");
-      if (prev.opacity) btn.style.setProperty("opacity", prev.opacity);
-      else btn.style.removeProperty("opacity");
-      if (prev.pointerEvents) {
-        btn.style.setProperty("pointer-events", prev.pointerEvents);
-      } else {
-        btn.style.removeProperty("pointer-events");
-      }
-      if (prev.zIndex) btn.style.setProperty("z-index", prev.zIndex);
-      else btn.style.removeProperty("z-index");
-      if (prev.ariaHidden != null) btn.setAttribute("aria-hidden", prev.ariaHidden);
-      else btn.setAttribute("aria-hidden", "true");
-      try {
-        hideThemeNativeAddToCartButtons();
-      } catch (e) {
-        void e;
-      }
-    }
-
-    var waitPromise = waitForThemeCartAdd(10000);
-    try {
-      if (typeof form.requestSubmit === "function") {
-        form.requestSubmit(btn);
-      } else if (typeof btn.click === "function") {
-        btn.click();
-      } else {
-        form.submit();
-      }
-    } catch (clickErr) {
-      restoreBtn();
-      return Promise.reject(clickErr);
-    }
-
-    return waitPromise.then(
-      function (detail) {
-        restoreBtn();
-        return detail;
-      },
-      function (err) {
-        restoreBtn();
-        return Promise.reject(err);
-      },
-    );
-  }
-
-  function applyThemeCartSectionsFromResponse(response, openDrawer) {
-    if (!response || !cartResponseHasSectionHtml(response.sections)) return false;
-    try {
-      /* Valor theme: renderFromSections(sections) + open() */
-      var valor = document.querySelector("valor-cart-drawer");
-      if (valor && typeof valor.renderFromSections === "function") {
-        try {
-          var okV = valor.renderFromSections(response.sections);
-          if (okV) {
-            try {
-              valor.classList.remove("valor-cart-drawer--empty");
-            } catch (eEmptyV) {
-              void eEmptyV;
-            }
-            scheduleCartDrawerDiscountLabelPatch();
-            if (openDrawer) {
-              setTimeout(function () {
-                try {
-                  if (typeof valor.open === "function") valor.open();
-                  else forceOpenThemeCartDrawer();
-                } catch (eOV) {
-                  forceOpenThemeCartDrawer();
-                }
-              }, 40);
-            }
-            return true;
-          }
-        } catch (eValorRender) {
-          void eValorRender;
-        }
-      }
-
-      var drawer =
-        document.querySelector("cart-drawer") ||
-        document.querySelector("cart-notification") ||
-        findThemeCartDrawerEl();
-      if (drawer && typeof drawer.renderContents === "function") {
-        try {
-          /* Dawn renderContents(parsedState, open) — honor openDrawer. */
-          if (drawer.renderContents.length >= 2) {
-            drawer.renderContents(response, !!openDrawer);
-          } else {
-            drawer.renderContents(response);
-          }
-        } catch (eRender) {
-          try {
-            drawer.renderContents(response);
-          } catch (e2) {
-            void e2;
-            return manualApplyCartSections(response.sections, openDrawer);
-          }
-        }
-        try {
-          drawer.classList.remove("is-empty");
-        } catch (eEmpty) {
-          void eEmpty;
-        }
-        scheduleCartDrawerDiscountLabelPatch();
-        if (openDrawer) {
-          setTimeout(function () {
-            if (!isThemeCartDrawerOpen() && typeof drawer.open === "function") {
-              try {
-                drawer.open();
-              } catch (eO) {
-                void eO;
-              }
-            }
-            if (!isThemeCartDrawerOpen()) forceOpenThemeCartDrawer();
-          }, 120);
-        }
-        return true;
-      }
-      return manualApplyCartSections(response.sections, openDrawer);
-    } catch (e) {
-      void e;
-    }
-    return false;
-  }
-
-  function getSectionInnerHTML(html, selector) {
-    var div = document.createElement("div");
-    div.innerHTML = html;
-    if (selector) {
-      var node = div.querySelector(selector);
-      return node ? node.innerHTML : div.innerHTML;
-    }
-    return div.innerHTML;
-  }
-
-  /** Fallback when theme has no renderContents — patch section DOM then open(). */
-  function manualApplyCartSections(sections, openDrawer) {
-    if (!sections) return false;
-    var drawer =
-      document.querySelector("cart-drawer") ||
-      document.querySelector("cart-notification");
-    var list = [];
-    try {
-      if (drawer && typeof drawer.getSectionsToRender === "function") {
-        list = drawer.getSectionsToRender();
-      }
-    } catch (eList) {
-      void eList;
-    }
-    if (!list.length) {
-      list = [
-        { id: "cart-drawer", selector: "#ValorCartDrawer" },
-        { id: "cart-drawer", selector: "valor-cart-drawer" },
-        { id: "cart-drawer", selector: "#CartDrawer" },
-        { id: "cart-drawer", selector: "#shopify-section-cart-drawer" },
-        { id: "cart-icon-bubble" },
-      ];
-    }
-    var applied = false;
-    for (var i = 0; i < list.length; i++) {
-      var section = list[i];
-      var html = sections[section.id] || sections[section.section];
-      if (!html) continue;
-      var el = section.selector
-        ? document.querySelector(section.selector)
-        : document.getElementById(section.id);
-      if (!el && section.id) {
-        el = document.getElementById("shopify-section-" + section.id);
-      }
-      if (!el) continue;
-      try {
-        /* Valor: replace inner HTML of the custom element from section markup */
-        if (el.tagName && String(el.tagName).toLowerCase() === "valor-cart-drawer") {
-          var tmp = document.createElement("div");
-          tmp.innerHTML = html;
-          var neu =
-            tmp.querySelector("#" + el.id) ||
-            tmp.querySelector("valor-cart-drawer");
-          if (neu) {
-            var wasOpen = el.hasAttribute("data-open");
-            el.innerHTML = neu.innerHTML;
-            if (wasOpen || openDrawer) {
-              el.setAttribute("data-open", "");
-              el.removeAttribute("hidden");
-              document.body.classList.add("valor-cart-drawer-open");
-            }
-            try {
-              if (neu.classList.contains("valor-cart-drawer--empty")) {
-                el.classList.add("valor-cart-drawer--empty");
-              } else {
-                el.classList.remove("valor-cart-drawer--empty");
-              }
-            } catch (eCls) {
-              void eCls;
-            }
-            applied = true;
-            continue;
-          }
-        }
-        el.innerHTML = getSectionInnerHTML(html, section.selector);
-        applied = true;
-      } catch (eSet) {
-        void eSet;
-      }
-    }
-    if (applied) {
-      var valorEl = document.querySelector("valor-cart-drawer");
-      if (valorEl) {
-        try {
-          valorEl.classList.remove("valor-cart-drawer--empty");
-        } catch (eEmptyV2) {
-          void eEmptyV2;
-        }
-        if (openDrawer && typeof valorEl.open === "function") {
-          try {
-            valorEl.open();
-          } catch (eOpenV2) {
-            void eOpenV2;
-          }
-        }
-      }
-    }
-    if (applied && drawer) {
-      try {
-        drawer.classList.remove("is-empty");
-      } catch (eEmpty2) {
-        void eEmpty2;
-      }
-      if (openDrawer && typeof drawer.open === "function") {
-        try {
-          drawer.open();
-        } catch (eOpen2) {
-          void eOpen2;
-        }
-      }
-      scheduleCartDrawerDiscountLabelPatch();
-    }
-    if (applied && openDrawer && !isThemeCartDrawerOpen()) {
-      forceOpenThemeCartDrawer();
-    }
-    return applied;
-  }
-
   /**
-   * Re-fetch LIVE cart section HTML (with items), patch drawer, then open.
-   * Never open via cart-icon click alone — that shows a stale empty drawer.
+   * Widget ATC → theme native submit only.
+   * form[action*="/cart/add"] [type="submit"] — theme opens its own drawer.
+   * We never fetch /cart/add.js or force-open an empty drawer.
    */
-  function refreshThemeCartSectionsAndOpen(openDrawer) {
-    var sectionIds = getThemeCartSectionsParam();
-    if (!sectionIds) return Promise.resolve(null);
-    return fetch(shopifyRoutesRoot() + "cart/update.js", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        sections: sectionIds,
-        sections_url: storefrontSectionsUrl(),
-      }),
-    })
-      .then(function (res) {
-        return res.ok ? res.json() : null;
-      })
-      .then(function (body) {
-        var applied = false;
-        if (body && body.sections) {
-          applied = applyThemeCartSectionsFromResponse(body, openDrawer);
-          if (!applied) {
-            applied = manualApplyCartSections(body.sections, openDrawer);
-          }
-          /* Valor listens for valor:cart:added with sections payload */
-          dispatchValorCartAdded(body);
-        }
-        /* If section HTML path failed, ask Valor drawer to refresh itself */
-        if (!applied) {
-          var valor = document.querySelector("valor-cart-drawer");
-          if (valor && typeof valor.refresh === "function") {
-            return Promise.resolve(valor.refresh())
-              .then(function () {
-                if (openDrawer) forceOpenThemeCartDrawer();
-                scheduleCartDrawerDiscountLabelPatch();
-                return body;
-              })
-              .catch(function () {
-                if (openDrawer) forceOpenThemeCartDrawer();
-                return body;
-              });
-          }
-        }
-        scheduleCartDrawerDiscountLabelPatch();
-        if (openDrawer && !isThemeCartDrawerOpen()) {
-          forceOpenThemeCartDrawer();
-        }
-        return body;
-      })
-      .catch(function () {
-        var valor = document.querySelector("valor-cart-drawer");
-        if (valor && typeof valor.refresh === "function") {
-          return Promise.resolve(valor.refresh())
-            .then(function () {
-              if (openDrawer) forceOpenThemeCartDrawer();
-              return null;
-            })
-            .catch(function () {
-              if (openDrawer) forceOpenThemeCartDrawer();
-              return null;
-            });
-        }
-        if (openDrawer) forceOpenThemeCartDrawer();
-        return null;
-      });
-  }
-
-  function fetchCartItemCount() {
-    return fetch(cartJsUrl(), {
-      credentials: "same-origin",
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-    })
-      .then(function (r) {
-        return r.ok ? r.json() : null;
-      })
-      .then(function (cart) {
-        return cart && typeof cart.item_count === "number" ? cart : null;
-      })
-      .catch(function () {
-        return null;
-      });
-  }
-
-  /** Sum of line quantities for a variant id in a /cart.js payload. */
-  function cartLineQtyForVariant(cart, variantId) {
-    var vid = parseInt(String(variantId), 10);
-    if (!Number.isFinite(vid) || vid < 1 || !cart || !Array.isArray(cart.items)) {
-      return 0;
-    }
-    var sum = 0;
-    for (var i = 0; i < cart.items.length; i++) {
-      var it = cart.items[i];
-      var id = parseInt(String(it.variant_id != null ? it.variant_id : it.id), 10);
-      if (id === vid) sum += it.quantity | 0;
-    }
-    return sum;
-  }
-
-  /**
-   * Theme ATC often ignores form qty (hidden stepper / JS state) and adds 1.
-   * After a theme click, top-up remaining units via /cart/add.js if short.
-   */
-  function ensureCartHasVariantQuantity(variantId, desiredQty, attribution) {
-    var want = parseInt(String(desiredQty), 10) || 1;
-    want = Math.min(VD_MAX_LINE_QTY, Math.max(1, want));
-    return fetchCartItemCount().then(function (cart) {
-      var have = cartLineQtyForVariant(cart, variantId);
-      if (have >= want) return cart;
-      var need = want - have;
-      return addVariantToCartViaFetch(
-        variantId,
-        need,
-        false,
-        attribution,
-      ).then(function () {
-        return fetchCartItemCount();
-      });
-    });
-  }
-
-  /**
-   * Fallback: /cart/add.js then refresh LIVE drawer sections before opening.
-   * Never open an empty/stale drawer via cart-icon click.
-   */
-  function addVariantToCartViaFetch(variantId, quantity, openDrawer, attribution) {
+  function addVariantToCartByThemeSubmit(variantId, quantity, attribution) {
     var id = parseInt(String(variantId), 10);
     var qty = parseInt(String(quantity), 10) || 1;
     if (!Number.isFinite(id) || id < 1) {
@@ -2825,172 +1818,35 @@
     }
     qty = Math.min(VD_MAX_LINE_QTY, Math.max(1, qty));
 
-    var form = findThemeProductAddForm() || findVdLiquidProductForm(null);
-    if (form) {
-      if (form.hasAttribute("data-offrefy-liquid-product-form") || (form.classList && form.classList.contains("offrefy-liquid-product-form"))) {
-        syncVdLiquidProductForm(form, id, qty, attribution);
+    var form = findThemeProductCartForm();
+    var btn = findThemeCartAddSubmitButton(form);
+    if (!form || !btn) {
+      return Promise.reject(new Error("No theme add to cart button"));
+    }
+
+    syncThemeCartAddForm(form, id, qty, attribution);
+
+    try {
+      if (typeof form.requestSubmit === "function") {
+        form.requestSubmit(btn);
+      } else if (typeof btn.click === "function") {
+        btn.click();
       } else {
-        syncThemeProductFormFields(form, id, qty, attribution);
+        return Promise.reject(new Error("Theme submit failed"));
       }
+    } catch (err) {
+      return Promise.reject(err);
     }
-
-    var sectionIds = getThemeCartSectionIds();
-    var fetchOpts;
-    if (form) {
-      var formData = new FormData(form);
-      formData.set("id", String(id));
-      formData.set("quantity", String(qty));
-      try {
-        formData.delete("sections");
-        formData.delete("sections_url");
-      } catch (eDel) {
-        void eDel;
-      }
-      if (sectionIds.length) {
-        formData.append("sections", sectionIds.join(","));
-        formData.append("sections_url", storefrontSectionsUrl());
-      }
-      var props = offrefyCartProperties(attribution);
-      if (props) {
-        for (var pk in props) {
-          if (Object.prototype.hasOwnProperty.call(props, pk)) {
-            formData.set("properties[" + pk + "]", String(props[pk]));
-          }
-        }
-      }
-      fetchOpts = {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          Accept: "application/json",
-          "X-Requested-With": "XMLHttpRequest",
-        },
-        body: formData,
-      };
-    } else {
-      var item = { id: id, quantity: qty };
-      var propsJson = offrefyCartProperties(attribution);
-      if (propsJson) item.properties = propsJson;
-      var payload = { items: [item] };
-      if (sectionIds.length) {
-        payload.sections = sectionIds.join(",");
-        payload.sections_url = storefrontSectionsUrl();
-      }
-      fetchOpts = {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(payload),
-      };
-    }
-
-    return syncCartLocaleAttribute(true).then(function () {
-      return fetch(cartAddJsUrl(), fetchOpts).then(function (res) {
-        return res.json().then(function (body) {
-          if (!res.ok) {
-            var msg = "Could not add to cart";
-            if (body && body.description) msg = String(body.description);
-            else if (body && body.message) {
-              msg = Array.isArray(body.message)
-                ? body.message.join(", ")
-                : String(body.message);
-            }
-            throw new Error(msg);
-          }
-
-          return fetchCartItemCount().then(function (cart) {
-            if (!cart || !(cart.item_count > 0)) {
-              throw new Error("Could not add to cart");
-            }
-            if (openDrawer) {
-              /* One section apply OR one refresh — never both (double rewrite breaks close). */
-              if (
-                body &&
-                body.sections &&
-                cartResponseHasSectionHtml(body.sections)
-              ) {
-                applyThemeCartSectionsFromResponse(body, true);
-                dispatchValorCartAdded(body);
-                publishThemeCartUpdate(cart);
-                scheduleCartDrawerDiscountLabelPatch();
-                if (!isThemeCartDrawerOpen()) forceOpenThemeCartDrawer();
-                return body;
-              }
-              dispatchValorCartAdded(body || {});
-              publishThemeCartUpdate(cart);
-              return refreshThemeCartSectionsAndOpen(true).then(function () {
-                publishThemeCartUpdate(cart);
-                if (!isThemeCartDrawerOpen()) forceOpenThemeCartDrawer();
-                return body;
-              });
-            }
-            /*
-             * Quiet add (top-up / add_to_cart CTA): never rewrite an already-open
-             * drawer — that destroys theme close-button bindings.
-             */
-            if (
-              body &&
-              body.sections &&
-              cartResponseHasSectionHtml(body.sections) &&
-              !isThemeCartDrawerOpen()
-            ) {
-              applyThemeCartSectionsFromResponse(body, false);
-            }
-            publishThemeCartUpdate(cart);
-            scheduleCartDrawerDiscountLabelPatch();
-            return body;
-          });
-        });
-      });
-    });
-  }
-
-  function shouldOpenDrawerAfterAdd(action) {
-    return String(action || "add_to_cart_open_drawer") === "add_to_cart_open_drawer";
+    return Promise.resolve();
   }
 
   function addVariantToCart(variantId, quantity, action, attribution) {
-    var openDrawer = shouldOpenDrawerAfterAdd(action);
     var qty = parseInt(String(quantity), 10) || 1;
     qty = Math.min(VD_MAX_LINE_QTY, Math.max(1, qty));
-
-    /*
-     * Prefer theme Add to Cart button for ATC CTAs (any tier qty): sync form
-     * qty/variant, then click the theme button so theme ATC handlers run.
-     * Fall back to /cart/add.js only if theme click fails.
-     */
-    var useThemeAtc =
-      !action ||
-      action === "add_to_cart" ||
-      action === "add_to_cart_open_drawer";
-
-    if (useThemeAtc) {
-      return addByClickingThemeAtc(
-        variantId,
-        qty,
-        attribution,
-        openDrawer,
-      ).catch(function () {
-        return addVariantToCartViaFetch(
-          variantId,
-          qty,
-          openDrawer,
-          attribution,
-        );
-      });
-    }
-    return addVariantToCartViaFetch(
-      variantId,
-      qty,
-      openDrawer,
-      attribution,
-    );
+    void action;
+    return addVariantToCartByThemeSubmit(variantId, qty, attribution);
   }
 
-  var vdHidePurchaseUiObserver = null;
 
   function resolveSafePageHref(url) {
     var s = String(url || "").trim();
@@ -3032,329 +1888,8 @@
       if (href) window.location.href = href;
       return Promise.resolve();
     }
-    /* Drawer open is done by theme ATC or refreshThemeCartSectionsAndOpen.
-       Do not force-open here — that opened a stale empty drawer. */
+    /* add_to_cart / open_drawer: theme ProductForm handles cart + drawer. */
     return Promise.resolve();
-  }
-
-  function hideThemeNativeAddToCartButtons() {
-    if (document.documentElement.getAttribute("data-offrefy-hide-theme-atc") !== "1") {
-      return;
-    }
-    var forms = document.querySelectorAll('form[action*="/cart/add"]');
-    for (var i = 0; i < forms.length; i++) {
-      var form = forms[i];
-      if (form.closest(".offrefy-root")) continue;
-      var btn =
-        form.querySelector('button[name="add"]') ||
-        form.querySelector('input[type="submit"][name="add"]') ||
-        form.querySelector("button.product-form__submit");
-      if (!btn) btn = form.querySelector('button[type="submit"]');
-      if (!btn || btn.closest(".offrefy-root")) continue;
-      btn.style.setProperty("display", "none", "important");
-      btn.setAttribute("aria-hidden", "true");
-    }
-  }
-
-  function hideThemeNativeBuyItNowButtons() {
-    if (document.documentElement.getAttribute("data-offrefy-hide-theme-bin") !== "1") {
-      return;
-    }
-    var selectors = [
-      ".shopify-payment-button",
-      ".dynamic-checkout__content",
-      "[data-shopify='payment-button']",
-      "shopify-accelerated-checkout-cart",
-    ];
-    for (var si = 0; si < selectors.length; si++) {
-      var nodes = document.querySelectorAll(selectors[si]);
-      for (var i = 0; i < nodes.length; i++) {
-        var n = nodes[i];
-        if (n.closest(".offrefy-root")) continue;
-        n.style.setProperty("display", "none", "important");
-        n.setAttribute("aria-hidden", "true");
-      }
-    }
-  }
-
-  /**
-   * Hides theme product-form variant UI so the widget picker is used.
-   * Covers: variant id (select/radio name="id"), split options (name^="options"), Dawn variant-selects / variant-radios, .product-form__input rows.
-   */
-  function hideThemeNativeVariantSelectors() {
-    if (document.documentElement.getAttribute("data-offrefy-hide-theme-variant") !== "1") {
-      return;
-    }
-    var seen =
-      typeof WeakSet !== "undefined"
-        ? new WeakSet()
-        : { _a: [], has: function (el) { return this._a.indexOf(el) !== -1; }, add: function (el) { this._a.push(el); } };
-
-    function hideBlock(el) {
-      if (!el || el.closest(".offrefy-root")) return;
-      if (seen.has(el)) return;
-      seen.add(el);
-      el.style.setProperty("display", "none", "important");
-      el.setAttribute("aria-hidden", "true");
-    }
-
-    function blockHasVariantUi(el) {
-      if (!el || !el.querySelector) return false;
-      if (el.querySelector('select[name="id"]')) return true;
-      if (el.querySelector('input[type="radio"][name="id"]')) return true;
-      if (el.querySelector('select[name^="options"]')) return true;
-      if (el.querySelector('input[type="radio"][name^="options"]')) return true;
-      if (el.querySelector('input[type="checkbox"][name^="options"]')) return true;
-      if (el.querySelector("input.swatch-input")) return true;
-      if (el.querySelector("[data-option-value-id]")) return true;
-      if (el.querySelector("[data-option-value]")) return true;
-      return false;
-    }
-
-    function isQuantityOnlyBlock(el) {
-      if (!el) return false;
-      var c = (el.className && String(el.className).toLowerCase()) || "";
-      if (/\bproduct-form__quantity\b/.test(c)) return true;
-      if (/\bproduct-form__input\b/.test(c) && /\bquantity\b/.test(c) && !blockHasVariantUi(el)) return true;
-      if (el.querySelector('input[name="quantity"]') && !blockHasVariantUi(el)) return true;
-      return false;
-    }
-
-    var forms = document.querySelectorAll('form[action*="/cart/add"]');
-    for (var fi = 0; fi < forms.length; fi++) {
-      var form = forms[fi];
-      if (form.closest(".offrefy-root")) continue;
-
-      var hosts = form.querySelectorAll("variant-selects, variant-radios");
-      for (var hi = 0; hi < hosts.length; hi++) {
-        hideBlock(hosts[hi]);
-      }
-
-      var rows = form.querySelectorAll(
-        "fieldset.product-form__input, fieldset.js.product-form__input, .product-form__input",
-      );
-      for (var ri = 0; ri < rows.length; ri++) {
-        var row = rows[ri];
-        if (isQuantityOnlyBlock(row)) continue;
-        if (!blockHasVariantUi(row)) continue;
-        hideBlock(row);
-      }
-
-      var optRadios = form.querySelectorAll('input[type="radio"][name^="options"]');
-      for (var oi = 0; oi < optRadios.length; oi++) {
-        var or = optRadios[oi];
-        var ow =
-          or.closest("fieldset.product-form__input") ||
-          or.closest("fieldset.js") ||
-          or.closest(".product-form__input") ||
-          or.closest(".variant-picker") ||
-          or.closest(".product-form__inputs") ||
-          or.parentElement;
-        hideBlock(ow);
-      }
-
-      var optSelects = form.querySelectorAll('select[name^="options"]');
-      for (var osi = 0; osi < optSelects.length; osi++) {
-        var os = optSelects[osi];
-        var osw =
-          os.closest("variant-selects") ||
-          os.closest("fieldset.product-form__input") ||
-          os.closest(".product-form__input") ||
-          os.closest("fieldset") ||
-          os.parentElement;
-        hideBlock(osw);
-      }
-
-      var selects = form.querySelectorAll('select[name="id"]');
-      for (var si = 0; si < selects.length; si++) {
-        var sel = selects[si];
-        var wrap =
-          sel.closest("variant-selects") ||
-          sel.closest(".product-form__input") ||
-          sel.closest(".product-form__variants") ||
-          sel.closest(".selector-wrapper") ||
-          sel.closest(".select-wrapper") ||
-          sel.parentElement;
-        hideBlock(wrap);
-      }
-
-      var radios = form.querySelectorAll('input[type="radio"][name="id"]');
-      for (var rdi = 0; rdi < radios.length; rdi++) {
-        var rad = radios[rdi];
-        var wrapR =
-          rad.closest("variant-radios") ||
-          rad.closest("variant-selects") ||
-          rad.closest(".product-form__input") ||
-          rad.closest("fieldset") ||
-          rad.closest(".variant-input-wrap");
-        hideBlock(wrapR);
-      }
-    }
-
-    /* Variant UI rendered outside form[action*="/cart/add"] (some themes / sections) */
-    var sectionRoots = document.querySelectorAll(
-      ".shopify-section--main-product, [id^='MainProduct'], product-info, .product--main .product__info",
-    );
-    for (var sr = 0; sr < sectionRoots.length; sr++) {
-      var sec = sectionRoots[sr];
-      if (!sec || sec.closest(".offrefy-root")) continue;
-
-      var extHosts = sec.querySelectorAll("variant-selects, variant-radios");
-      for (var xi = 0; xi < extHosts.length; xi++) {
-        var xh = extHosts[xi];
-        if (xh.closest(".offrefy-root")) continue;
-        if (xh.closest('form[action*="/cart/add"]')) continue;
-        hideBlock(xh);
-      }
-
-      var extFieldsets = sec.querySelectorAll("fieldset.product-form__input, fieldset.js.product-form__input");
-      for (var fi2 = 0; fi2 < extFieldsets.length; fi2++) {
-        var fs = extFieldsets[fi2];
-        if (fs.closest(".offrefy-root")) continue;
-        if (fs.closest('form[action*="/cart/add"]')) continue;
-        if (isQuantityOnlyBlock(fs)) continue;
-        if (!blockHasVariantUi(fs)) continue;
-        hideBlock(fs);
-      }
-
-      var extOptRadios = sec.querySelectorAll('input[type="radio"][name^="options"]');
-      for (var er = 0; er < extOptRadios.length; er++) {
-        var erEl = extOptRadios[er];
-        if (erEl.closest(".offrefy-root")) continue;
-        if (erEl.closest('form[action*="/cart/add"]')) continue;
-        var erw =
-          erEl.closest("fieldset.product-form__input") ||
-          erEl.closest(".product-form__input") ||
-          erEl.closest(".variant-picker") ||
-          erEl.parentElement;
-        hideBlock(erw);
-      }
-    }
-  }
-
-  /**
-   * Hides theme product-form quantity UI (+/−, number input, quantity-input host). Cart qty still syncs from the widget.
-   */
-  function hideThemeNativeQuantitySelectors() {
-    if (document.documentElement.getAttribute("data-offrefy-hide-theme-qty") !== "1") {
-      return;
-    }
-    var seen =
-      typeof WeakSet !== "undefined"
-        ? new WeakSet()
-        : { _a: [], has: function (el) { return this._a.indexOf(el) !== -1; }, add: function (el) { this._a.push(el); } };
-
-    function hideBlock(el) {
-      if (!el || el.closest(".offrefy-root")) return;
-      if (seen.has(el)) return;
-      seen.add(el);
-      el.style.setProperty("display", "none", "important");
-      el.setAttribute("aria-hidden", "true");
-    }
-
-    function rowHasVariantUi(el) {
-      if (!el || !el.querySelector) return false;
-      if (el.querySelector('select[name="id"]')) return true;
-      if (el.querySelector('input[type="radio"][name="id"]')) return true;
-      if (el.querySelector('select[name^="options"]')) return true;
-      if (el.querySelector('input[type="radio"][name^="options"]')) return true;
-      if (el.querySelector('input[type="checkbox"][name^="options"]')) return true;
-      if (el.querySelector("input.swatch-input")) return true;
-      if (el.querySelector("[data-option-value-id]")) return true;
-      if (el.querySelector("[data-option-value]")) return true;
-      return false;
-    }
-
-    var forms = document.querySelectorAll('form[action*="/cart/add"]');
-    for (var fi = 0; fi < forms.length; fi++) {
-      var form = forms[fi];
-      if (form.closest(".offrefy-root")) continue;
-
-      var qHosts = form.querySelectorAll("quantity-input");
-      for (var hi = 0; hi < qHosts.length; hi++) {
-        hideBlock(qHosts[hi]);
-      }
-
-      var qtyInputs = form.querySelectorAll(
-        'input[type="number"][name="quantity"], input[name="quantity"]:not([type="hidden"]), select[name="quantity"]',
-      );
-      for (var qi = 0; qi < qtyInputs.length; qi++) {
-        var inp = qtyInputs[qi];
-        if (String(inp.getAttribute("type") || "").toLowerCase() === "hidden") continue;
-        var row = inp.closest("fieldset.product-form__input") || inp.closest(".product-form__input");
-        var wrap =
-          inp.closest("quantity-input") ||
-          inp.closest(".quantity-input") ||
-          inp.closest(".product-form__quantity") ||
-          inp.closest(".quantity-selector") ||
-          inp.closest(".product-form__quantity-wrapper");
-        if (row && rowHasVariantUi(row)) {
-          var inner =
-            inp.closest("quantity-input") ||
-            inp.closest(".quantity") ||
-            inp.closest("[class*='quantity-selector']");
-          hideBlock(inner || wrap || inp.parentElement);
-        } else {
-          hideBlock(wrap || row || inp.parentElement);
-        }
-      }
-    }
-
-    var sectionRoots = document.querySelectorAll(
-      ".shopify-section--main-product, [id^='MainProduct'], product-info, .product--main .product__info",
-    );
-    for (var sr = 0; sr < sectionRoots.length; sr++) {
-      var sec = sectionRoots[sr];
-      if (!sec || sec.closest(".offrefy-root")) continue;
-      var extQ = sec.querySelectorAll("quantity-input");
-      for (var xi = 0; xi < extQ.length; xi++) {
-        var xq = extQ[xi];
-        if (xq.closest(".offrefy-root")) continue;
-        if (xq.closest('form[action*="/cart/add"]')) continue;
-        hideBlock(xq);
-      }
-    }
-  }
-
-  function applyThemePurchaseUiHides() {
-    hideThemeNativeAddToCartButtons();
-    hideThemeNativeBuyItNowButtons();
-    hideThemeNativeVariantSelectors();
-    hideThemeNativeQuantitySelectors();
-  }
-
-  var vdHidePurchaseUiScheduled = false;
-  function ensureThemePurchaseUiHideObserver() {
-    if (vdHidePurchaseUiObserver || typeof MutationObserver === "undefined") return;
-    vdHidePurchaseUiObserver = new MutationObserver(function (mutations) {
-      for (var i = 0; i < mutations.length; i++) {
-        var t = mutations[i].target;
-        if (
-          t &&
-          t.closest &&
-          (t.closest(".offrefy-root") ||
-            t.closest("cart-drawer") ||
-            t.closest("#CartDrawer") ||
-            t.closest("cart-notification") ||
-            t.closest("#cart-notification"))
-        ) {
-          continue;
-        }
-        if (vdHidePurchaseUiScheduled) return;
-        vdHidePurchaseUiScheduled = true;
-        requestAnimationFrame(function () {
-          vdHidePurchaseUiScheduled = false;
-          applyThemePurchaseUiHides();
-        });
-        return;
-      }
-    });
-    vdHidePurchaseUiObserver.observe(document.body, { childList: true, subtree: true });
-  }
-
-  function scheduleThemePurchaseUiHides() {
-    applyThemePurchaseUiHides();
-    ensureThemePurchaseUiHideObserver();
   }
 
   var FONT_PX_MIN = 10;
@@ -4240,34 +2775,22 @@
     var ui = applyWidgetDisplayToRoot(root, widgetDisplay, heading);
     var isVolumeTable = ui.widgetPresentation === "volume_table";
 
-    if (ui.hideThemeAddToCart) {
-      document.documentElement.setAttribute("data-offrefy-hide-theme-atc", "1");
-    } else {
+    /*
+     * App-block isolation: never hide or mutate theme purchase UI
+     * (ATC / Buy it now / variant / qty), regardless of legacy widget settings.
+     */
+    try {
       document.documentElement.removeAttribute("data-offrefy-hide-theme-atc");
-    }
-    if (ui.hideThemeBuyItNow) {
-      document.documentElement.setAttribute("data-offrefy-hide-theme-bin", "1");
-    } else {
       document.documentElement.removeAttribute("data-offrefy-hide-theme-bin");
-    }
-    if (ui.hideThemeVariantSelector) {
-      document.documentElement.setAttribute("data-offrefy-hide-theme-variant", "1");
-    } else {
       document.documentElement.removeAttribute("data-offrefy-hide-theme-variant");
-    }
-    if (ui.hideThemeQuantitySelector) {
-      document.documentElement.setAttribute("data-offrefy-hide-theme-qty", "1");
-    } else {
       document.documentElement.removeAttribute("data-offrefy-hide-theme-qty");
+    } catch (eHideClear) {
+      void eHideClear;
     }
-    if (
-      ui.hideThemeAddToCart ||
-      ui.hideThemeBuyItNow ||
-      ui.hideThemeVariantSelector ||
-      ui.hideThemeQuantitySelector
-    ) {
-      scheduleThemePurchaseUiHides();
-    }
+    ui.hideThemeAddToCart = false;
+    ui.hideThemeBuyItNow = false;
+    ui.hideThemeVariantSelector = false;
+    ui.hideThemeQuantitySelector = false;
 
     var tiers = campaign.tiers.slice().sort(function (a, b) {
       return (a.minQty | 0) - (b.minQty | 0);
@@ -4325,19 +2848,6 @@
     };
     var rn = "offrefy-tier-" + String(radioName).replace(/[^a-zA-Z0-9_-]/g, "-");
 
-    function readThemeProductFormVariantId() {
-      var forms = document.querySelectorAll('form[action*="/cart/add"]');
-      for (var fi = 0; fi < forms.length; fi++) {
-        var form = forms[fi];
-        if (form.closest(".offrefy-root")) continue;
-        var vs = form.querySelector('select[name="id"]');
-        if (vs && vs.value) return String(vs.value);
-        var hid = form.querySelector('input[name="id"][type="hidden"]');
-        if (hid && hid.value) return String(hid.value);
-      }
-      return "";
-    }
-
     function resolveActiveVariantIdForCart() {
       if (vdShowVariant) {
         var selAdd = mountEl.querySelector(".offrefy-card--selected .offrefy-variant-select");
@@ -4346,8 +2856,6 @@
         }
         if (selAdd) return String(selAdd.value);
       }
-      var fromForm = readThemeProductFormVariantId();
-      if (fromForm) return fromForm;
       return String(root.getAttribute("data-variant-id") || "");
     }
 
@@ -4539,26 +3047,6 @@
       );
     }
 
-    function bindNativeThemeAtcAnalytics() {
-      if (root.getAttribute("data-offrefy-native-atc-bound") === "1") return;
-      root.setAttribute("data-offrefy-native-atc-bound", "1");
-      var form = findThemeProductAddForm();
-      if (!form) return;
-      form.addEventListener(
-        "submit",
-        function () {
-          if (widgetAtcInFlight) return;
-          applyOffrefyPropertiesToForm(form, offrefyAttribution);
-          var vid =
-            readThemeProductFormVariantId() || resolveActiveVariantIdForCart();
-          if (!vid) return;
-          var qty = readThemeProductFormQuantity(stateQty);
-          recordAddToCartAnalytics(qty, vid);
-        },
-        true,
-      );
-    }
-
     function updateAllPrices() {
       var uc = currentUnitCents;
       if (isVolumeTable) {
@@ -4676,36 +3164,26 @@
       var qty = parseInt(String(stateQty), 10) || 1;
       qty = Math.min(VD_MAX_LINE_QTY, Math.max(1, qty));
       var str = String(qty);
-      var liquid = findVdLiquidProductForm(null);
+      var liquid = findVdLiquidProductForm(root);
       if (liquid) {
         var lq =
           liquid.querySelector("[data-offrefy-liquid-qty]") ||
           liquid.querySelector('input[name="quantity"]');
         if (lq) lq.value = str;
       }
-      /*
-       * Never overwrite theme qty on widget paint — that freezes Dawn/Horizon/+
-       * custom steppers on the offer min qty (e.g. stuck at 12).
-       * Push to theme only immediately before widget ATC.
-       */
-      if (forceTheme) {
-        setThemeProductFormQuantity(stateQty);
-      }
+      /* Isolation: never overwrite theme qty steppers. */
+      void forceTheme;
     }
 
     function syncFormVariant(vid) {
-      var form = findThemeProductAddForm();
-      if (!form) return;
-      var vs = form.querySelector('select[name="id"]');
-      if (vs) {
-        vs.value = String(vid);
-        vs.dispatchEvent(new Event("change", { bubbles: true }));
-      }
-      var hid = form.querySelector('input[name="id"][type="hidden"]');
-      if (hid) {
-        hid.value = String(vid);
-        hid.dispatchEvent(new Event("change", { bubbles: true }));
-      }
+      /* Isolation: sync only the in-block liquid form, not the theme product form. */
+      var liquid = findVdLiquidProductForm(root);
+      if (!liquid) return;
+      var idInput =
+        liquid.querySelector("[data-offrefy-liquid-variant-id]") ||
+        liquid.querySelector('input[name="id"]') ||
+        liquid.querySelector('select[name="id"]');
+      if (idInput) idInput.value = String(vid);
     }
 
     function syncAllVariantSelects(vid) {
@@ -4718,24 +3196,24 @@
 
     function scrollToAtc() {
       clampQty();
-      syncQtyToForm(true);
+      syncQtyToForm(false);
       var sel = mountEl.querySelector(".offrefy-card--selected .offrefy-variant-select");
       if (sel) {
         syncFormVariant(sel.value);
         root.setAttribute("data-variant-id", String(sel.value));
       } else {
-        var fb = readThemeProductFormVariantId() || root.getAttribute("data-variant-id");
+        var fb = root.getAttribute("data-variant-id");
         if (fb) syncFormVariant(fb);
       }
-      var form = findThemeProductAddForm();
-      if (form) {
-        form.scrollIntoView({ behavior: "smooth", block: "center" });
-        var btn =
-          findThemeAddToCartButton(form) ||
-          form.querySelector('button[type="submit"]') ||
-          form.querySelector('[name="add"]') ||
-          form.querySelector("button");
-        if (btn && typeof btn.focus === "function") btn.focus();
+      var focusEl =
+        mountEl.querySelector("[data-offrefy-cta]") ||
+        mountEl.querySelector("[data-offrefy-tier-add]") ||
+        root;
+      try {
+        focusEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        if (focusEl && typeof focusEl.focus === "function") focusEl.focus();
+      } catch (eScroll) {
+        void eScroll;
       }
     }
 
@@ -4881,13 +3359,6 @@
     }
 
     var selVariantId = vidRoot || firstAvailableVariantIdInList(variants) || "";
-    if (!vdShowVariant) {
-      var tvSel = readThemeProductFormVariantId();
-      if (tvSel) {
-        selVariantId = tvSel;
-        root.setAttribute("data-variant-id", tvSel);
-      }
-    }
 
     if (isVolumeTable) {
       h.push(
@@ -5198,7 +3669,7 @@
         ev.preventDefault();
         ev.stopPropagation();
         clampQty();
-        syncQtyToForm(true);
+        syncQtyToForm(false);
         var vidAdd = resolveActiveVariantIdForCart();
         if (!vidAdd) {
           scrollToAtc();
@@ -5240,7 +3711,7 @@
         ev.preventDefault();
         ev.stopPropagation();
         clampQty();
-        syncQtyToForm(true);
+        syncQtyToForm(false);
         var vidC = resolveActiveVariantIdForCart();
         if (!vidC) {
           scrollToAtc();
@@ -5275,33 +3746,17 @@
       });
     }
 
-    if (!vdShowVariant && shouldShowVariantPicker(variants)) {
-      document.addEventListener(
-        "change",
-        function vdThemeVariantFollow(ev) {
-          var t = ev.target;
-          if (!t || !t.name || String(t.name) !== "id") return;
-          var form = t.closest && t.closest('form[action*="/cart/add"]');
-          if (!form || form.closest(".offrefy-root")) return;
-          var v = String(t.value || "");
-          if (!v) return;
-          currentUnitCents = readPriceForVariant(v);
-          root.setAttribute("data-variant-id", v);
-          updateAllPrices();
-          updateQtyDisplay();
-          updatePurchaseControlsAvailability();
-        },
-        true,
-      );
-    }
-
+    root.removeAttribute("hidden");
     root.style.display = "";
+    root.style.removeProperty("margin");
+    root.style.removeProperty("padding");
+    root.style.removeProperty("min-height");
+    root.setAttribute("data-offrefy-ready", "1");
     mountEl.hidden = false;
     root.setAttribute("data-offrefy-inited", "1");
-    bindNativeThemeAtcAnalytics();
     trackImpression(campaign, root.getAttribute("data-product-id"));
     offrefyNs().embed = offrefyNs().embed || {};
-    offrefyNs().embed.version = "1.29.9";
+    offrefyNs().embed.version = "1.30.4";
 
   }
   /**
@@ -5452,7 +3907,13 @@
         };
       }
       if (!camp || !camp.tiers || !camp.tiers.length) {
+        root.setAttribute("hidden", "");
         root.style.display = "none";
+        root.style.margin = "0";
+        root.style.padding = "0";
+        root.style.minHeight = "0";
+        root.removeAttribute("data-offrefy-ready");
+        mount.hidden = true;
         return;
       }
       if (cfg && cfg.translations) {
@@ -5554,7 +4015,7 @@
       "https://offrey.xloxi.com";
     var ver =
       (typeof offrefyNs().assetVersion === "string" && offrefyNs().assetVersion) ||
-      "1.29.9";
+      "1.30.4";
     var link = document.createElement("link");
     link.rel = "stylesheet";
     link.href =
@@ -5596,7 +4057,10 @@
 
   function hideAllWidgetRoots() {
     document.querySelectorAll(".offrefy-root").forEach(function (el) {
+      el.setAttribute("hidden", "");
       el.style.display = "none";
+      el.style.margin = "0";
+      el.removeAttribute("data-offrefy-ready");
       el.removeAttribute("data-offrefy-inited");
       var mount = el.querySelector("[data-offrefy-mount]");
       if (mount) mount.hidden = true;
@@ -5618,7 +4082,6 @@
       runWidget(el);
     });
 
-    installCartMutationInterceptor();
     bindCartDrawerDiscountLabelPatching();
     bindStorefrontLocaleWatcher();
     vdLastKnownStorefrontLocale = resolveStorefrontLocale(null) || "en";

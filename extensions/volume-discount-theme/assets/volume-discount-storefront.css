@@ -106,6 +106,17 @@
   --offrefy-fw-normal: 400;
 }
 
+/* No offer yet / no matching campaign — zero layout footprint (stops page shake). */
+[data-offrefy-root].offrefy-qb[hidden] {
+  display: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  border: 0 !important;
+}
+
 .offrefy-qb[data-offrefy-font-scale="compact"] {
   --offrefy-text-xs: clamp(0.75rem, 0.28vw + 0.7rem, 0.8125rem);
   --offrefy-text-sm: clamp(0.8125rem, 0.32vw + 0.74rem, 0.875rem);
