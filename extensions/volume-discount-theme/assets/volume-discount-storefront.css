@@ -1088,9 +1088,29 @@ input.vd-qty-value:focus {
 /* Narrow phones: stack label row then prices (avoid Buy/price overlap).
    30rem ≈ 480px — covers ~383px preview and typical mobile columns. */
 @media (max-width: 30rem) {
+  .volume-discount-embed {
+    --vd-card-pad: 12px;
+    --vd-gap: 0.65rem;
+    --vd-radio: 20px;
+  }
+
+  .vd-cards {
+    gap: 0.55rem;
+  }
+
+  .vd-cards > label.vd-card--badge-top-float:first-of-type {
+    margin-top: 0.55rem;
+  }
+
+  .vd-cards > label.vd-card--badge-top-float ~ label.vd-card--badge-top-float {
+    margin-top: 0.5rem;
+  }
+
   .vd-topbar {
     flex-direction: column;
     align-items: stretch;
+    gap: 0.45rem;
+    margin-bottom: 0.55rem;
   }
 
   .vd-countdown {
@@ -1102,7 +1122,8 @@ input.vd-qty-value:focus {
   .volume-discount-embed .ofd-tier-row {
     flex-wrap: wrap !important;
     align-items: flex-start !important;
-    row-gap: 0.4rem;
+    row-gap: 0.3rem;
+    column-gap: 0.5rem;
   }
 
   .ofd-tier-main,
@@ -1116,6 +1137,7 @@ input.vd-qty-value:focus {
   .volume-discount-embed .ofd-tier-copy {
     min-width: 0 !important;
     max-width: 100%;
+    gap: 0.2rem;
   }
 
   .ofd-tier-qty {
@@ -1132,6 +1154,7 @@ input.vd-qty-value:focus {
     padding-left: 0.35rem;
     align-items: flex-end !important;
     text-align: right !important;
+    gap: 0.1rem;
   }
 
   /* Very tight (~≤400px): full-width price stack under label */
@@ -1151,25 +1174,134 @@ input.vd-qty-value:focus {
       text-align: left !important;
       margin-inline-start: 0 !important;
       padding-left: var(--vd-leader, 2.1rem);
-      margin-top: 0.15rem !important;
+      margin-top: 0.1rem !important;
     }
   }
 
+  /* Expanded tier: tight 2-row grid — no empty right gutter */
+  .vd-card__expand {
+    margin-top: 0.35rem;
+    padding-top: 0.3rem;
+  }
+
+  .vd-card__divider {
+    margin-bottom: 0.3rem;
+  }
+
   .vd-expand-compact {
-    flex-direction: column;
-    align-items: stretch;
+    --vd-compact-control-h: 32px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "idx select"
+      "total trailing";
+    gap: 0.4rem 0.45rem;
+    align-items: center;
+    padding: 0.45rem 0.5rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .vd-expand-compact .vd-tier-idx {
+    grid-area: idx;
+    line-height: var(--vd-compact-control-h, 32px);
+  }
+
+  .vd-expand-compact .vd-select-wrap {
+    grid-area: select;
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .vd-expand-compact .vd-variant-select {
+    width: 100%;
+    max-width: none;
   }
 
   .vd-expand-compact .vd-line-total {
-    margin-inline-start: 0;
+    grid-area: total;
+    margin: 0;
+    width: auto;
+    min-width: 0;
     text-align: start;
-    width: 100%;
+    line-height: 1.2;
+    align-self: center;
   }
 
   .vd-expand-trailing {
-    margin-inline-start: 0;
+    grid-area: trailing;
+    display: inline-flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.35rem;
+    margin: 0;
     width: 100%;
-    justify-content: flex-start;
+    min-width: 0;
+  }
+
+  .vd-expand-compact .vd-qty-stack {
+    align-items: stretch;
+    max-width: none;
+  }
+
+  .vd-expand-compact .vd-qty-group {
+    width: auto;
+  }
+
+  .vd-expand-compact .vd-add-outline {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    padding-inline: 0.55rem;
+  }
+
+  .vd-expand-compact input.vd-qty-value {
+    width: 2.75rem;
+    min-width: 2.5rem;
+    max-width: 3.25rem;
+  }
+
+  /* No variant picker: idx + controls on one useful row */
+  .vd-expand-compact--no-variant {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "idx trailing"
+      "total trailing";
+  }
+
+  .vd-expand-compact--no-variant .vd-expand-trailing {
+    align-self: center;
+  }
+
+  /* No line total: variant row + full-width controls */
+  .vd-expand-compact--no-line-total {
+    grid-template-areas:
+      "idx select"
+      "trailing trailing";
+  }
+
+  .vd-expand-compact--no-variant.vd-expand-compact--no-line-total {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "idx"
+      "trailing";
+  }
+
+  .vd-expand-compact--no-variant.vd-expand-compact--no-line-total .vd-expand-trailing {
+    justify-content: space-between;
+  }
+
+  .vd-cta {
+    margin-top: 0.85rem;
+    min-height: 2.75rem;
+    padding: 0.7rem 1rem;
+  }
+
+  .vd-footnote {
+    margin-top: 0.45rem;
+    max-width: none;
   }
 }
 

@@ -35,7 +35,7 @@
 %}
 <script>
 (function () {
-  var VD_ASSET_VERSION = "1.28.6";
+  var VD_ASSET_VERSION = "1.28.7";
   var APP_ORIGIN = "https://offrey.xloxi.com";
   window.__vdStorefrontLocale = {{ request.locale.iso_code | json }};
   window.__vdAssetVersion = VD_ASSET_VERSION;
@@ -170,9 +170,14 @@
   window.__vdStorefrontAssetsLoaded = true;
   var head = document.head || document.getElementsByTagName("head")[0];
   var cssHref = {{ 'volume-discount-storefront.css' | asset_url | json }};
+  cssHref +=
+    (cssHref.indexOf("?") === -1 ? "?" : "&") +
+    "vd=" +
+    encodeURIComponent(VD_ASSET_VERSION);
   var css = document.createElement("link");
   css.rel = "stylesheet";
   css.href = cssHref;
+  css.setAttribute("data-vd-asset-version", VD_ASSET_VERSION);
   {% if vd_is_product %}
   css.fetchPriority = "high";
   {% endif %}
