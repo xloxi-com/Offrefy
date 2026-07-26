@@ -1926,10 +1926,26 @@
     if (themeForm && themeBtn) {
       return fetchCartItemCount().then(function (before) {
         var prev = before ? before.item_count : 0;
+        var prevVariantQty = cartLineQtyForVariant(before, variantId);
         if (!triggerThemeAtcClick(themeForm, themeBtn)) {
           return Promise.reject(new Error("Theme ATC click failed"));
         }
-        return waitForCartIncrease(prev);
+        return waitForCartIncrease(prev).then(function () {
+          /* Theme may have added only 1 — top-up to the widget tier qty. */
+          return ensureCartHasVariantQuantity(
+            variantId,
+            quantity,
+            attribution,
+          ).then(function (cart) {
+            var afterQty = cartLineQtyForVariant(cart, variantId);
+            if (afterQty <= prevVariantQty) {
+              return Promise.reject(new Error("Theme ATC qty mismatch"));
+            }
+            return refreshThemeCartSectionsAndOpen(true).then(function () {
+              return cart;
+            });
+          });
+        });
       }).catch(function () {
         if (!liquidForm) {
           return Promise.reject(new Error("No theme or liquid product form"));
@@ -1971,7 +1987,8 @@
 
     function add(el) {
       if (!el || (el.closest && el.closest(".vd-storefront-root"))) return;
-      if (String(el.getAttribute("type") || "").toLowerCase() === "hidden") return;
+      /* Include type=hidden — many themes keep qty only as a hidden input while
+         the visible stepper is custom JS (and may stay at 1 after we hide it). */
       if (
         el.closest &&
         el.closest(
@@ -2377,6 +2394,43 @@
       });
   }
 
+  /** Sum of line quantities for a variant id in a /cart.js payload. */
+  function cartLineQtyForVariant(cart, variantId) {
+    var vid = parseInt(String(variantId), 10);
+    if (!Number.isFinite(vid) || vid < 1 || !cart || !Array.isArray(cart.items)) {
+      return 0;
+    }
+    var sum = 0;
+    for (var i = 0; i < cart.items.length; i++) {
+      var it = cart.items[i];
+      var id = parseInt(String(it.variant_id != null ? it.variant_id : it.id), 10);
+      if (id === vid) sum += it.quantity | 0;
+    }
+    return sum;
+  }
+
+  /**
+   * Theme ATC often ignores form qty (hidden stepper / JS state) and adds 1.
+   * After a theme click, top-up remaining units via /cart/add.js if short.
+   */
+  function ensureCartHasVariantQuantity(variantId, desiredQty, attribution) {
+    var want = parseInt(String(desiredQty), 10) || 1;
+    want = Math.min(VD_MAX_LINE_QTY, Math.max(1, want));
+    return fetchCartItemCount().then(function (cart) {
+      var have = cartLineQtyForVariant(cart, variantId);
+      if (have >= want) return cart;
+      var need = want - have;
+      return addVariantToCartViaFetch(
+        variantId,
+        need,
+        false,
+        attribution,
+      ).then(function () {
+        return fetchCartItemCount();
+      });
+    });
+  }
+
   /**
    * Fallback: /cart/add.js then refresh LIVE drawer sections before opening.
    * Never open an empty/stale drawer via cart-icon click.
@@ -2487,18 +2541,26 @@
 
   function addVariantToCart(variantId, quantity, action, attribution) {
     var openDrawer = shouldOpenDrawerAfterAdd(action);
-    /* Always prefer theme ATC for add / open-drawer CTAs — works across Shopify themes. */
+    var qty = parseInt(String(quantity), 10) || 1;
+    qty = Math.min(VD_MAX_LINE_QTY, Math.max(1, qty));
+
+    /*
+     * Theme native ATC often hardcodes qty=1 (hidden qty / JS state), so for
+     * tier quantities > 1 always use /cart/add.js with an explicit quantity.
+     * Qty 1 can still use theme click for best drawer UX.
+     */
     var useThemeAtc =
-      !action ||
-      action === "add_to_cart" ||
-      action === "add_to_cart_open_drawer";
+      qty <= 1 &&
+      (!action ||
+        action === "add_to_cart" ||
+        action === "add_to_cart_open_drawer");
 
     if (useThemeAtc) {
-      return addByClickingThemeAtc(variantId, quantity, attribution).catch(
+      return addByClickingThemeAtc(variantId, qty, attribution).catch(
         function () {
           return addVariantToCartViaFetch(
             variantId,
-            quantity,
+            qty,
             openDrawer,
             attribution,
           );
@@ -2507,7 +2569,7 @@
     }
     return addVariantToCartViaFetch(
       variantId,
-      quantity,
+      qty,
       openDrawer,
       attribution,
     );
@@ -4793,7 +4855,7 @@
     trackImpression(campaign, root.getAttribute("data-product-id"));
     window.VolumeDiscount = window.VolumeDiscount || {};
     window.VolumeDiscount.embed = window.VolumeDiscount.embed || {};
-    window.VolumeDiscount.embed.version = "1.28.3";
+    window.VolumeDiscount.embed.version = "1.28.5";
 
   }
   /**
