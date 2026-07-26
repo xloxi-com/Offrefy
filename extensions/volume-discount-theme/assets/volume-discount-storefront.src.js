@@ -1643,8 +1643,7 @@
       drawer.hasAttribute("open") ||
       drawer.hasAttribute("data-open") ||
       drawer.classList.contains("active") ||
-      drawer.classList.contains("is-open") ||
-      drawer.classList.contains("animate")
+      drawer.classList.contains("is-open")
     );
   }
 
@@ -1716,13 +1715,13 @@
   }
 
   function forceOpenThemeCartDrawer() {
-    /* One-shot open only. Delayed icon clicks re-open after the merchant
-       closes the drawer (Valor / Dawn race with section HTML refresh). */
     openThemeCartDrawer();
-    if (isThemeCartDrawerOpen()) return;
     setTimeout(function () {
       if (!isThemeCartDrawerOpen()) clickHeaderCartIcon();
-    }, 80);
+    }, 100);
+    setTimeout(function () {
+      if (!isThemeCartDrawerOpen()) clickHeaderCartIcon();
+    }, 350);
   }
 
   function updateCartCountBubbles(cart) {
@@ -2136,10 +2135,12 @@
 
   /**
    * Cross-theme ATC:
-   * 1) Theme native Add to Cart click (best drawer UX)
-   * 2) Liquid {% form 'product' %} bridge via /cart/add.js (all free/premium themes)
+   * 1) Theme native Add to Cart click (theme ATC button function only)
+   * 2) Liquid {% form 'product' %} bridge via /cart/add.js (fallback)
+   * Drawer open follows `openDrawer` (ctaButtonAction), never forced.
    */
-  function addByClickingThemeAtc(variantId, quantity, attribution) {
+  function addByClickingThemeAtc(variantId, quantity, attribution, openDrawer) {
+    var wantDrawer = !!openDrawer;
     var root = document.querySelector(".offrefy-root");
     var liquidForm = findVdLiquidProductForm(root);
     var themeForm = findThemeProductAddForm();
@@ -2192,12 +2193,17 @@
             if (afterQty <= prevVariantQty) {
               return Promise.reject(new Error("Theme ATC qty mismatch"));
             }
-            /* Theme ATC usually opened the drawer already — refresh only. */
-            return refreshThemeCartSectionsAndOpen(!isThemeCartDrawerOpen()).then(
-              function () {
-                return cart;
-              },
-            );
+            /*
+             * Theme ATC already opened/updated the drawer. Do NOT rewrite
+             * cart-drawer section HTML here — that destroys close-button
+             * listeners and leaves the drawer stuck open.
+             */
+            publishThemeCartUpdate(cart);
+            scheduleCartDrawerDiscountLabelPatch();
+            if (wantDrawer && !isThemeCartDrawerOpen()) {
+              openThemeCartDrawer();
+            }
+            return cart;
           });
         });
       }).catch(function () {
@@ -2207,14 +2213,19 @@
         return addVariantToCartViaFetch(
           variantId,
           quantity,
-          true,
+          wantDrawer,
           attribution,
         );
       });
     }
 
     if (liquidForm) {
-      return addVariantToCartViaFetch(variantId, quantity, true, attribution);
+      return addVariantToCartViaFetch(
+        variantId,
+        quantity,
+        wantDrawer,
+        attribution,
+      );
     }
 
     return Promise.reject(new Error("No theme or liquid product form"));
@@ -2517,9 +2528,9 @@
         findThemeCartDrawerEl();
       if (drawer && typeof drawer.renderContents === "function") {
         try {
-          /* Dawn renderContents updates HTML and opens the drawer. */
+          /* Dawn renderContents(parsedState, open) — honor openDrawer. */
           if (drawer.renderContents.length >= 2) {
-            drawer.renderContents(response, true);
+            drawer.renderContents(response, !!openDrawer);
           } else {
             drawer.renderContents(response);
           }
@@ -2894,25 +2905,43 @@
             if (!cart || !(cart.item_count > 0)) {
               throw new Error("Could not add to cart");
             }
-            /* Prefer sections from /cart/add.js response (Valor + Dawn) */
-            var openedFromAdd = false;
-            if (body && body.sections && cartResponseHasSectionHtml(body.sections)) {
-              applyThemeCartSectionsFromResponse(body, openDrawer);
-              dispatchValorCartAdded(body);
-              if (openDrawer) openedFromAdd = isThemeCartDrawerOpen();
-            } else if (openDrawer) {
+            if (openDrawer) {
+              /* One section apply OR one refresh — never both (double rewrite breaks close). */
+              if (
+                body &&
+                body.sections &&
+                cartResponseHasSectionHtml(body.sections)
+              ) {
+                applyThemeCartSectionsFromResponse(body, true);
+                dispatchValorCartAdded(body);
+                publishThemeCartUpdate(cart);
+                scheduleCartDrawerDiscountLabelPatch();
+                if (!isThemeCartDrawerOpen()) forceOpenThemeCartDrawer();
+                return body;
+              }
               dispatchValorCartAdded(body || {});
+              publishThemeCartUpdate(cart);
+              return refreshThemeCartSectionsAndOpen(true).then(function () {
+                publishThemeCartUpdate(cart);
+                if (!isThemeCartDrawerOpen()) forceOpenThemeCartDrawer();
+                return body;
+              });
+            }
+            /*
+             * Quiet add (top-up / add_to_cart CTA): never rewrite an already-open
+             * drawer — that destroys theme close-button bindings.
+             */
+            if (
+              body &&
+              body.sections &&
+              cartResponseHasSectionHtml(body.sections) &&
+              !isThemeCartDrawerOpen()
+            ) {
+              applyThemeCartSectionsFromResponse(body, false);
             }
             publishThemeCartUpdate(cart);
-            if (!openDrawer) return body;
-            /* Re-sync drawer HTML without force-reopening — a second
-               openDrawer=true fights the theme close button (Valor). */
-            return refreshThemeCartSectionsAndOpen(!openedFromAdd).then(function () {
-              if (!openedFromAdd && !isThemeCartDrawerOpen()) {
-                forceOpenThemeCartDrawer();
-              }
-              return body;
-            });
+            scheduleCartDrawerDiscountLabelPatch();
+            return body;
           });
         });
       });
@@ -2929,27 +2958,29 @@
     qty = Math.min(VD_MAX_LINE_QTY, Math.max(1, qty));
 
     /*
-     * Theme native ATC often hardcodes qty=1 (hidden qty / JS state), so for
-     * tier quantities > 1 always use /cart/add.js with an explicit quantity.
-     * Qty 1 can still use theme click for best drawer UX.
+     * Prefer theme Add to Cart button for ATC CTAs (any tier qty): sync form
+     * qty/variant, then click the theme button so theme ATC handlers run.
+     * Fall back to /cart/add.js only if theme click fails.
      */
     var useThemeAtc =
-      qty <= 1 &&
-      (!action ||
-        action === "add_to_cart" ||
-        action === "add_to_cart_open_drawer");
+      !action ||
+      action === "add_to_cart" ||
+      action === "add_to_cart_open_drawer";
 
     if (useThemeAtc) {
-      return addByClickingThemeAtc(variantId, qty, attribution).catch(
-        function () {
-          return addVariantToCartViaFetch(
-            variantId,
-            qty,
-            openDrawer,
-            attribution,
-          );
-        },
-      );
+      return addByClickingThemeAtc(
+        variantId,
+        qty,
+        attribution,
+        openDrawer,
+      ).catch(function () {
+        return addVariantToCartViaFetch(
+          variantId,
+          qty,
+          openDrawer,
+          attribution,
+        );
+      });
     }
     return addVariantToCartViaFetch(
       variantId,
@@ -5270,7 +5301,7 @@
     bindNativeThemeAtcAnalytics();
     trackImpression(campaign, root.getAttribute("data-product-id"));
     offrefyNs().embed = offrefyNs().embed || {};
-    offrefyNs().embed.version = "1.29.8";
+    offrefyNs().embed.version = "1.29.9";
 
   }
   /**
@@ -5523,7 +5554,7 @@
       "https://offrey.xloxi.com";
     var ver =
       (typeof offrefyNs().assetVersion === "string" && offrefyNs().assetVersion) ||
-      "1.29.8";
+      "1.29.9";
     var link = document.createElement("link");
     link.rel = "stylesheet";
     link.href =
