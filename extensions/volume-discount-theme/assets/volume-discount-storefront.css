@@ -1085,32 +1085,32 @@ input.vd-qty-value:focus {
   opacity: 0.92;
 }
 
-/* Narrow phones: stack label row then prices (avoid Buy/price overlap).
-   30rem ≈ 480px — covers ~383px preview and typical mobile columns. */
+/* Narrow phones (~≤480px): keep label | prices on one row (flush right),
+   expand as select-full + controls row — no overlap / no empty right gutter. */
 @media (max-width: 30rem) {
   .volume-discount-embed {
-    --vd-card-pad: 12px;
-    --vd-gap: 0.65rem;
-    --vd-radio: 20px;
+    --vd-card-pad: 10px;
+    --vd-gap: 0.5rem;
+    --vd-radio: 18px;
   }
 
   .vd-cards {
-    gap: 0.55rem;
+    gap: 0.5rem;
   }
 
   .vd-cards > label.vd-card--badge-top-float:first-of-type {
-    margin-top: 0.55rem;
+    margin-top: 0.5rem;
   }
 
   .vd-cards > label.vd-card--badge-top-float ~ label.vd-card--badge-top-float {
-    margin-top: 0.5rem;
+    margin-top: 0.45rem;
   }
 
   .vd-topbar {
     flex-direction: column;
     align-items: stretch;
-    gap: 0.45rem;
-    margin-bottom: 0.55rem;
+    gap: 0.4rem;
+    margin-bottom: 0.5rem;
   }
 
   .vd-countdown {
@@ -1120,187 +1120,236 @@ input.vd-qty-value:focus {
 
   .ofd-tier-row,
   .volume-discount-embed .ofd-tier-row {
-    flex-wrap: wrap !important;
-    align-items: flex-start !important;
-    row-gap: 0.3rem;
-    column-gap: 0.5rem;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 0.4rem !important;
   }
 
   .ofd-tier-main,
   .volume-discount-embed .ofd-tier-main {
     flex: 1 1 auto !important;
     min-width: 0 !important;
-    max-width: calc(100% - 5.5rem);
+    max-width: none !important;
   }
 
   .ofd-tier-copy,
   .volume-discount-embed .ofd-tier-copy {
     min-width: 0 !important;
     max-width: 100%;
-    gap: 0.2rem;
+    gap: 0.15rem;
   }
 
   .ofd-tier-qty {
     overflow-wrap: anywhere;
   }
 
+  .ofd-tier-save--under,
+  .vd-option-subtext--under {
+    font-size: 11px;
+    line-height: 1.3;
+  }
+
   .ofd-tier-prices,
   .volume-discount-embed .ofd-tier-prices {
     flex: 0 0 auto !important;
+    flex-shrink: 0 !important;
     width: auto !important;
-    max-width: 45%;
+    max-width: none !important;
     margin-inline-start: auto !important;
     margin-top: 0 !important;
-    padding-left: 0.35rem;
+    padding-left: 0.25rem;
     align-items: flex-end !important;
     text-align: right !important;
-    gap: 0.1rem;
+    gap: 0.08rem;
   }
 
-  /* Very tight (~≤400px): full-width price stack under label */
-  @media (max-width: 25rem) {
-    .ofd-tier-main,
-    .volume-discount-embed .ofd-tier-main {
-      flex: 1 1 100% !important;
-      max-width: 100%;
-    }
-
-    .ofd-tier-prices,
-    .volume-discount-embed .ofd-tier-prices {
-      width: 100% !important;
-      max-width: 100%;
-      flex-basis: 100% !important;
-      align-items: flex-start !important;
-      text-align: left !important;
-      margin-inline-start: 0 !important;
-      padding-left: var(--vd-leader, 2.1rem);
-      margin-top: 0.1rem !important;
-    }
+  .ofd-tier-was {
+    font-size: 11px;
   }
 
-  /* Expanded tier: tight 2-row grid — no empty right gutter */
+  .ofd-tier-amt {
+    font-size: var(--vd-fs-price, 15px);
+    white-space: nowrap;
+  }
+
+  /* Expanded tier: variant full-width, then # · price · qty · Add */
   .vd-card__expand {
-    margin-top: 0.35rem;
-    padding-top: 0.3rem;
+    margin-top: 0.3rem;
+    padding-top: 0.25rem;
   }
 
   .vd-card__divider {
-    margin-bottom: 0.3rem;
+    margin-bottom: 0.25rem;
   }
 
-  .vd-expand-compact {
-    --vd-compact-control-h: 32px;
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
+  .vd-expand-compact,
+  .volume-discount-embed .vd-expand-compact {
+    --vd-compact-control-h: 34px;
+    display: grid !important;
+    grid-template-columns: auto auto minmax(0, 1fr);
     grid-template-areas:
-      "idx select"
-      "total trailing";
-    gap: 0.4rem 0.45rem;
+      "select select select"
+      "idx total trailing";
+    column-gap: 0.4rem;
+    row-gap: 0.4rem;
     align-items: center;
-    padding: 0.45rem 0.5rem;
+    padding: 0.4rem 0.45rem;
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
   }
 
-  .vd-expand-compact .vd-tier-idx {
+  .vd-expand-compact .vd-tier-idx,
+  .volume-discount-embed .vd-expand-compact .vd-tier-idx {
     grid-area: idx;
-    line-height: var(--vd-compact-control-h, 32px);
+    line-height: var(--vd-compact-control-h, 34px);
+    flex: none;
   }
 
-  .vd-expand-compact .vd-select-wrap {
+  .vd-expand-compact .vd-select-wrap,
+  .volume-discount-embed .vd-expand-compact .vd-select-wrap {
     grid-area: select;
-    flex: 1 1 auto;
+    flex: none;
     width: 100%;
     min-width: 0;
-    max-width: none;
+    max-width: none !important;
   }
 
-  .vd-expand-compact .vd-variant-select {
+  .vd-expand-compact .vd-variant-select,
+  .volume-discount-embed .vd-expand-compact .vd-variant-select {
     width: 100%;
     max-width: none;
   }
 
-  .vd-expand-compact .vd-line-total {
+  .vd-expand-compact .vd-line-total,
+  .volume-discount-embed .vd-expand-compact .vd-line-total {
     grid-area: total;
-    margin: 0;
+    margin: 0 !important;
     width: auto;
-    min-width: 0;
+    min-width: min-content;
+    max-width: 100%;
     text-align: start;
     line-height: 1.2;
     align-self: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  .vd-expand-trailing {
+  .vd-expand-trailing,
+  .volume-discount-embed .vd-expand-trailing {
     grid-area: trailing;
-    display: inline-flex;
+    display: inline-flex !important;
     flex-wrap: nowrap;
     align-items: center;
     justify-content: flex-end;
-    gap: 0.35rem;
-    margin: 0;
-    width: 100%;
+    justify-self: end;
+    gap: 0.3rem;
+    margin: 0 !important;
+    width: auto;
     min-width: 0;
+    max-width: 100%;
   }
 
   .vd-expand-compact .vd-qty-stack {
     align-items: stretch;
     max-width: none;
+    flex: 0 0 auto;
   }
 
   .vd-expand-compact .vd-qty-group {
     width: auto;
+    flex: 0 0 auto;
   }
 
   .vd-expand-compact .vd-add-outline {
     flex: 0 0 auto;
     white-space: nowrap;
-    padding-inline: 0.55rem;
+    padding-inline: 0.5rem;
+    font-size: 12px;
   }
 
-  .vd-expand-compact input.vd-qty-value {
-    width: 2.75rem;
-    min-width: 2.5rem;
-    max-width: 3.25rem;
+  .vd-expand-compact input.vd-qty-value,
+  .volume-discount-embed .vd-expand-compact input.vd-qty-value {
+    width: 2.35rem !important;
+    min-width: 2.2rem !important;
+    max-width: 2.75rem !important;
   }
 
-  /* No variant picker: idx + controls on one useful row */
-  .vd-expand-compact--no-variant {
+  /* No variant: single controls row */
+  .vd-expand-compact--no-variant,
+  .volume-discount-embed .vd-expand-compact--no-variant {
+    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-areas: "idx total trailing";
+  }
+
+  /* No line total */
+  .vd-expand-compact--no-line-total,
+  .volume-discount-embed .vd-expand-compact--no-line-total {
     grid-template-columns: auto minmax(0, 1fr);
     grid-template-areas:
-      "idx trailing"
-      "total trailing";
+      "select select"
+      "idx trailing";
   }
 
-  .vd-expand-compact--no-variant .vd-expand-trailing {
-    align-self: center;
-  }
-
-  /* No line total: variant row + full-width controls */
-  .vd-expand-compact--no-line-total {
-    grid-template-areas:
-      "idx select"
-      "trailing trailing";
-  }
-
-  .vd-expand-compact--no-variant.vd-expand-compact--no-line-total {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "idx"
-      "trailing";
+  .vd-expand-compact--no-variant.vd-expand-compact--no-line-total,
+  .volume-discount-embed .vd-expand-compact--no-variant.vd-expand-compact--no-line-total {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: "idx trailing";
   }
 
   .vd-expand-compact--no-variant.vd-expand-compact--no-line-total .vd-expand-trailing {
-    justify-content: space-between;
+    justify-content: flex-end;
+    width: 100%;
+  }
+
+  /* Ultra-narrow: qty row under price so nothing clips */
+  @media (max-width: 22.5rem) {
+    .vd-expand-compact,
+    .volume-discount-embed .vd-expand-compact {
+      grid-template-columns: auto minmax(0, 1fr);
+      grid-template-areas:
+        "select select"
+        "idx total"
+        "trailing trailing";
+    }
+
+    .vd-expand-trailing,
+    .volume-discount-embed .vd-expand-trailing {
+      justify-self: stretch;
+      justify-content: space-between;
+      width: 100%;
+    }
+
+    .vd-expand-compact--no-variant,
+    .volume-discount-embed .vd-expand-compact--no-variant {
+      grid-template-areas:
+        "idx total"
+        "trailing trailing";
+    }
+
+    .vd-expand-compact--no-line-total,
+    .volume-discount-embed .vd-expand-compact--no-line-total {
+      grid-template-areas:
+        "select select"
+        "idx trailing";
+    }
+
+    .vd-expand-compact--no-variant.vd-expand-compact--no-line-total,
+    .volume-discount-embed
+      .vd-expand-compact--no-variant.vd-expand-compact--no-line-total {
+      grid-template-areas: "idx trailing";
+    }
   }
 
   .vd-cta {
-    margin-top: 0.85rem;
-    min-height: 2.75rem;
-    padding: 0.7rem 1rem;
+    margin-top: 0.75rem;
+    min-height: 2.65rem;
+    padding: 0.65rem 1rem;
   }
 
   .vd-footnote {
-    margin-top: 0.45rem;
+    margin-top: 0.4rem;
     max-width: none;
   }
 }
