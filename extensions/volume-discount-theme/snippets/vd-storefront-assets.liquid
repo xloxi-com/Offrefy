@@ -35,30 +35,30 @@
 %}
 <script>
 (function () {
-  var VD_ASSET_VERSION = "1.28.9";
+  var VD_ASSET_VERSION = "1.29.2";
   var APP_ORIGIN = "https://offrey.xloxi.com";
-  window.__vdStorefrontLocale = {{ request.locale.iso_code | json }};
-  window.__vdAssetVersion = VD_ASSET_VERSION;
-  window.__vdAppOrigin = APP_ORIGIN;
+  window.__xloxiStorefrontLocale = {{ request.locale.iso_code | json }};
+  window.__xloxiAssetVersion = VD_ASSET_VERSION;
+  window.__xloxiAppOrigin = APP_ORIGIN;
   {% if vd_widget and vd_widget.rev %}
-  window.__vdConfigRev = {{ vd_widget.rev | json }};
+  window.__xloxiConfigRev = {{ vd_widget.rev | json }};
   {% else %}
-  window.__vdConfigRev = "";
+  window.__xloxiConfigRev = "";
   {% endif %}
   {% if vd_widget and vd_widget.maxDiscountProducts %}
-  window.__vdMaxDiscountProducts = {{ vd_widget.maxDiscountProducts | json }};
+  window.__xloxiMaxDiscountProducts = {{ vd_widget.maxDiscountProducts | json }};
   {% else %}
-  window.__vdMaxDiscountProducts = 500;
+  window.__xloxiMaxDiscountProducts = 500;
   {% endif %}
-  window.__vdCartBadgeTemplates = {
+  window.__xloxiCartBadgeTemplates = {
     locale: {{ locale_base | json }},
     discount: {{ vd_cart_discount | json }},
     qty: {{ vd_cart_discount_qty | json }}
   };
   {% if vd_widget and vd_widget.translations %}
-  window.__vdStorefrontTranslations = {{ vd_widget.translations | json }};
+  window.__xloxiStorefrontTranslations = {{ vd_widget.translations | json }};
   {% endif %}
-  window.__vdCustomer = {
+  window.__xloxiCustomer = {
     loggedIn: {% if customer %}true{% else %}false{% endif %},
     tags: {% if customer %}{{ customer.tags | json }}{% else %}[]{% endif %}
   };
@@ -74,9 +74,9 @@
     var pid = {{ vd_product.id | json }};
     var vid = {{ vd_product.selected_or_first_available_variant.id | json }};
     if (!shop || !pid) return;
-    var rev = window.__vdConfigRev ? String(window.__vdConfigRev) : "";
+    var rev = window.__xloxiConfigRev ? String(window.__xloxiConfigRev) : "";
     var key = rev + "|" + String(pid) + "|" + String(vid || "");
-    window.__vdConfigPrefetchKey = key;
+    window.__xloxiConfigPrefetchKey = key;
     var u =
       APP_ORIGIN +
       "/widget-config?shop=" +
@@ -87,7 +87,7 @@
       (rev ? "&rev=" + encodeURIComponent(rev) : "") +
       "&_=" +
       encodeURIComponent(String(Math.floor(Date.now() / 5000)));
-    window.__vdConfigPrefetch = fetch(u, {
+    window.__xloxiConfigPrefetch = fetch(u, {
       credentials: "omit",
       cache: "no-store",
       headers: { Accept: "application/json" },
@@ -108,7 +108,7 @@
     try {
       if (window.Shopify && window.Shopify.designMode) return;
     } catch (e) {}
-    var loc = window.__vdStorefrontLocale;
+    var loc = window.__xloxiStorefrontLocale;
     if (!loc && document.documentElement) {
       var lang = document.documentElement.getAttribute("lang");
       if (lang) loc = lang;
@@ -161,13 +161,13 @@
   var existing = document.querySelector('script[src*="volume-discount-storefront.js"]');
   if (existing) {
     if (existing.getAttribute("data-vd-asset-version") === VD_ASSET_VERSION) {
-      window.__vdStorefrontAssetsLoaded = true;
+      window.__xloxiStorefrontAssetsLoaded = true;
       return;
     }
     existing.parentNode && existing.parentNode.removeChild(existing);
   }
 
-  window.__vdStorefrontAssetsLoaded = true;
+  window.__xloxiStorefrontAssetsLoaded = true;
   var head = document.head || document.getElementsByTagName("head")[0];
   var cssHref = {{ 'volume-discount-storefront.css' | asset_url | json }};
   cssHref +=

@@ -6,7 +6,7 @@
 /* Liquid {% form 'product' %} ATC bridge — visually hidden, all themes.
    Themes often force button[name="add"] { display:flex !important }, so we
    hide the whole form + submit with !important (inline style is backup). */
-.vd-liquid-product-form {
+.xloxi-liquid-product-form {
   position: absolute !important;
   left: -9999px !important;
   top: 0 !important;
@@ -23,9 +23,9 @@
   pointer-events: none !important;
 }
 
-.vd-liquid-product-form .vd-liquid-submit,
-.vd-liquid-product-form button[name="add"],
-.vd-liquid-product-form [data-vd-liquid-submit] {
+.xloxi-liquid-product-form .xloxi-liquid-submit,
+.xloxi-liquid-product-form button[name="add"],
+.xloxi-liquid-product-form [data-xloxi-liquid-submit] {
   display: none !important;
   visibility: hidden !important;
   position: absolute !important;
@@ -39,7 +39,7 @@
   pointer-events: none !important;
 }
 
-.volume-discount-embed {
+.xloxi-qb {
   box-sizing: border-box;
   /* Fill the theme product column — no inner max-width so CTA/cards align with form buttons */
   margin-block: clamp(0.75rem, 3vw, 1.25rem);
@@ -123,7 +123,7 @@
   --vd-fw-normal: 400;
 }
 
-.volume-discount-embed[data-vd-font-scale="compact"] {
+.xloxi-qb[data-xloxi-font-scale="compact"] {
   --vd-text-xs: clamp(0.75rem, 0.28vw + 0.7rem, 0.8125rem);
   --vd-text-sm: clamp(0.8125rem, 0.32vw + 0.74rem, 0.875rem);
   --vd-text-md: clamp(0.875rem, 0.4vw + 0.78rem, 0.9375rem);
@@ -131,7 +131,7 @@
   --vd-text-xl: clamp(1rem, 0.65vw + 0.82rem, 1.125rem);
 }
 
-.volume-discount-embed[data-vd-font-scale="comfortable"] {
+.xloxi-qb[data-xloxi-font-scale="comfortable"] {
   --vd-text-xs: clamp(0.875rem, 0.4vw + 0.78rem, 0.9375rem);
   --vd-text-sm: clamp(0.9375rem, 0.5vw + 0.82rem, 1rem);
   --vd-text-md: clamp(1rem, 0.6vw + 0.86rem, 1.125rem);
@@ -141,23 +141,23 @@
 
 /* Tight horizontal inset only on very narrow viewports (edge-to-edge in product column otherwise) */
 @media (max-width: 379px) {
-  .volume-discount-embed {
+  .xloxi-qb {
     padding-inline: clamp(0.25rem, 2.5vw, 0.5rem);
   }
 }
 
-.volume-discount-embed *,
-.volume-discount-embed *::before,
-.volume-discount-embed *::after {
+.xloxi-qb *,
+.xloxi-qb *::before,
+.xloxi-qb *::after {
   box-sizing: border-box;
 }
 
-.volume-discount-embed__inner {
+.xloxi-qb__inner {
   width: 100%;
   max-width: 100%;
 }
 
-.vd-bundle {
+.xloxi-bundle {
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -167,7 +167,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.vd-cards {
+.xloxi-cards {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -178,7 +178,7 @@
   overflow: visible;
 }
 
-.vd-section-title {
+.xloxi-section-title {
   margin: 0 0 clamp(0.45rem, 2vw, 0.65rem);
   padding: 0;
   text-align: center;
@@ -189,8 +189,8 @@
   color: inherit;
 }
 
-/* Header — layout from widgetDisplay (data-vd-header-*, --vd-heading-text-align, --vd-countdown-justify) */
-.vd-topbar {
+/* Header — layout from widgetDisplay (data-xloxi-header-*, --vd-heading-text-align, --vd-countdown-justify) */
+.xloxi-topbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -201,58 +201,58 @@
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
-.volume-discount-embed[data-vd-header-layout="stacked"] .vd-topbar {
+.xloxi-qb[data-xloxi-header-layout="stacked"] .xloxi-topbar {
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
 }
 
-.vd-topbar .vd-title {
+.xloxi-topbar .xloxi-title {
   order: 1;
 }
 
-.vd-topbar .vd-countdown {
+.xloxi-topbar .xloxi-countdown {
   order: 2;
 }
 
-.volume-discount-embed[data-vd-header-swap="1"] .vd-topbar .vd-title {
+.xloxi-qb[data-xloxi-header-swap="1"] .xloxi-topbar .xloxi-title {
   order: 2;
 }
 
-.volume-discount-embed[data-vd-header-swap="1"] .vd-topbar .vd-countdown {
+.xloxi-qb[data-xloxi-header-swap="1"] .xloxi-topbar .xloxi-countdown {
   order: 1;
 }
 
-.volume-discount-embed[data-vd-header-layout="stacked"] .vd-topbar .vd-title {
+.xloxi-qb[data-xloxi-header-layout="stacked"] .xloxi-topbar .xloxi-title {
   flex: 0 0 auto;
   width: 100%;
 }
 
-.volume-discount-embed[data-vd-header-layout="stacked"] .vd-topbar .vd-countdown {
+.xloxi-qb[data-xloxi-header-layout="stacked"] .xloxi-topbar .xloxi-countdown {
   flex: 0 0 auto;
   width: 100%;
   min-width: 0;
 }
 
-/* Narrow screens: stack + center when enabled in app (data-vd-header-mobile-stack="1") */
+/* Narrow screens: stack + center when enabled in app (data-xloxi-header-mobile-stack="1") */
 @media (max-width: 749px) {
-  .volume-discount-embed[data-vd-header-mobile-stack="1"][data-vd-header-layout="split"]
-    .vd-topbar,
-  .volume-discount-embed[data-vd-header-mobile-stack="1"][data-vd-header-layout="stacked"]
-    .vd-topbar {
+  .xloxi-qb[data-xloxi-header-mobile-stack="1"][data-xloxi-header-layout="split"]
+    .xloxi-topbar,
+  .xloxi-qb[data-xloxi-header-mobile-stack="1"][data-xloxi-header-layout="stacked"]
+    .xloxi-topbar {
     flex-direction: column;
     align-items: center;
     justify-content: center;
   }
 
-  .volume-discount-embed[data-vd-header-mobile-stack="1"] .vd-topbar .vd-title {
+  .xloxi-qb[data-xloxi-header-mobile-stack="1"] .xloxi-topbar .xloxi-title {
     flex: 0 0 auto;
     width: 100%;
     min-width: 0;
     text-align: center;
   }
 
-  .volume-discount-embed[data-vd-header-mobile-stack="1"] .vd-topbar .vd-countdown {
+  .xloxi-qb[data-xloxi-header-mobile-stack="1"] .xloxi-topbar .xloxi-countdown {
     flex: 0 0 auto;
     width: 100%;
     min-width: 0;
@@ -260,7 +260,7 @@
   }
 }
 
-.vd-title {
+.xloxi-title {
   margin: 0;
   font-family: var(--vd-theme-font-heading), var(--vd-font-emoji);
   font-size: var(--vd-fs-title, 20px);
@@ -273,7 +273,7 @@
   text-align: var(--vd-heading-text-align, start);
 }
 
-.vd-countdown {
+.xloxi-countdown {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -287,9 +287,9 @@
 }
 
 /* Timer Right: hug the trailing edge of the widget (same as cards / CTA). */
-.volume-discount-embed[data-vd-header-layout="split"][data-vd-countdown-align="end"]
-  .vd-topbar
-  .vd-countdown {
+.xloxi-qb[data-xloxi-header-layout="split"][data-xloxi-countdown-align="end"]
+  .xloxi-topbar
+  .xloxi-countdown {
   margin-inline-start: auto;
   margin-inline-end: 0;
   justify-content: flex-end;
@@ -299,32 +299,32 @@
  * Heading Right (+ timer Right): pack title + countdown against the trailing edge
  * so the timer starts at the widget’s right end (no gutter).
  */
-.volume-discount-embed[data-vd-header-layout="split"][data-vd-heading-align="end"]
-  .vd-topbar {
+.xloxi-qb[data-xloxi-header-layout="split"][data-xloxi-heading-align="end"]
+  .xloxi-topbar {
   justify-content: flex-end;
 }
 
-.volume-discount-embed[data-vd-header-layout="split"][data-vd-heading-align="end"]
-  .vd-topbar
-  .vd-title {
+.xloxi-qb[data-xloxi-header-layout="split"][data-xloxi-heading-align="end"]
+  .xloxi-topbar
+  .xloxi-title {
   flex: 0 1 auto;
   text-align: end;
 }
 
-.volume-discount-embed[data-vd-header-layout="stacked"][data-vd-countdown-align="end"]
-  .vd-topbar
-  .vd-countdown {
+.xloxi-qb[data-xloxi-header-layout="stacked"][data-xloxi-countdown-align="end"]
+  .xloxi-topbar
+  .xloxi-countdown {
   justify-content: flex-end;
 }
 
-.volume-discount-embed[data-vd-header-layout="stacked"][data-vd-heading-align="end"]
-  .vd-topbar
-  .vd-title {
+.xloxi-qb[data-xloxi-header-layout="stacked"][data-xloxi-heading-align="end"]
+  .xloxi-topbar
+  .xloxi-title {
   text-align: end;
   width: 100%;
 }
 
-.vd-countdown-line {
+.xloxi-countdown-line {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
@@ -332,18 +332,18 @@
   max-width: 100%;
 }
 
-.volume-discount-embed[data-vd-header-layout="stacked"] .vd-countdown {
+.xloxi-qb[data-xloxi-header-layout="stacked"] .xloxi-countdown {
   text-align: inherit;
 }
 
-.vd-countdown-muted {
+.xloxi-countdown-muted {
   font-size: var(--vd-fs-cd-label, 13px);
   font-weight: var(--vd-fw-normal, 400);
   color: var(--vd-muted);
   line-height: 1.3;
 }
 
-.vd-countdown-badge {
+.xloxi-countdown-badge {
   display: inline-flex;
   align-items: center;
   min-height: 1.75rem;
@@ -362,16 +362,16 @@
 /* Room for floating top badge (half pill sits above card top).
    Apply to EVERY badge card — not only badge→badge siblings — so a
    non-badge card above does not leave the pill stuck to its bottom edge. */
-.vd-cards > label.vd-card--badge-top-float {
+.xloxi-cards > label.xloxi-card--badge-top-float {
   margin-top: 0.75rem;
 }
 
-.vd-cards > label.vd-card--badge-top-float:first-of-type {
+.xloxi-cards > label.xloxi-card--badge-top-float:first-of-type {
   margin-top: 0.55rem;
 }
 
 /* Hide native radio — theme CSS often restyles inputs and caused a “double circle” */
-.vd-sr-only {
+.xloxi-sr-only {
   position: absolute !important;
   width: 1px !important;
   height: 1px !important;
@@ -387,7 +387,7 @@
   -webkit-appearance: none !important;
 }
 
-.volume-discount-embed label.vd-card > input[type="radio"].vd-sr-only {
+.xloxi-qb label.xloxi-card > input[type="radio"].xloxi-sr-only {
   position: absolute !important;
   left: -9999px !important;
   top: auto !important;
@@ -395,7 +395,7 @@
   height: 1px !important;
 }
 
-.vd-card {
+.xloxi-card {
   display: block;
   width: 100%;
   min-width: 0;
@@ -417,7 +417,7 @@
 
 /* Themes often set product labels to inline/auto width — unselected cards
    then shrink-wrap (prices look inset) while selected expand forces 100%. */
-.volume-discount-embed label.vd-card {
+.xloxi-qb label.xloxi-card {
   display: block !important;
   width: 100% !important;
   max-width: 100% !important;
@@ -425,11 +425,11 @@
 }
 
 /* Floating badge on top edge (badge position: top left / center / right) */
-label.vd-card.vd-card--badge-top-float {
+.xloxi-qb label.xloxi-card.xloxi-card--badge-top-float {
   position: relative;
 }
 
-.vd-card:hover:not(.vd-card--selected) {
+.xloxi-card:hover:not(.xloxi-card--selected) {
   border-color: #cfcfcf;
   box-shadow: var(--vd-shadow-card-hover);
 }
@@ -439,7 +439,7 @@ label.vd-card.vd-card--badge-top-float {
  * product form labels. Force our neutral border + shadow inside the embed.
  * Keep border-width identical selected/unselected to avoid horizontal jump.
  */
-.volume-discount-embed label.vd-card:not(.vd-card--selected) {
+.xloxi-qb label.xloxi-card:not(.xloxi-card--selected) {
   border-width: 2px !important;
   border-style: solid !important;
   border-color: var(--vd-card-border) !important;
@@ -448,13 +448,13 @@ label.vd-card.vd-card--badge-top-float {
   transform: none !important;
 }
 
-.volume-discount-embed label.vd-card:not(.vd-card--selected):hover {
+.xloxi-qb label.xloxi-card:not(.xloxi-card--selected):hover {
   border-color: #cfcfcf !important;
   box-shadow: var(--vd-shadow-card-hover) !important;
   transform: none !important;
 }
 
-.volume-discount-embed label.vd-card.vd-card--selected {
+.xloxi-qb label.xloxi-card.xloxi-card--selected {
   border-width: 2px !important;
   border-style: solid !important;
   border-color: var(--vd-maroon) !important;
@@ -463,26 +463,26 @@ label.vd-card.vd-card--badge-top-float {
   transform: none !important;
 }
 
-.volume-discount-embed label.vd-card.vd-card--selected:hover {
+.xloxi-qb label.xloxi-card.xloxi-card--selected:hover {
   border-color: var(--vd-maroon) !important;
   box-shadow: var(--vd-shadow-selected) !important;
   transform: none !important;
 }
 
-.volume-discount-embed label.vd-card:focus,
-.volume-discount-embed label.vd-card:focus-within,
-.volume-discount-embed label.vd-card:focus-visible {
+.xloxi-qb label.xloxi-card:focus,
+.xloxi-qb label.xloxi-card:focus-within,
+.xloxi-qb label.xloxi-card:focus-visible {
   outline: none !important;
 }
 
 /* Keyboard focus — brand color (not theme blue) */
-.vd-card:focus-within input.vd-sr-only:focus-visible ~ .vd-card__inner {
+.xloxi-card:focus-within input.xloxi-sr-only:focus-visible ~ .xloxi-card__inner {
   outline: 2px solid var(--vd-maroon);
   outline-offset: 2px;
   border-radius: calc(var(--vd-radius-card) - 4px);
 }
 
-.vd-card--selected {
+.xloxi-card--selected {
   background: linear-gradient(
     165deg,
     #fffefb 0%,
@@ -495,13 +495,13 @@ label.vd-card.vd-card--badge-top-float {
   transform: none;
 }
 
-.vd-card--selected:hover {
+.xloxi-card--selected:hover {
   border-color: var(--vd-maroon);
   box-shadow: var(--vd-shadow-selected);
   transform: none;
 }
 
-.vd-card__inner {
+.xloxi-card__inner {
   display: block;
   width: 100%;
   max-width: 100%;
@@ -509,7 +509,7 @@ label.vd-card.vd-card--badge-top-float {
   padding: var(--vd-card-pad);
 }
 
-.volume-discount-embed .vd-card__inner {
+.xloxi-qb .xloxi-card__inner {
   display: block !important;
   width: 100% !important;
   max-width: 100% !important;
@@ -530,14 +530,14 @@ label.vd-card.vd-card--badge-top-float {
 
 /* Some themes reset `span { display:inline }` / flex inside product forms —
    prices then pack next to the label (short labels → gap on the right). */
-.volume-discount-embed .ofd-tier-row,
-.volume-discount-embed .ofd-tier-main,
-.volume-discount-embed .ofd-tier-copy,
-.volume-discount-embed .ofd-tier-prices {
+.xloxi-qb .ofd-tier-row,
+.xloxi-qb .ofd-tier-main,
+.xloxi-qb .ofd-tier-copy,
+.xloxi-qb .ofd-tier-prices {
   display: flex !important;
 }
 
-.volume-discount-embed .ofd-tier-row {
+.xloxi-qb .ofd-tier-row {
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
@@ -554,7 +554,7 @@ label.vd-card.vd-card--badge-top-float {
   min-width: 0;
 }
 
-.volume-discount-embed .ofd-tier-main {
+.xloxi-qb .ofd-tier-main {
   flex: 1 1 auto !important;
   min-width: 0 !important;
 }
@@ -567,11 +567,11 @@ label.vd-card.vd-card--badge-top-float {
   min-width: 0;
 }
 
-.volume-discount-embed .ofd-tier-copy {
+.xloxi-qb .ofd-tier-copy {
   flex-direction: column !important;
 }
 
-.vd-radio-circle {
+.xloxi-radio-circle {
   flex-shrink: 0;
   width: var(--vd-radio);
   height: var(--vd-radio);
@@ -585,12 +585,12 @@ label.vd-card.vd-card--badge-top-float {
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
-.vd-card--selected .vd-radio-circle {
+.xloxi-card--selected .xloxi-radio-circle {
   border-color: var(--vd-radio-accent, var(--vd-maroon));
 }
 
 /* Inner dot: 50% of outer circle (percent avoids fragile calc() on --vd-radio). */
-.vd-card--selected .vd-radio-circle::after {
+.xloxi-card--selected .xloxi-radio-circle::after {
   content: "";
   width: 50%;
   height: 50%;
@@ -617,7 +617,7 @@ label.vd-card.vd-card--badge-top-float {
   line-height: 1.25;
 }
 
-.vd-badge-pill {
+.xloxi-badge-pill {
   display: inline-flex;
   align-items: center;
   max-width: 100%;
@@ -637,13 +637,13 @@ label.vd-card.vd-card--badge-top-float {
 }
 
 /* Badge on its own row (below label or after subtext) — not inline with .ofd-tier-qty */
-.vd-badge-pill--row {
+.xloxi-badge-pill--row {
   align-self: flex-start;
   margin-top: 0.05rem;
 }
 
 /* Top-edge badge overlapping card top border — align via modifier class */
-.vd-card__badge-top--float {
+.xloxi-card__badge-top--float {
   position: absolute;
   top: 0;
   z-index: 2;
@@ -653,7 +653,7 @@ label.vd-card.vd-card--badge-top-float {
   box-sizing: border-box;
 }
 
-.vd-card__badge-top--float.vd-card__badge-top--align-end {
+.xloxi-card__badge-top--float.xloxi-card__badge-top--align-end {
   right: var(--vd-card-pad);
   left: auto;
   transform: translateY(-50%);
@@ -661,7 +661,7 @@ label.vd-card.vd-card--badge-top-float {
   max-width: calc(100% - 2 * var(--vd-card-pad));
 }
 
-.vd-card__badge-top--float.vd-card__badge-top--align-start {
+.xloxi-card__badge-top--float.xloxi-card__badge-top--align-start {
   left: var(--vd-card-pad);
   right: auto;
   transform: translateY(-50%);
@@ -669,7 +669,7 @@ label.vd-card.vd-card--badge-top-float {
   max-width: calc(100% - 2 * var(--vd-card-pad));
 }
 
-.vd-card__badge-top--float.vd-card__badge-top--align-center {
+.xloxi-card__badge-top--float.xloxi-card__badge-top--align-center {
   left: 50%;
   right: auto;
   transform: translate(-50%, -50%);
@@ -678,13 +678,13 @@ label.vd-card.vd-card--badge-top-float {
   max-width: calc(100% - 2 * var(--vd-card-pad));
 }
 
-.vd-card__badge-top--float .vd-badge-pill {
+.xloxi-card__badge-top--float .xloxi-badge-pill {
   pointer-events: auto;
   max-width: 100%;
 }
 
 /* Stacked above strike/price in the right column */
-.vd-badge-pill--pricecol {
+.xloxi-badge-pill--pricecol {
   align-self: flex-end;
   margin-bottom: 0.18rem;
 }
@@ -702,7 +702,7 @@ label.vd-card.vd-card--badge-top-float {
   margin-inline-start: auto;
 }
 
-.volume-discount-embed .ofd-tier-prices {
+.xloxi-qb .ofd-tier-prices {
   flex-direction: column !important;
   align-items: flex-end !important;
   justify-content: center !important;
@@ -754,7 +754,7 @@ label.vd-card.vd-card--badge-top-float {
   max-width: 100%;
 }
 
-.vd-option-subtext--under {
+.xloxi-option-subtext--under {
   display: block;
   margin-top: 0;
   font-size: var(--vd-fs-option-subtext, var(--vd-fs-save, 12px));
@@ -767,18 +767,18 @@ label.vd-card.vd-card--badge-top-float {
 }
 
 /* Expanded tier — single compact row (# · variant · total · qty · Add) */
-.vd-card__expand {
+.xloxi-card__expand {
   display: none;
   width: 100%;
   margin-top: 0.45rem;
   padding-top: 0.45rem;
 }
 
-.vd-card:has(input.vd-sr-only:checked) .vd-card__expand {
+.xloxi-card:has(input.xloxi-sr-only:checked) .xloxi-card__expand {
   display: block;
 }
 
-.vd-card__divider {
+.xloxi-card__divider {
   height: 1px;
   margin: 0 0 0.4rem;
   border: 0;
@@ -791,7 +791,7 @@ label.vd-card.vd-card--badge-top-float {
   );
 }
 
-.vd-expand-compact {
+.xloxi-expand-compact {
   /* One height for variant select, qty strip, and “+ Add” (30px incl. borders via box-sizing) */
   --vd-compact-control-h: 30px;
   display: flex;
@@ -805,16 +805,16 @@ label.vd-card.vd-card--badge-top-float {
   border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-.vd-expand-compact--no-variant .vd-line-total,
-.vd-expand-compact--no-qty .vd-line-total {
+.xloxi-expand-compact--no-variant .xloxi-line-total,
+.xloxi-expand-compact--no-qty .xloxi-line-total {
   margin-inline-start: 0.25rem;
 }
 
-.vd-expand-compact--no-line-total .vd-expand-trailing {
+.xloxi-expand-compact--no-line-total .xloxi-expand-trailing {
   margin-inline-start: auto;
 }
 
-.vd-expand-trailing {
+.xloxi-expand-trailing {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
@@ -822,7 +822,7 @@ label.vd-card.vd-card--badge-top-float {
   margin-inline-start: auto;
 }
 
-.vd-tier-idx {
+.xloxi-tier-idx {
   font-size: var(--vd-fs-cd-label, 12px);
   font-weight: var(--vd-fw-normal, 400);
   color: var(--vd-muted);
@@ -830,13 +830,13 @@ label.vd-card.vd-card--badge-top-float {
   flex: 0 0 auto;
 }
 
-.vd-select-wrap {
+.xloxi-select-wrap {
   flex: 1 1 6.5rem;
   min-width: min(100%, 5.5rem);
   max-width: 12rem;
 }
 
-.vd-variant-select {
+.xloxi-variant-select {
   box-sizing: border-box;
   width: 100%;
   min-height: var(--vd-compact-control-h, 30px);
@@ -851,17 +851,17 @@ label.vd-card.vd-card--badge-top-float {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.vd-variant-select:hover {
+.xloxi-variant-select:hover {
   border-color: #c8c8c8;
 }
 
-.vd-variant-select:focus {
+.xloxi-variant-select:focus {
   outline: none;
   border-color: var(--vd-maroon);
   box-shadow: 0 0 0 3px rgba(107, 29, 30, 0.12);
 }
 
-.vd-qty-stack {
+.xloxi-qty-stack {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -870,7 +870,7 @@ label.vd-card.vd-card--badge-top-float {
   max-width: 100%;
 }
 
-.vd-cart-qty-alert {
+.xloxi-cart-qty-alert {
   margin: 0;
   padding: 0;
   font-size: var(--vd-fs-save, 12px);
@@ -882,11 +882,11 @@ label.vd-card.vd-card--badge-top-float {
   box-sizing: border-box;
 }
 
-.vd-cart-qty-alert[hidden] {
+.xloxi-cart-qty-alert[hidden] {
   display: none !important;
 }
 
-.vd-cart-qty-alert--global {
+.xloxi-cart-qty-alert--global {
   margin: 0.55rem 0 0;
   padding: 0.55rem 0.85rem;
   max-width: none;
@@ -896,7 +896,7 @@ label.vd-card.vd-card--badge-top-float {
   font-size: var(--vd-text-sm, 0.9375rem);
 }
 
-.vd-qty-group {
+.xloxi-qty-group {
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
@@ -911,7 +911,7 @@ label.vd-card.vd-card--badge-top-float {
   background: var(--vd-surface);
 }
 
-.vd-qty-btn {
+.xloxi-qty-btn {
   box-sizing: border-box;
   width: var(--vd-compact-control-h, 30px);
   min-width: var(--vd-compact-control-h, 30px);
@@ -934,29 +934,29 @@ label.vd-card.vd-card--badge-top-float {
     color 0.15s ease;
 }
 
-.vd-qty-btn:hover:not(:disabled) {
+.xloxi-qty-btn:hover:not(:disabled) {
   background: linear-gradient(180deg, #fdf8f8 0%, #f5eded 100%);
   color: var(--vd-maroon);
 }
 
-.vd-qty-btn:active:not(:disabled) {
+.xloxi-qty-btn:active:not(:disabled) {
   background: #efe8e8;
 }
 
-.vd-qty-btn:focus-visible {
+.xloxi-qty-btn:focus-visible {
   position: relative;
   z-index: 1;
   outline: 2px solid var(--vd-maroon);
   outline-offset: -2px;
 }
 
-.vd-qty-btn:disabled {
+.xloxi-qty-btn:disabled {
   cursor: not-allowed;
   opacity: 0.38;
   color: #888;
 }
 
-.vd-qty-value {
+.xloxi-qty-value {
   box-sizing: border-box;
   min-width: 2.25rem;
   display: inline-flex;
@@ -975,7 +975,7 @@ label.vd-card.vd-card--badge-top-float {
   letter-spacing: 0.02em;
 }
 
-input.vd-qty-value {
+.xloxi-qb input.xloxi-qty-value {
   box-sizing: border-box;
   display: block;
   flex: 0 0 auto;
@@ -998,12 +998,12 @@ input.vd-qty-value {
   text-align: center;
 }
 
-input.vd-qty-value:focus {
+.xloxi-qb input.xloxi-qty-value:focus {
   outline: none;
   background: rgba(255, 255, 255, 0.35);
 }
 
-.vd-line-total {
+.xloxi-line-total {
   font-weight: var(--vd-fw-strong, 700);
   font-size: var(--vd-fs-price, 16px);
   line-height: var(--vd-compact-control-h, 30px);
@@ -1011,7 +1011,7 @@ input.vd-qty-value:focus {
   text-align: right;
 }
 
-.vd-add-outline {
+.xloxi-add-outline {
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
@@ -1036,27 +1036,27 @@ input.vd-qty-value:focus {
     border-color 0.15s ease;
 }
 
-.vd-add-outline:hover:not(:disabled) {
+.xloxi-add-outline:hover:not(:disabled) {
   background: linear-gradient(180deg, #fff8f8 0%, #fceeee 100%);
   border-color: var(--vd-maroon);
 }
 
-.vd-add-outline:active:not(:disabled) {
+.xloxi-add-outline:active:not(:disabled) {
   transform: translateY(1px);
 }
 
-.vd-add-outline:disabled {
+.xloxi-add-outline:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.vd-add-outline:focus-visible {
+.xloxi-add-outline:focus-visible {
   outline: 2px solid var(--vd-maroon);
   outline-offset: 2px;
 }
 
 /* CTA — min 48px tap height on touch */
-.vd-cta {
+.xloxi-cta {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1079,26 +1079,26 @@ input.vd-qty-value:focus {
     transform 0.12s ease;
 }
 
-.vd-cta:hover:not(:disabled) {
+.xloxi-cta:hover:not(:disabled) {
   background: var(--vd-maroon-cta-hover);
 }
 
-.vd-cta:active:not(:disabled) {
+.xloxi-cta:active:not(:disabled) {
   transform: translateY(1px);
 }
 
-.vd-cta:disabled {
+.xloxi-cta:disabled {
   opacity: 0.55;
   cursor: not-allowed;
   transform: none;
 }
 
-.vd-cta:focus-visible {
+.xloxi-cta:focus-visible {
   outline: 2px solid var(--vd-maroon);
   outline-offset: 2px;
 }
 
-.vd-stock-alert {
+.xloxi-stock-alert {
   margin: 0.65rem 0 0;
   padding: 0.55rem 0.85rem;
   border-radius: var(--vd-radius-control, 10px);
@@ -1111,7 +1111,7 @@ input.vd-qty-value:focus {
   box-sizing: border-box;
 }
 
-.vd-stock-alert[hidden] {
+.xloxi-stock-alert[hidden] {
   display: none !important;
   margin: 0;
   padding: 0;
@@ -1119,7 +1119,7 @@ input.vd-qty-value:focus {
   overflow: hidden;
 }
 
-.vd-footnote {
+.xloxi-footnote {
   margin: clamp(0.55rem, 2vw, 0.75rem) 0 0;
   font-size: var(--vd-fs-footnote, 12px);
   font-weight: var(--vd-fw-normal, 400);
@@ -1134,63 +1134,63 @@ input.vd-qty-value:focus {
 /* Narrow phones (~≤480px): keep label | prices on one row (flush right),
    expand as select-full + controls row — no overlap / no empty right gutter. */
 @media (max-width: 30rem) {
-  .volume-discount-embed {
+  .xloxi-qb {
     --vd-card-pad: 10px;
     --vd-gap: 0.5rem;
     --vd-radio: 18px;
   }
 
-  .vd-cards {
+  .xloxi-cards {
     gap: 0.65rem;
   }
 
-  .vd-cards > label.vd-card--badge-top-float {
+  .xloxi-cards > label.xloxi-card--badge-top-float {
     margin-top: 0.95rem;
   }
 
-  .vd-cards > label.vd-card--badge-top-float:first-of-type {
+  .xloxi-cards > label.xloxi-card--badge-top-float:first-of-type {
     margin-top: 0.65rem;
   }
 
-  .vd-topbar {
+  .xloxi-topbar {
     flex-direction: column;
     align-items: stretch;
     gap: 0.4rem;
     margin-bottom: 0.5rem;
   }
 
-  .vd-countdown {
+  .xloxi-countdown {
     justify-content: var(--vd-countdown-justify, flex-end);
   }
 
-  .volume-discount-embed[data-vd-countdown-align="end"] .vd-countdown {
+  .xloxi-qb[data-xloxi-countdown-align="end"] .xloxi-countdown {
     justify-content: flex-end;
   }
 
-  .volume-discount-embed[data-vd-countdown-align="start"] .vd-countdown {
+  .xloxi-qb[data-xloxi-countdown-align="start"] .xloxi-countdown {
     justify-content: flex-start;
   }
 
-  .volume-discount-embed[data-vd-countdown-align="center"] .vd-countdown {
+  .xloxi-qb[data-xloxi-countdown-align="center"] .xloxi-countdown {
     justify-content: center;
   }
 
   .ofd-tier-row,
-  .volume-discount-embed .ofd-tier-row {
+  .xloxi-qb .ofd-tier-row {
     flex-wrap: nowrap !important;
     align-items: center !important;
     gap: 0.4rem !important;
   }
 
   .ofd-tier-main,
-  .volume-discount-embed .ofd-tier-main {
+  .xloxi-qb .ofd-tier-main {
     flex: 1 1 auto !important;
     min-width: 0 !important;
     max-width: none !important;
   }
 
   .ofd-tier-copy,
-  .volume-discount-embed .ofd-tier-copy {
+  .xloxi-qb .ofd-tier-copy {
     min-width: 0 !important;
     max-width: 100%;
     gap: 0.15rem;
@@ -1201,13 +1201,13 @@ input.vd-qty-value:focus {
   }
 
   .ofd-tier-save--under,
-  .vd-option-subtext--under {
+  .xloxi-option-subtext--under {
     font-size: 11px;
     line-height: 1.3;
   }
 
   .ofd-tier-prices,
-  .volume-discount-embed .ofd-tier-prices {
+  .xloxi-qb .ofd-tier-prices {
     flex: 0 0 auto !important;
     flex-shrink: 0 !important;
     width: auto !important;
@@ -1230,17 +1230,17 @@ input.vd-qty-value:focus {
   }
 
   /* Expanded tier: variant full-width, then # · price · qty · Add */
-  .vd-card__expand {
+  .xloxi-card__expand {
     margin-top: 0.3rem;
     padding-top: 0.25rem;
   }
 
-  .vd-card__divider {
+  .xloxi-card__divider {
     margin-bottom: 0.25rem;
   }
 
-  .vd-expand-compact,
-  .volume-discount-embed .vd-expand-compact {
+  .xloxi-expand-compact,
+  .xloxi-qb .xloxi-expand-compact {
     --vd-compact-control-h: 34px;
     display: grid !important;
     grid-template-columns: auto auto minmax(0, 1fr);
@@ -1256,15 +1256,15 @@ input.vd-qty-value:focus {
     box-sizing: border-box;
   }
 
-  .vd-expand-compact .vd-tier-idx,
-  .volume-discount-embed .vd-expand-compact .vd-tier-idx {
+  .xloxi-expand-compact .xloxi-tier-idx,
+  .xloxi-qb .xloxi-expand-compact .xloxi-tier-idx {
     grid-area: idx;
     line-height: var(--vd-compact-control-h, 34px);
     flex: none;
   }
 
-  .vd-expand-compact .vd-select-wrap,
-  .volume-discount-embed .vd-expand-compact .vd-select-wrap {
+  .xloxi-expand-compact .xloxi-select-wrap,
+  .xloxi-qb .xloxi-expand-compact .xloxi-select-wrap {
     grid-area: select;
     flex: none;
     width: 100%;
@@ -1272,14 +1272,14 @@ input.vd-qty-value:focus {
     max-width: none !important;
   }
 
-  .vd-expand-compact .vd-variant-select,
-  .volume-discount-embed .vd-expand-compact .vd-variant-select {
+  .xloxi-expand-compact .xloxi-variant-select,
+  .xloxi-qb .xloxi-expand-compact .xloxi-variant-select {
     width: 100%;
     max-width: none;
   }
 
-  .vd-expand-compact .vd-line-total,
-  .volume-discount-embed .vd-expand-compact .vd-line-total {
+  .xloxi-expand-compact .xloxi-line-total,
+  .xloxi-qb .xloxi-expand-compact .xloxi-line-total {
     grid-area: total;
     margin: 0 !important;
     width: auto;
@@ -1293,8 +1293,8 @@ input.vd-qty-value:focus {
     text-overflow: ellipsis;
   }
 
-  .vd-expand-trailing,
-  .volume-discount-embed .vd-expand-trailing {
+  .xloxi-expand-trailing,
+  .xloxi-qb .xloxi-expand-trailing {
     grid-area: trailing;
     display: inline-flex !important;
     flex-wrap: nowrap;
@@ -1308,62 +1308,62 @@ input.vd-qty-value:focus {
     max-width: 100%;
   }
 
-  .vd-expand-compact .vd-qty-stack {
+  .xloxi-expand-compact .xloxi-qty-stack {
     align-items: stretch;
     max-width: none;
     flex: 0 0 auto;
   }
 
-  .vd-expand-compact .vd-qty-group {
+  .xloxi-expand-compact .xloxi-qty-group {
     width: auto;
     flex: 0 0 auto;
   }
 
-  .vd-expand-compact .vd-add-outline {
+  .xloxi-expand-compact .xloxi-add-outline {
     flex: 0 0 auto;
     white-space: nowrap;
     padding-inline: 0.5rem;
     font-size: 12px;
   }
 
-  .vd-expand-compact input.vd-qty-value,
-  .volume-discount-embed .vd-expand-compact input.vd-qty-value {
+  .xloxi-expand-compact input.xloxi-qty-value,
+  .xloxi-qb .xloxi-expand-compact input.xloxi-qty-value {
     width: 2.35rem !important;
     min-width: 2.2rem !important;
     max-width: 2.75rem !important;
   }
 
   /* No variant: single controls row */
-  .vd-expand-compact--no-variant,
-  .volume-discount-embed .vd-expand-compact--no-variant {
+  .xloxi-expand-compact--no-variant,
+  .xloxi-qb .xloxi-expand-compact--no-variant {
     grid-template-columns: auto auto minmax(0, 1fr);
     grid-template-areas: "idx total trailing";
   }
 
   /* No line total */
-  .vd-expand-compact--no-line-total,
-  .volume-discount-embed .vd-expand-compact--no-line-total {
+  .xloxi-expand-compact--no-line-total,
+  .xloxi-qb .xloxi-expand-compact--no-line-total {
     grid-template-columns: auto minmax(0, 1fr);
     grid-template-areas:
       "select select"
       "idx trailing";
   }
 
-  .vd-expand-compact--no-variant.vd-expand-compact--no-line-total,
-  .volume-discount-embed .vd-expand-compact--no-variant.vd-expand-compact--no-line-total {
+  .xloxi-expand-compact--no-variant.xloxi-expand-compact--no-line-total,
+  .xloxi-qb .xloxi-expand-compact--no-variant.xloxi-expand-compact--no-line-total {
     grid-template-columns: auto minmax(0, 1fr);
     grid-template-areas: "idx trailing";
   }
 
-  .vd-expand-compact--no-variant.vd-expand-compact--no-line-total .vd-expand-trailing {
+  .xloxi-expand-compact--no-variant.xloxi-expand-compact--no-line-total .xloxi-expand-trailing {
     justify-content: flex-end;
     width: 100%;
   }
 
   /* Ultra-narrow: qty row under price so nothing clips */
   @media (max-width: 22.5rem) {
-    .vd-expand-compact,
-    .volume-discount-embed .vd-expand-compact {
+    .xloxi-expand-compact,
+    .xloxi-qb .xloxi-expand-compact {
       grid-template-columns: auto minmax(0, 1fr);
       grid-template-areas:
         "select select"
@@ -1371,41 +1371,41 @@ input.vd-qty-value:focus {
         "trailing trailing";
     }
 
-    .vd-expand-trailing,
-    .volume-discount-embed .vd-expand-trailing {
+    .xloxi-expand-trailing,
+    .xloxi-qb .xloxi-expand-trailing {
       justify-self: stretch;
       justify-content: space-between;
       width: 100%;
     }
 
-    .vd-expand-compact--no-variant,
-    .volume-discount-embed .vd-expand-compact--no-variant {
+    .xloxi-expand-compact--no-variant,
+    .xloxi-qb .xloxi-expand-compact--no-variant {
       grid-template-areas:
         "idx total"
         "trailing trailing";
     }
 
-    .vd-expand-compact--no-line-total,
-    .volume-discount-embed .vd-expand-compact--no-line-total {
+    .xloxi-expand-compact--no-line-total,
+    .xloxi-qb .xloxi-expand-compact--no-line-total {
       grid-template-areas:
         "select select"
         "idx trailing";
     }
 
-    .vd-expand-compact--no-variant.vd-expand-compact--no-line-total,
-    .volume-discount-embed
-      .vd-expand-compact--no-variant.vd-expand-compact--no-line-total {
+    .xloxi-expand-compact--no-variant.xloxi-expand-compact--no-line-total,
+    .xloxi-qb
+      .xloxi-expand-compact--no-variant.xloxi-expand-compact--no-line-total {
       grid-template-areas: "idx trailing";
     }
   }
 
-  .vd-cta {
+  .xloxi-cta {
     margin-top: 0.75rem;
     min-height: 2.65rem;
     padding: 0.65rem 1rem;
   }
 
-  .vd-footnote {
+  .xloxi-footnote {
     margin-top: 0.4rem;
     max-width: none;
   }
@@ -1413,45 +1413,77 @@ input.vd-qty-value:focus {
 
 /*
  * Hide theme variant UI when Display → “Hide variant selector in theme” is on.
+ * Only while an Offrefy widget root is on the page (:has(.xloxi-root)) so collection
+ * / other templates are never affected by leftover html flags.
  * JS also sets display:none on nodes; these rules catch Dawn/Horizon pickers and reduce FOUC.
  */
-html[data-vd-hide-theme-variant="1"] form[action*="/cart/add"] variant-selects,
-html[data-vd-hide-theme-variant="1"] form[action*="/cart/add"] variant-radios {
+html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+  .shopify-section--main-product
+  form[action*="/cart/add"]
+  variant-selects,
+html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+  .shopify-section--main-product
+  form[action*="/cart/add"]
+  variant-radios,
+html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+  product-info
+  form[action*="/cart/add"]
+  variant-selects,
+html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+  product-info
+  form[action*="/cart/add"]
+  variant-radios {
   display: none !important;
 }
 
-html[data-vd-hide-theme-variant="1"] form[action*="/cart/add"] fieldset.product-form__input:has(
-    input[type="radio"][name^="options"]
-  ),
-html[data-vd-hide-theme-variant="1"] form[action*="/cart/add"] fieldset.product-form__input:has(
-    select[name^="options"]
-  ),
-html[data-vd-hide-theme-variant="1"] form[action*="/cart/add"] fieldset.product-form__input:has(
-    select[name="id"]
-  ),
-html[data-vd-hide-theme-variant="1"] form[action*="/cart/add"] .product-form__input:has(
-    input[type="radio"][name^="options"]
-  ),
-html[data-vd-hide-theme-variant="1"] form[action*="/cart/add"] .product-form__input:has(
-    select[name^="options"]
-  ) {
+html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+  .shopify-section--main-product
+  form[action*="/cart/add"]
+  fieldset.product-form__input:has(input[type="radio"][name^="options"]),
+html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+  .shopify-section--main-product
+  form[action*="/cart/add"]
+  fieldset.product-form__input:has(select[name^="options"]),
+html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+  .shopify-section--main-product
+  form[action*="/cart/add"]
+  fieldset.product-form__input:has(select[name="id"]),
+html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+  .shopify-section--main-product
+  form[action*="/cart/add"]
+  .product-form__input:has(input[type="radio"][name^="options"]),
+html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+  .shopify-section--main-product
+  form[action*="/cart/add"]
+  .product-form__input:has(select[name^="options"]) {
   display: none !important;
 }
 
-html[data-vd-hide-theme-variant="1"] .shopify-section--main-product variant-selects,
-html[data-vd-hide-theme-variant="1"] .shopify-section--main-product variant-radios,
-html[data-vd-hide-theme-variant="1"] product-info variant-selects,
-html[data-vd-hide-theme-variant="1"] product-info variant-radios {
+html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+  .shopify-section--main-product
+  variant-selects,
+html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+  .shopify-section--main-product
+  variant-radios,
+html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root) product-info variant-selects,
+html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root) product-info variant-radios {
   display: none !important;
 }
 
 /* Theme quantity control — Display → “Hide quantity selector in theme” */
-html[data-vd-hide-theme-qty="1"] form[action*="/cart/add"] quantity-input,
-html[data-vd-hide-theme-qty="1"] form[action*="/cart/add"] .product-form__quantity {
+html[data-xloxi-hide-theme-qty="1"]:has(.xloxi-root)
+  .shopify-section--main-product
+  form[action*="/cart/add"]
+  quantity-input,
+html[data-xloxi-hide-theme-qty="1"]:has(.xloxi-root)
+  .shopify-section--main-product
+  form[action*="/cart/add"]
+  .product-form__quantity {
   display: none !important;
 }
 
-html[data-vd-hide-theme-qty="1"]
+html[data-xloxi-hide-theme-qty="1"]:has(.xloxi-root)
+  .shopify-section--main-product
   form[action*="/cart/add"]
   fieldset.product-form__input:has(input[name="quantity"]:not([type="hidden"])):not(
     :has([name^="options"])
@@ -1459,27 +1491,32 @@ html[data-vd-hide-theme-qty="1"]
   display: none !important;
 }
 
-html[data-vd-hide-theme-qty="1"]
+html[data-xloxi-hide-theme-qty="1"]:has(.xloxi-root)
+  .shopify-section--main-product
   form[action*="/cart/add"]
-  .product-form__input:has(input[name="quantity"]:not([type="hidden"])):not(:has([name^="options"])) {
+  .product-form__input:has(input[name="quantity"]:not([type="hidden"])):not(
+    :has([name^="options"])
+  ) {
   display: none !important;
 }
 
-html[data-vd-hide-theme-qty="1"] .shopify-section--main-product quantity-input,
-html[data-vd-hide-theme-qty="1"] product-info quantity-input {
+html[data-xloxi-hide-theme-qty="1"]:has(.xloxi-root)
+  .shopify-section--main-product
+  quantity-input,
+html[data-xloxi-hide-theme-qty="1"]:has(.xloxi-root) product-info quantity-input {
   display: none !important;
 }
 
 /*
  * Volume table — parity with admin Product Page preview
  * (`QuantityBreaksTailwindPreview` → `.volumeTableWrap` / `.volumeTable`).
- * Do not override `.vd-topbar` here: use Display “Heading layout” + data-vd-header-* like the preview.
+ * Do not override `.xloxi-topbar` here: use Display “Heading layout” + data-xloxi-header-* like the preview.
  */
-.vd-bundle--volume-table .vd-title {
+.xloxi-bundle--volume-table .xloxi-title {
   color: var(--vd-maroon);
 }
 
-.vd-cards--volume-table {
+.xloxi-cards--volume-table {
   display: block;
   margin-top: 0.15rem;
   width: 100%;
@@ -1490,7 +1527,7 @@ html[data-vd-hide-theme-qty="1"] product-info quantity-input {
  * Outer clips backgrounds/borders to border-radius. Inner handles horizontal scroll.
  * (Same pattern as admin `.volumeTableWrap` / `.volumeTableScroll`.)
  */
-.vd-volume-table-scroll {
+.xloxi-volume-table-scroll {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
@@ -1500,7 +1537,7 @@ html[data-vd-hide-theme-qty="1"] product-info quantity-input {
   overflow: hidden;
 }
 
-.vd-volume-table-scroll-inner {
+.xloxi-volume-table-scroll-inner {
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
@@ -1510,7 +1547,7 @@ html[data-vd-hide-theme-qty="1"] product-info quantity-input {
 }
 
 /* Mirrors admin `.volumeTable` */
-.vd-volume-table {
+.xloxi-volume-table {
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
@@ -1520,7 +1557,7 @@ html[data-vd-hide-theme-qty="1"] product-info quantity-input {
   margin: 0;
 }
 
-.vd-volume-table thead th {
+.xloxi-volume-table thead th {
   padding-block: var(--vd-vt-cell-pad-block, 0.65rem);
   font-size: var(--vd-fs-buy, 0.9375rem);
   font-weight: var(--vd-fw-strong, 600);
@@ -1531,14 +1568,14 @@ html[data-vd-hide-theme-qty="1"] product-info quantity-input {
   border: 1px solid var(--vd-card-border);
 }
 
-.vd-volume-table thead th:nth-child(1) {
+.xloxi-volume-table thead th:nth-child(1) {
   width: 36%;
   text-align: var(--vd-vt-col1-text-align, start);
   padding-inline-start: var(--vd-vt-col1-pad-inline-start, 0.75rem);
   padding-inline-end: var(--vd-vt-col1-pad-inline-end, 0.6rem);
 }
 
-.vd-volume-table thead th:nth-child(2) {
+.xloxi-volume-table thead th:nth-child(2) {
   width: 28%;
   text-align: var(--vd-vt-col2-text-align, center);
   padding-inline-start: var(--vd-vt-col2-pad-inline-start, 0.6rem);
@@ -1546,14 +1583,14 @@ html[data-vd-hide-theme-qty="1"] product-info quantity-input {
   color: var(--vd-vt-discount-fg, var(--vd-save));
 }
 
-.vd-volume-table thead th:nth-child(3) {
+.xloxi-volume-table thead th:nth-child(3) {
   width: 36%;
   text-align: var(--vd-vt-col3-text-align, end);
   padding-inline-start: var(--vd-vt-col3-pad-inline-start, 0.6rem);
   padding-inline-end: var(--vd-vt-col3-pad-inline-end, 0.75rem);
 }
 
-.vd-volume-table td {
+.xloxi-volume-table td {
   padding-block: var(--vd-vt-cell-pad-block, 0.7rem);
   text-align: center;
   vertical-align: middle;
@@ -1561,14 +1598,14 @@ html[data-vd-hide-theme-qty="1"] product-info quantity-input {
   border: 1px solid var(--vd-card-border);
 }
 
-.vd-volume-table tbody td:nth-child(1) {
+.xloxi-volume-table tbody td:nth-child(1) {
   text-align: var(--vd-vt-col1-text-align, start);
   padding-inline-start: var(--vd-vt-col1-pad-inline-start, 0.75rem);
   padding-inline-end: var(--vd-vt-col1-pad-inline-end, 0.6rem);
   color: var(--vd-muted);
 }
 
-.vd-volume-table tbody td:nth-child(2) {
+.xloxi-volume-table tbody td:nth-child(2) {
   text-align: var(--vd-vt-col2-text-align, center);
   padding-inline-start: var(--vd-vt-col2-pad-inline-start, 0.6rem);
   padding-inline-end: var(--vd-vt-col2-pad-inline-end, 0.6rem);
@@ -1576,17 +1613,17 @@ html[data-vd-hide-theme-qty="1"] product-info quantity-input {
   font-weight: var(--vd-fw-accent, 600);
 }
 
-.vd-volume-table tbody td:nth-child(3) {
+.xloxi-volume-table tbody td:nth-child(3) {
   text-align: var(--vd-vt-col3-text-align, end);
   padding-inline-start: var(--vd-vt-col3-pad-inline-start, 0.6rem);
   padding-inline-end: var(--vd-vt-col3-pad-inline-end, 0.75rem);
 }
 
-.vd-volume-table td[data-vd-discount-cell] {
+.xloxi-volume-table td[data-xloxi-discount-cell] {
   font-size: inherit;
 }
 
-.vd-volume-table .ofd-tier-amt {
+.xloxi-volume-table .ofd-tier-amt {
   font-size: var(--vd-fs-price, 1rem);
   font-weight: var(--vd-fw-strong, 600);
   line-height: 1.3;
@@ -1596,6 +1633,6 @@ html[data-vd-hide-theme-qty="1"] product-info quantity-input {
 /* Volume table rows are informational only (no tier radio / selection). */
 
 /* Main CTA padding matches admin Product Page preview button */
-.vd-bundle--volume-table .vd-cta {
+.xloxi-bundle--volume-table .xloxi-cta {
   padding: 0.875rem 1rem;
 }

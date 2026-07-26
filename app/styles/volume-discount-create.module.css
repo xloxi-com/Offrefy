@@ -212,7 +212,7 @@
   word-break: break-word;
 }
 
-/* Match storefront `.volume-discount-embed` font resolution (Dawn + Horizon + inherit). */
+/* Match storefront `.xloxi-qb` font resolution (Dawn + Horizon + inherit). */
 :global(.vd-admin-qb-preview) {
   --vd-theme-font-body: var(
     --font-body-family,

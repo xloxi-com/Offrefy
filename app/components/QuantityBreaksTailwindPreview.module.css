@@ -81,7 +81,7 @@
   box-sizing: border-box;
 }
 
-/* Expanded tier row — mirrors storefront .vd-card__expand + .vd-expand-compact + qty / + Add */
+/* Expanded tier row — mirrors storefront .xloxi-card__expand + .xloxi-expand-compact + qty / + Add */
 .expandSection {
   width: 100%;
   margin-top: 0.45rem;

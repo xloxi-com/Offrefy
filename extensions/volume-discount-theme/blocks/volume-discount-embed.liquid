@@ -1,9 +1,11 @@
 {% comment %}
   App embed (body) — Theme settings → App embeds.
-  Enable flag only. Storefront JS/CSS inject where the merchant added the
-  “Quantity breaks” app block (product page / section), not on every page.
+  Enable flag on product pages only. No CSS/JS here (avoids collection/home
+  inject). Storefront assets load from the Quantity breaks app block.
 {% endcomment %}
-<script>window.__vdAppEmbedActive = true;</script>
+{% if request.page_type == 'product' or template.name == 'product' %}
+  <script>window.__xloxiAppEmbedActive = true;</script>
+{% endif %}
 
 {% schema %}
 {

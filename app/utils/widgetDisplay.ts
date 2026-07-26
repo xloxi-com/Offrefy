@@ -611,7 +611,7 @@ export type VolumeDiscountWidgetDisplay = {
   fontWeightNormal: number;
   /**
    * Optional CSS injected as a `<style>` inside the storefront widget root
-   * (`.volume-discount-embed`). Merchant-owned; scope selectors under that class.
+   * (`.xloxi-qb`). Merchant-owned; scope selectors under that class.
    */
   customCss: string;
   /**

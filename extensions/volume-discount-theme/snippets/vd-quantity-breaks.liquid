@@ -47,26 +47,26 @@
   Markup only. Storefront JS/CSS inject from the Quantity breaks app block
   (quantity-breaks.liquid), not the global app embed.
 
-  Liquid product form (vd-atc-form-*) is the cross-theme ATC bridge:
+  Liquid product form (xloxi-atc-form-*) is the cross-theme ATC bridge:
   Shopify {% form 'product' %} works on every free/premium theme. Widget JS
   syncs qty/variant here and either clicks the theme ATC or submits this form
   via /cart/add.js so drawers/notifications still work.
 {%- endcomment -%}
 {%- liquid
-  assign vd_product_form_id = 'vd-atc-form-' | append: vd_id_suffix
+  assign vd_product_form_id = 'xloxi-atc-form-' | append: vd_id_suffix
 -%}
 <div
-  class="vd-storefront-root volume-discount-embed"
-  id="vd-shopify-{{ vd_id_suffix }}"
-  data-config-id="vd-json-{{ vd_id_suffix }}"
+  class="xloxi-root xloxi-qb"
+  id="xloxi-shopify-{{ vd_id_suffix }}"
+  data-config-id="xloxi-json-{{ vd_id_suffix }}"
   data-storefront-locale="{{ request.locale.iso_code }}"
-  data-vd-trans-buy="{{ vd_trans_buy | escape }}"
-  data-vd-trans-you-save="{{ vd_trans_you_save | escape }}"
-  data-vd-trans-add="{{ vd_trans_add | escape }}"
+  data-xloxi-trans-buy="{{ vd_trans_buy | escape }}"
+  data-xloxi-trans-you-save="{{ vd_trans_you_save | escape }}"
+  data-xloxi-trans-add="{{ vd_trans_add | escape }}"
   data-heading="{{ vd_heading | escape }}"
   data-section-heading="{{ vd_section_heading | escape }}"
-  data-vd-product-form-id="{{ vd_product_form_id }}"
-  data-vd-use-liquid-form="1"
+  data-xloxi-product-form-id="{{ vd_product_form_id }}"
+  data-xloxi-use-liquid-form="1"
   {% if vd_product != blank %}
     data-product-id="{{ vd_product.id }}"
     data-variant-id="{{ vd_product.selected_or_first_available_variant.id }}"
@@ -89,7 +89,7 @@
   {% endif %}
 >
   {% if vd_product != blank %}
-    <script type="application/json" data-vd-variants-json>
+    <script type="application/json" data-xloxi-variants-json>
       [
         {%- for v in vd_product.variants -%}
           {"id":{{ v.id }},"title":{{ v.title | json }},"price":{{ v.price }},"available":{% if v.available %}true{% else %}false{% endif %}}{%- unless forloop.last -%},{%- endunless -%}
@@ -97,12 +97,12 @@
       ]
     </script>
     {% if vd_product.metafields.volume_discount.tiers.value %}
-      <script type="application/json" data-vd-product-rule>
+      <script type="application/json" data-xloxi-product-rule>
         {{ vd_product.metafields.volume_discount.tiers.value | json }}
       </script>
     {% endif %}
   {% endif %}
-  <script type="application/json" id="vd-json-{{ vd_id_suffix }}">
+  <script type="application/json" id="xloxi-json-{{ vd_id_suffix }}">
     {% if request.design_mode %}
       {% if vd_widget != blank and vd_widget.campaigns.size > 0 %}
         {{ vd_widget | json }}
@@ -122,8 +122,8 @@
     mount until the widget paints (avoids a stray theme-styled “Add” button).
   {%- endcomment -%}
   <div
-    class="volume-discount-embed__inner vd-mount"
-    data-vd-mount
+    class="xloxi-qb__inner xloxi-mount"
+    data-xloxi-mount
     {% unless request.design_mode %}hidden{% endunless %}
   >
     {% if vd_product != blank %}
@@ -131,28 +131,28 @@
         Platform product form — valid on all Shopify themes (free + premium).
         Always visually hidden; used by +Add / Grab This Deal when theme ATC is missing.
       {%- endcomment -%}
-      {% form 'product', vd_product, id: vd_product_form_id, class: 'vd-liquid-product-form', data-vd-liquid-product-form: '1' %}
+      {% form 'product', vd_product, id: vd_product_form_id, class: 'xloxi-liquid-product-form', data-xloxi-liquid-product-form: '1' %}
         <input
           type="hidden"
           name="id"
           value="{{ vd_product.selected_or_first_available_variant.id }}"
-          data-vd-liquid-variant-id
+          data-xloxi-liquid-variant-id
         >
         <input
           type="hidden"
           name="quantity"
           value="1"
           min="1"
-          data-vd-liquid-qty
+          data-xloxi-liquid-qty
         >
         <button
           type="submit"
           name="add"
-          class="vd-liquid-submit"
+          class="xloxi-liquid-submit"
           hidden
           tabindex="-1"
           aria-hidden="true"
-          data-vd-liquid-submit
+          data-xloxi-liquid-submit
           style="display:none!important;visibility:hidden!important;position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;"
         >
           {{ vd_trans_add | escape }}

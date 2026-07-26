@@ -158,6 +158,8 @@ type TierForm = {
   value: string;
   valueUnit: string;
   badge: string;
+  /** When true, cart qty must be an exact multiple of Buy from for this tier. */
+  multiples: boolean;
   /** Custom tier line on the widget; empty uses auto (Buy 1, Buy 10–14, …). */
   buyLabelText: string;
   /** Optional line under the option label (same band as “You save …”). */
@@ -171,6 +173,7 @@ const defaultTier = (): TierForm => ({
   value: "10",
   valueUnit: "%",
   badge: "",
+  multiples: false,
   buyLabelText: "",
   optionSubtext: "",
   activeByDefault: true,
@@ -358,6 +361,7 @@ function tiersFromInitialCampaign(ic: VolumeDiscountInitialCampaign): TierForm[]
       value: normalizeTierValueForForm(t.value),
       valueUnit: t.valueUnit === "amount" ? "amount-each" : t.valueUnit,
       badge: typeof t.badge === "string" ? t.badge : "",
+      multiples: t.multiples === true,
       buyLabelText: t.buyLabelText ?? "",
       optionSubtext: t.optionSubtext ?? "",
     })),
@@ -3439,7 +3443,7 @@ export function VolumeDiscountCreateView({
                             <Text as="p" variant="bodySm" tone="subdued">
                               Extra rules injected on the storefront root (
                               <Text as="span" fontWeight="semibold">
-                                .volume-discount-embed
+                                .xloxi-qb
                               </Text>
                               ). Admin preview:{" "}
                               <Text as="span" fontWeight="semibold">

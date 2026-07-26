@@ -21,8 +21,8 @@
 
   function fetchConfigKey(productId, variantId) {
     var rev =
-      typeof window.__vdConfigRev !== "undefined" && window.__vdConfigRev != null
-        ? String(window.__vdConfigRev)
+      typeof window.__xloxiConfigRev !== "undefined" && window.__xloxiConfigRev != null
+        ? String(window.__xloxiConfigRev)
         : "";
     return rev + "|" + String(productId || "") + "|" + String(variantId || "");
   }
@@ -41,8 +41,8 @@
 
   function withRevQuery(url) {
     var rev =
-      typeof window.__vdConfigRev !== "undefined" && window.__vdConfigRev != null
-        ? String(window.__vdConfigRev)
+      typeof window.__xloxiConfigRev !== "undefined" && window.__xloxiConfigRev != null
+        ? String(window.__xloxiConfigRev)
         : "";
     /* Always bust HTTP caches with a coarse bucket so admin edits show on next page load. */
     var bucket = String(Math.floor(Date.now() / 5000));
@@ -92,8 +92,8 @@
       urls.push(withRevQuery(withShopQuery(PROXY + q)));
     }
     var abs =
-      typeof window.__vdAppOrigin === "string"
-        ? String(window.__vdAppOrigin).replace(/\/$/, "")
+      typeof window.__xloxiAppOrigin === "string"
+        ? String(window.__xloxiAppOrigin).replace(/\/$/, "")
         : "";
     if (abs) {
       urls.push(withRevQuery(withShopQuery(abs + "/widget-config" + q)));
@@ -161,13 +161,13 @@
     var existing = fetchPromiseByKey.get(key);
     if (existing) return existing;
 
-    var prefetchKey = window.__vdConfigPrefetchKey;
+    var prefetchKey = window.__xloxiConfigPrefetchKey;
     var prefetchPromise =
       prefetchKey &&
       prefetchKey === key &&
-      window.__vdConfigPrefetch &&
-      typeof window.__vdConfigPrefetch.then === "function"
-        ? window.__vdConfigPrefetch.then(function (body) {
+      window.__xloxiConfigPrefetch &&
+      typeof window.__xloxiConfigPrefetch.then === "function"
+        ? window.__xloxiConfigPrefetch.then(function (body) {
             return isUsableWidgetConfig(body) ? body : null;
           })
         : Promise.resolve(null);
@@ -212,7 +212,7 @@
   function applyOffrefyPropertiesToForm(form, attribution) {
     var props = offrefyCartProperties(attribution);
     if (!form || !props) return;
-    var existing = form.querySelectorAll("[data-vd-offrefy-prop]");
+    var existing = form.querySelectorAll("[data-xloxi-prop]");
     for (var ei = 0; ei < existing.length; ei++) {
       existing[ei].remove();
     }
@@ -222,7 +222,7 @@
       input.type = "hidden";
       input.name = "properties[" + key + "]";
       input.value = props[key];
-      input.setAttribute("data-vd-offrefy-prop", "1");
+      input.setAttribute("data-xloxi-prop", "1");
       form.appendChild(input);
     }
   }
@@ -425,7 +425,7 @@
   function customerAllowsCampaign(campaign) {
     var ct = String((campaign && campaign.customerType) || "everyone");
     if (ct === "everyone" || !ct) return true;
-    var cust = window.__vdCustomer || {};
+    var cust = window.__xloxiCustomer || {};
     var loggedIn = cust.loggedIn === true;
     if (ct === "logged-in") return loggedIn;
     if (ct === "logged-in-tag-any") {
@@ -575,7 +575,7 @@
 
   function rememberStorefrontTranslations(transMap) {
     if (transMap && typeof transMap === "object" && !Array.isArray(transMap)) {
-      window.__vdStorefrontTranslations = transMap;
+      window.__xloxiStorefrontTranslations = transMap;
     }
   }
 
@@ -595,7 +595,7 @@
 
   function resolveCartBadgeTemplates() {
     var locale = resolveStorefrontLocale(null) || "en";
-    var fromWindow = window.__vdCartBadgeTemplates;
+    var fromWindow = window.__xloxiCartBadgeTemplates;
     if (
       fromWindow &&
       fromWindow.discount &&
@@ -608,7 +608,7 @@
       };
     }
 
-    var transMap = window.__vdStorefrontTranslations || {};
+    var transMap = window.__xloxiStorefrontTranslations || {};
     var entry = transMap[locale] || {};
     var preset = CART_BADGE_JS_FALLBACKS[locale];
     var discount =
@@ -655,7 +655,7 @@
   function refreshCartBadgeTemplatesForLocale() {
     var locale = resolveStorefrontLocale(null) || "en";
     var templates = resolveCartBadgeTemplates();
-    window.__vdCartBadgeTemplates = {
+    window.__xloxiCartBadgeTemplates = {
       locale: locale,
       discount: templates.discount,
       qty: templates.qty,
@@ -741,8 +741,8 @@
   }
 
   function bindCartDrawerDiscountLabelPatching() {
-    if (window.__vdCartBadgePatchBound) return;
-    window.__vdCartBadgePatchBound = true;
+    if (window.__xloxiCartBadgePatchBound) return;
+    window.__xloxiCartBadgePatchBound = true;
     ["cart:updated", "cart:change", "cart:refresh"].forEach(function (evt) {
       document.documentElement.addEventListener(evt, scheduleCartDrawerDiscountLabelPatch);
     });
@@ -768,8 +768,8 @@
           scheduleCartDrawerDiscountLabelPatch();
         });
         drawerObserver.observe(drawer, { childList: true, subtree: true });
-        if (drawer.getAttribute("data-vd-open-watch") === "1") return;
-        drawer.setAttribute("data-vd-open-watch", "1");
+        if (drawer.getAttribute("data-xloxi-open-watch") === "1") return;
+        drawer.setAttribute("data-xloxi-open-watch", "1");
         if (openWatchObserver) {
           try {
             openWatchObserver.disconnect();
@@ -804,7 +804,7 @@
       return;
     }
     vdLastKnownStorefrontLocale = next;
-    window.__vdStorefrontLocale = next;
+    window.__xloxiStorefrontLocale = next;
     vdLastSyncedCartLocale = "";
     refreshCartBadgeTemplatesForLocale();
     syncCartLocaleAttribute(true)
@@ -819,8 +819,8 @@
   }
 
   function bindStorefrontLocaleWatcher() {
-    if (window.__vdLocaleWatchBound) return;
-    window.__vdLocaleWatchBound = true;
+    if (window.__xloxiLocaleWatchBound) return;
+    window.__xloxiLocaleWatchBound = true;
     vdLastKnownStorefrontLocale = resolveStorefrontLocale(null) || "en";
 
     if (typeof MutationObserver !== "undefined") {
@@ -872,7 +872,7 @@
           var pathOnly = href.replace(/^https?:\/\/[^/]+/i, "");
           var pathLocale = localeCodeFromPathPrefix(pathOnly);
           if (pathLocale) {
-            window.__vdStorefrontLocale = pathLocale;
+            window.__xloxiStorefrontLocale = pathLocale;
             vdLastKnownStorefrontLocale = "";
             setTimeout(handleStorefrontLocaleChange, 0);
             setTimeout(handleStorefrontLocaleChange, 400);
@@ -884,7 +884,7 @@
           link.getAttribute("data-language") ||
           link.getAttribute("data-value");
         if (dataLocale) {
-          window.__vdStorefrontLocale = normalizeLocaleCode(dataLocale);
+          window.__xloxiStorefrontLocale = normalizeLocaleCode(dataLocale);
           vdLastKnownStorefrontLocale = "";
           setTimeout(handleStorefrontLocaleChange, 0);
           setTimeout(refreshCartDrawerForLocaleChange, 500);
@@ -897,9 +897,9 @@
   function tierStringsFromRoot(root) {
     if (!root || !root.getAttribute) return {};
     return {
-      transBuy: root.getAttribute("data-vd-trans-buy") || "",
-      transYouSave: root.getAttribute("data-vd-trans-you-save") || "",
-      transAdd: root.getAttribute("data-vd-trans-add") || "",
+      transBuy: root.getAttribute("data-xloxi-trans-buy") || "",
+      transYouSave: root.getAttribute("data-xloxi-trans-you-save") || "",
+      transAdd: root.getAttribute("data-xloxi-trans-add") || "",
     };
   }
 
@@ -987,10 +987,10 @@
   }
 
   function clearCountdown(root) {
-    var id = root.getAttribute("data-vd-cd-iv");
+    var id = root.getAttribute("data-xloxi-cd-iv");
     if (id) {
       clearInterval(parseInt(id, 10));
-      root.removeAttribute("data-vd-cd-iv");
+      root.removeAttribute("data-xloxi-cd-iv");
     }
   }
 
@@ -1054,8 +1054,8 @@
     );
     if (pathLocale) return pathLocale;
 
-    if (typeof window.__vdStorefrontLocale === "string" && window.__vdStorefrontLocale) {
-      return normalizeLocaleCode(window.__vdStorefrontLocale);
+    if (typeof window.__xloxiStorefrontLocale === "string" && window.__xloxiStorefrontLocale) {
+      return normalizeLocaleCode(window.__xloxiStorefrontLocale);
     }
 
     var fromRoot =
@@ -1089,8 +1089,8 @@
     ) {
       return cfg.maxDiscountProducts | 0;
     }
-    if (typeof window.__vdMaxDiscountProducts === "number" && window.__vdMaxDiscountProducts > 0) {
-      return window.__vdMaxDiscountProducts | 0;
+    if (typeof window.__xloxiMaxDiscountProducts === "number" && window.__xloxiMaxDiscountProducts > 0) {
+      return window.__xloxiMaxDiscountProducts | 0;
     }
     return vdCachedMaxDiscountProducts > 0
       ? vdCachedMaxDiscountProducts
@@ -1101,7 +1101,7 @@
     var n = resolveMaxDiscountProducts(cfg);
     if (n > 0) {
       vdCachedMaxDiscountProducts = n;
-      window.__vdMaxDiscountProducts = n;
+      window.__xloxiMaxDiscountProducts = n;
     }
     return n;
   }
@@ -1251,8 +1251,8 @@
 
   /** Sync locked discount slots immediately after any cart mutation (theme /cart/add.js, etc.). */
   function installCartMutationInterceptor() {
-    if (window.__vdCartMutationIntercept) return;
-    window.__vdCartMutationIntercept = true;
+    if (window.__xloxiCartMutationIntercept) return;
+    window.__xloxiCartMutationIntercept = true;
     var nativeFetch = window.fetch;
     if (typeof nativeFetch !== "function") return;
 
@@ -1723,21 +1723,21 @@
   }
 
   function findVdLiquidProductForm(root) {
-    var el = root || document.querySelector(".vd-storefront-root");
+    var el = root || document.querySelector(".xloxi-root");
     if (el) {
-      var id = el.getAttribute("data-vd-product-form-id");
+      var id = el.getAttribute("data-xloxi-product-form-id");
       if (id) {
         var byId = document.getElementById(id);
         if (byId) return byId;
       }
       var inRoot =
-        el.querySelector("form[data-vd-liquid-product-form]") ||
-        el.querySelector("form.vd-liquid-product-form");
+        el.querySelector("form[data-xloxi-liquid-product-form]") ||
+        el.querySelector("form.xloxi-liquid-product-form");
       if (inRoot) return inRoot;
     }
     return (
-      document.querySelector("form[data-vd-liquid-product-form]") ||
-      document.querySelector("form.vd-liquid-product-form")
+      document.querySelector("form[data-xloxi-liquid-product-form]") ||
+      document.querySelector("form.xloxi-liquid-product-form")
     );
   }
 
@@ -1747,11 +1747,11 @@
     var qty = parseInt(String(quantity), 10) || 1;
     qty = Math.min(VD_MAX_LINE_QTY, Math.max(1, qty));
     var idInput =
-      form.querySelector("[data-vd-liquid-variant-id]") ||
+      form.querySelector("[data-xloxi-liquid-variant-id]") ||
       form.querySelector('input[name="id"]');
     if (idInput && vid) idInput.value = vid;
     var qtyInput =
-      form.querySelector("[data-vd-liquid-qty]") ||
+      form.querySelector("[data-xloxi-liquid-qty]") ||
       form.querySelector('input[name="quantity"]');
     if (qtyInput) qtyInput.value = String(qty);
     applyOffrefyPropertiesToForm(form, attribution);
@@ -1762,7 +1762,7 @@
     var forms = document.querySelectorAll(
       'form[action*="/cart/add"], form[action*="cart/add"], form[data-type="add-to-cart-form"], form.product-form, product-form form, form#product_form, form#AddToCartForm, form[id*="product-form"], form[id*="ProductForm"]',
     );
-    var widget = document.querySelector(".vd-storefront-root");
+    var widget = document.querySelector(".xloxi-root");
     var widgetScope = widget
       ? widget.closest(
           "product-info, .product, [id^='MainProduct'], .shopify-section, .product__info, .product-single, .product-details",
@@ -1776,12 +1776,12 @@
       if (!form) continue;
       /* Skip our Liquid bridge form — theme ATC must be the theme's own form. */
       if (
-        form.hasAttribute("data-vd-liquid-product-form") ||
-        (form.classList && form.classList.contains("vd-liquid-product-form"))
+        form.hasAttribute("data-xloxi-liquid-product-form") ||
+        (form.classList && form.classList.contains("xloxi-liquid-product-form"))
       ) {
         continue;
       }
-      if (form.closest(".vd-storefront-root")) continue;
+      if (form.closest(".xloxi-root")) continue;
       if (
         form.closest(
           "cart-drawer, cart-notification, #CartDrawer, .cart-drawer, cart-items, #main-cart-items",
@@ -1820,12 +1820,12 @@
     var all = document.querySelectorAll('form[action*="/cart/add"]');
     for (var j = 0; j < all.length; j++) {
       if (
-        all[j].hasAttribute("data-vd-liquid-product-form") ||
-        (all[j].classList && all[j].classList.contains("vd-liquid-product-form"))
+        all[j].hasAttribute("data-xloxi-liquid-product-form") ||
+        (all[j].classList && all[j].classList.contains("xloxi-liquid-product-form"))
       ) {
         continue;
       }
-      if (!all[j].closest(".vd-storefront-root")) return all[j];
+      if (!all[j].closest(".xloxi-root")) return all[j];
     }
     return null;
   }
@@ -1886,7 +1886,7 @@
       var nodes = form.querySelectorAll(selectors[s]);
       for (var i = 0; i < nodes.length; i++) {
         var el = nodes[i];
-        if (el.closest(".vd-storefront-root")) continue;
+        if (el.closest(".xloxi-root")) continue;
         if (isThemeBuyItNowButton(el)) continue;
         return el;
       }
@@ -1913,7 +1913,7 @@
       var ext = scope.querySelector(
         'button[name="add"], button.product-form__submit, [data-add-to-cart], .product-form__cart-submit, #AddToCart',
       );
-      if (ext && !ext.closest(".vd-storefront-root") && !isThemeBuyItNowButton(ext)) {
+      if (ext && !ext.closest(".xloxi-root") && !isThemeBuyItNowButton(ext)) {
         return ext;
       }
     }
@@ -1929,7 +1929,7 @@
     if (!form || !btn) return false;
 
     var restoreHide =
-      document.documentElement.getAttribute("data-vd-hide-theme-atc") === "1" ||
+      document.documentElement.getAttribute("data-xloxi-hide-theme-atc") === "1" ||
       window.getComputedStyle(btn).display === "none" ||
       btn.getAttribute("aria-hidden") === "true";
 
@@ -2006,7 +2006,7 @@
           else btn.style.removeProperty("opacity");
           if (prev.ariaHidden != null) btn.setAttribute("aria-hidden", prev.ariaHidden);
           else if (restoreHide) btn.setAttribute("aria-hidden", "true");
-          if (document.documentElement.getAttribute("data-vd-hide-theme-atc") === "1") {
+          if (document.documentElement.getAttribute("data-xloxi-hide-theme-atc") === "1") {
             try {
               hideThemeNativeAddToCartButtons();
             } catch (eHide) {
@@ -2026,7 +2026,7 @@
    * 2) Liquid {% form 'product' %} bridge via /cart/add.js (all free/premium themes)
    */
   function addByClickingThemeAtc(variantId, quantity, attribution) {
-    var root = document.querySelector(".vd-storefront-root");
+    var root = document.querySelector(".xloxi-root");
     var liquidForm = findVdLiquidProductForm(root);
     var themeForm = findThemeProductAddForm();
     var themeBtn = findThemeAddToCartButton(themeForm);
@@ -2123,7 +2123,7 @@
           };
 
     function add(el) {
-      if (!el || (el.closest && el.closest(".vd-storefront-root"))) return;
+      if (!el || (el.closest && el.closest(".xloxi-root"))) return;
       /* Include type=hidden — many themes keep qty only as a hidden input while
          the visible stepper is custom JS (and may stay at 1 after we hide it). */
       if (
@@ -2198,7 +2198,7 @@
     var liquid = findVdLiquidProductForm(null);
     if (liquid) {
       var lq =
-        liquid.querySelector("[data-vd-liquid-qty]") ||
+        liquid.querySelector("[data-xloxi-liquid-qty]") ||
         liquid.querySelector('input[name="quantity"]');
       if (lq) lq.value = str;
     }
@@ -2290,7 +2290,7 @@
     /* Theme ATC may be visually hidden — keep it clickable off-screen so the
        theme ProductForm submit runs (Shopify default add + cart drawer). */
     var restoreHide =
-      document.documentElement.getAttribute("data-vd-hide-theme-atc") === "1";
+      document.documentElement.getAttribute("data-xloxi-hide-theme-atc") === "1";
     var prev = {
       display: btn.style.getPropertyValue("display"),
       position: btn.style.getPropertyValue("position"),
@@ -2699,7 +2699,7 @@
 
     var form = findThemeProductAddForm() || findVdLiquidProductForm(null);
     if (form) {
-      if (form.hasAttribute("data-vd-liquid-product-form") || (form.classList && form.classList.contains("vd-liquid-product-form"))) {
+      if (form.hasAttribute("data-xloxi-liquid-product-form") || (form.classList && form.classList.contains("xloxi-liquid-product-form"))) {
         syncVdLiquidProductForm(form, id, qty, attribution);
       } else {
         syncThemeProductFormFields(form, id, qty, attribution);
@@ -2886,26 +2886,26 @@
   }
 
   function hideThemeNativeAddToCartButtons() {
-    if (document.documentElement.getAttribute("data-vd-hide-theme-atc") !== "1") {
+    if (document.documentElement.getAttribute("data-xloxi-hide-theme-atc") !== "1") {
       return;
     }
     var forms = document.querySelectorAll('form[action*="/cart/add"]');
     for (var i = 0; i < forms.length; i++) {
       var form = forms[i];
-      if (form.closest(".vd-storefront-root")) continue;
+      if (form.closest(".xloxi-root")) continue;
       var btn =
         form.querySelector('button[name="add"]') ||
         form.querySelector('input[type="submit"][name="add"]') ||
         form.querySelector("button.product-form__submit");
       if (!btn) btn = form.querySelector('button[type="submit"]');
-      if (!btn || btn.closest(".vd-storefront-root")) continue;
+      if (!btn || btn.closest(".xloxi-root")) continue;
       btn.style.setProperty("display", "none", "important");
       btn.setAttribute("aria-hidden", "true");
     }
   }
 
   function hideThemeNativeBuyItNowButtons() {
-    if (document.documentElement.getAttribute("data-vd-hide-theme-bin") !== "1") {
+    if (document.documentElement.getAttribute("data-xloxi-hide-theme-bin") !== "1") {
       return;
     }
     var selectors = [
@@ -2918,7 +2918,7 @@
       var nodes = document.querySelectorAll(selectors[si]);
       for (var i = 0; i < nodes.length; i++) {
         var n = nodes[i];
-        if (n.closest(".vd-storefront-root")) continue;
+        if (n.closest(".xloxi-root")) continue;
         n.style.setProperty("display", "none", "important");
         n.setAttribute("aria-hidden", "true");
       }
@@ -2930,7 +2930,7 @@
    * Covers: variant id (select/radio name="id"), split options (name^="options"), Dawn variant-selects / variant-radios, .product-form__input rows.
    */
   function hideThemeNativeVariantSelectors() {
-    if (document.documentElement.getAttribute("data-vd-hide-theme-variant") !== "1") {
+    if (document.documentElement.getAttribute("data-xloxi-hide-theme-variant") !== "1") {
       return;
     }
     var seen =
@@ -2939,7 +2939,7 @@
         : { _a: [], has: function (el) { return this._a.indexOf(el) !== -1; }, add: function (el) { this._a.push(el); } };
 
     function hideBlock(el) {
-      if (!el || el.closest(".vd-storefront-root")) return;
+      if (!el || el.closest(".xloxi-root")) return;
       if (seen.has(el)) return;
       seen.add(el);
       el.style.setProperty("display", "none", "important");
@@ -2971,7 +2971,7 @@
     var forms = document.querySelectorAll('form[action*="/cart/add"]');
     for (var fi = 0; fi < forms.length; fi++) {
       var form = forms[fi];
-      if (form.closest(".vd-storefront-root")) continue;
+      if (form.closest(".xloxi-root")) continue;
 
       var hosts = form.querySelectorAll("variant-selects, variant-radios");
       for (var hi = 0; hi < hosts.length; hi++) {
@@ -3045,12 +3045,12 @@
     );
     for (var sr = 0; sr < sectionRoots.length; sr++) {
       var sec = sectionRoots[sr];
-      if (!sec || sec.closest(".vd-storefront-root")) continue;
+      if (!sec || sec.closest(".xloxi-root")) continue;
 
       var extHosts = sec.querySelectorAll("variant-selects, variant-radios");
       for (var xi = 0; xi < extHosts.length; xi++) {
         var xh = extHosts[xi];
-        if (xh.closest(".vd-storefront-root")) continue;
+        if (xh.closest(".xloxi-root")) continue;
         if (xh.closest('form[action*="/cart/add"]')) continue;
         hideBlock(xh);
       }
@@ -3058,7 +3058,7 @@
       var extFieldsets = sec.querySelectorAll("fieldset.product-form__input, fieldset.js.product-form__input");
       for (var fi2 = 0; fi2 < extFieldsets.length; fi2++) {
         var fs = extFieldsets[fi2];
-        if (fs.closest(".vd-storefront-root")) continue;
+        if (fs.closest(".xloxi-root")) continue;
         if (fs.closest('form[action*="/cart/add"]')) continue;
         if (isQuantityOnlyBlock(fs)) continue;
         if (!blockHasVariantUi(fs)) continue;
@@ -3068,7 +3068,7 @@
       var extOptRadios = sec.querySelectorAll('input[type="radio"][name^="options"]');
       for (var er = 0; er < extOptRadios.length; er++) {
         var erEl = extOptRadios[er];
-        if (erEl.closest(".vd-storefront-root")) continue;
+        if (erEl.closest(".xloxi-root")) continue;
         if (erEl.closest('form[action*="/cart/add"]')) continue;
         var erw =
           erEl.closest("fieldset.product-form__input") ||
@@ -3084,7 +3084,7 @@
    * Hides theme product-form quantity UI (+/−, number input, quantity-input host). Cart qty still syncs from the widget.
    */
   function hideThemeNativeQuantitySelectors() {
-    if (document.documentElement.getAttribute("data-vd-hide-theme-qty") !== "1") {
+    if (document.documentElement.getAttribute("data-xloxi-hide-theme-qty") !== "1") {
       return;
     }
     var seen =
@@ -3093,7 +3093,7 @@
         : { _a: [], has: function (el) { return this._a.indexOf(el) !== -1; }, add: function (el) { this._a.push(el); } };
 
     function hideBlock(el) {
-      if (!el || el.closest(".vd-storefront-root")) return;
+      if (!el || el.closest(".xloxi-root")) return;
       if (seen.has(el)) return;
       seen.add(el);
       el.style.setProperty("display", "none", "important");
@@ -3116,7 +3116,7 @@
     var forms = document.querySelectorAll('form[action*="/cart/add"]');
     for (var fi = 0; fi < forms.length; fi++) {
       var form = forms[fi];
-      if (form.closest(".vd-storefront-root")) continue;
+      if (form.closest(".xloxi-root")) continue;
 
       var qHosts = form.querySelectorAll("quantity-input");
       for (var hi = 0; hi < qHosts.length; hi++) {
@@ -3153,11 +3153,11 @@
     );
     for (var sr = 0; sr < sectionRoots.length; sr++) {
       var sec = sectionRoots[sr];
-      if (!sec || sec.closest(".vd-storefront-root")) continue;
+      if (!sec || sec.closest(".xloxi-root")) continue;
       var extQ = sec.querySelectorAll("quantity-input");
       for (var xi = 0; xi < extQ.length; xi++) {
         var xq = extQ[xi];
-        if (xq.closest(".vd-storefront-root")) continue;
+        if (xq.closest(".xloxi-root")) continue;
         if (xq.closest('form[action*="/cart/add"]')) continue;
         hideBlock(xq);
       }
@@ -3180,7 +3180,7 @@
         if (
           t &&
           t.closest &&
-          (t.closest(".vd-storefront-root") ||
+          (t.closest(".xloxi-root") ||
             t.closest("cart-drawer") ||
             t.closest("#CartDrawer") ||
             t.closest("cart-notification") ||
@@ -3429,9 +3429,9 @@
   }
 
   function badgeTopFloatAlignClass(pos) {
-    if (pos === "top_left") return "vd-card__badge-top--align-start";
-    if (pos === "top_center") return "vd-card__badge-top--align-center";
-    return "vd-card__badge-top--align-end";
+    if (pos === "top_left") return "xloxi-card__badge-top--align-start";
+    if (pos === "top_center") return "xloxi-card__badge-top--align-center";
+    return "xloxi-card__badge-top--align-end";
   }
 
   var BADGE_SIZE_PCT_MIN = 60;
@@ -3445,23 +3445,23 @@
 
   function applyWidgetHeaderDisplayToRoot(root, d) {
     var layout = effectiveWidgetHeaderLayout(d);
-    root.setAttribute("data-vd-header-layout", layout);
+    root.setAttribute("data-xloxi-header-layout", layout);
     if (d.widgetHeaderMobileStack === true) {
-      root.setAttribute("data-vd-header-mobile-stack", "1");
+      root.setAttribute("data-xloxi-header-mobile-stack", "1");
     } else {
-      root.removeAttribute("data-vd-header-mobile-stack");
+      root.removeAttribute("data-xloxi-header-mobile-stack");
     }
     if (effectiveWidgetHeaderSwapOrder(d)) {
-      root.setAttribute("data-vd-header-swap", "1");
+      root.setAttribute("data-xloxi-header-swap", "1");
     } else {
-      root.removeAttribute("data-vd-header-swap");
+      root.removeAttribute("data-xloxi-header-swap");
     }
     var ha = pickWidgetHeaderTextAlign(d.widgetHeadingAlign, "center");
     var ca = pickWidgetHeaderTextAlign(d.countdownAlign, "center");
     // Heading "Right" → pin timer to the trailing edge (matches merchant intent).
     if (ha === "end") ca = "end";
-    root.setAttribute("data-vd-heading-align", ha);
-    root.setAttribute("data-vd-countdown-align", ca);
+    root.setAttribute("data-xloxi-heading-align", ha);
+    root.setAttribute("data-xloxi-countdown-align", ca);
     root.style.setProperty("--vd-heading-text-align", ha);
     root.style.setProperty("--vd-countdown-justify", countdownAlignToJustify(ca));
   }
@@ -3576,7 +3576,7 @@
   };
 
   function parseVariantsFromRoot(root) {
-    var el = root.querySelector("script[data-vd-variants-json]");
+    var el = root.querySelector("script[data-xloxi-variants-json]");
     if (!el || !el.textContent) return [];
     try {
       var arr = JSON.parse(el.textContent.trim());
@@ -3620,7 +3620,7 @@
     var forms = document.querySelectorAll('form[action*="/cart/add"]');
     for (var fi = 0; fi < forms.length; fi++) {
       var form = forms[fi];
-      if (form.closest(".vd-storefront-root")) continue;
+      if (form.closest(".xloxi-root")) continue;
       var vs = form.querySelector('select[name="id"]');
       if (vs && vs.value) return String(vs.value);
       var hid = form.querySelector('input[name="id"][type="hidden"]');
@@ -3642,10 +3642,10 @@
     if (existingPid && (!forcePrice || (existingPrice && existingPrice > 0))) {
       return Promise.resolve(true);
     }
-    if (root.getAttribute("data-vd-hydrating") === "1") {
+    if (root.getAttribute("data-xloxi-hydrating") === "1") {
       return Promise.resolve(false);
     }
-    root.setAttribute("data-vd-hydrating", "1");
+    root.setAttribute("data-xloxi-hydrating", "1");
     return fetchProductJsonForPage()
       .then(function (pj) {
         if (!pj || !pj.id) return false;
@@ -3684,11 +3684,11 @@
           return false;
         }
 
-        var variantsScript = root.querySelector("script[data-vd-variants-json]");
+        var variantsScript = root.querySelector("script[data-xloxi-variants-json]");
         if (!variantsScript) {
           variantsScript = document.createElement("script");
           variantsScript.type = "application/json";
-          variantsScript.setAttribute("data-vd-variants-json", "");
+          variantsScript.setAttribute("data-xloxi-variants-json", "");
           root.insertBefore(variantsScript, root.firstChild);
         }
         variantsScript.textContent = JSON.stringify(
@@ -3707,7 +3707,7 @@
         return false;
       })
       .then(function (ok) {
-        root.removeAttribute("data-vd-hydrating");
+        root.removeAttribute("data-xloxi-hydrating");
         return ok;
       });
   }
@@ -3812,14 +3812,14 @@
     var text = String(css != null ? css : "")
       .slice(0, VD_CUSTOM_CSS_MAX_CHARS)
       .trim();
-    var el = root.querySelector("style[data-vd-custom-css]");
+    var el = root.querySelector("style[data-xloxi-custom-css]");
     if (!text) {
       if (el && el.parentNode) el.parentNode.removeChild(el);
       return;
     }
     if (!el) {
       el = document.createElement("style");
-      el.setAttribute("data-vd-custom-css", "");
+      el.setAttribute("data-xloxi-custom-css", "");
       el.setAttribute("type", "text/css");
       root.insertBefore(el, root.firstChild);
     }
@@ -3828,9 +3828,9 @@
 
   function applyWidgetDisplayToRoot(root, disp, _themeHeading) {
     var d = mergeWidgetDisplay(disp);
-    root.removeAttribute("data-vd-font-scale");
-    if (d.fontScale === "compact") root.setAttribute("data-vd-font-scale", "compact");
-    else if (d.fontScale === "comfortable") root.setAttribute("data-vd-font-scale", "comfortable");
+    root.removeAttribute("data-xloxi-font-scale");
+    if (d.fontScale === "compact") root.setAttribute("data-xloxi-font-scale", "compact");
+    else if (d.fontScale === "comfortable") root.setAttribute("data-xloxi-font-scale", "comfortable");
 
     applyWidgetHeaderDisplayToRoot(root, d);
 
@@ -4089,16 +4089,16 @@
     var isVolumeTable = ui.widgetPresentation === "volume_table";
 
     if (ui.hideThemeAddToCart) {
-      document.documentElement.setAttribute("data-vd-hide-theme-atc", "1");
+      document.documentElement.setAttribute("data-xloxi-hide-theme-atc", "1");
     }
     if (ui.hideThemeBuyItNow) {
-      document.documentElement.setAttribute("data-vd-hide-theme-bin", "1");
+      document.documentElement.setAttribute("data-xloxi-hide-theme-bin", "1");
     }
     if (ui.hideThemeVariantSelector) {
-      document.documentElement.setAttribute("data-vd-hide-theme-variant", "1");
+      document.documentElement.setAttribute("data-xloxi-hide-theme-variant", "1");
     }
     if (ui.hideThemeQuantitySelector) {
-      document.documentElement.setAttribute("data-vd-hide-theme-qty", "1");
+      document.documentElement.setAttribute("data-xloxi-hide-theme-qty", "1");
     }
     if (
       ui.hideThemeAddToCart ||
@@ -4163,13 +4163,13 @@
       campaignId: campaign.id,
       productId: root.getAttribute("data-product-id"),
     };
-    var rn = "vd-tier-" + String(radioName).replace(/[^a-zA-Z0-9_-]/g, "-");
+    var rn = "xloxi-tier-" + String(radioName).replace(/[^a-zA-Z0-9_-]/g, "-");
 
     function readThemeProductFormVariantId() {
       var forms = document.querySelectorAll('form[action*="/cart/add"]');
       for (var fi = 0; fi < forms.length; fi++) {
         var form = forms[fi];
-        if (form.closest(".vd-storefront-root")) continue;
+        if (form.closest(".xloxi-root")) continue;
         var vs = form.querySelector('select[name="id"]');
         if (vs && vs.value) return String(vs.value);
         var hid = form.querySelector('input[name="id"][type="hidden"]');
@@ -4180,9 +4180,9 @@
 
     function resolveActiveVariantIdForCart() {
       if (vdShowVariant) {
-        var selAdd = mountEl.querySelector(".vd-card--selected .vd-variant-select");
+        var selAdd = mountEl.querySelector(".xloxi-card--selected .xloxi-variant-select");
         if (!selAdd) {
-          selAdd = mountEl.querySelector(".vd-variant-select");
+          selAdd = mountEl.querySelector(".xloxi-variant-select");
         }
         if (selAdd) return String(selAdd.value);
       }
@@ -4257,54 +4257,54 @@
 
     function expandHtml(c, selId) {
       var selectBlock = vdShowVariant
-        ? '<div class="vd-select-wrap"><select class="vd-variant-select" aria-label="Variant">' +
+        ? '<div class="xloxi-select-wrap"><select class="xloxi-variant-select" aria-label="Variant">' +
           variantOptionsHtml(selId) +
           "</select></div>"
         : "";
       var qtyBlock = ui.hideWidgetQuantitySelector
         ? ""
-        : '<div class="vd-qty-group" role="group" aria-label="Quantity">' +
-          '<button type="button" class="vd-qty-btn" data-vd-qty-dec aria-label="Decrease quantity"><span aria-hidden="true">−</span></button>' +
-          '<input type="text" class="vd-qty-value" data-vd-qty-display inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="' +
+        : '<div class="xloxi-qty-group" role="group" aria-label="Quantity">' +
+          '<button type="button" class="xloxi-qty-btn" data-xloxi-qty-dec aria-label="Decrease quantity"><span aria-hidden="true">−</span></button>' +
+          '<input type="text" class="xloxi-qty-value" data-xloxi-qty-display inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="' +
           String(String(VD_MAX_LINE_QTY).length) +
           '" aria-label="Quantity" value="' +
           stateQty +
           '" />' +
-          '<button type="button" class="vd-qty-btn" data-vd-qty-inc aria-label="Increase quantity"><span aria-hidden="true">+</span></button>' +
+          '<button type="button" class="xloxi-qty-btn" data-xloxi-qty-inc aria-label="Increase quantity"><span aria-hidden="true">+</span></button>' +
           "</div>";
       var qtyStack =
         qtyBlock === ""
           ? ""
-          : '<div class="vd-qty-stack">' +
+          : '<div class="xloxi-qty-stack">' +
             qtyBlock +
-            '<p class="vd-cart-qty-alert" data-vd-cart-qty-alert hidden tabindex="-1"></p>' +
+            '<p class="xloxi-cart-qty-alert" data-xloxi-cart-qty-alert hidden tabindex="-1"></p>' +
             "</div>";
       var lineTotalBlock = ui.hideWidgetLineTotal
         ? ""
-        : '<span class="vd-line-total" data-vd-line-total></span>';
+        : '<span class="xloxi-line-total" data-xloxi-line-total></span>';
       var tierAddBtn = ui.hideWidgetTierAddButton
         ? ""
-        : '<button type="button" class="vd-add-outline" data-vd-tier-add>+ ' +
+        : '<button type="button" class="xloxi-add-outline" data-xloxi-tier-add>+ ' +
           esc(ui.transAdd || "Add") +
           "</button>";
       var trailingInner = qtyStack + tierAddBtn;
       var trailingHtml = trailingInner
-        ? '<div class="vd-expand-trailing">' + trailingInner + "</div>"
+        ? '<div class="xloxi-expand-trailing">' + trailingInner + "</div>"
         : "";
       if (!selectBlock && !lineTotalBlock && !trailingHtml) {
         return "";
       }
-      var expandClasses = "vd-expand-compact";
-      if (!vdShowVariant) expandClasses += " vd-expand-compact--no-variant";
-      if (ui.hideWidgetQuantitySelector) expandClasses += " vd-expand-compact--no-qty";
-      if (ui.hideWidgetLineTotal) expandClasses += " vd-expand-compact--no-line-total";
+      var expandClasses = "xloxi-expand-compact";
+      if (!vdShowVariant) expandClasses += " xloxi-expand-compact--no-variant";
+      if (ui.hideWidgetQuantitySelector) expandClasses += " xloxi-expand-compact--no-qty";
+      if (ui.hideWidgetLineTotal) expandClasses += " xloxi-expand-compact--no-line-total";
       return (
-        '<div class="vd-card__expand">' +
-        '<div class="vd-card__divider" aria-hidden="true"></div>' +
+        '<div class="xloxi-card__expand">' +
+        '<div class="xloxi-card__divider" aria-hidden="true"></div>' +
         '<div class="' +
         expandClasses +
         '">' +
-        '<span class="vd-tier-idx">#' +
+        '<span class="xloxi-tier-idx">#' +
         (c + 1) +
         "</span>" +
         selectBlock +
@@ -4380,8 +4380,8 @@
     }
 
     function bindNativeThemeAtcAnalytics() {
-      if (root.getAttribute("data-vd-native-atc-bound") === "1") return;
-      root.setAttribute("data-vd-native-atc-bound", "1");
+      if (root.getAttribute("data-xloxi-native-atc-bound") === "1") return;
+      root.setAttribute("data-xloxi-native-atc-bound", "1");
       var form = findThemeProductAddForm();
       if (!form) return;
       form.addEventListener(
@@ -4402,21 +4402,21 @@
     function updateAllPrices() {
       var uc = currentUnitCents;
       if (isVolumeTable) {
-        var trows = mountEl.querySelectorAll(".vd-volume-tier-row");
+        var trows = mountEl.querySelectorAll(".xloxi-volume-tier-row");
         for (var vi = 0; vi < tiers.length; vi++) {
           var vt = tiers[vi];
           var vu = tierUnitCents(uc, vt);
           var vrow = trows[vi];
           if (!vrow) continue;
-          var vmain = vrow.querySelector("[data-vd-main-price]");
+          var vmain = vrow.querySelector("[data-xloxi-main-price]");
           if (vmain) vmain.textContent = fmtMoney(vu, currency);
-          var vdisc = vrow.querySelector("[data-vd-discount-cell]");
+          var vdisc = vrow.querySelector("[data-xloxi-discount-cell]");
           if (vdisc) vdisc.textContent = tierVolumeTableDiscountLabel(vt);
         }
         return;
       }
       var perUnitCards = ui.cardPriceShowsUnit === true;
-      var cards = mountEl.querySelectorAll(".vd-card");
+      var cards = mountEl.querySelectorAll(".xloxi-card");
       for (var i = 0; i < tiers.length; i++) {
         var d = tiers[i];
         var lt = lineTotals(uc, d);
@@ -4427,7 +4427,7 @@
         if (!card) continue;
         var strike = card.querySelector("[data-ofd-tier-was]");
         var save = card.querySelector("[data-ofd-tier-save]");
-        var mainP = card.querySelector("[data-vd-main-price]");
+        var mainP = card.querySelector("[data-xloxi-main-price]");
         if (mainP) mainP.textContent = fmtMoney(perUnitCards ? u : lt.discounted, currency);
         var showStrikeSave = perUnitCards ? P > 0 && u < uc : minQ > 1 && P > 0;
         var hideCompare = ui.hideWidgetComparePrice === true;
@@ -4453,11 +4453,11 @@
 
     function updateAllLineTotals() {
       var uc = currentUnitCents;
-      var cards = mountEl.querySelectorAll(".vd-card");
+      var cards = mountEl.querySelectorAll(".xloxi-card");
       for (var i = 0; i < tiers.length; i++) {
         var card = cards[i];
         if (!card) continue;
-        var el = card.querySelector("[data-vd-line-total]");
+        var el = card.querySelector("[data-xloxi-line-total]");
         if (!el) continue;
         var per = tierUnitCents(uc, tiers[i]);
         el.textContent = fmtMoney(per * stateQty, currency);
@@ -4493,7 +4493,7 @@
       clampQty();
       var m = getTierMinQty();
       var str = String(stateQty);
-      var nodes = mountEl.querySelectorAll("[data-vd-qty-display]");
+      var nodes = mountEl.querySelectorAll("[data-xloxi-qty-display]");
       for (var qi = 0; qi < nodes.length; qi++) {
         var n = nodes[qi];
         if (n.tagName === "INPUT") {
@@ -4504,7 +4504,7 @@
           n.textContent = str;
         }
       }
-      var decs = mountEl.querySelectorAll("[data-vd-qty-dec]");
+      var decs = mountEl.querySelectorAll("[data-xloxi-qty-dec]");
       for (var dj = 0; dj < decs.length; dj++) {
         decs[dj].disabled = stateQty <= m;
       }
@@ -4533,7 +4533,7 @@
 
     function syncAllVariantSelects(vid) {
       if (!vdShowVariant) return;
-      var sels = mountEl.querySelectorAll(".vd-variant-select");
+      var sels = mountEl.querySelectorAll(".xloxi-variant-select");
       for (var si = 0; si < sels.length; si++) {
         sels[si].value = String(vid);
       }
@@ -4542,7 +4542,7 @@
     function scrollToAtc() {
       clampQty();
       syncQtyToForm();
-      var sel = mountEl.querySelector(".vd-card--selected .vd-variant-select");
+      var sel = mountEl.querySelector(".xloxi-card--selected .xloxi-variant-select");
       if (sel) {
         syncFormVariant(sel.value);
         root.setAttribute("data-variant-id", String(sel.value));
@@ -4563,11 +4563,11 @@
     }
 
     function syncSelectedCard() {
-      var labels = mountEl.querySelectorAll(".vd-card");
+      var labels = mountEl.querySelectorAll(".xloxi-card");
       for (var i = 0; i < labels.length; i++) {
         var lab = labels[i];
         var inp = lab.querySelector("input[type=radio]");
-        lab.classList.toggle("vd-card--selected", !!(inp && inp.checked));
+        lab.classList.toggle("xloxi-card--selected", !!(inp && inp.checked));
       }
     }
 
@@ -4595,7 +4595,7 @@
         vdCartMaxQtyRedirectTimer = null;
       }
       var nodes = mountEl.querySelectorAll(
-        "[data-vd-cart-qty-alert], [data-vd-cart-qty-alert-global]",
+        "[data-xloxi-cart-qty-alert], [data-xloxi-cart-qty-alert-global]",
       );
       for (var ci = 0; ci < nodes.length; ci++) {
         nodes[ci].setAttribute("hidden", "");
@@ -4604,18 +4604,18 @@
     }
 
     function getVdActiveCartQtyAlertEl() {
-      var per = mountEl.querySelector(".vd-card--selected [data-vd-cart-qty-alert]");
+      var per = mountEl.querySelector(".xloxi-card--selected [data-xloxi-cart-qty-alert]");
       if (per) return per;
-      return mountEl.querySelector("[data-vd-cart-qty-alert-global]");
+      return mountEl.querySelector("[data-xloxi-cart-qty-alert-global]");
     }
 
     function showVdCartMaxQtyMessageAndGoToCart() {
       clearVdCartQtyAlert();
       var alertEl = getVdActiveCartQtyAlertEl();
       var msg =
-        (typeof window.VolumeDiscount !== "undefined" &&
-          window.VolumeDiscount.messages &&
-          window.VolumeDiscount.messages.cartMaxQty) ||
+        (typeof window.Xloxi !== "undefined" &&
+          window.Xloxi.messages &&
+          window.Xloxi.messages.cartMaxQty) ||
         VD_MSG_CART_MAX_QTY;
       if (alertEl) {
         alertEl.textContent = msg;
@@ -4633,12 +4633,12 @@
     }
 
     function showVdOutOfStockMessage() {
-      var el = mountEl.querySelector("[data-vd-stock-alert]");
+      var el = mountEl.querySelector("[data-xloxi-stock-alert]");
       if (!el) return;
       el.textContent =
-        (typeof window.VolumeDiscount !== "undefined" &&
-          window.VolumeDiscount.messages &&
-          window.VolumeDiscount.messages.soldOut) ||
+        (typeof window.Xloxi !== "undefined" &&
+          window.Xloxi.messages &&
+          window.Xloxi.messages.soldOut) ||
         "This variant is sold out.";
       el.removeAttribute("hidden");
       try {
@@ -4656,13 +4656,13 @@
     function updatePurchaseControlsAvailability() {
       var vidNow = resolveActiveVariantIdForCart();
       var purchasable = isVariantAvailableForCart(vidNow);
-      var ctaEl = mountEl.querySelector("[data-vd-cta]");
+      var ctaEl = mountEl.querySelector("[data-xloxi-cta]");
       if (ctaEl) ctaEl.disabled = !purchasable;
-      var tierAdds = mountEl.querySelectorAll("[data-vd-tier-add]");
+      var tierAdds = mountEl.querySelectorAll("[data-xloxi-tier-add]");
       for (var tax = 0; tax < tierAdds.length; tax++) {
         tierAdds[tax].disabled = !purchasable;
       }
-      var ael = mountEl.querySelector("[data-vd-stock-alert]");
+      var ael = mountEl.querySelector("[data-xloxi-stock-alert]");
       if (ael && purchasable) {
         clearTimeout(ael._vdStockT);
         ael.setAttribute("hidden", "");
@@ -4678,19 +4678,19 @@
 
     var h = [];
     h.push(
-      '<div class="vd-bundle' +
-        (isVolumeTable ? " vd-bundle--volume-table" : "") +
+      '<div class="xloxi-bundle' +
+        (isVolumeTable ? " xloxi-bundle--volume-table" : "") +
         '">',
     );
     var sec = String(sectionHeading || "").trim();
     if (sec) {
-      h.push('<h2 class="vd-section-title">' + esc(sec) + "</h2>");
+      h.push('<h2 class="xloxi-section-title">' + esc(sec) + "</h2>");
     }
     var titleText = String(ui.title || "").trim();
     if (titleText || cdLive) {
-      h.push('<div class="vd-topbar">');
+      h.push('<div class="xloxi-topbar">');
       if (titleText) {
-        h.push('<p class="vd-title">' + esc(titleText) + "</p>");
+        h.push('<p class="xloxi-title">' + esc(titleText) + "</p>");
       }
       if (cdLive) {
         var noticeRaw = String(ui.countdownLabel || "").trim();
@@ -4699,9 +4699,9 @@
             .replace(/\s*%c\s*/gi, " ")
             .replace(/\s+/g, " ")
             .trim() || "Sale end in";
-        h.push('<div class="vd-countdown">');
-        h.push('<span class="vd-countdown-muted">' + esc(notice) + "</span> ");
-        h.push('<span class="vd-countdown-badge" data-vd-cd></span>');
+        h.push('<div class="xloxi-countdown">');
+        h.push('<span class="xloxi-countdown-muted">' + esc(notice) + "</span> ");
+        h.push('<span class="xloxi-countdown-badge" data-xloxi-cd></span>');
         h.push("</div>");
       }
       h.push("</div>");
@@ -4718,13 +4718,13 @@
 
     if (isVolumeTable) {
       h.push(
-        '<div class="vd-cards vd-cards--volume-table" role="radiogroup" aria-label="' +
+        '<div class="xloxi-cards xloxi-cards--volume-table" role="radiogroup" aria-label="' +
           esc(String(ui.title || "").trim() || "Quantity breaks") +
           '">',
       );
-      h.push('<div class="vd-volume-table-scroll">');
-      h.push('<div class="vd-volume-table-scroll-inner">');
-      h.push('<table class="vd-volume-table"><thead><tr>');
+      h.push('<div class="xloxi-volume-table-scroll">');
+      h.push('<div class="xloxi-volume-table-scroll-inner">');
+      h.push('<table class="xloxi-volume-table"><thead><tr>');
       h.push("<th>" + esc(ui.transQty) + "</th>");
       h.push("<th>" + esc(ui.transDiscount) + "</th>");
       h.push("<th>" + esc(ui.transPrice) + "</th>");
@@ -4732,15 +4732,15 @@
       for (var c = 0; c < tiers.length; c++) {
         var d = tiers[c];
         var uInit = tierUnitCents(currentUnitCents, d);
-        h.push('<tr class="vd-volume-tier-row">');
+        h.push('<tr class="xloxi-volume-tier-row">');
         h.push("<td>" + esc(localizedTierBuyLabel(d.buyLabel, c, tiers, ui.transBuy)) + "</td>");
         h.push(
-          '<td data-vd-discount-cell>' +
+          '<td data-xloxi-discount-cell>' +
             esc(tierVolumeTableDiscountLabel(d)) +
             "</td>",
         );
         h.push(
-          '<td><span class="ofd-tier-amt" data-vd-main-price>' +
+          '<td><span class="ofd-tier-amt" data-xloxi-main-price>' +
             fmtMoney(uInit, currency) +
             "</span></td>",
         );
@@ -4748,7 +4748,7 @@
       }
       h.push("</tbody></table></div></div></div>");
     } else {
-      h.push('<div class="vd-cards" role="radiogroup" aria-label="' + esc(String(ui.title || "").trim() || "Quantity breaks") + '">');
+      h.push('<div class="xloxi-cards" role="radiogroup" aria-label="' + esc(String(ui.title || "").trim() || "Quantity breaks") + '">');
       var perUnitCardsInit = ui.cardPriceShowsUnit === true;
       var hideCompareInit = ui.hideWidgetComparePrice === true;
       var badgePos = String(ui.badgePosition || "after_label");
@@ -4769,7 +4769,7 @@
       var tierBadgeHtml = function (badgeText, rowClass) {
         if (!badgeText) return "";
         return (
-          '<span class="vd-badge-pill' +
+          '<span class="xloxi-badge-pill' +
           (rowClass ? " " + rowClass : "") +
           '">' +
           esc(badgeText) +
@@ -4788,13 +4788,13 @@
           : minQ > 1 && P > 0;
 
         h.push(
-          '<label class="vd-card' +
-            (c2 === defaultIdx ? " vd-card--selected" : "") +
-            (badge && isBadgeTopFloat(badgePos) ? " vd-card--badge-top-float" : "") +
+          '<label class="xloxi-card' +
+            (c2 === defaultIdx ? " xloxi-card--selected" : "") +
+            (badge && isBadgeTopFloat(badgePos) ? " xloxi-card--badge-top-float" : "") +
             '">',
         );
         h.push(
-          '<input class="vd-sr-only" type="radio" name="' +
+          '<input class="xloxi-sr-only" type="radio" name="' +
             rn +
             '" value="' +
             d.minQty +
@@ -4804,17 +4804,17 @@
         );
         if (badge && isBadgeTopFloat(badgePos)) {
           h.push(
-            '<div class="vd-card__badge-top vd-card__badge-top--float ' +
+            '<div class="xloxi-card__badge-top xloxi-card__badge-top--float ' +
               badgeTopFloatAlignClass(badgePos) +
               '">' +
               tierBadgeHtml(badge, "") +
               "</div>",
           );
         }
-        h.push('<span class="vd-card__inner">');
+        h.push('<span class="xloxi-card__inner">');
         h.push('<div class="ofd-tier-row">');
         h.push('<div class="ofd-tier-main">');
-        h.push('<span class="vd-radio-circle" aria-hidden="true"></span>');
+        h.push('<span class="xloxi-radio-circle" aria-hidden="true"></span>');
         h.push('<div class="ofd-tier-copy">');
         h.push('<div class="ofd-tier-label-row">');
         h.push('<span class="ofd-tier-qty">' + esc(localizedTierBuyLabel(d.buyLabel, c2, tiers, ui.transBuy)) + "</span>");
@@ -4823,19 +4823,19 @@
         }
         h.push("</div>");
         if (badge && badgePos === "below_label") {
-          h.push(tierBadgeHtml(badge, "vd-badge-pill--row"));
+          h.push(tierBadgeHtml(badge, "xloxi-badge-pill--row"));
         }
         var optSub =
           d.optionSubtext && String(d.optionSubtext).trim();
         if (optSub) {
           h.push(
-            '<span class="vd-option-subtext vd-option-subtext--under">' +
+            '<span class="xloxi-option-subtext xloxi-option-subtext--under">' +
               esc(optSub) +
               "</span>",
           );
         }
         if (badge && badgePos === "after_subtext") {
-          h.push(tierBadgeHtml(badge, "vd-badge-pill--row"));
+          h.push(tierBadgeHtml(badge, "xloxi-badge-pill--row"));
         }
         if (showStrikeInit) {
           h.push(
@@ -4849,7 +4849,7 @@
         h.push("</div></div>");
         h.push('<div class="ofd-tier-prices">');
         if (badge && badgePos === "price_column") {
-          h.push(tierBadgeHtml(badge, "vd-badge-pill--pricecol"));
+          h.push(tierBadgeHtml(badge, "xloxi-badge-pill--pricecol"));
         }
         if (showStrikeInit && !hideCompareInit) {
           h.push(
@@ -4861,7 +4861,7 @@
           h.push('<span class="ofd-tier-was" data-ofd-tier-was style="display:none"></span>');
         }
         h.push(
-          '<span class="ofd-tier-amt" data-vd-main-price>' +
+          '<span class="ofd-tier-amt" data-xloxi-main-price>' +
             fmtMoney(perUnitCardsInit ? cardUnitCents : lt.discounted, currency) +
             "</span>",
         );
@@ -4875,33 +4875,33 @@
     var hideVolCta = isVolumeTable && ui.hideWidgetMainCta === true;
     if (!hideVolCta) {
       h.push(
-        '<button type="button" class="vd-cta" data-vd-cta>' +
+        '<button type="button" class="xloxi-cta" data-xloxi-cta>' +
           esc(ui.ctaLabel) +
           "</button>",
       );
     }
     h.push(
-      '<p class="vd-stock-alert" data-vd-stock-alert hidden tabindex="-1"></p>',
+      '<p class="xloxi-stock-alert" data-xloxi-stock-alert hidden tabindex="-1"></p>',
     );
     h.push(
-      '<p class="vd-cart-qty-alert vd-cart-qty-alert--global" data-vd-cart-qty-alert-global hidden tabindex="-1"></p>',
+      '<p class="xloxi-cart-qty-alert xloxi-cart-qty-alert--global" data-xloxi-cart-qty-alert-global hidden tabindex="-1"></p>',
     );
-    h.push('<p class="vd-footnote">' + esc(ui.footnote) + "</p>");
+    h.push('<p class="xloxi-footnote">' + esc(ui.footnote) + "</p>");
     h.push("</div>");
 
-    /* Keep Liquid ATC bridge form across re-mount (lives inside [data-vd-mount]
+    /* Keep Liquid ATC bridge form across re-mount (lives inside [data-xloxi-mount]
        so it stays hidden until the widget paints — do not wipe it with innerHTML). */
     var liquidBridge =
-      mountEl.querySelector("form[data-vd-liquid-product-form]") ||
-      mountEl.querySelector("form.vd-liquid-product-form");
+      mountEl.querySelector("form[data-xloxi-liquid-product-form]") ||
+      mountEl.querySelector("form.xloxi-liquid-product-form");
     mountEl.innerHTML = h.join("");
     if (liquidBridge) {
       mountEl.insertBefore(liquidBridge, mountEl.firstChild);
     }
 
-    var cdEl = mountEl.querySelector("[data-vd-cd]");
+    var cdEl = mountEl.querySelector("[data-xloxi-cd]");
     if (cdEl && cdLive) {
-      var cdWrap = cdEl.closest(".vd-countdown");
+      var cdWrap = cdEl.closest(".xloxi-countdown");
       var tickCd = function () {
         var now = Date.now();
         // Countdown always targets end — schedule start only gates offer status, not the pill.
@@ -4911,7 +4911,7 @@
       };
       tickCd();
       var iv = setInterval(tickCd, 1000);
-      root.setAttribute("data-vd-cd-iv", String(iv));
+      root.setAttribute("data-xloxi-cd-iv", String(iv));
     }
 
     var initVid = selVariantId;
@@ -4928,7 +4928,7 @@
       if (
         !t ||
         !t.getAttribute ||
-        t.getAttribute("data-vd-qty-display") == null ||
+        t.getAttribute("data-xloxi-qty-display") == null ||
         t.tagName !== "INPUT"
       ) {
         return;
@@ -4945,7 +4945,7 @@
       if (
         t &&
         t.getAttribute &&
-        t.getAttribute("data-vd-qty-display") != null &&
+        t.getAttribute("data-xloxi-qty-display") != null &&
         t.tagName === "INPUT"
       ) {
         applyQtyFromInput(t);
@@ -4955,7 +4955,7 @@
         vdShowVariant &&
         t &&
         t.classList &&
-        t.classList.contains("vd-variant-select")
+        t.classList.contains("xloxi-variant-select")
       ) {
         var v = t.value;
         currentUnitCents = readPriceForVariant(v);
@@ -4981,7 +4981,7 @@
       if (
         !t ||
         !t.getAttribute ||
-        t.getAttribute("data-vd-qty-display") == null ||
+        t.getAttribute("data-xloxi-qty-display") == null ||
         t.tagName !== "INPUT"
       ) {
         return;
@@ -4994,7 +4994,7 @@
       if (
         !t ||
         !t.getAttribute ||
-        t.getAttribute("data-vd-qty-display") == null ||
+        t.getAttribute("data-xloxi-qty-display") == null ||
         t.tagName !== "INPUT"
       ) {
         return;
@@ -5006,22 +5006,22 @@
     });
 
     mountEl.addEventListener("click", function (ev) {
-      var btn = ev.target && ev.target.closest ? ev.target.closest("[data-vd-qty-dec],[data-vd-qty-inc],[data-vd-tier-add]") : null;
+      var btn = ev.target && ev.target.closest ? ev.target.closest("[data-xloxi-qty-dec],[data-xloxi-qty-inc],[data-xloxi-tier-add]") : null;
       if (!btn) return;
-      if (btn.hasAttribute("data-vd-qty-dec")) {
+      if (btn.hasAttribute("data-xloxi-qty-dec")) {
         ev.preventDefault();
         var mq = getTierMinQty();
         stateQty = Math.max(mq, stateQty - 1);
         updateQtyDisplay();
         return;
       }
-      if (btn.hasAttribute("data-vd-qty-inc")) {
+      if (btn.hasAttribute("data-xloxi-qty-inc")) {
         ev.preventDefault();
         stateQty = Math.min(VD_MAX_LINE_QTY, stateQty + 1);
         updateQtyDisplay();
         return;
       }
-      if (btn.hasAttribute("data-vd-tier-add")) {
+      if (btn.hasAttribute("data-xloxi-tier-add")) {
         ev.preventDefault();
         ev.stopPropagation();
         clampQty();
@@ -5061,7 +5061,7 @@
       }
     });
 
-    var cta = mountEl.querySelector("[data-vd-cta]");
+    var cta = mountEl.querySelector("[data-xloxi-cta]");
     if (cta) {
       cta.addEventListener("click", function (ev) {
         ev.preventDefault();
@@ -5109,7 +5109,7 @@
           var t = ev.target;
           if (!t || !t.name || String(t.name) !== "id") return;
           var form = t.closest && t.closest('form[action*="/cart/add"]');
-          if (!form || form.closest(".vd-storefront-root")) return;
+          if (!form || form.closest(".xloxi-root")) return;
           var v = String(t.value || "");
           if (!v) return;
           currentUnitCents = readPriceForVariant(v);
@@ -5124,12 +5124,12 @@
 
     root.style.display = "";
     mountEl.hidden = false;
-    root.setAttribute("data-vd-inited", "1");
+    root.setAttribute("data-xloxi-inited", "1");
     bindNativeThemeAtcAnalytics();
     trackImpression(campaign, root.getAttribute("data-product-id"));
-    window.VolumeDiscount = window.VolumeDiscount || {};
-    window.VolumeDiscount.embed = window.VolumeDiscount.embed || {};
-    window.VolumeDiscount.embed.version = "1.28.6";
+    window.Xloxi = window.Xloxi || {};
+    window.Xloxi.embed = window.Xloxi.embed || {};
+    window.Xloxi.embed.version = "1.29.2";
 
   }
   /**
@@ -5188,7 +5188,7 @@
   }
 
   function readCompactProductRule(root) {
-    var el = root && root.querySelector("script[data-vd-product-rule]");
+    var el = root && root.querySelector("script[data-xloxi-product-rule]");
     if (!el) return null;
     try {
       return expandCompactProductRule(JSON.parse(String(el.textContent || "").trim()));
@@ -5198,9 +5198,9 @@
   }
 
   function runWidget(root) {
-    if (root.getAttribute("data-vd-inited") === "1") return;
+    if (root.getAttribute("data-xloxi-inited") === "1") return;
     var configId = root.getAttribute("data-config-id");
-    var mount = root.querySelector("[data-vd-mount]");
+    var mount = root.querySelector("[data-xloxi-mount]");
     var scriptEl = configId ? document.getElementById(configId) : null;
     if (!mount) return;
 
@@ -5253,7 +5253,7 @@
               mount.hidden = true;
               return;
             }
-            root.removeAttribute("data-vd-inited");
+            root.removeAttribute("data-xloxi-inited");
             runWidget(root);
           },
         );
@@ -5352,7 +5352,7 @@
 
     function finishFetch(remote) {
       if (!root.isConnected) return;
-      if (root.getAttribute("data-vd-inited") === "1") return;
+      if (root.getAttribute("data-xloxi-inited") === "1") return;
       var cfg = sanitizeWidgetConfig(
         remote || { version: 1, campaigns: [] },
         designMode,
@@ -5375,21 +5375,21 @@
   }
 
   function ensureHostedStorefrontCss() {
-    if (document.querySelector('link[data-vd-hosted-css="1"]')) return;
+    if (document.querySelector('link[data-xloxi-hosted-css="1"]')) return;
     if (document.querySelector('link[href*="volume-discount-storefront.css"]')) return;
     var origin =
-      (typeof window.__vdAppOrigin === "string" && window.__vdAppOrigin) ||
+      (typeof window.__xloxiAppOrigin === "string" && window.__xloxiAppOrigin) ||
       "https://offrey.xloxi.com";
     var ver =
-      (typeof window.__vdAssetVersion === "string" && window.__vdAssetVersion) ||
-      "1.24.0";
+      (typeof window.__xloxiAssetVersion === "string" && window.__xloxiAssetVersion) ||
+      "1.29.2";
     var link = document.createElement("link");
     link.rel = "stylesheet";
     link.href =
       String(origin).replace(/\/$/, "") +
       "/vd-storefront.css?v=" +
       encodeURIComponent(ver);
-    link.setAttribute("data-vd-hosted-css", "1");
+    link.setAttribute("data-xloxi-hosted-css", "1");
     (document.head || document.documentElement).appendChild(link);
   }
 
@@ -5423,10 +5423,10 @@
   }
 
   function hideAllWidgetRoots() {
-    document.querySelectorAll(".vd-storefront-root").forEach(function (el) {
+    document.querySelectorAll(".xloxi-root").forEach(function (el) {
       el.style.display = "none";
-      el.removeAttribute("data-vd-inited");
-      var mount = el.querySelector("[data-vd-mount]");
+      el.removeAttribute("data-xloxi-inited");
+      var mount = el.querySelector("[data-xloxi-mount]");
       if (mount) mount.hidden = true;
     });
   }
@@ -5436,13 +5436,13 @@
     var syncCartSideEffects = opts.syncCart !== false;
 
     /* App embed off → never mount (block markup alone must not show the widget). */
-    if (!window.__vdAppEmbedActive) {
+    if (!window.__xloxiAppEmbedActive) {
       hideAllWidgetRoots();
       return;
     }
 
     /* Widget first — never wait on cart network before mounting. */
-    document.querySelectorAll(".vd-storefront-root").forEach(function (el) {
+    document.querySelectorAll(".xloxi-root").forEach(function (el) {
       runWidget(el);
     });
 

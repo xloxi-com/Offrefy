@@ -1,26 +1,37 @@
 {% comment %}
-  App block — Theme editor → Add section → Apps, or Product information → Add block → Apps.
-  Available on all templates (not product-only) so reviewers/merchants find it from Home too.
-  Product comes from closest.product or the template product (no theme-editor settings).
-  This block is the only place that injects storefront JS/CSS. App embed only sets the
-  enable flag (needed for live mount + theme-editor when body embeds are flaky).
+  App block — Product information → Add block → Apps (product templates only).
+  Injects storefront JS/CSS + widget markup here only. App embed sets the live
+  enable flag on product pages; design mode sets the flag so theme editor works
+  when body embeds are not injected.
 {% endcomment %}
 {% liquid
+  assign vd_is_product_page = false
+  if request.page_type == 'product' or template.name == 'product'
+    assign vd_is_product_page = true
+  endif
+
   if closest.product != blank
     assign vd_product = closest.product
   elsif product != blank
     assign vd_product = product
   endif
 %}
-<script>window.__vdAppEmbedActive = true;</script>
-{% render 'vd-storefront-assets', vd_product: vd_product %}
-{% render 'vd-quantity-breaks', block: block, vd_product: vd_product %}
+{% if vd_is_product_page or request.design_mode %}
+  {% if request.design_mode %}
+    <script>window.__xloxiAppEmbedActive = true;</script>
+  {% endif %}
+  {% render 'vd-storefront-assets', vd_product: vd_product %}
+  {% render 'vd-quantity-breaks', block: block, vd_product: vd_product %}
+{% endif %}
 
 {% schema %}
 {
   "name": "t:volume_discount.blocks.quantity_breaks.name",
   "target": "section",
   "stylesheet": "volume-discount-storefront.css",
+  "enabled_on": {
+    "templates": ["product"]
+  },
   "settings": []
 }
 {% endschema %}

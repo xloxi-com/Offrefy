@@ -6,7 +6,7 @@
       },
       "embed": {
         "name": "Offrefy (global)",
-        "paragraph": "Turn this ON on the live theme to enable Offrefy. Scripts and CSS load only where you add the “Quantity breaks” block (Product information → Add block → Apps, or Add section → Apps)."
+        "paragraph": "Turn this ON on the live theme to enable Offrefy on product pages. Scripts and CSS load only where you add the “Quantity breaks” block on a product template (Product information → Add block → Apps)."
       }
     }
   }

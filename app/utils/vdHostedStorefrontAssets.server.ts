@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 /** Keep in sync with `vd-storefront-assets.liquid` + storefront embed.version. */
-const ASSET_VERSION = "1.28.2";
+const ASSET_VERSION = "1.29.2";
 
 function assetPath(fileName: string) {
   return path.join(
@@ -50,8 +50,8 @@ export function vdLoaderJsResponse(appOrigin: string) {
   const body = `(function(){
   var O=${JSON.stringify(origin)};
   var V=${JSON.stringify(ASSET_VERSION)};
-  try { window.__vdAppOrigin = window.__vdAppOrigin || O; } catch (e) {}
-  try { window.__vdAssetVersion = window.__vdAssetVersion || V; } catch (e2) {}
+  try { window.__xloxiAppOrigin = window.__xloxiAppOrigin || O; } catch (e) {}
+  try { window.__xloxiAssetVersion = window.__xloxiAssetVersion || V; } catch (e2) {}
   /* No hosted widget inject — App Embed (theme extension) owns storefront JS. */
 })();`;
   return new Response(body, {

@@ -107,7 +107,7 @@ const variantOptions = [
   { label: "250ml", value: "250ml", available: false },
 ];
 
-/** Mirrors storefront `.vd-card__badge-top--float` + align modifiers (approx. card padding). */
+/** Mirrors storefront `.xloxi-card__badge-top--float` + align modifiers (approx. card padding). */
 function topFloatBadgeWrapStyle(
   position: Extract<
     VolumeDiscountBadgePosition,
