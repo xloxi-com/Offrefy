@@ -1406,31 +1406,59 @@
 
   function findThemeCartDrawerEl() {
     return (
+      document.querySelector("valor-cart-drawer") ||
       document.querySelector("cart-drawer") ||
       document.querySelector("cart-notification") ||
       document.getElementById("CartDrawer") ||
+      document.getElementById("ValorCartDrawer") ||
       document.querySelector("cart-drawer-component") ||
       document.querySelector("[id*='CartDrawer']") ||
       document.querySelector("[id*='cart-drawer']")
     );
   }
 
-  /** Same IDs Dawn ProductForm sends — must match renderContents lookup keys (section.id). */
+  /** Same IDs Dawn/Valor ProductForm sends — must match renderContents / renderFromSections keys. */
   function getThemeCartSectionIds() {
+    var ids = [];
+    var seen = Object.create(null);
+    function pushId(id) {
+      var s = String(id || "").trim();
+      if (!s || seen[s]) return;
+      seen[s] = true;
+      ids.push(s);
+    }
     try {
       var drawer = findThemeCartDrawerEl();
       if (drawer && typeof drawer.getSectionsToRender === "function") {
-        return drawer
-          .getSectionsToRender()
-          .map(function (section) {
-            return section.id || section.section;
-          })
-          .filter(Boolean);
+        drawer.getSectionsToRender().forEach(function (section) {
+          pushId(section.id || section.section);
+        });
       }
     } catch (e) {
       void e;
     }
-    return ["cart-drawer", "cart-icon-bubble"];
+    /* Valor + Dawn defaults */
+    pushId("cart-drawer");
+    pushId("cart-icon-bubble");
+    /* Discover cart-related Shopify sections in the DOM */
+    try {
+      var nodes = document.querySelectorAll(
+        '[id^="shopify-section-"][id*="cart"], [id^="shopify-section-"][id*="Cart"], [id^="shopify-section-"][id*="header"]',
+      );
+      for (var i = 0; i < nodes.length; i++) {
+        var raw = String(nodes[i].id || "");
+        var sid = raw.replace(/^shopify-section-/, "");
+        if (
+          /cart|header|drawer/i.test(sid) &&
+          sid.indexOf("template--") !== 0
+        ) {
+          pushId(sid);
+        }
+      }
+    } catch (e2) {
+      void e2;
+    }
+    return ids.length ? ids : ["cart-drawer", "cart-icon-bubble"];
   }
 
   function getThemeCartSectionsParam() {
@@ -1452,6 +1480,8 @@
 
   function clickHeaderCartIcon() {
     var selectors = [
+      ".valor-header__cart",
+      "a.valor-header__cart",
       "#cart-icon-bubble",
       "a#cart-icon-bubble",
       "cart-icon-bubble a",
@@ -1480,12 +1510,14 @@
 
   function isThemeCartDrawerOpen() {
     var drawer =
+      document.querySelector("valor-cart-drawer") ||
       document.querySelector("cart-drawer") ||
       document.querySelector("cart-notification") ||
       document.querySelector("cart-drawer-component");
     if (!drawer) return false;
     return !!(
       drawer.hasAttribute("open") ||
+      drawer.hasAttribute("data-open") ||
       drawer.classList.contains("active") ||
       drawer.classList.contains("is-open") ||
       drawer.classList.contains("animate")
@@ -1499,6 +1531,23 @@
    */
   function openThemeCartDrawer() {
     try {
+      var valor = document.querySelector("valor-cart-drawer");
+      if (valor) {
+        try {
+          valor.classList.remove("valor-cart-drawer--empty");
+        } catch (eEmptyV) {
+          void eEmptyV;
+        }
+        if (typeof valor.open === "function") {
+          try {
+            valor.open();
+          } catch (eOpenV) {
+            void eOpenV;
+          }
+          if (isThemeCartDrawerOpen()) return true;
+        }
+      }
+
       var drawer = document.querySelector("cart-drawer");
       if (drawer) {
         try {
@@ -1552,6 +1601,72 @@
     }, 350);
   }
 
+  function updateCartCountBubbles(cart) {
+    var count =
+      cart && typeof cart.item_count === "number" ? cart.item_count | 0 : 0;
+    try {
+      var valor = document.querySelector("valor-cart-drawer");
+      if (valor && typeof valor.updateCartCount === "function") {
+        valor.updateCartCount({ item_count: count });
+      }
+    } catch (eV) {
+      void eV;
+    }
+    /* Valor header badge */
+    try {
+      var cartLink = document.querySelector(".valor-header__cart");
+      if (cartLink) {
+        var bubble = cartLink.querySelector(".valor-cart-count");
+        var hiddenText = cartLink.querySelector("[data-cart-count-text]");
+        if (count > 0) {
+          if (!bubble) {
+            bubble = document.createElement("span");
+            bubble.className = "valor-cart-count";
+            bubble.setAttribute("aria-hidden", "true");
+            if (hiddenText) cartLink.insertBefore(bubble, hiddenText);
+            else cartLink.appendChild(bubble);
+          }
+          bubble.textContent = count < 100 ? String(count) : "";
+        } else if (bubble) {
+          bubble.remove();
+        }
+        if (hiddenText && hiddenText.dataset && hiddenText.dataset.template) {
+          hiddenText.textContent = String(hiddenText.dataset.template).replace(
+            "%count%",
+            String(count),
+          );
+        }
+      }
+    } catch (eValorBadge) {
+      void eValorBadge;
+    }
+    /* Dawn-style bubbles */
+    try {
+      var dawnBubbles = document.querySelectorAll(
+        ".cart-count-bubble span[aria-hidden='true'], .cart-count-bubble span:not(.visually-hidden), [data-cart-count], .header__icon--cart .cart-count",
+      );
+      for (var i = 0; i < dawnBubbles.length; i++) {
+        dawnBubbles[i].textContent = count > 0 ? String(count) : "";
+      }
+    } catch (eDawn) {
+      void eDawn;
+    }
+  }
+
+  /** Valor theme listens for this after /cart/add.js (see cart-drawer.js). */
+  function dispatchValorCartAdded(detail) {
+    try {
+      document.dispatchEvent(
+        new CustomEvent("valor:cart:added", {
+          bubbles: true,
+          detail: detail || {},
+        }),
+      );
+    } catch (e) {
+      void e;
+    }
+  }
+
   function publishThemeCartUpdate(cartData) {
     try {
       if (
@@ -1580,9 +1695,16 @@
           detail: { cart: cartData },
         }),
       );
+      document.dispatchEvent(
+        new CustomEvent("valor:cart:updated", {
+          bubbles: true,
+          detail: cartData || {},
+        }),
+      );
     } catch (e2) {
       void e2;
     }
+    updateCartCountBubbles(cartData);
   }
 
   function findVdLiquidProductForm(root) {
@@ -2228,6 +2350,35 @@
   function applyThemeCartSectionsFromResponse(response, openDrawer) {
     if (!response || !cartResponseHasSectionHtml(response.sections)) return false;
     try {
+      /* Valor theme: renderFromSections(sections) + open() */
+      var valor = document.querySelector("valor-cart-drawer");
+      if (valor && typeof valor.renderFromSections === "function") {
+        try {
+          var okV = valor.renderFromSections(response.sections);
+          if (okV) {
+            try {
+              valor.classList.remove("valor-cart-drawer--empty");
+            } catch (eEmptyV) {
+              void eEmptyV;
+            }
+            scheduleCartDrawerDiscountLabelPatch();
+            if (openDrawer) {
+              setTimeout(function () {
+                try {
+                  if (typeof valor.open === "function") valor.open();
+                  else forceOpenThemeCartDrawer();
+                } catch (eOV) {
+                  forceOpenThemeCartDrawer();
+                }
+              }, 40);
+            }
+            return true;
+          }
+        } catch (eValorRender) {
+          void eValorRender;
+        }
+      }
+
       var drawer =
         document.querySelector("cart-drawer") ||
         document.querySelector("cart-notification") ||
@@ -2263,6 +2414,7 @@
                 void eO;
               }
             }
+            if (!isThemeCartDrawerOpen()) forceOpenThemeCartDrawer();
           }, 120);
         }
         return true;
@@ -2300,7 +2452,10 @@
     }
     if (!list.length) {
       list = [
+        { id: "cart-drawer", selector: "#ValorCartDrawer" },
+        { id: "cart-drawer", selector: "valor-cart-drawer" },
         { id: "cart-drawer", selector: "#CartDrawer" },
+        { id: "cart-drawer", selector: "#shopify-section-cart-drawer" },
         { id: "cart-icon-bubble" },
       ];
     }
@@ -2317,10 +2472,55 @@
       }
       if (!el) continue;
       try {
+        /* Valor: replace inner HTML of the custom element from section markup */
+        if (el.tagName && String(el.tagName).toLowerCase() === "valor-cart-drawer") {
+          var tmp = document.createElement("div");
+          tmp.innerHTML = html;
+          var neu =
+            tmp.querySelector("#" + el.id) ||
+            tmp.querySelector("valor-cart-drawer");
+          if (neu) {
+            var wasOpen = el.hasAttribute("data-open");
+            el.innerHTML = neu.innerHTML;
+            if (wasOpen || openDrawer) {
+              el.setAttribute("data-open", "");
+              el.removeAttribute("hidden");
+              document.body.classList.add("valor-cart-drawer-open");
+            }
+            try {
+              if (neu.classList.contains("valor-cart-drawer--empty")) {
+                el.classList.add("valor-cart-drawer--empty");
+              } else {
+                el.classList.remove("valor-cart-drawer--empty");
+              }
+            } catch (eCls) {
+              void eCls;
+            }
+            applied = true;
+            continue;
+          }
+        }
         el.innerHTML = getSectionInnerHTML(html, section.selector);
         applied = true;
       } catch (eSet) {
         void eSet;
+      }
+    }
+    if (applied) {
+      var valorEl = document.querySelector("valor-cart-drawer");
+      if (valorEl) {
+        try {
+          valorEl.classList.remove("valor-cart-drawer--empty");
+        } catch (eEmptyV2) {
+          void eEmptyV2;
+        }
+        if (openDrawer && typeof valorEl.open === "function") {
+          try {
+            valorEl.open();
+          } catch (eOpenV2) {
+            void eOpenV2;
+          }
+        }
       }
     }
     if (applied && drawer) {
@@ -2337,6 +2537,9 @@
         }
       }
       scheduleCartDrawerDiscountLabelPatch();
+    }
+    if (applied && openDrawer && !isThemeCartDrawerOpen()) {
+      forceOpenThemeCartDrawer();
     }
     return applied;
   }
@@ -2364,15 +2567,51 @@
         return res.ok ? res.json() : null;
       })
       .then(function (body) {
+        var applied = false;
         if (body && body.sections) {
-          if (!applyThemeCartSectionsFromResponse(body, openDrawer)) {
-            manualApplyCartSections(body.sections, openDrawer);
+          applied = applyThemeCartSectionsFromResponse(body, openDrawer);
+          if (!applied) {
+            applied = manualApplyCartSections(body.sections, openDrawer);
+          }
+          /* Valor listens for valor:cart:added with sections payload */
+          dispatchValorCartAdded(body);
+        }
+        /* If section HTML path failed, ask Valor drawer to refresh itself */
+        if (!applied) {
+          var valor = document.querySelector("valor-cart-drawer");
+          if (valor && typeof valor.refresh === "function") {
+            return Promise.resolve(valor.refresh())
+              .then(function () {
+                if (openDrawer) forceOpenThemeCartDrawer();
+                scheduleCartDrawerDiscountLabelPatch();
+                return body;
+              })
+              .catch(function () {
+                if (openDrawer) forceOpenThemeCartDrawer();
+                return body;
+              });
           }
         }
         scheduleCartDrawerDiscountLabelPatch();
+        if (openDrawer && !isThemeCartDrawerOpen()) {
+          forceOpenThemeCartDrawer();
+        }
         return body;
       })
       .catch(function () {
+        var valor = document.querySelector("valor-cart-drawer");
+        if (valor && typeof valor.refresh === "function") {
+          return Promise.resolve(valor.refresh())
+            .then(function () {
+              if (openDrawer) forceOpenThemeCartDrawer();
+              return null;
+            })
+            .catch(function () {
+              if (openDrawer) forceOpenThemeCartDrawer();
+              return null;
+            });
+        }
+        if (openDrawer) forceOpenThemeCartDrawer();
         return null;
       });
   }
@@ -2523,10 +2762,19 @@
             if (!cart || !(cart.item_count > 0)) {
               throw new Error("Could not add to cart");
             }
+            /* Prefer sections from /cart/add.js response (Valor + Dawn) */
+            if (body && body.sections && cartResponseHasSectionHtml(body.sections)) {
+              applyThemeCartSectionsFromResponse(body, openDrawer);
+              dispatchValorCartAdded(body);
+            } else if (openDrawer) {
+              dispatchValorCartAdded(body || {});
+            }
             publishThemeCartUpdate(cart);
             if (!openDrawer) return body;
-            /* Always re-fetch live section HTML so drawer is not empty. */
+            /* Always re-fetch live section HTML so drawer/badge stay in sync. */
             return refreshThemeCartSectionsAndOpen(true).then(function () {
+              publishThemeCartUpdate(cart);
+              if (!isThemeCartDrawerOpen()) forceOpenThemeCartDrawer();
               return body;
             });
           });
@@ -4855,7 +5103,7 @@
     trackImpression(campaign, root.getAttribute("data-product-id"));
     window.VolumeDiscount = window.VolumeDiscount || {};
     window.VolumeDiscount.embed = window.VolumeDiscount.embed || {};
-    window.VolumeDiscount.embed.version = "1.28.5";
+    window.VolumeDiscount.embed.version = "1.28.6";
 
   }
   /**
