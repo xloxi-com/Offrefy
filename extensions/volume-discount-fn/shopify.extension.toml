@@ -16,6 +16,11 @@ description = "One automatic Product Discount reads unlimited campaigns from pro
   # enterprise/Plus-limited; on Basic it errors and wipes all Remise discounts.
   # Rules come from product volume_discount.tiers metafields (written on sync).
 
+  # Feeds $customerSegmentTags in input.graphql from sync-written metafield.
+  [extensions.input.variables]
+  namespace = "volume_discount"
+  key = "input_variables"
+
   [extensions.build]
   command = ""
   path = "dist/function.wasm"

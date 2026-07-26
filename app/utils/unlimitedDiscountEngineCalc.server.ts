@@ -64,6 +64,7 @@ export type FunctionTierConfig = {
   fixedAmount?: number;
   appliesToEachItem?: boolean;
   fixedPricePerUnit?: number;
+  multiples?: boolean;
 };
 
 function isPercentValueUnit(valueUnit: string): boolean {
@@ -87,27 +88,44 @@ function tierToFunctionTier(t: TierPayload): FunctionTierConfig | null {
   const minQty = minQtyFromBuyFrom(t.buyFrom);
   const raw = parseFloat(t.value);
   if (!Number.isFinite(raw) || raw < 0) return null;
+  const multiples = t.multiples === true;
+  const mode = String(t.discountMode || "per-item").toLowerCase();
+
+  if (mode === "fixed" && !isPercentValueUnit(t.valueUnit)) {
+    if (raw <= 0) return null;
+    return { minQty, fixedPricePerUnit: raw, ...(multiples ? { multiples: true } : {}) };
+  }
 
   if (isPercentValueUnit(t.valueUnit)) {
     let pct = raw;
     if (pct > 0 && pct <= 1) pct = pct * 100;
     if (pct < 0 || pct > 100) return null;
-    return { minQty, percent: pct };
+    return { minQty, percent: pct, ...(multiples ? { multiples: true } : {}) };
   }
 
   if (t.valueUnit === "fixed-price") {
     if (raw <= 0) return null;
-    return { minQty, fixedPricePerUnit: raw };
+    return {
+      minQty,
+      fixedPricePerUnit: raw,
+      ...(multiples ? { multiples: true } : {}),
+    };
   }
 
-  if (t.valueUnit === "amount-each") {
-    return { minQty, fixedAmount: raw, appliesToEachItem: true };
+  if (t.valueUnit === "amount-each" || t.valueUnit === "amount") {
+    return {
+      minQty,
+      fixedAmount: raw,
+      appliesToEachItem: mode !== "per-line",
+      ...(multiples ? { multiples: true } : {}),
+    };
   }
 
   return {
     minQty,
     fixedAmount: raw,
-    appliesToEachItem: t.discountMode === "per-item",
+    appliesToEachItem: mode === "per-item",
+    ...(multiples ? { multiples: true } : {}),
   };
 }
 
@@ -123,8 +141,9 @@ function bestTiersFromPayload(tiers: TierPayload[]): FunctionTierConfig[] {
 function pickTier(tiers: FunctionTierConfig[], qty: number): FunctionTierConfig | null {
   let best: FunctionTierConfig | null = null;
   for (const t of tiers) {
-    if (qty >= t.minQty) best = t;
-    else break;
+    if (qty < t.minQty) break;
+    if (t.multiples === true && t.minQty > 0 && qty % t.minQty !== 0) continue;
+    best = t;
   }
   return best;
 }
@@ -198,10 +217,52 @@ function qtyForCampaign(
   allItems: DiscountEngineCalcItemIn[],
 ): number {
   const mode = String(row.quantityCondition ?? "per-variant");
-  if (mode === "total-all") {
+  const scope = String(
+    (row as { productScope?: string }).productScope ?? "",
+  );
+  // Group products + total-all → sum matching campaign products only.
+  if (
+    (mode === "total-all" || mode === "a") &&
+    scope === "group-products"
+  ) {
+    const ids = Array.isArray(row.productIds)
+      ? (row.productIds as unknown[]).map(String)
+      : [];
+    const idSet = new Set(
+      ids.map((x) => canonicalProductGid(x)).filter(Boolean),
+    );
+    return allItems
+      .filter((x) => idSet.has(canonicalProductGid(x.product_id)))
+      .reduce((s, x) => s + Math.max(0, Math.floor(x.quantity)), 0);
+  }
+  if (mode === "total-all" || mode === "a") {
     return allItems.reduce((s, x) => s + Math.max(0, Math.floor(x.quantity)), 0);
   }
-  if (mode === "per-product") {
+  if (mode === "per-collection" || mode === "c") {
+    const groups = (
+      row as {
+        collectionGroups?: { productIds?: unknown[] }[];
+      }
+    ).collectionGroups;
+    if (Array.isArray(groups) && groups.length) {
+      const linePid = canonicalProductGid(line.product_id);
+      let best = 0;
+      for (const g of groups) {
+        const gids = Array.isArray(g?.productIds) ? g.productIds : [];
+        const set = new Set(
+          gids.map((x) => canonicalProductGid(String(x))).filter(Boolean),
+        );
+        if (!set.has(linePid)) continue;
+        const sum = allItems
+          .filter((x) => set.has(canonicalProductGid(x.product_id)))
+          .reduce((s, x) => s + Math.max(0, Math.floor(x.quantity)), 0);
+        if (sum > best) best = sum;
+      }
+      if (best > 0) return best;
+    }
+    return Math.max(0, Math.floor(line.quantity));
+  }
+  if (mode === "per-product" || mode === "p") {
     const pg = canonicalProductGid(line.product_id);
     return allItems
       .filter((x) => canonicalProductGid(x.product_id) === pg)

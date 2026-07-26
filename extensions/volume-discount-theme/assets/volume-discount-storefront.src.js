@@ -422,9 +422,31 @@
     return false;
   }
 
+  function customerAllowsCampaign(campaign) {
+    var ct = String((campaign && campaign.customerType) || "everyone");
+    if (ct === "everyone" || !ct) return true;
+    var cust = window.__vdCustomer || {};
+    var loggedIn = cust.loggedIn === true;
+    if (ct === "logged-in") return loggedIn;
+    if (ct === "logged-in-tag-any") {
+      if (!loggedIn) return false;
+      var need = Array.isArray(campaign.customerTags) ? campaign.customerTags : [];
+      if (!need.length) return false;
+      var have = Array.isArray(cust.tags) ? cust.tags : [];
+      var set = {};
+      for (var i = 0; i < have.length; i++) set[String(have[i])] = true;
+      for (var j = 0; j < need.length; j++) {
+        if (set[String(need[j])]) return true;
+      }
+      return false;
+    }
+    return true;
+  }
+
   function pickCampaign(cfg, productId, variantId, productGid, variantGid) {
     var list = (cfg && cfg.campaigns) || [];
     for (var i = 0; i < list.length; i++) {
+      if (!customerAllowsCampaign(list[i])) continue;
       if (productMatch(list[i], productId, variantId, productGid, variantGid)) {
         return list[i];
       }

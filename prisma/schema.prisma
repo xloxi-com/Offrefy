@@ -146,6 +146,10 @@ model VolumeDiscountSettings {
   widgetPosition        String   @default("below_cart")
   enableCartRules       Boolean  @default(true)
   syncOnProductUpdate   Boolean  @default(true)
+  /// Combine Offrefy automatic discount with other Shopify product discounts.
+  combinesWithProductDiscounts  Boolean @default(true)
+  combinesWithOrderDiscounts    Boolean @default(false)
+  combinesWithShippingDiscounts Boolean @default(true)
   
   // JSON translations dictionary (e.g. {"en": {...}, "es": {...}})
   translationsString    String   @default("{}") @db.Text

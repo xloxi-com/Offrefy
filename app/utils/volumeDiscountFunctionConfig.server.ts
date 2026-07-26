@@ -24,6 +24,8 @@ export type FunctionTierConfig = {
   appliesToEachItem?: boolean;
   /** Target sale price per unit (shop currency); discount = line subtotal − this × qty */
   fixedPricePerUnit?: number;
+  /** When true, qty must be an exact multiple of minQty for the tier to apply. */
+  multiples?: boolean;
 };
 
 export type FunctionCampaignConfig = {
@@ -97,33 +99,58 @@ function minQtyFromBuyFrom(buyFrom: string): number {
   return Math.max(1, Math.floor(Number.isFinite(n) ? n : 1));
 }
 
+function withMultiples(
+  tier: FunctionTierConfig,
+  multiples: boolean,
+): FunctionTierConfig {
+  return multiples ? { ...tier, multiples: true } : tier;
+}
+
 function tierToFunctionTier(t: TierPayload): FunctionTierConfig | null {
   const minQty = minQtyFromBuyFrom(t.buyFrom);
   const raw = parseFloat(t.value);
   if (!Number.isFinite(raw) || raw < 0) return null;
+  const multiples = t.multiples === true;
+  const mode = String(t.discountMode || "per-item").toLowerCase();
+
+  // CSV discountMode "fixed" → fixed price per unit
+  if (mode === "fixed" && !isPercentValueUnit(t.valueUnit)) {
+    if (raw <= 0) return null;
+    return withMultiples({ minQty, fixedPricePerUnit: raw }, multiples);
+  }
 
   if (isPercentValueUnit(t.valueUnit)) {
     let pct = raw;
     if (pct > 0 && pct <= 1) pct = pct * 100;
     if (pct < 0 || pct > 100) return null;
-    return { minQty, percent: pct };
+    return withMultiples({ minQty, percent: pct }, multiples);
   }
 
   if (t.valueUnit === "fixed-price") {
     if (raw <= 0) return null;
-    return { minQty, fixedPricePerUnit: raw };
+    return withMultiples({ minQty, fixedPricePerUnit: raw }, multiples);
   }
 
-  if (t.valueUnit === "amount-each") {
-    return { minQty, fixedAmount: raw, appliesToEachItem: true };
+  if (t.valueUnit === "amount-each" || t.valueUnit === "amount") {
+    return withMultiples(
+      {
+        minQty,
+        fixedAmount: raw,
+        appliesToEachItem: mode !== "per-line",
+      },
+      multiples,
+    );
   }
 
-  // Legacy: valueUnit "amount" (or older saves) — respect Discount mode
-  return {
-    minQty,
-    fixedAmount: raw,
-    appliesToEachItem: t.discountMode === "per-item",
-  };
+  // Legacy / unknown unit — respect Discount mode
+  return withMultiples(
+    {
+      minQty,
+      fixedAmount: raw,
+      appliesToEachItem: mode === "per-item",
+    },
+    multiples,
+  );
 }
 
 function bestTiersFromPayload(tiers: TierPayload[]): FunctionTierConfig[] {

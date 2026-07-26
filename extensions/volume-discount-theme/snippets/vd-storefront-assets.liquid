@@ -35,7 +35,7 @@
 %}
 <script>
 (function () {
-  var VD_ASSET_VERSION = "1.28.3";
+  var VD_ASSET_VERSION = "1.28.4";
   var APP_ORIGIN = "https://offrey.xloxi.com";
   window.__vdStorefrontLocale = {{ request.locale.iso_code | json }};
   window.__vdAssetVersion = VD_ASSET_VERSION;
@@ -58,6 +58,10 @@
   {% if vd_widget and vd_widget.translations %}
   window.__vdStorefrontTranslations = {{ vd_widget.translations | json }};
   {% endif %}
+  window.__vdCustomer = {
+    loggedIn: {% if customer %}true{% else %}false{% endif %},
+    tags: {% if customer %}{{ customer.tags | json }}{% else %}[]{% endif %}
+  };
 
   {% if vd_is_product and vd_product != blank %}
   /* Start widget-config before the main bundle parses — biggest TTI win on product pages.

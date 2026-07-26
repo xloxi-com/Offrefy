@@ -1563,6 +1563,44 @@ export function VolumeDiscountCreateView({
                         </s-select>
                       </div>
 
+                      {(tier.valueUnit === "amount-each" ||
+                        tier.valueUnit === "amount") && (
+                        <s-select
+                          label="Discount mode"
+                          name="discountMode"
+                          icon="select"
+                          value={
+                            tier.discountMode === "per-line"
+                              ? "per-line"
+                              : "per-item"
+                          }
+                          onChange={(e) =>
+                            updateTier({
+                              discountMode: e.currentTarget.value,
+                            })
+                          }
+                          onInput={(e) =>
+                            updateTier({
+                              discountMode: e.currentTarget.value,
+                            })
+                          }
+                        >
+                          <s-option value="per-item">Per item</s-option>
+                          <s-option value="per-line">Per line</s-option>
+                        </s-select>
+                      )}
+
+                      <s-checkbox
+                        label="Require exact multiples of Buy from"
+                        name="tierMultiples"
+                        checked={tier.multiples === true}
+                        onChange={(e) =>
+                          updateTier({
+                            multiples: Boolean(e.currentTarget.checked),
+                          })
+                        }
+                      />
+
                       <s-text-field
                         label="Option label (widget)"
                         name="tierBuyLabelText"
@@ -1709,7 +1747,7 @@ export function VolumeDiscountCreateView({
                         <BlockStack gap="300">
                           <Text as="p" variant="bodyMd" tone="subdued">
                             {productScope === "group-products"
-                              ? "Select multiple products that belong to this offer group."
+                              ? "Select products in this offer group. With “Total quantity of all products”, qty is summed across the group (not the whole cart)."
                               : "Select individual products."}
                           </Text>
                           <InlineStack gap="200" wrap blockAlign="end">

@@ -1,7 +1,18 @@
 # Metafield-only cart discount input (no fetchResult — avoids fuel burn).
 # ruleSource.w = compact "all products" wildcard when product tiers MF is missing.
-query CartInput {
+# $customerSegmentTags comes from discount metafield volume_discount.input_variables
+# (union of tags from active logged-in-tag-any campaigns).
+query CartInput($customerSegmentTags: [String!] = []) {
   cart {
+    buyerIdentity {
+      isAuthenticated
+      customer {
+        hasTags(tags: $customerSegmentTags) {
+          tag
+          hasTag
+        }
+      }
+    }
     lines {
       id
       quantity
@@ -11,7 +22,9 @@ query CartInput {
         }
       }
       merchandise {
+        __typename
         ... on ProductVariant {
+          id
           product {
             id
             tiersMetafield: metafield(namespace: "volume_discount", key: "tiers") {

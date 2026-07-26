@@ -20,11 +20,20 @@ import {
   resolveStorefrontWidgetShopGid,
   syncShopStorefrontWidgetMetafield,
 } from "./shopStorefrontMetafield.server";
-import { rebuildDiscountRulesForShop } from "../utils/discountRules.server";
 import {
+  rebuildDiscountRulesForShop,
+  normalizeCatalogIdKey,
+} from "../utils/discountRules.server";
+import {
+  buildCompactRuleForProduct,
   buildProductRuleIndex,
   splitProductRuleIndexIntoMetafieldChunks,
+  type ProductRuleCampaignInput,
 } from "../utils/productRuleIndex.server";
+import {
+  isLikelyVariantId,
+  resolveVariantToProductIds,
+} from "../utils/variantProductResolve.server";
 import {
   fingerprintMetafieldEntries,
   readLiveDiscountMetafieldFingerprint,
@@ -656,20 +665,90 @@ async function syncVolumeDiscountShopImpl(
       customerType: string;
       customerTags: string[];
       productIds: string[];
+      collectionGroups?: { collectionId: string; productIds: string[] }[];
       tiers: import("../utils/volumeDiscountFunctionConfig.server").FunctionTierConfig[];
     }[]) ?? [];
 
-    const rulesInput = campaignsForRules.map((c) => ({
-      id: c.id,
-      campaignName: c.campaignName,
-      displayName: c.displayName,
-      productScope: c.productScope,
-      quantityCondition: c.quantityCondition,
-      customerType: c.customerType,
-      customerTags: c.customerTags,
-      productIds: c.productIds,
-      tiers: c.tiers,
-    }));
+    const variantRawIds: string[] = [];
+    for (const c of campaignsForRules) {
+      if (c.productScope !== "variants") continue;
+      for (const raw of c.productIds) {
+        const s = String(raw).trim();
+        if (isLikelyVariantId(s) || /^\d+$/.test(s)) variantRawIds.push(s);
+      }
+    }
+    const variantToProduct =
+      variantRawIds.length > 0
+        ? await resolveVariantToProductIds(admin, variantRawIds)
+        : new Map<string, string>();
+
+    const rulesInput: ProductRuleCampaignInput[] = campaignsForRules.map(
+      (c) => {
+        const collectionIdsByProduct: Record<string, string[]> = {};
+        if (
+          c.productScope === "collections" &&
+          Array.isArray(c.collectionGroups)
+        ) {
+          for (const g of c.collectionGroups) {
+            const colKey = normalizeCatalogIdKey(g.collectionId);
+            if (!colKey) continue;
+            for (const pidRaw of g.productIds ?? []) {
+              const pid = normalizeCatalogIdKey(pidRaw);
+              if (!pid) continue;
+              const prev = collectionIdsByProduct[pid] ?? [];
+              if (!prev.includes(colKey)) prev.push(colKey);
+              collectionIdsByProduct[pid] = prev;
+            }
+          }
+        }
+
+        if (c.productScope === "variants") {
+          const productIds: string[] = [];
+          const variantIds: string[] = [];
+          for (const raw of c.productIds) {
+            const s = String(raw).trim();
+            const vid = normalizeCatalogIdKey(s);
+            const pid =
+              variantToProduct.get(s) ||
+              (vid ? variantToProduct.get(vid) : "") ||
+              "";
+            if (pid) {
+              productIds.push(pid);
+              if (vid) variantIds.push(vid);
+            } else if (vid && !isLikelyVariantId(s)) {
+              productIds.push(vid);
+            }
+          }
+          return {
+            id: c.id,
+            campaignName: c.campaignName,
+            displayName: c.displayName,
+            productScope: c.productScope,
+            quantityCondition: c.quantityCondition,
+            customerType: c.customerType,
+            customerTags: c.customerTags,
+            productIds: [...new Set(productIds)],
+            variantIds: [...new Set(variantIds)],
+            tiers: c.tiers,
+          };
+        }
+
+        return {
+          id: c.id,
+          campaignName: c.campaignName,
+          displayName: c.displayName,
+          productScope: c.productScope,
+          quantityCondition: c.quantityCondition,
+          customerType: c.customerType,
+          customerTags: c.customerTags,
+          productIds: c.productIds,
+          ...(Object.keys(collectionIdsByProduct).length
+            ? { collectionIdsByProduct }
+            : {}),
+          tiers: c.tiers,
+        };
+      },
+    );
 
     const discountFunctionTranslations = compactTranslationsForDiscountFunction(
       await loadStorefrontTranslationsForShop(shop),
@@ -692,6 +771,9 @@ async function syncVolumeDiscountShopImpl(
         }> = [];
 
         const newProductIds = new Set<string>();
+        const campaignById = new Map(
+          rulesInput.map((c) => [c.id, c] as const),
+        );
 
         await ensureProductTiersStorefrontDefinition(admin).catch((e) => {
           console.warn("[volume-discount] product tiers storefront definition", e);
@@ -702,33 +784,69 @@ async function syncVolumeDiscountShopImpl(
           newProductIds.add(row.productId);
 
           const productGid = `gid://shopify/Product/${row.productId}`;
-          
-          let tiersArray: any[] = [];
-          if (Array.isArray(row.tiers)) {
-            tiersArray = row.tiers;
-          } else if (typeof row.tiers === "string") {
-            try {
-              tiersArray = JSON.parse(row.tiers);
-            } catch {}
+          const campaign = campaignById.get(row.campaignId);
+
+          let compactRule: Record<string, unknown>;
+          if (campaign) {
+            compactRule = buildCompactRuleForProduct({
+              campaign,
+              productId: row.productId,
+            });
+          } else {
+            let tiersArray: any[] = [];
+            if (Array.isArray(row.tiers)) {
+              tiersArray = row.tiers;
+            } else if (typeof row.tiers === "string") {
+              try {
+                tiersArray = JSON.parse(row.tiers);
+              } catch {}
+            }
+
+            const compactTiers = tiersArray
+              .map((t) => {
+                const minQty = Number(t.minQuantity || t.minQty || 1);
+                const val = Number(t.value ?? 0);
+                const u = t.multiples === true ? { u: 1 } : {};
+                if (t.discountType === "percentage")
+                  return { m: minQty, p: val, ...u };
+                if (t.discountType === "fixed_price")
+                  return { m: minQty, fp: val, ...u };
+                if (t.discountType === "fixed")
+                  return {
+                    m: minQty,
+                    f: val,
+                    ...(t.appliesToEachItem ? { e: 1 } : {}),
+                    ...u,
+                  };
+                return null;
+              })
+              .filter(Boolean);
+
+            compactRule = {
+              c: row.campaignId,
+              m: (
+                row.displayName ||
+                row.campaignName ||
+                "Volume discount"
+              ).slice(0, 80),
+              q:
+                row.quantityCondition === "total-all"
+                  ? "a"
+                  : row.quantityCondition === "per-collection"
+                    ? "c"
+                    : row.quantityCondition === "per-product"
+                      ? "p"
+                      : "v",
+              ct:
+                row.customerType === "logged-in-tag-any"
+                  ? "t"
+                  : row.customerType === "logged-in"
+                    ? "l"
+                    : "e",
+              tg: Array.isArray(row.customerTags) ? row.customerTags : [],
+              t: compactTiers,
+            };
           }
-
-          const compactTiers = tiersArray.map((t) => {
-            const minQty = Number(t.minQuantity || t.minQty || 1);
-            const val = Number(t.value ?? 0);
-            if (t.discountType === "percentage") return { m: minQty, p: val };
-            if (t.discountType === "fixed_price") return { m: minQty, fp: val };
-            if (t.discountType === "fixed") return { m: minQty, f: val, ...(t.appliesToEachItem ? { e: 1 } : {}) };
-            return null;
-          }).filter(Boolean);
-
-          const compactRule = {
-            c: row.campaignId,
-            m: (row.displayName || row.campaignName || "Volume discount").slice(0, 80),
-            q: row.quantityCondition === "total-all" ? "a" : row.quantityCondition === "per-collection" ? "c" : row.quantityCondition === "per-product" ? "p" : "v",
-            ct: row.customerType === "logged-in-tag-any" ? "t" : row.customerType === "logged-in" ? "l" : "e",
-            tg: Array.isArray(row.customerTags) ? row.customerTags : [],
-            t: compactTiers,
-          };
 
           metafieldsToSet.push({
             ownerId: productGid,
@@ -803,7 +921,7 @@ async function syncVolumeDiscountShopImpl(
         }
 
         const productIndex = buildProductRuleIndex({
-          campaigns: campaignsForRules,
+          campaigns: rulesInput,
         });
         const split = splitProductRuleIndexIntoMetafieldChunks(
           productIndex,
@@ -921,11 +1039,12 @@ async function syncVolumeDiscountShopImpl(
     title: SHARED_DISCOUNT_TITLE,
     functionHandle: functionHandle(),
     discountClasses: ["PRODUCT"],
-    combinesWith: {
-      productDiscounts: true,
-      orderDiscounts: false,
-      shippingDiscounts: true,
-    },
+    combinesWith: await (async () => {
+      const { readDiscountCombinesWith } = await import(
+        "../utils/discountCombinesWith.server"
+      );
+      return readDiscountCombinesWith(shop);
+    })(),
     metafields,
   };
 

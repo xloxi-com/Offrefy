@@ -4,6 +4,10 @@
     "target": "cart.lines.discounts.generate.run",
     "input": {
       "cart": {
+        "buyerIdentity": {
+          "isAuthenticated": false,
+          "customer": null
+        },
         "lines": [
           {
             "id": "gid://shopify/CartLine/0",
@@ -14,6 +18,8 @@
               }
             },
             "merchandise": {
+              "__typename": "ProductVariant",
+              "id": "gid://shopify/ProductVariant/1",
               "product": {
                 "id": "gid://shopify/Product/8040248016986",
                 "tiersMetafield": null

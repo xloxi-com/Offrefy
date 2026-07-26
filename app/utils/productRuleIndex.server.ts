@@ -1,3 +1,8 @@
+/**
+ * Compact product → rule index for discount metafield chunks + product tiers MF.
+ * Keep keys as Shopify product numeric ids (never variant ids).
+ */
+
 import type { FunctionTierConfig } from "./volumeDiscountFunctionConfig.server";
 import type { DiscountFunctionCartTranslations } from "./storefrontTranslations";
 import {
@@ -13,10 +18,14 @@ export type CompactProductRule = {
   q: string;
   ct: string;
   tg?: string[];
+  /** Variant allowlist (numeric ids) when productScope is variants. */
+  vs?: string[];
+  /** Collection numeric ids this product belongs to (for per-collection qty). */
+  cx?: string[];
   t: Array<
-    | { m: number; p: number }
-    | { m: number; f: number; e?: number }
-    | { m: number; fp: number }
+    | { m: number; p: number; u?: number }
+    | { m: number; f: number; e?: number; u?: number }
+    | { m: number; fp: number; u?: number }
   >;
 };
 
@@ -36,35 +45,56 @@ const CT_MAP: Record<string, string> = {
 function compactTiers(tiers: FunctionTierConfig[]): CompactProductRule["t"] {
   const out: CompactProductRule["t"] = [];
   for (const t of tiers) {
+    const u = t.multiples === true ? ({ u: 1 } as const) : {};
     if (t.percent != null) {
-      out.push({ m: t.minQty, p: t.percent });
+      out.push({ m: t.minQty, p: t.percent, ...u });
     } else if (t.fixedPricePerUnit != null) {
-      out.push({ m: t.minQty, fp: t.fixedPricePerUnit });
+      out.push({ m: t.minQty, fp: t.fixedPricePerUnit, ...u });
     } else if (t.fixedAmount != null) {
       out.push({
         m: t.minQty,
         f: t.fixedAmount,
         ...(t.appliesToEachItem ? { e: 1 } : {}),
+        ...u,
       });
     }
   }
   return out;
 }
 
+/** Qty mode letter for compact metafields. */
+export function compactQtyMode(
+  productScope: string,
+  quantityCondition: string,
+): string {
+  const scope = String(productScope || "");
+  const q = String(quantityCondition || "per-variant");
+  // Group products + total-all → sum only group members (same campaign), not whole cart.
+  if (scope === "group-products" && (q === "total-all" || q === "a")) {
+    return "g";
+  }
+  return Q_MAP[q] ?? "v";
+}
+
 export type ProductRuleIndex = Record<string, CompactProductRule>;
 
+export type ProductRuleCampaignInput = {
+  id: string;
+  campaignName: string;
+  displayName?: string | null;
+  productScope: string;
+  quantityCondition: string;
+  customerType: string;
+  customerTags: string[];
+  /** Product numeric ids / GIDs (already product-scoped for variants). */
+  productIds: string[];
+  variantIds?: string[];
+  collectionIdsByProduct?: Record<string, string[]>;
+  tiers: FunctionTierConfig[];
+};
+
 export function buildProductRuleIndex(args: {
-  campaigns: {
-    id: string;
-    campaignName: string;
-    displayName?: string | null;
-    productScope: string;
-    quantityCondition: string;
-    customerType: string;
-    customerTags: string[];
-    productIds: string[];
-    tiers: FunctionTierConfig[];
-  }[];
+  campaigns: ProductRuleCampaignInput[];
 }): ProductRuleIndex {
   const index: ProductRuleIndex = {};
   const score = (tiers: FunctionTierConfig[]) => {
@@ -83,9 +113,10 @@ export function buildProductRuleIndex(args: {
     const compact: CompactProductRule = {
       c: campaign.id,
       m: label.slice(0, 80),
-      q: Q_MAP[campaign.quantityCondition] ?? "v",
+      q: compactQtyMode(campaign.productScope, campaign.quantityCondition),
       ct: CT_MAP[campaign.customerType] ?? "e",
       ...(campaign.customerTags.length ? { tg: campaign.customerTags } : {}),
+      ...(campaign.variantIds?.length ? { vs: campaign.variantIds } : {}),
       t: compactTiers(campaign.tiers),
     };
 
@@ -96,15 +127,27 @@ export function buildProductRuleIndex(args: {
     } else {
       for (const raw of campaign.productIds) {
         const s = String(raw).trim();
-        const m = s.match(/\/(\d+)\s*$/);
-        keys.add(m ? m[1]! : /^\d+$/.test(s) ? s : s);
+        const m = s.match(/\/Product\/(\d+)/);
+        if (m) {
+          keys.add(m[1]!);
+          continue;
+        }
+        // Prefer Product/ over Variant/ — callers should pass product ids for variants scope.
+        const any = s.match(/\/(\d+)\s*$/);
+        keys.add(any ? any[1]! : /^\d+$/.test(s) ? s : s);
       }
     }
 
     for (const pid of keys) {
+      const withCx: CompactProductRule = {
+        ...compact,
+        ...(campaign.collectionIdsByProduct?.[pid]?.length
+          ? { cx: campaign.collectionIdsByProduct[pid] }
+          : {}),
+      };
       const prev = index[pid];
       if (!prev || score(campaign.tiers) > scoreFromCompact(prev)) {
-        index[pid] = compact;
+        index[pid] = withCx;
       }
     }
   }
@@ -263,4 +306,27 @@ export function splitProductRuleIndexIntoMetafieldChunks(
   });
 
   return { chunks, productCount, needsRemoteLookup: false };
+}
+
+/** Build one compact rule object for a product tiers metafield write. */
+export function buildCompactRuleForProduct(args: {
+  campaign: ProductRuleCampaignInput;
+  productId: string;
+}): CompactProductRule {
+  const { campaign, productId } = args;
+  const label =
+    (campaign.displayName && campaign.displayName.trim()) ||
+    campaign.campaignName;
+  return {
+    c: campaign.id,
+    m: label.slice(0, 80),
+    q: compactQtyMode(campaign.productScope, campaign.quantityCondition),
+    ct: CT_MAP[campaign.customerType] ?? "e",
+    ...(campaign.customerTags.length ? { tg: campaign.customerTags } : {}),
+    ...(campaign.variantIds?.length ? { vs: campaign.variantIds } : {}),
+    ...(campaign.collectionIdsByProduct?.[productId]?.length
+      ? { cx: campaign.collectionIdsByProduct[productId] }
+      : {}),
+    t: compactTiers(campaign.tiers),
+  };
 }

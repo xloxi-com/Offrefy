@@ -95,7 +95,7 @@ export const PLANS: Record<PricingPlanId, PlanDefinition> = {
       "All appearance templates",
       "Advanced analytics & attribution",
       "Scheduling & automation",
-      "Import & export (CSV / Excel)",
+      "Import & export (CSV)",
       "Custom CSS & advanced styling",
       "Priority support",
     ],
@@ -417,7 +417,7 @@ export const FEATURE_COMPARE_ROWS: FeatureCompareRow[] = [
   },
   {
     id: "importExport",
-    feature: "Import & export (CSV / Excel)",
+    feature: "Import & export (CSV)",
     free: false,
     standard: false,
     premium: true,

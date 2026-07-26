@@ -7,6 +7,7 @@ export type DiscountRuleTier = {
   discountType: "percentage" | "fixed" | "fixed_price";
   value: number;
   appliesToEachItem?: boolean;
+  multiples?: boolean;
 };
 
 export type ProductRulePayload = {
@@ -39,17 +40,20 @@ export function normalizeProductIdKey(raw: unknown): string {
 function functionTiersToRuleTiers(tiers: FunctionTierConfig[]): DiscountRuleTier[] {
   const out: DiscountRuleTier[] = [];
   for (const t of tiers) {
+    const multiples = t.multiples === true ? true : undefined;
     if (t.percent != null) {
       out.push({
         minQuantity: t.minQty,
         discountType: "percentage",
         value: t.percent,
+        ...(multiples ? { multiples: true } : {}),
       });
     } else if (t.fixedPricePerUnit != null) {
       out.push({
         minQuantity: t.minQty,
         discountType: "fixed_price",
         value: t.fixedPricePerUnit,
+        ...(multiples ? { multiples: true } : {}),
       });
     } else if (t.fixedAmount != null) {
       out.push({
@@ -57,6 +61,7 @@ function functionTiersToRuleTiers(tiers: FunctionTierConfig[]): DiscountRuleTier
         discountType: "fixed",
         value: t.fixedAmount,
         appliesToEachItem: t.appliesToEachItem,
+        ...(multiples ? { multiples: true } : {}),
       });
     }
   }
@@ -80,7 +85,14 @@ type CampaignForRules = {
   quantityCondition: string;
   customerType: string;
   customerTags: string[];
+  /** Product GIDs/ids — for variants scope these must already be product ids. */
   productIds: string[];
+  /** When scope is variants: numeric variant ids allowed at checkout. */
+  variantIds?: string[];
+  /**
+   * When scope is collections + per-collection qty: productId → collection numeric ids.
+   */
+  collectionIdsByProduct?: Record<string, string[]>;
   tiers: FunctionTierConfig[];
 };
 
@@ -337,14 +349,23 @@ export async function lookupDiscountRulesForProducts(
         );
         const type = String(o.discountType ?? "").toLowerCase();
         if (type === "percentage" || type === "percent") {
-          tiers.push({ minQty, percent: Number(o.value) });
+          tiers.push({
+            minQty,
+            percent: Number(o.value),
+            ...(o.multiples === true ? { multiples: true } : {}),
+          });
         } else if (type === "fixed_price" || type === "fixed-price") {
-          tiers.push({ minQty, fixedPricePerUnit: Number(o.value) });
+          tiers.push({
+            minQty,
+            fixedPricePerUnit: Number(o.value),
+            ...(o.multiples === true ? { multiples: true } : {}),
+          });
         } else if (type === "fixed") {
           tiers.push({
             minQty,
             fixedAmount: Number(o.value),
             appliesToEachItem: Boolean(o.appliesToEachItem),
+            ...(o.multiples === true ? { multiples: true } : {}),
           });
         }
       }

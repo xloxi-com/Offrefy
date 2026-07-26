@@ -13,6 +13,8 @@ import {
   Button,
   InlineStack,
   Banner,
+  Select,
+  Checkbox,
 } from "@shopify/polaris";
 import { RefreshIcon, AutomationIcon } from "@shopify/polaris-icons";
 import { ApprovefyPromoCard } from "../components/ApprovefyPromoCard";
@@ -76,6 +78,12 @@ type SettingsData = {
   syncInterval: string;
   lastSynced: string | null;
   translations: TranslationsMap;
+  combinesWith: {
+    productDiscounts: boolean;
+    orderDiscounts: boolean;
+    shippingDiscounts: boolean;
+  };
+  canUseSchedulingAutomation: boolean;
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -166,10 +174,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   );
   applyShopCampaignScheduleTransitionsIfNeeded(session.shop);
 
+  const [{ capabilities }, combinesWith] = await Promise.all([
+    resolveShopPlanContext(session.shop),
+    import("../utils/discountCombinesWith.server").then((m) =>
+      m.readDiscountCombinesWith(session.shop),
+    ),
+  ]);
+
   const settings: SettingsData = {
     syncInterval: dbSettings.syncInterval,
     lastSynced: lastSyncedAt ? new Date(lastSyncedAt).toISOString() : null,
     translations: translationSync.translations,
+    combinesWith,
+    canUseSchedulingAutomation: capabilities.schedulingAutomation,
   };
 
   const needsLocaleScope = missingLocaleScope || !hasLocaleScope;
@@ -244,6 +261,63 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         },
       },
     );
+  }
+
+  if (intent === "saveSyncStacking") {
+    const {
+      normalizeSyncInterval,
+      persistDiscountCombinesWith,
+    } = await import("../utils/discountCombinesWith.server");
+    const { capabilities } = await resolveShopPlanContext(session.shop);
+    let syncInterval = normalizeSyncInterval(
+      String(formData.get("syncInterval") ?? "disabled"),
+    );
+    // Auto intervals (cron) are Premium schedulingAutomation; others can use Manual.
+    if (
+      syncInterval !== "disabled" &&
+      !capabilities.schedulingAutomation
+    ) {
+      syncInterval = "disabled";
+    }
+    const combinesWith = {
+      productDiscounts: formData.get("combinesWithProduct") === "1",
+      orderDiscounts: formData.get("combinesWithOrder") === "1",
+      shippingDiscounts: formData.get("combinesWithShipping") === "1",
+    };
+    await persistDiscountCombinesWith(session.shop, combinesWith);
+    // Keep translations; only flip syncInterval
+    const row = await readStorefrontSettingsRow(session.shop);
+    const translations = parseStoredStorefrontTranslations(
+      row.translationsString,
+    );
+    await persistStorefrontTranslations(
+      session.shop,
+      translations,
+      syncInterval,
+    );
+    scheduleDueSyncForShopIfNeeded(
+      session.shop,
+      syncInterval,
+      await readShopLastSyncedAt(session.shop),
+    );
+    // Push discount combinesWith via Function sync
+    runAfterResponse(
+      (async () => {
+        try {
+          await syncVolumeDiscountShop(admin, session.shop, {
+            force: true,
+            purgeLegacy: false,
+          });
+        } catch (e) {
+          console.error("[volume-discount-settings] sync after stacking", e);
+        }
+      })(),
+    );
+    return {
+      ok: true,
+      message: "Sync & stacking settings saved",
+      intent,
+    };
   }
 
   if (intent === "saveSettings") {
@@ -472,11 +546,21 @@ export default function SettingsPage() {
   const syncFetcher = useFetcher<typeof action>();
   const translateFetcher = useFetcher<typeof action>();
   const adminLangFetcher = useFetcher<typeof action>();
+  const syncStackFetcher = useFetcher<typeof action>();
 
   // Local Form States
   const [syncInterval, setSyncInterval] = useState(settings.syncInterval);
   const [lastSynced, setLastSynced] = useState<string | null>(settings.lastSynced);
   const [translations, setTranslations] = useState<TranslationsMap>(settings.translations);
+  const [combineProduct, setCombineProduct] = useState(
+    settings.combinesWith.productDiscounts,
+  );
+  const [combineOrder, setCombineOrder] = useState(
+    settings.combinesWith.orderDiscounts,
+  );
+  const [combineShipping, setCombineShipping] = useState(
+    settings.combinesWith.shippingDiscounts,
+  );
   const [adminLanguageDraft, setAdminLanguageDraft] =
     useState<AdminLanguageCode>(() =>
       normalizeAdminLanguage(initialAdminLanguage),
@@ -489,6 +573,12 @@ export default function SettingsPage() {
   useEffect(() => {
     setSyncInterval(settings.syncInterval);
   }, [settings.syncInterval]);
+
+  useEffect(() => {
+    setCombineProduct(settings.combinesWith.productDiscounts);
+    setCombineOrder(settings.combinesWith.orderDiscounts);
+    setCombineShipping(settings.combinesWith.shippingDiscounts);
+  }, [settings.combinesWith]);
 
   useEffect(() => {
     setTranslations(settings.translations);
@@ -622,6 +712,22 @@ export default function SettingsPage() {
     syncFetcher.submit(data, { method: "post" });
   }, [syncFetcher]);
 
+  const handleSaveSyncStacking = useCallback(() => {
+    const data = new FormData();
+    data.append("intent", "saveSyncStacking");
+    data.append("syncInterval", syncInterval);
+    data.append("combinesWithProduct", combineProduct ? "1" : "0");
+    data.append("combinesWithOrder", combineOrder ? "1" : "0");
+    data.append("combinesWithShipping", combineShipping ? "1" : "0");
+    syncStackFetcher.submit(data, { method: "post" });
+  }, [
+    syncInterval,
+    combineProduct,
+    combineOrder,
+    combineShipping,
+    syncStackFetcher,
+  ]);
+
   const handleAutoTranslate = useCallback(() => {
     if (!canEditTranslations) {
       shopify.toast.show(t("settings.toast.upgradeTranslations"));
@@ -703,6 +809,21 @@ export default function SettingsPage() {
       }
     }
   }, [settingsFetcher.data, settingsFetcher.state, shopify, t]);
+
+  useEffect(() => {
+    if (syncStackFetcher.data && syncStackFetcher.state === "idle") {
+      const result = syncStackFetcher.data;
+      if (result.ok) {
+        shopify.toast.show(
+          "message" in result && typeof result.message === "string"
+            ? result.message
+            : "Sync & stacking saved",
+        );
+      } else if ("error" in result && result.error) {
+        shopify.toast.show(`Error: ${result.error}`);
+      }
+    }
+  }, [syncStackFetcher.data, syncStackFetcher.state, shopify]);
 
   useEffect(() => {
     if (syncFetcher.data && syncFetcher.state === "idle") {
@@ -990,6 +1111,66 @@ export default function SettingsPage() {
           {/* Right Side: Manual Actions + Admin Language */}
           <Layout.Section variant="oneThird">
             <BlockStack gap="500">
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingMd">
+                    Sync & stacking
+                  </Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    {settings.canUseSchedulingAutomation
+                      ? "Auto sync runs on a schedule (Premium). Schedule start/end still flips via cron for all plans when Sync now or admin pages run."
+                      : "Upgrade to Premium to enable automatic sync intervals. Manual Sync now always works."}
+                  </Text>
+                  <Select
+                    label="Auto sync interval"
+                    options={[
+                      { label: "Manual only", value: "disabled" },
+                      { label: "Every 5 minutes", value: "5m" },
+                      { label: "Every 15 minutes", value: "15m" },
+                      { label: "Every 30 minutes", value: "30m" },
+                      { label: "Every hour", value: "1h" },
+                      { label: "Every 6 hours", value: "6h" },
+                      { label: "Every 12 hours", value: "12h" },
+                      { label: "Every 24 hours", value: "24h" },
+                    ]}
+                    value={
+                      settings.canUseSchedulingAutomation
+                        ? syncInterval
+                        : "disabled"
+                    }
+                    onChange={setSyncInterval}
+                    disabled={!settings.canUseSchedulingAutomation}
+                  />
+                  <Text as="h3" variant="headingSm">
+                    Combine with other discounts
+                  </Text>
+                  <Checkbox
+                    label="Product discounts"
+                    checked={combineProduct}
+                    onChange={setCombineProduct}
+                  />
+                  <Checkbox
+                    label="Order discounts"
+                    checked={combineOrder}
+                    onChange={setCombineOrder}
+                  />
+                  <Checkbox
+                    label="Shipping discounts"
+                    checked={combineShipping}
+                    onChange={setCombineShipping}
+                  />
+                  <InlineStack align="end">
+                    <Button
+                      variant="primary"
+                      onClick={handleSaveSyncStacking}
+                      loading={syncStackFetcher.state !== "idle"}
+                    >
+                      Save sync settings
+                    </Button>
+                  </InlineStack>
+                </BlockStack>
+              </Card>
+
               <Card>
                 <BlockStack gap="300">
                   <Text as="h2" variant="headingMd">
