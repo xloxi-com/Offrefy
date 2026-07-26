@@ -234,7 +234,7 @@
   "home.bannerEmbedFailTitle": "Could not enable app embed automatically",
   "home.bannerEmbedFailBody": "Use Theme editor → App embeds → turn on Offrefy (global) → Save.",
   "home.stepEnableEmbedTitle": "Enable app embed",
-  "home.stepEnableEmbedDesc": "Theme settings → App embeds → turn on Offrefy (global) to load storefront scripts. Then add the Quantity breaks block where you want the widget.",
+  "home.stepEnableEmbedDesc": "Theme settings → App embeds → turn on Offrefy (global) to enable the app. Then add the Quantity breaks block where you want the widget (scripts/CSS load only there).",
   "home.stepEnableEmbedAlt": "Illustration of enabling a storefront integration",
   "home.stepAddBlockTitle": "Add widget on product page",
   "home.stepAddBlockDesc": "Product template → Add block → Quantity breaks (or Add section → Apps). The widget only shows where you place this block.",

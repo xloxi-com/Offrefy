@@ -9,11 +9,12 @@
     assign vd_product = product
   endif
 
-  # No theme-editor settings; soft-read legacy values if previously saved.
+  # No theme-editor heading setting; app widgetHeading controls the title.
+  # Soft-read legacy block.settings.heading only if previously saved.
   if block and block.settings.heading != blank
     assign vd_heading = block.settings.heading
   else
-    assign vd_heading = 'Get more, save more 🥳'
+    assign vd_heading = ''
   endif
   if block and block.settings.show_section_heading == true and block.settings.section_heading != blank
     assign vd_section_heading = block.settings.section_heading | strip
@@ -43,8 +44,8 @@
   endif
 %}
 {%- comment -%}
-  Markup only. Storefront JS/CSS load from the Offrefy (global) app embed.
-  If the embed is off, this block must not boot the widget on its own.
+  Markup only. Storefront JS/CSS inject from the Quantity breaks app block
+  (quantity-breaks.liquid), not the global app embed.
 
   Liquid product form (vd-atc-form-*) is the cross-theme ATC bridge:
   Shopify {% form 'product' %} works on every free/premium theme. Widget JS

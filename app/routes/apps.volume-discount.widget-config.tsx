@@ -16,6 +16,7 @@ import {
 } from "../services/volumeDiscountStorefrontCache.server";
 import { cachedJsonResponse } from "../utils/httpCache.server";
 import { volumeDiscountCampaignSyncSelect } from "../utils/volumeDiscountCampaignSelect.server";
+import { storefrontLiveCampaignWhere } from "../utils/campaignScheduleStatus";
 import type { LoaderFunctionArgs } from "react-router";
 
 async function persistDbOnlyStorefrontPayload(
@@ -114,7 +115,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       /* Stale empty full-shop cache can poison per-product lookups — rebuild when possible. */
       if (!storefrontWidgetPayloadHasCampaigns(value)) {
         const rows = await prisma.volumeDiscountCampaign.findMany({
-          where: { shop, status: "active" },
+          where: storefrontLiveCampaignWhere(shop),
           orderBy: { createdAt: "asc" },
           select: volumeDiscountCampaignSyncSelect,
         });
@@ -158,7 +159,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   try {
     const rows = await prisma.volumeDiscountCampaign.findMany({
-      where: { shop, status: "active" },
+      where: storefrontLiveCampaignWhere(shop),
       orderBy: { createdAt: "asc" },
       select: volumeDiscountCampaignSyncSelect,
     });

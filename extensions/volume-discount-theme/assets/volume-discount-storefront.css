@@ -65,6 +65,9 @@
     --font-heading-family,
     var(--font-heading--family, var(--vd-theme-font-body))
   );
+  /* Theme heading fonts often omit emoji glyphs — keep color emoji as fallback. */
+  --vd-font-emoji: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji",
+    "Twemoji Mozilla", "EmojiOne Color", emoji;
   font-family: var(--vd-theme-font-body);
   line-height: 1.5;
   color: #1a1a1a;
@@ -179,7 +182,7 @@
   margin: 0 0 clamp(0.45rem, 2vw, 0.65rem);
   padding: 0;
   text-align: center;
-  font-family: var(--vd-theme-font-heading);
+  font-family: var(--vd-theme-font-heading), var(--vd-font-emoji);
   font-size: var(--vd-fs-title, 20px);
   font-weight: var(--vd-fw-strong, 700);
   line-height: 1.25;
@@ -259,7 +262,7 @@
 
 .vd-title {
   margin: 0;
-  font-family: var(--vd-theme-font-heading);
+  font-family: var(--vd-theme-font-heading), var(--vd-font-emoji);
   font-size: var(--vd-fs-title, 20px);
   font-weight: var(--vd-fw-strong, 700);
   line-height: 1.25;
@@ -276,8 +279,49 @@
   align-items: center;
   justify-content: var(--vd-countdown-justify, flex-end);
   gap: 0.35rem 0.5rem;
-  flex: 1 1 auto;
-  min-width: min(100%, 11rem);
+  /* Content-sized so space-between pins the timer to the topbar edge (no 11rem gap). */
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 100%;
+  margin-inline-end: 0;
+}
+
+/* Timer Right: hug the trailing edge of the widget (same as cards / CTA). */
+.volume-discount-embed[data-vd-header-layout="split"][data-vd-countdown-align="end"]
+  .vd-topbar
+  .vd-countdown {
+  margin-inline-start: auto;
+  margin-inline-end: 0;
+  justify-content: flex-end;
+}
+
+/*
+ * Heading Right (+ timer Right): pack title + countdown against the trailing edge
+ * so the timer starts at the widget’s right end (no gutter).
+ */
+.volume-discount-embed[data-vd-header-layout="split"][data-vd-heading-align="end"]
+  .vd-topbar {
+  justify-content: flex-end;
+}
+
+.volume-discount-embed[data-vd-header-layout="split"][data-vd-heading-align="end"]
+  .vd-topbar
+  .vd-title {
+  flex: 0 1 auto;
+  text-align: end;
+}
+
+.volume-discount-embed[data-vd-header-layout="stacked"][data-vd-countdown-align="end"]
+  .vd-topbar
+  .vd-countdown {
+  justify-content: flex-end;
+}
+
+.volume-discount-embed[data-vd-header-layout="stacked"][data-vd-heading-align="end"]
+  .vd-topbar
+  .vd-title {
+  text-align: end;
+  width: 100%;
 }
 
 .vd-countdown-line {
@@ -1116,8 +1160,19 @@ input.vd-qty-value:focus {
   }
 
   .vd-countdown {
+    justify-content: var(--vd-countdown-justify, flex-end);
+  }
+
+  .volume-discount-embed[data-vd-countdown-align="end"] .vd-countdown {
+    justify-content: flex-end;
+  }
+
+  .volume-discount-embed[data-vd-countdown-align="start"] .vd-countdown {
     justify-content: flex-start;
-    text-align: left;
+  }
+
+  .volume-discount-embed[data-vd-countdown-align="center"] .vd-countdown {
+    justify-content: center;
   }
 
   .ofd-tier-row,

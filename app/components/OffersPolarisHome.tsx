@@ -85,8 +85,7 @@ type OfferListActionData =
         | "delete"
         | "duplicate"
         | "bulkActivate"
-        | "bulkDeactivate"
-        | "syncAll";
+        | "bulkDeactivate";
       count?: number;
     }
   | { ok: false; error: string };
@@ -255,11 +254,9 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
   const { search } = useLocation();
   const listIndexAction = adminEmbeddedIndexActionPath(search);
   const listFetcher = useFetcher<OfferListActionData>();
-  const syncAllFetcher = useFetcher<OfferListActionData>();
   const csvImportFetcher = useFetcher<OffersCsvImportActionData>();
   const csvExportFetcher = useFetcher<OffersCsvExportActionData>();
   const wasSubmittingList = useRef(false);
-  const wasSubmittingSyncAll = useRef(false);
   const wasSubmittingCsvImport = useRef(false);
   const wasSubmittingCsvExport = useRef(false);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[] | null>(
@@ -511,23 +508,6 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     t,
   ]);
 
-  useEffect(() => {
-    if (syncAllFetcher.state !== "idle") {
-      wasSubmittingSyncAll.current = true;
-      return;
-    }
-    if (!wasSubmittingSyncAll.current) return;
-    wasSubmittingSyncAll.current = false;
-    const d = syncAllFetcher.data;
-    if (!d) return;
-    if (d.ok && d.intent === "syncAll") {
-      notify(t("offers.toast.synced"));
-      onCampaignsMutated();
-    } else if (!d.ok) {
-      notify(d.error);
-    }
-  }, [syncAllFetcher.state, syncAllFetcher.data, notify, onCampaignsMutated, t]);
-
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importOverwriteCampaign, setImportOverwriteCampaign] = useState(false);
 
@@ -624,16 +604,8 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     }
   }, [csvExportFetcher.state, csvExportFetcher.data, notify, t]);
 
-  const listMutationPending =
-    listFetcher.state !== "idle" || syncAllFetcher.state !== "idle";
+  const listMutationPending = listFetcher.state !== "idle";
   const listMutationSubmitting = listFetcher.state === "submitting";
-
-  const submitSyncAll = useCallback(() => {
-    if (syncAllFetcher.state !== "idle" || campaigns.length === 0) return;
-    const fd = new FormData();
-    fd.set("_action", "syncAll");
-    syncAllFetcher.submit(fd, { method: "post", action: listIndexAction });
-  }, [campaigns.length, listIndexAction, syncAllFetcher]);
 
   const showOfferLimitReached = useCallback(() => {
     if (onOfferLimitReached) {
@@ -717,7 +689,6 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
   const csvImportAction = adminEmbeddedPath("/app/offers/import", search);
   const csvImportPending = csvImportFetcher.state !== "idle";
   const csvExportPending = csvExportFetcher.state !== "idle";
-  const syncAllPending = syncAllFetcher.state !== "idle";
   const canExportOffers =
     canImportExport &&
     campaigns.length > 0 &&
@@ -858,22 +829,13 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
   const pageSecondaryActions = useMemo(
     () => [
       {
-        // Icon-only reload (separate from Sync all), same pattern as Analytics.
+        // Icon-only reload, same pattern as Analytics.
         content: "",
         icon: RefreshIcon,
         loading: isReloading,
         disabled: isReloading,
         onAction: () => revalidator.revalidate(),
         accessibilityLabel: t("common.reload"),
-      },
-      {
-        content: t("offers.syncAll"),
-        loading: syncAllPending,
-        disabled:
-          campaigns.length === 0 ||
-          syncAllPending ||
-          listFetcher.state !== "idle",
-        onAction: submitSyncAll,
       },
       {
         content: planLockedActionContent(
@@ -902,17 +864,13 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
       },
     ],
     [
-      campaigns.length,
       canExportOffers,
       canImportExport,
       csvExportPending,
       isReloading,
-      listFetcher.state,
       notify,
       revalidator,
       submitExportCsv,
-      submitSyncAll,
-      syncAllPending,
       t,
       upgradeLabel,
     ],

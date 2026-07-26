@@ -543,7 +543,6 @@ export default function SettingsPage() {
     useAdminI18n();
   
   const settingsFetcher = useFetcher<typeof action>();
-  const syncFetcher = useFetcher<typeof action>();
   const translateFetcher = useFetcher<typeof action>();
   const adminLangFetcher = useFetcher<typeof action>();
   const syncStackFetcher = useFetcher<typeof action>();
@@ -706,12 +705,6 @@ export default function SettingsPage() {
     t,
   ]);
 
-  const handleSyncNow = useCallback(() => {
-    const data = new FormData();
-    data.append("intent", "syncAll");
-    syncFetcher.submit(data, { method: "post" });
-  }, [syncFetcher]);
-
   const handleSaveSyncStacking = useCallback(() => {
     const data = new FormData();
     data.append("intent", "saveSyncStacking");
@@ -826,28 +819,6 @@ export default function SettingsPage() {
   }, [syncStackFetcher.data, syncStackFetcher.state, shopify]);
 
   useEffect(() => {
-    if (syncFetcher.data && syncFetcher.state === "idle") {
-      const result = syncFetcher.data;
-      if (result.ok) {
-        const message =
-          "message" in result && typeof result.message === "string"
-            ? result.message
-            : t("settings.toast.syncComplete");
-        shopify.toast.show(message);
-        if (
-          "lastSynced" in result &&
-          typeof result.lastSynced === "string" &&
-          result.lastSynced
-        ) {
-          setLastSynced(result.lastSynced);
-        }
-      } else if ("error" in result && result.error) {
-        shopify.toast.show(`Sync Error: ${result.error}`);
-      }
-    }
-  }, [syncFetcher.data, syncFetcher.state, shopify, t]);
-
-  useEffect(() => {
     if (translateFetcher.data && translateFetcher.state === "idle") {
       const result = translateFetcher.data;
       if (result.ok) {
@@ -892,7 +863,6 @@ export default function SettingsPage() {
   }, [adminLangFetcher.data, adminLangFetcher.state, setAdminLanguage, shopify, t]);
 
   const isSaving = settingsFetcher.state === "submitting";
-  const isSyncing = syncFetcher.state === "submitting";
   const isAutoTranslating = translateFetcher.state === "submitting";
 
   // Get active translation block
@@ -1118,8 +1088,8 @@ export default function SettingsPage() {
                   </Text>
                   <Text as="p" variant="bodySm" tone="subdued">
                     {settings.canUseSchedulingAutomation
-                      ? "Auto sync runs on a schedule (Premium). Schedule start/end still flips via cron for all plans when Sync now or admin pages run."
-                      : "Upgrade to Premium to enable automatic sync intervals. Manual Sync now always works."}
+                      ? "Offers update Shopify automatically on save. Optional auto intervals also refresh discounts on a schedule (Premium)."
+                      : "Offers update Shopify automatically on save. Upgrade to Premium for optional background refresh intervals."}
                   </Text>
                   <Select
                     label="Auto sync interval"
@@ -1207,27 +1177,18 @@ export default function SettingsPage() {
                     {t("settings.manualActions")}
                   </Text>
                   <Text as="p" tone="subdued">
-                    {t("settings.manualActionsHelp")}
+                    Offers push to Shopify automatically when you save. Last
+                    background refresh is shown below.
                   </Text>
                   <Divider />
-                  {syncFetcher.data && !syncFetcher.data.ok && (
-                    <Banner title={t("settings.syncFailed")} tone="critical">
-                      <p>{syncFetcher.data.error || t("common.unknownError")}</p>
-                    </Banner>
-                  )}
-                  <InlineStack align="space-between" blockAlign="center">
-                    <Button onClick={handleSyncNow} loading={isSyncing} variant="primary">
-                      {t("settings.syncNow")}
-                    </Button>
-                    <BlockStack gap="050">
-                      <Text as="p" variant="bodyMd" fontWeight="semibold" tone="subdued">
-                        {t("settings.lastSynced")}
-                      </Text>
-                      <Text as="p" variant="bodyMd" tone={lastSynced ? "success" : "subdued"}>
-                        {formatSyncTime(lastSynced)}
-                      </Text>
-                    </BlockStack>
-                  </InlineStack>
+                  <BlockStack gap="050">
+                    <Text as="p" variant="bodyMd" fontWeight="semibold" tone="subdued">
+                      {t("settings.lastSynced")}
+                    </Text>
+                    <Text as="p" variant="bodyMd" tone={lastSynced ? "success" : "subdued"}>
+                      {formatSyncTime(lastSynced)}
+                    </Text>
+                  </BlockStack>
                 </BlockStack>
               </Card>
 

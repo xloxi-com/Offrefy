@@ -1,3 +1,10 @@
+import {
+  formatShopWallClockDisplay,
+  shopWallClockFromNow,
+  shopWallClockToUtcIso,
+  utcIsoToShopWallClock,
+} from "./shopTimezone";
+
 /**
  * Human duration input like `1d 23h 43m 4s` (order flexible; units optional).
  */
@@ -105,13 +112,51 @@ export function formatCountdownDhms(totalSeconds: number): string {
   return formatCountdownForUnit(totalSeconds, "days");
 }
 
-export function isoToDatetimeLocalValue(iso: string | null | undefined): string {
+export function isoToDatetimeLocalValue(
+  iso: string | null | undefined,
+  timeZone?: string,
+): string {
   if (!iso) return "";
+  if (timeZone) return utcIsoToShopWallClock(iso, timeZone);
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   const pad = (n: number) => String(n).padStart(2, "0");
   // Include seconds so preview / reset round-trips keep sub-minute accuracy (minute-only drifted up to ~59s).
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+/** Human-readable label for `YYYY-MM-DDTHH:mm:ss` wall-clock values (shop or browser). */
+export function formatDatetimeLocalDisplay(
+  local: string | null | undefined,
+): string {
+  return formatShopWallClockDisplay(local);
+}
+
+/**
+ * Parse `YYYY-MM-DDTHH:mm[:ss]` as a *local* calendar time (not UTC).
+ * Prefer `shopWallClockToUtcIso` when a shop IANA timezone is known.
+ */
+export function parseDatetimeLocalAsLocalDate(
+  local: string,
+): Date | null {
+  const t = local.trim();
+  if (!t) return null;
+  const m = t.match(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/,
+  );
+  if (!m) {
+    const d = new Date(t);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(
+    Number(m[1]),
+    Number(m[2]) - 1,
+    Number(m[3]),
+    Number(m[4]),
+    Number(m[5]),
+    Number(m[6] ?? "0"),
+  );
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 /** Seconds per admin “Unit” (days / hours / minutes) for volume-discount countdown. */
@@ -121,23 +166,27 @@ export function volumeDiscountCountdownSecondsPerUnit(unit: string): number {
   return 86400;
 }
 
-/** Value for `datetime-local` state: end = now + amount × unit. */
+/** Value for `datetime-local` state: end = now + amount × unit (shop TZ when provided). */
 export function countdownDatetimeLocalFromNow(
   amount: number,
   unit: string,
+  timeZone?: string,
 ): string {
+  if (timeZone) return shopWallClockFromNow(amount, unit, timeZone);
   const n = Math.max(1, Math.floor(Number(amount)) || 1);
   const mult = volumeDiscountCountdownSecondsPerUnit(unit);
   const end = new Date(Date.now() + n * mult * 1000);
   return isoToDatetimeLocalValue(end.toISOString());
 }
 
-/** Interpret `datetime-local` string as local instant → ISO UTC. */
-export function datetimeLocalToIsoUtc(local: string): string | null {
-  const t = local.trim();
-  if (!t) return null;
-  const d = new Date(t);
-  if (Number.isNaN(d.getTime())) return null;
+/** Interpret wall-clock string → ISO UTC (shop TZ when provided). */
+export function datetimeLocalToIsoUtc(
+  local: string,
+  timeZone?: string,
+): string | null {
+  if (timeZone) return shopWallClockToUtcIso(local, timeZone);
+  const d = parseDatetimeLocalAsLocalDate(local);
+  if (!d) return null;
   return d.toISOString();
 }
 

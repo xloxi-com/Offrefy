@@ -77,14 +77,20 @@ export function billingAmountDollars(
 
 /**
  * Shopify test charges (no real money).
+ * - Development stores (`partnerDevelopment`) → always test (required to approve)
  * - BILLING_TEST=true  → always test (local / partner testing)
- * - BILLING_TEST=false → always live billing
+ * - BILLING_TEST=false → live billing (ignored on development stores)
  * - unset → live in production; test in development
  *
  * Live merchant stores must not default to test — that showed
  * "You will not be billed for this test charge."
  */
-export function billingIsTest(): boolean {
+export function billingIsTest(options?: {
+  partnerDevelopment?: boolean;
+}): boolean {
+  // Dev stores cannot approve real charges — always create test subscriptions.
+  if (options?.partnerDevelopment === true) return true;
+
   const raw = process.env.BILLING_TEST?.trim().toLowerCase();
   if (raw === "true" || raw === "1") return true;
   if (raw === "false" || raw === "0") return false;

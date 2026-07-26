@@ -54,14 +54,16 @@ export type QuantityBreaksPreviewTierRow = {
 export type QuantityBreaksTailwindPreviewProps = {
   rows: QuantityBreaksPreviewTierRow[];
   currencySymbol?: string;
-  /** @deprecated Prefer `display` + `themeHeadingFallback` */
+  /** @deprecated Prefer `display.widgetHeading` */
   heading?: string;
   showCountdown?: boolean;
   /** @deprecated Prefer `display.ctaLabel` */
   ctaLabel?: string;
   /** Merges with defaults; drives colors, copy, typography. */
   display?: Partial<VolumeDiscountWidgetDisplay>;
-  /** Theme block default when `display.widgetHeading` is empty. */
+  /**
+   * @deprecated Unused — empty `display.widgetHeading` hides the title.
+   */
   themeHeadingFallback?: string;
   /** ISO end instant — live preview; omit for demo ticker. */
   countdownEndsAtIso?: string | null;
@@ -159,9 +161,9 @@ function QuantityBreaksTailwindPreviewInner({
   showCountdown: showCountdownLegacy,
   ctaLabel: ctaLabelLegacy,
   display: displayPartial,
-  themeHeadingFallback = "Get more, save more 🥳",
+  themeHeadingFallback: _themeHeadingFallback,
   countdownEndsAtIso = null,
-  countdownStartsAtIso = null,
+  countdownStartsAtIso: _countdownStartsAtIso = null,
   freezeCountdown = false,
   countdownPreviewNonce = 0,
   previewDevice: previewDeviceProp,
@@ -192,11 +194,37 @@ function QuantityBreaksTailwindPreviewInner({
       d.countdownAlign === "start");
   const headerMobileCentered = mobileStackHeader;
   const isVolumeTableLayout = d.widgetPresentation === "volume_table";
+  /** Heading Right → timer also pins to the trailing edge (storefront + preview). */
+  const countdownAlignEffective =
+    d.widgetHeadingAlign === "end" ? "end" : d.countdownAlign;
+  const headerPackEnd =
+    !headerUsesColumn &&
+    !headerMobileCentered &&
+    d.widgetHeadingAlign === "end";
+  const headerRowJustify = headerUsesColumn
+    ? headerMobileCentered
+      ? "center"
+      : "flex-start"
+    : headerPackEnd
+      ? "flex-end"
+      : d.widgetHeaderLayout === "split"
+        ? "space-between"
+        : "flex-start";
+  const headingFlex = headerUsesColumn
+    ? "0 0 auto"
+    : headerPackEnd
+      ? "0 1 auto"
+      : d.widgetHeaderLayout === "split"
+        ? "1 1 auto"
+        : "0 0 auto";
   const sp = d.fontSizeScalePercent;
   const fs = (px: number) => scaledWidgetFontSizeCss(px, sp);
+  /** Empty optional heading = hide title (no theme-block fallback). */
   const headingResolved =
     d.widgetHeading.trim() ||
-    (heading != null && heading.trim() !== "" ? heading : themeHeadingFallback);
+    (heading != null && heading.trim() !== "" ? heading.trim() : "");
+  const showHeading = headingResolved !== "";
+  const radiogroupLabel = showHeading ? headingResolved : "Quantity breaks";
   const showCountdown =
     showCountdownLegacy !== undefined ? showCountdownLegacy : d.showCountdown;
   const ctaLabel = ctaLabelLegacy ?? d.ctaLabel;
@@ -296,16 +324,13 @@ function QuantityBreaksTailwindPreviewInner({
   const [countdownPhase, setCountdownPhase] =
     useState<CountdownPreviewPhase>("demo");
   const previewRootRef = useRef<HTMLDivElement>(null);
+  const showCountdownInHeader = showCountdown && countdownPhase !== "before";
+  const showHeaderBar = showHeading || showCountdownInHeader;
 
   const hasLiveCountdownEnd =
     typeof countdownEndsAtIso === "string" &&
     countdownEndsAtIso.trim() !== "" &&
     !Number.isNaN(Date.parse(countdownEndsAtIso));
-  const startsMs =
-    typeof countdownStartsAtIso === "string" &&
-    countdownStartsAtIso.trim() !== ""
-      ? Date.parse(countdownStartsAtIso)
-      : NaN;
 
   useEffect(() => {
     if (visibleVariantOptions.some((o) => o.value === variant)) return;
@@ -331,10 +356,7 @@ function QuantityBreaksTailwindPreviewInner({
       const endsMs = Date.parse(countdownEndsAtIso!);
       const tick = () => {
         const now = Date.now();
-        if (!Number.isNaN(startsMs) && now < startsMs) {
-          setCountdownPhase("before");
-          return;
-        }
+        // Always show countdown to end; schedule start does not delay the pill.
         setCountdownPhase("active");
         setSecondsLeft(Math.max(0, Math.floor((endsMs - now) / 1000)));
       };
@@ -354,7 +376,6 @@ function QuantityBreaksTailwindPreviewInner({
     showCountdown,
     hasLiveCountdownEnd,
     countdownEndsAtIso,
-    startsMs,
     freezeCountdown,
     countdownPreviewNonce,
   ]);
@@ -409,6 +430,7 @@ function QuantityBreaksTailwindPreviewInner({
         style={cssVars}
       >
         <BlockStack gap="300">
+          {showHeaderBar ? (
           <div
             style={{
               display: "flex",
@@ -422,32 +444,19 @@ function QuantityBreaksTailwindPreviewInner({
                   ? "center"
                   : "stretch"
                 : "flex-start",
-              justifyContent: headerUsesColumn
-                ? headerMobileCentered
-                  ? "center"
-                  : "flex-start"
-                : d.widgetHeaderLayout === "split"
-                  ? "space-between"
-                  : "flex-start",
+              justifyContent: headerRowJustify,
               gap: "var(--p-space-300, 0.75rem)",
               marginBottom: "clamp(0.85rem, 2.2vw, 1.15rem)",
               paddingBottom: "clamp(0.65rem, 2vw, 0.85rem)",
               borderBottom: "1px solid rgba(0, 0, 0, 0.06)",
             }}
           >
+            {showHeading ? (
             <div
               style={{
                 order:
-                  showCountdown &&
-                  countdownPhase !== "before" &&
-                  headerSwapEffective
-                    ? 2
-                    : 1,
-                flex: headerUsesColumn
-                  ? "0 0 auto"
-                  : d.widgetHeaderLayout === "split"
-                    ? "1 1 auto"
-                    : "0 0 auto",
+                  showCountdownInHeader && headerSwapEffective ? 2 : 1,
+                flex: headingFlex,
                 minWidth: 0,
                 maxWidth: "100%",
                 width: headerUsesColumn ? "100%" : undefined,
@@ -472,7 +481,8 @@ function QuantityBreaksTailwindPreviewInner({
               >
                 <span
                   style={{
-                    fontFamily: "var(--vd-theme-font-heading)",
+                    fontFamily:
+                      "var(--vd-theme-font-heading), Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, emoji",
                     fontSize: `var(--vd-fs-title, ${fs(d.fontSizeTitle)})`,
                     fontWeight: "var(--vd-fw-strong)",
                     color: d.primaryColor,
@@ -482,7 +492,8 @@ function QuantityBreaksTailwindPreviewInner({
                 </span>
               </Text>
             </div>
-            {showCountdown && countdownPhase !== "before" ? (
+            ) : null}
+            {showCountdownInHeader ? (
               <div
                 style={{
                   order: headerSwapEffective ? 1 : 2,
@@ -491,18 +502,16 @@ function QuantityBreaksTailwindPreviewInner({
                   alignItems: "center",
                   justifyContent: headerMobileCentered
                     ? "center"
-                    : countdownAlignToFlexJustify(d.countdownAlign),
+                    : countdownAlignToFlexJustify(countdownAlignEffective),
                   gap: "0.35rem 0.5rem",
-                  flex: headerUsesColumn
-                    ? "0 0 auto"
-                    : d.widgetHeaderLayout === "split"
-                      ? "1 1 auto"
-                      : "0 0 auto",
-                  minWidth:
-                    !headerUsesColumn && d.widgetHeaderLayout === "split"
-                      ? "min(100%, 11rem)"
-                      : undefined,
+                  flex: "0 0 auto",
+                  minWidth: 0,
+                  maxWidth: "100%",
                   width: headerUsesColumn ? "100%" : undefined,
+                  marginInlineStart:
+                    !headerUsesColumn && countdownAlignEffective === "end"
+                      ? "auto"
+                      : undefined,
                 }}
               >
                 <Text as="span" variant="bodySm" tone="subdued">
@@ -538,6 +547,7 @@ function QuantityBreaksTailwindPreviewInner({
               </div>
             ) : null}
           </div>
+          ) : null}
           <div className={previewWidgetStyles.volumeTableWrap}>
             <div className={previewWidgetStyles.volumeTableScroll}>
               <table className={previewWidgetStyles.volumeTable}>
@@ -618,6 +628,7 @@ function QuantityBreaksTailwindPreviewInner({
       style={cssVars}
     >
       <BlockStack gap="300">
+        {showHeaderBar ? (
         <div
           style={{
             display: "flex",
@@ -631,32 +642,18 @@ function QuantityBreaksTailwindPreviewInner({
                 ? "center"
                 : "stretch"
               : "flex-start",
-            justifyContent: headerUsesColumn
-              ? headerMobileCentered
-                ? "center"
-                : "flex-start"
-              : d.widgetHeaderLayout === "split"
-                ? "space-between"
-                : "flex-start",
+            justifyContent: headerRowJustify,
             gap: "var(--p-space-300, 0.75rem)",
             marginBottom: "clamp(0.85rem, 2.2vw, 1.15rem)",
             paddingBottom: "clamp(0.65rem, 2vw, 0.85rem)",
             borderBottom: "1px solid rgba(0, 0, 0, 0.06)",
           }}
         >
+          {showHeading ? (
           <div
             style={{
-              order:
-                showCountdown &&
-                countdownPhase !== "before" &&
-                headerSwapEffective
-                  ? 2
-                  : 1,
-              flex: headerUsesColumn
-                ? "0 0 auto"
-                : d.widgetHeaderLayout === "split"
-                  ? "1 1 auto"
-                  : "0 0 auto",
+              order: showCountdownInHeader && headerSwapEffective ? 2 : 1,
+              flex: headingFlex,
               minWidth: 0,
               maxWidth: "100%",
               width: headerUsesColumn ? "100%" : undefined,
@@ -681,7 +678,8 @@ function QuantityBreaksTailwindPreviewInner({
             >
               <span
                 style={{
-                  fontFamily: "var(--vd-theme-font-heading)",
+                  fontFamily:
+                    "var(--vd-theme-font-heading), Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, emoji",
                   fontSize: `var(--vd-fs-title, ${fs(d.fontSizeTitle)})`,
                   fontWeight: "var(--vd-fw-strong)",
                 }}
@@ -690,7 +688,8 @@ function QuantityBreaksTailwindPreviewInner({
               </span>
             </Text>
           </div>
-          {showCountdown && countdownPhase !== "before" ? (
+          ) : null}
+          {showCountdownInHeader ? (
             <div
               style={{
                 order: headerSwapEffective ? 1 : 2,
@@ -699,18 +698,16 @@ function QuantityBreaksTailwindPreviewInner({
                 alignItems: "center",
                 justifyContent: headerMobileCentered
                   ? "center"
-                  : countdownAlignToFlexJustify(d.countdownAlign),
+                  : countdownAlignToFlexJustify(countdownAlignEffective),
                 gap: "0.35rem 0.5rem",
-                flex: headerUsesColumn
-                  ? "0 0 auto"
-                  : d.widgetHeaderLayout === "split"
-                    ? "1 1 auto"
-                    : "0 0 auto",
-                minWidth:
-                  !headerUsesColumn && d.widgetHeaderLayout === "split"
-                    ? "min(100%, 11rem)"
-                    : undefined,
+                flex: "0 0 auto",
+                minWidth: 0,
+                maxWidth: "100%",
                 width: headerUsesColumn ? "100%" : undefined,
+                marginInlineStart:
+                  !headerUsesColumn && countdownAlignEffective === "end"
+                    ? "auto"
+                    : undefined,
               }}
             >
               <Text as="span" variant="bodySm" tone="subdued">
@@ -746,8 +743,9 @@ function QuantityBreaksTailwindPreviewInner({
             </div>
           ) : null}
         </div>
+        ) : null}
 
-        <div role="radiogroup" aria-label={headingResolved}>
+        <div role="radiogroup" aria-label={radiogroupLabel}>
           <div style={{ paddingTop: floatTopBadge ? "12px" : undefined }}>
             <BlockStack gap="400">
             {rows.map((row, index) => {

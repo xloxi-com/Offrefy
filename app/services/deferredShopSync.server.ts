@@ -44,10 +44,8 @@ function enqueueShopWork(shop: string, work: () => Promise<void>): void {
 
 /**
  * Run Shopify discount + storefront sync after the HTTP response (Vercel `waitUntil`).
- * Returns immediately so campaign save actions respond after the DB write only.
- *
- * Always flushes the storefront widget cache first so product-page tiers update
- * without needing a manual Sync all — even if the slower Function sync fails later.
+ * Prefer `await syncVolumeDiscountShopToShopify` on offer save so discounts update
+ * before the admin sees success — this helper remains for delete/bulk/cron paths.
  */
 export function scheduleVolumeDiscountShopSync(
   admin: AdminGraphql,
@@ -58,15 +56,11 @@ export function scheduleVolumeDiscountShopSync(
   invalidateMemoryCachePrefix(`widget:${shop}:`);
   invalidateMemoryCachePrefix(`cart-rules:${shop}:`);
   enqueueShopWork(shop, async () => {
-    const flush = await flushStorefrontWidgetPayloadNow(admin, shop);
-    if (flush.errors.length) {
-      console.error(
-        "[volume-discount] deferred flushStorefrontWidgetPayloadNow",
-        shop,
-        flush.errors.join("; "),
-      );
-    }
-    const { errors } = await syncVolumeDiscountShop(admin, shop, options);
+    const { errors } = await syncVolumeDiscountShopToShopify(
+      admin,
+      shop,
+      options,
+    );
     if (errors.length) {
       console.error(
         "[volume-discount] deferred syncVolumeDiscountShop",
@@ -78,9 +72,31 @@ export function scheduleVolumeDiscountShopSync(
 }
 
 /**
+ * Flush storefront cache + push Automatic Discount / metafields to Shopify now.
+ * Used on offer save so merchants do not need a manual Sync button.
+ */
+export async function syncVolumeDiscountShopToShopify(
+  admin: AdminGraphql,
+  shop: string,
+  options: SyncShopOptions = {},
+): Promise<{ errors: string[] }> {
+  invalidateMemoryCachePrefix(`widget:${shop}:`);
+  invalidateMemoryCachePrefix(`cart-rules:${shop}:`);
+  const flush = await flushStorefrontWidgetPayloadNow(admin, shop);
+  if (flush.errors.length) {
+    console.error(
+      "[volume-discount] flushStorefrontWidgetPayloadNow",
+      shop,
+      flush.errors.join("; "),
+    );
+  }
+  const { errors } = await syncVolumeDiscountShop(admin, shop, options);
+  return { errors: [...flush.errors, ...errors] };
+}
+
+/**
  * Lightweight storefront metafield refresh without blocking the save response.
- * Uses DB→cache flush so widget updates without Sync all (does not require a
- * linked automatic discount the way the older metafield-read path did).
+ * Uses DB→cache flush so widget updates without a linked automatic discount.
  */
 export function scheduleStorefrontWidgetRefresh(
   admin: AdminGraphql,

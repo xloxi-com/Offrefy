@@ -443,9 +443,24 @@
     return true;
   }
 
+  function campaignInScheduleWindow(campaign) {
+    var now = Date.now();
+    // Scheduled: hide until start. After end: hide. Active window: show.
+    if (campaign && campaign.countdownStartsAt != null) {
+      var startMs = Date.parse(String(campaign.countdownStartsAt));
+      if (!isNaN(startMs) && now < startMs) return false;
+    }
+    if (campaign && campaign.countdownEndsAt != null) {
+      var endMs = Date.parse(String(campaign.countdownEndsAt));
+      if (!isNaN(endMs) && now >= endMs) return false;
+    }
+    return true;
+  }
+
   function pickCampaign(cfg, productId, variantId, productGid, variantGid) {
     var list = (cfg && cfg.campaigns) || [];
     for (var i = 0; i < list.length; i++) {
+      if (!campaignInScheduleWindow(list[i])) continue;
       if (!customerAllowsCampaign(list[i])) continue;
       if (productMatch(list[i], productId, variantId, productGid, variantGid)) {
         return list[i];
@@ -3443,6 +3458,10 @@
     }
     var ha = pickWidgetHeaderTextAlign(d.widgetHeadingAlign, "center");
     var ca = pickWidgetHeaderTextAlign(d.countdownAlign, "center");
+    // Heading "Right" → pin timer to the trailing edge (matches merchant intent).
+    if (ha === "end") ca = "end";
+    root.setAttribute("data-vd-heading-align", ha);
+    root.setAttribute("data-vd-countdown-align", ca);
     root.style.setProperty("--vd-heading-text-align", ha);
     root.style.setProperty("--vd-countdown-justify", countdownAlignToJustify(ca));
   }
@@ -3473,7 +3492,7 @@
   }
 
   var WD_DEFAULT = {
-    widgetHeading: "",
+    widgetHeading: "Get more, save more 🥳",
     showCountdown: false,
     widgetHeaderLayout: "split",
     widgetHeadingAlign: "center",
@@ -3807,7 +3826,7 @@
     el.textContent = text;
   }
 
-  function applyWidgetDisplayToRoot(root, disp, themeHeading) {
+  function applyWidgetDisplayToRoot(root, disp, _themeHeading) {
     var d = mergeWidgetDisplay(disp);
     root.removeAttribute("data-vd-font-scale");
     if (d.fontScale === "compact") root.setAttribute("data-vd-font-scale", "compact");
@@ -3972,7 +3991,7 @@
     }
     var pres = String(d.widgetPresentation || "").trim();
     return {
-      title: h || String(themeHeading || "").trim() || "Quantity breaks",
+      title: h,
       widgetPresentation: pres === "volume_table" ? "volume_table" : "tier_cards",
       showCountdown: d.showCountdown === true,
       countdownLabel: String(d.countdownLabel || WD_DEFAULT.countdownLabel).trim() ||
@@ -4046,7 +4065,16 @@
         }
       }
     }
-    if (langTrans.transHeading != null && langTrans.transHeading !== "") widgetDisplay.widgetHeading = langTrans.transHeading;
+    // Offer "Widget heading" wins when set (keeps emoji / custom copy).
+    // Settings translations only fill in when the offer heading is empty.
+    var offerHeading = String(widgetDisplay.widgetHeading || "").trim();
+    if (
+      !offerHeading &&
+      langTrans.transHeading != null &&
+      String(langTrans.transHeading).trim() !== ""
+    ) {
+      widgetDisplay.widgetHeading = langTrans.transHeading;
+    }
     if (langTrans.transCta != null && langTrans.transCta !== "") widgetDisplay.ctaLabel = langTrans.transCta;
     if (langTrans.transFootnote != null && langTrans.transFootnote !== "") widgetDisplay.footnote = langTrans.transFootnote;
     if (langTrans.transCountdown != null && langTrans.transCountdown !== "") widgetDisplay.countdownLabel = langTrans.transCountdown;
@@ -4646,10 +4674,6 @@
       campaign.countdownEndsAt != null
         ? Date.parse(String(campaign.countdownEndsAt))
         : NaN;
-    var cdStartsMs =
-      campaign.countdownStartsAt != null
-        ? Date.parse(String(campaign.countdownStartsAt))
-        : NaN;
     var cdLive = ui.showCountdown === true && !isNaN(cdEndsMs);
 
     var h = [];
@@ -4662,21 +4686,26 @@
     if (sec) {
       h.push('<h2 class="vd-section-title">' + esc(sec) + "</h2>");
     }
-    h.push('<div class="vd-topbar">');
-    h.push('<p class="vd-title">' + esc(ui.title) + "</p>");
-    if (cdLive) {
-      var noticeRaw = String(ui.countdownLabel || "").trim();
-      var notice =
-        noticeRaw
-          .replace(/\s*%c\s*/gi, " ")
-          .replace(/\s+/g, " ")
-          .trim() || "Sale end in";
-      h.push('<div class="vd-countdown">');
-      h.push('<span class="vd-countdown-muted">' + esc(notice) + "</span> ");
-      h.push('<span class="vd-countdown-badge" data-vd-cd></span>');
+    var titleText = String(ui.title || "").trim();
+    if (titleText || cdLive) {
+      h.push('<div class="vd-topbar">');
+      if (titleText) {
+        h.push('<p class="vd-title">' + esc(titleText) + "</p>");
+      }
+      if (cdLive) {
+        var noticeRaw = String(ui.countdownLabel || "").trim();
+        var notice =
+          noticeRaw
+            .replace(/\s*%c\s*/gi, " ")
+            .replace(/\s+/g, " ")
+            .trim() || "Sale end in";
+        h.push('<div class="vd-countdown">');
+        h.push('<span class="vd-countdown-muted">' + esc(notice) + "</span> ");
+        h.push('<span class="vd-countdown-badge" data-vd-cd></span>');
+        h.push("</div>");
+      }
       h.push("</div>");
     }
-    h.push("</div>");
 
     var selVariantId = vidRoot || firstAvailableVariantIdInList(variants) || "";
     if (!vdShowVariant) {
@@ -4690,7 +4719,7 @@
     if (isVolumeTable) {
       h.push(
         '<div class="vd-cards vd-cards--volume-table" role="radiogroup" aria-label="' +
-          esc(ui.title) +
+          esc(String(ui.title || "").trim() || "Quantity breaks") +
           '">',
       );
       h.push('<div class="vd-volume-table-scroll">');
@@ -4719,7 +4748,7 @@
       }
       h.push("</tbody></table></div></div></div>");
     } else {
-      h.push('<div class="vd-cards" role="radiogroup" aria-label="' + esc(ui.title) + '">');
+      h.push('<div class="vd-cards" role="radiogroup" aria-label="' + esc(String(ui.title || "").trim() || "Quantity breaks") + '">');
       var perUnitCardsInit = ui.cardPriceShowsUnit === true;
       var hideCompareInit = ui.hideWidgetComparePrice === true;
       var badgePos = String(ui.badgePosition || "after_label");
@@ -4875,10 +4904,7 @@
       var cdWrap = cdEl.closest(".vd-countdown");
       var tickCd = function () {
         var now = Date.now();
-        if (!isNaN(cdStartsMs) && now < cdStartsMs) {
-          if (cdWrap) cdWrap.style.display = "none";
-          return;
-        }
+        // Countdown always targets end — schedule start only gates offer status, not the pill.
         if (cdWrap) cdWrap.style.display = "";
         var left = Math.max(0, Math.floor((cdEndsMs - now) / 1000));
         cdEl.textContent = formatCountdown(left, ui.countdownTimeUnit);
@@ -5390,7 +5416,7 @@
 
   /**
    * Autoinject disabled: widget only mounts where the merchant added the
-   * “Quantity breaks” theme block. App embed loads scripts/CSS only.
+   * “Quantity breaks” theme block (that block also injects JS/CSS).
    */
   function ensureAutoinjectRoot() {
     return null;

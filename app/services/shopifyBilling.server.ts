@@ -4,6 +4,7 @@ import {
   billingPlanKeyFor,
   type BillingPlanKey,
 } from "../utils/billingPlans";
+import { resolveShopifyShopPlanCap } from "../utils/cartDiscountTargetCap.server";
 import {
   PAID_PLAN_TRIAL_DAYS,
   type PricingInterval,
@@ -109,6 +110,16 @@ export async function cancelActiveAppSubscriptions(
 }
 
 /**
+ * Prefer test charges on development stores; otherwise follow env / NODE_ENV.
+ */
+export async function resolveBillingIsTest(
+  admin: GraphqlAdmin,
+): Promise<boolean> {
+  const { partnerDevelopment } = await resolveShopifyShopPlanCap(admin);
+  return billingIsTest({ partnerDevelopment });
+}
+
+/**
  * Creates a recurring app subscription and returns Shopify's approval URL.
  * Paid plans only — Free must cancel subscriptions + setShopPlan locally
  * (Shopify rejects price amount 0).
@@ -128,7 +139,10 @@ export async function createPlanSubscriptionConfirmationUrl(
       "Free plan does not use Shopify billing — cancel subscriptions instead",
     );
   }
-  const isTest = options.isTest ?? billingIsTest();
+  // Development stores must use test:true or merchants cannot approve the charge.
+  const { partnerDevelopment } = await resolveShopifyShopPlanCap(admin);
+  const isTest =
+    partnerDevelopment || (options.isTest ?? billingIsTest());
   const billingPlan = billingPlanKeyFor(plan, interval);
   const amount = billingAmountDollars(plan, interval);
   const shopifyInterval =

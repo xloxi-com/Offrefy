@@ -2,9 +2,8 @@
   App block — Theme editor → Add section → Apps, or Product information → Add block → Apps.
   Available on all templates (not product-only) so reviewers/merchants find it from Home too.
   Product comes from closest.product or the template product (no theme-editor settings).
-  Boots storefront JS/CSS here so the widget still mounts when the app embed is on
-  but Hyper/theme-editor preview does not inject body embeds reliably. Embed remains
-  the recommended global path (cart badge etc. on non-product pages).
+  This block is the only place that injects storefront JS/CSS. App embed only sets the
+  enable flag (needed for live mount + theme-editor when body embeds are flaky).
 {% endcomment %}
 {% liquid
   if closest.product != blank

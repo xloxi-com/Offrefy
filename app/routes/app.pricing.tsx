@@ -41,7 +41,6 @@ import {
   type PricingPlanId,
 } from "../utils/pricingPlans";
 import {
-  billingIsTest,
   pricingPlanFromBillingName,
 } from "../utils/billingPlans";
 import { resolveShopPlan, setShopPlan, ensureDefaultFreePlanOnInstall } from "../utils/shopPlan.server";
@@ -50,6 +49,7 @@ import {
   cancelActiveAppSubscriptions,
   createPlanSubscriptionConfirmationUrl,
   listActiveAppSubscriptions,
+  resolveBillingIsTest,
 } from "../services/shopifyBilling.server";
 import {
   hasEphemeralBillingParams,
@@ -118,7 +118,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return {
     currentPlan,
     justActivated,
-    billingTestMode: billingIsTest(),
+    billingTestMode: await resolveBillingIsTest(admin),
   };
 };
 
@@ -178,6 +178,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   // Paid plans go through Shopify approval via appSubscriptionCreate.
+  // createPlanSubscriptionConfirmationUrl forces test:true on development stores.
   try {
     const { confirmationUrl } = await createPlanSubscriptionConfirmationUrl(
       admin,
@@ -185,7 +186,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         plan,
         interval,
         returnUrl: embeddedReturnUrl,
-        isTest: billingIsTest(),
       },
     );
     return {

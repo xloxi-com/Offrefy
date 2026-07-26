@@ -14,7 +14,7 @@ import { IndeterminateLinearProgress } from "../components/IndeterminateLinearPr
 import { prisma } from "../db.server";
 import {
   scheduleStorefrontWidgetRefresh,
-  scheduleVolumeDiscountShopSync,
+  syncVolumeDiscountShopToShopify,
 } from "../services/deferredShopSync.server";
 import { applyDueCampaignScheduleTransitions } from "../services/campaignScheduleTransitions.server";
 import { authenticate } from "../shopify.server";
@@ -35,6 +35,7 @@ import {
 } from "../utils/volumeDiscountForm.server";
 import type { VolumeDiscountNewOfferPreset } from "../types/volumeDiscount";
 import { adminEmbeddedPath } from "../utils/adminEmbeddedPath";
+import { resolveShopIanaTimezone } from "../utils/shopTimezone.server";
 
 const VolumeDiscountCreateView = lazy(() =>
   import("../components/VolumeDiscountCreateView").then((m) => ({
@@ -47,19 +48,21 @@ type NewOfferNavigationState = {
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const presetParam = new URL(request.url).searchParams.get("preset");
   const newOfferPreset: VolumeDiscountNewOfferPreset =
     presetParam === "volume" ? "volume_table" : "quantity_breaks";
-  const [{ plan, capabilities }, activeCount] = await Promise.all([
+  const [{ plan, capabilities }, activeCount, shopTimezone] = await Promise.all([
     resolveShopPlanContext(session.shop),
     countActiveCampaigns(session.shop),
+    resolveShopIanaTimezone(admin),
   ]);
   return {
     newOfferPreset,
     plan,
     planCapabilities: capabilities,
     activeCount,
+    shopTimezone,
   };
 };
 
@@ -139,33 +142,37 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   });
 
   const transition = await applyDueCampaignScheduleTransitions(session.shop);
-  const liveNow =
+  const needsFunctionSync =
     d.campaignStatus === "active" ||
+    d.campaignStatus === "scheduled" ||
     transition.activatedIds.includes(record.id) ||
     transition.shopsNeedingShopifySync.includes(session.shop);
 
-  /* Draft / scheduled offers are not in the aggregate discount — skip slow GraphQL. */
-  if (liveNow) {
-    scheduleVolumeDiscountShopSync(admin, session.shop, {
+  /* Push Automatic Discount + widget to Shopify before responding (no manual Sync). */
+  if (needsFunctionSync) {
+    const { errors } = await syncVolumeDiscountShopToShopify(admin, session.shop, {
       changedCampaignIds: [record.id],
       skipScheduleTransitions: true,
+      force: true,
     });
-  } else if (
-    d.campaignStatus === "scheduled" ||
-    d.countdownStartsAt ||
-    d.countdownEndsAt
-  ) {
-    /* Keep storefront cache/rev fresh for countdown schedule metadata. */
+    if (errors.length) {
+      return {
+        ok: false as const,
+        error: `Offer saved, but Shopify discount update failed: ${errors.join(" ")}`,
+      };
+    }
+  } else if (d.countdownStartsAt || d.countdownEndsAt) {
     scheduleStorefrontWidgetRefresh(admin, session.shop);
   }
 
-  return { ok: true as const, campaignId: record.id, syncPending: true as const };
+  return { ok: true as const, campaignId: record.id };
 };
 
 export default function VolumeDiscountNewRoute() {
   const {
     newOfferPreset: loaderPreset,
     planCapabilities,
+    shopTimezone,
   } = useLoaderData<typeof loader>();
   const [searchParams] = useSearchParams();
   const location = useLocation();
@@ -180,7 +187,7 @@ export default function VolumeDiscountNewRoute() {
   const defaultCampaignName =
     navState?.defaultCampaignName?.trim() || "Offer";
   const onSuccess = useCallback(() => {
-    shopify.toast.show("Offer saved — syncing to Shopify");
+    shopify.toast.show("Offer saved — updated on Shopify");
     navigate(adminEmbeddedPath("/app/offers", search));
   }, [navigate, search, shopify]);
 
@@ -193,6 +200,7 @@ export default function VolumeDiscountNewRoute() {
         defaultCampaignName={defaultCampaignName}
         newOfferPreset={newOfferPreset}
         planCapabilities={planCapabilities}
+        shopTimezone={shopTimezone}
       />
     </Suspense>
   );

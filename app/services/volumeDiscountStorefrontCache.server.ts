@@ -1,5 +1,6 @@
 import type { VolumeDiscountCampaignStorefrontRow } from "../utils/storefrontWidgetConfig.server";
 import { volumeDiscountCampaignSyncSelect } from "../utils/volumeDiscountCampaignSelect.server";
+import { storefrontLiveCampaignWhere } from "../utils/campaignScheduleStatus";
 import { prisma } from "../db.server";
 import {
   buildStorefrontWidgetValue,
@@ -57,7 +58,7 @@ export function scheduleStorefrontPayloadRevalidation(
   void (async () => {
     try {
       const rows = await prisma.volumeDiscountCampaign.findMany({
-        where: { shop, status: "active" },
+        where: storefrontLiveCampaignWhere(shop),
         orderBy: { createdAt: "asc" },
         select: volumeDiscountCampaignSyncSelect,
       });

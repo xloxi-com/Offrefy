@@ -43,3 +43,70 @@ export function isCampaignScheduleExpired(
 export function isCampaignLiveStatus(status: string): boolean {
   return String(status).toLowerCase() === "active";
 }
+
+/**
+ * Campaigns that should be synced to Shopify Function / storefront widget:
+ * Active, or Scheduled (rules ready before start — Shopify discount startsAt/endsAt
+ * gates when the automatic discount is live; Functions cannot use Date.now()).
+ * Exclude anything whose end time has already passed.
+ */
+export function campaignEligibleForDiscountSync(opts: {
+  status: string;
+  endsAt: Date | null;
+  now?: Date;
+}): boolean {
+  const status = String(opts.status ?? "").toLowerCase();
+  if (status !== "active" && status !== "scheduled") return false;
+  if (isCampaignScheduleExpired(opts.endsAt, opts.now ?? new Date())) {
+    return false;
+  }
+  return true;
+}
+
+/** Prisma `where` fragment for discount/widget sync rows. */
+export function discountSyncCampaignWhere(
+  shop: string,
+  now: Date = new Date(),
+): {
+  shop: string;
+  status: { in: ["active", "scheduled"] };
+  OR: [{ countdownEndsAt: null }, { countdownEndsAt: { gt: Date } }];
+} {
+  return {
+    shop,
+    status: { in: ["active", "scheduled"] },
+    OR: [{ countdownEndsAt: null }, { countdownEndsAt: { gt: now } }],
+  };
+}
+
+/**
+ * Storefront widget only — hide until Schedule start, hide after end.
+ * (Discount Function may still sync Scheduled early via startsAt.)
+ */
+export function storefrontLiveCampaignWhere(
+  shop: string,
+  now: Date = new Date(),
+): {
+  shop: string;
+  status: { in: ["active", "scheduled"] };
+  AND: Array<
+    | { OR: [{ countdownStartsAt: null }, { countdownStartsAt: { lte: Date } }] }
+    | { OR: [{ countdownEndsAt: null }, { countdownEndsAt: { gt: Date } }] }
+  >;
+} {
+  return {
+    shop,
+    status: { in: ["active", "scheduled"] },
+    AND: [
+      {
+        OR: [
+          { countdownStartsAt: null },
+          { countdownStartsAt: { lte: now } },
+        ],
+      },
+      {
+        OR: [{ countdownEndsAt: null }, { countdownEndsAt: { gt: now } }],
+      },
+    ],
+  };
+}

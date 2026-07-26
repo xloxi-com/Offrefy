@@ -10,29 +10,48 @@ import {
 import { CalendarIcon } from "@shopify/polaris-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { formatDatetimeLocalDisplay } from "../utils/countdownTimes";
+import { utcIsoToShopWallClock } from "../utils/shopTimezone";
+
 export type PolarisDateTimeFieldProps = {
   label: string;
   value: string;
   onChange: (next: string) => void;
   helpText?: string;
+  /** When set, “Today” uses this shop IANA timezone (not the browser). */
+  shopTimezone?: string;
 };
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-/** Parse `YYYY-MM-DDTHH:mm:ss` (datetime-local) into local Date + time string. */
+/**
+ * Parse wall-clock `YYYY-MM-DDTHH:mm[:ss]` into calendar Date + time string.
+ * Digits are treated as opaque wall-clock parts (shop TZ), not browser-local ISO.
+ */
 function parseDatetimeLocal(raw: string): {
   date: Date;
   time: string;
 } | null {
   const t = raw.trim();
   if (!t) return null;
-  const d = new Date(t);
+  const m = t.match(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/,
+  );
+  if (!m) return null;
+  const d = new Date(
+    Number(m[1]),
+    Number(m[2]) - 1,
+    Number(m[3]),
+    Number(m[4]),
+    Number(m[5]),
+    Number(m[6] ?? "0"),
+  );
   if (Number.isNaN(d.getTime())) return null;
   return {
     date: d,
-    time: `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`,
+    time: `${pad2(Number(m[4]))}:${pad2(Number(m[5]))}:${pad2(Number(m[6] ?? "0"))}`,
   };
 }
 
@@ -44,19 +63,6 @@ function toDatetimeLocalValue(date: Date, timeHms: string): string {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(h)}:${pad2(m)}:${pad2(s)}`;
 }
 
-function formatDisplay(raw: string): string {
-  const parsed = parseDatetimeLocal(raw);
-  if (!parsed) return "";
-  return parsed.date.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
-
 /**
  * Polaris date + time picker (Popover + DatePicker + time TextField).
  * Value is datetime-local: `YYYY-MM-DDTHH:mm:ss`.
@@ -66,12 +72,16 @@ export function PolarisDateTimeField({
   value,
   onChange,
   helpText,
+  shopTimezone,
 }: PolarisDateTimeFieldProps) {
   const [open, setOpen] = useState(false);
 
   const parsed = useMemo(() => parseDatetimeLocal(value), [value]);
   const selectedDate = parsed?.date ?? new Date();
   const timeValue = parsed?.time ?? "00:00:00";
+  const timeHelp = shopTimezone
+    ? "Hours and minutes (Shopify store timezone)."
+    : "Hours and minutes (store local time).";
 
   const [{ month, year }, setMonthYear] = useState(() => ({
     month: selectedDate.getMonth(),
@@ -86,6 +96,23 @@ export function PolarisDateTimeField({
     });
   }, [open, selectedDate]);
 
+  const shopNowWallClock = useCallback((): {
+    date: Date;
+    time: string;
+    wall: string;
+  } | null => {
+    let wall = "";
+    if (shopTimezone) {
+      wall = utcIsoToShopWallClock(new Date().toISOString(), shopTimezone);
+    } else {
+      const n = new Date();
+      wall = `${n.getFullYear()}-${pad2(n.getMonth() + 1)}-${pad2(n.getDate())}T${pad2(n.getHours())}:${pad2(n.getMinutes())}:${pad2(n.getSeconds())}`;
+    }
+    const parsedNow = parseDatetimeLocal(wall);
+    if (!parsedNow) return null;
+    return { date: parsedNow.date, time: parsedNow.time, wall };
+  }, [shopTimezone]);
+
   const emit = useCallback(
     (date: Date, timeHms: string) => {
       onChange(toDatetimeLocalValue(date, timeHms));
@@ -95,9 +122,14 @@ export function PolarisDateTimeField({
 
   const handleDateChange = useCallback(
     (range: { start: Date; end: Date }) => {
-      emit(range.start, timeValue);
+      // Keep an existing non-midnight time; otherwise fill shop “now”.
+      const keepTime =
+        timeValue !== "00:00:00" && timeValue !== "00:00"
+          ? timeValue
+          : shopNowWallClock()?.time ?? timeValue;
+      emit(range.start, keepTime);
     },
-    [emit, timeValue],
+    [emit, shopNowWallClock, timeValue],
   );
 
   const handleTimeChange = useCallback(
@@ -117,10 +149,12 @@ export function PolarisDateTimeField({
   }, []);
 
   const handleToday = useCallback(() => {
-    const now = new Date();
-    setMonthYear({ month: now.getMonth(), year: now.getFullYear() });
-    emit(now, timeValue);
-  }, [emit, timeValue]);
+    const now = shopNowWallClock();
+    if (!now) return;
+    setMonthYear({ month: now.date.getMonth(), year: now.date.getFullYear() });
+    // Write full wall-clock (date + current shop time) in one shot.
+    onChange(now.wall);
+  }, [onChange, shopNowWallClock]);
 
   const handleClear = useCallback(() => {
     onChange("");
@@ -130,7 +164,7 @@ export function PolarisDateTimeField({
   const activator = (
     <TextField
       label={label}
-      value={formatDisplay(value)}
+      value={formatDatetimeLocalDisplay(value)}
       onChange={() => {}}
       onFocus={() => setOpen(true)}
       autoComplete="off"
@@ -164,12 +198,13 @@ export function PolarisDateTimeField({
             selected={selectedDate}
           />
           <TextField
+            key={`vd-time-${timeValue.slice(0, 5)}`}
             label="Time"
             type="time"
             value={timeValue.slice(0, 5)}
             onChange={handleTimeChange}
             autoComplete="off"
-            helpText="Hours and minutes (store local time)."
+            helpText={timeHelp}
           />
           <InlineStack align="space-between" blockAlign="center">
             <Button variant="plain" onClick={handleClear}>

@@ -1,18 +1,9 @@
 {% comment %}
   App embed (body) — Theme settings → App embeds.
-  Loads storefront JS/CSS for cart badge + global pages. Quantity breaks block also
-  boots assets on product templates so the widget still mounts if this embed is off
-  or the theme preview does not inject body embeds.
+  Enable flag only. Storefront JS/CSS inject where the merchant added the
+  “Quantity breaks” app block (product page / section), not on every page.
 {% endcomment %}
-{% liquid
-  if product != blank
-    assign vd_product = product
-  elsif closest.product != blank
-    assign vd_product = closest.product
-  endif
-%}
 <script>window.__vdAppEmbedActive = true;</script>
-{% render 'vd-storefront-assets', vd_product: vd_product %}
 
 {% schema %}
 {

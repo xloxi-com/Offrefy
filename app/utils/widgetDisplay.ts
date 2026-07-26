@@ -231,6 +231,32 @@ export const WIDGET_HEADER_TEXT_ALIGN_OPTIONS: {
   { label: "Right", value: "end" },
 ];
 
+/**
+ * Patch for heading / timer alignment selects.
+ * Heading Right also pins the timer to the trailing edge (storefront).
+ */
+export function widgetHeaderAlignPatch(
+  field: "widgetHeadingAlign" | "countdownAlign",
+  value: VolumeDiscountWidgetHeaderTextAlign,
+): Partial<
+  Pick<VolumeDiscountWidgetDisplay, "widgetHeadingAlign" | "countdownAlign">
+> {
+  if (field === "widgetHeadingAlign") {
+    return {
+      widgetHeadingAlign: value,
+      ...(value === "end" ? { countdownAlign: "end" as const } : {}),
+    };
+  }
+  return { countdownAlign: value };
+}
+
+/** Patch for header layout (split / stacked). */
+export function widgetHeaderLayoutPatch(
+  value: VolumeDiscountWidgetHeaderLayout,
+): Pick<VolumeDiscountWidgetDisplay, "widgetHeaderLayout"> {
+  return { widgetHeaderLayout: value };
+}
+
 function pickWidgetHeaderLayout(
   raw: unknown,
 ): VolumeDiscountWidgetHeaderLayout {
@@ -410,7 +436,7 @@ export function isVolumeDiscountAppearancePresetId(
 
 /** Product-page widget appearance; stored on `VolumeDiscountCampaign.widgetDisplay`. */
 export type VolumeDiscountWidgetDisplay = {
-  /** Overrides theme block heading when non-empty after trim. */
+  /** Optional widget title; empty after trim hides the heading (no theme fallback). */
   widgetHeading: string;
   /**
    * `tier_cards` = selectable tier rows (default). `volume_table` = Quantity / Discount / Price per item table.
@@ -1469,7 +1495,7 @@ function pickAppearanceTemplateId(
 }
 
 export const DEFAULT_WIDGET_DISPLAY: VolumeDiscountWidgetDisplay = {
-  widgetHeading: "",
+  widgetHeading: "Get more, save more 🥳",
   widgetPresentation: "tier_cards",
   showCountdown: false,
   widgetHeaderLayout: "split",

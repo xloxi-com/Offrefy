@@ -21,7 +21,7 @@ export type StorefrontTranslationFields = {
 export type StorefrontTranslationsMap = Record<string, StorefrontTranslationFields>;
 
 export const ENGLISH_STOREFRONT_TRANSLATION: StorefrontTranslationFields = {
-  transHeading: "Buy more save more",
+  transHeading: "Get more, save more 🥳",
   transQty: "Qty",
   transDiscount: "Discount",
   transPrice: "Price / ea",

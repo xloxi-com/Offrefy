@@ -30,7 +30,6 @@ import {
   scheduleVolumeDiscountShopSync,
 } from "../services/deferredShopSync.server";
 import { applyDueCampaignScheduleTransitions } from "../services/scheduledVolumeDiscountSync.server";
-import { syncVolumeDiscountShop } from "../services/volumeDiscountFunctionSync.server";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { OfferLimitUpgradeModal } from "../components/OfferLimitUpgradeModal";
@@ -214,14 +213,15 @@ export async function action({ request }: ActionFunctionArgs) {
     if (rows.length !== targetIds.length) {
       return { ok: false as const, error: "One or more offers not found" };
     }
-    const deletedAnyActive = rows.some(
-      (r) => String(r.status).toLowerCase() === "active",
-    );
+    const deletedNeedsShopifySync = rows.some((r) => {
+      const s = String(r.status).toLowerCase();
+      return s === "active" || s === "scheduled";
+    });
     await prisma.volumeDiscountCampaign.deleteMany({
       where: { shop: session.shop, id: { in: targetIds } },
     });
-    /* Draft-only deletes are not in the Shopify discount or storefront widget JSON — skip slow sync. */
-    if (!deletedAnyActive) {
+    /* Draft-only deletes are not in the Shopify discount — skip slow sync. */
+    if (!deletedNeedsShopifySync) {
       return {
         ok: true as const,
         intent: "delete" as const,
@@ -233,33 +233,7 @@ export async function action({ request }: ActionFunctionArgs) {
       ok: true as const,
       intent: "delete" as const,
       count: targetIds.length,
-      syncPending: true as const,
     };
-  }
-
-  if (intent === "syncAll") {
-    const activeCount = await prisma.volumeDiscountCampaign.count({
-      where: { shop: session.shop, status: "active" },
-    });
-    const { errors, discountIds } = await syncVolumeDiscountShop(
-      admin,
-      session.shop,
-      {
-        purgeLegacy: true,
-        force: true,
-      },
-    );
-    if (errors.length) {
-      return { ok: false as const, error: errors.join(" ") };
-    }
-    if (activeCount > 0 && discountIds.length === 0) {
-      return {
-        ok: false as const,
-        error:
-          "Active offers exist but Shopify did not create the automatic discount. Sync again after deploying the function extension.",
-      };
-    }
-    return { ok: true as const, intent: "syncAll" as const };
   }
 
   if (intent === "exportCsv") {

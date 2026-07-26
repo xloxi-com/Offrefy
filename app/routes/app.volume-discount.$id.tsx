@@ -15,7 +15,7 @@ import { planCampaignSaveSync } from "../utils/campaignSyncDelta.server";
 import { applyDueCampaignScheduleTransitions } from "../services/campaignScheduleTransitions.server";
 import {
   scheduleStorefrontWidgetRefresh,
-  scheduleVolumeDiscountShopSync,
+  syncVolumeDiscountShopToShopify,
 } from "../services/deferredShopSync.server";
 import { deleteAutomaticDiscounts } from "../services/volumeDiscountShopify.server";
 import { authenticate } from "../shopify.server";
@@ -39,6 +39,7 @@ import {
   countActiveCampaigns,
   resolveShopPlanContext,
 } from "../utils/shopPlan.server";
+import { resolveShopIanaTimezone } from "../utils/shopTimezone.server";
 import type { PlanCapabilities, PricingPlanId } from "../utils/pricingPlans";
 
 const VolumeDiscountCreateView = lazy(() =>
@@ -66,6 +67,7 @@ export type VolumeDiscountEditLoaderData = {
   };
   plan: PricingPlanId;
   planCapabilities: PlanCapabilities;
+  shopTimezone: string;
 };
 
 function jsonStringArrayField(value: unknown): string[] {
@@ -77,13 +79,13 @@ export const loader = async ({
   request,
   params,
 }: LoaderFunctionArgs): Promise<VolumeDiscountEditLoaderData | Response> => {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const id = params.id;
   if (!id) {
     throw new Response("Not found", { status: 404 });
   }
 
-  const [planCtx, row] = await Promise.all([
+  const [planCtx, row, shopTimezone] = await Promise.all([
     resolveShopPlanContext(session.shop),
     prisma.volumeDiscountCampaign.findFirst({
       where: { id, shop: session.shop },
@@ -104,6 +106,7 @@ export const loader = async ({
         countdownEndsAt: true,
       } as unknown as Prisma.VolumeDiscountCampaignSelect,
     }),
+    resolveShopIanaTimezone(admin),
   ]);
   if (!row) {
     throw new Response("Not found", { status: 404 });
@@ -138,6 +141,7 @@ export const loader = async ({
     },
     plan: planCtx.plan,
     planCapabilities: planCtx.capabilities,
+    shopTimezone,
   };
 };
 
@@ -254,17 +258,26 @@ export const action = async ({
 
   if (
     syncPlan.kind === "full" ||
+    afterStatus === "active" ||
+    afterStatus === "scheduled" ||
     transition.shopsNeedingShopifySync.includes(session.shop)
   ) {
-    scheduleVolumeDiscountShopSync(admin, session.shop, {
+    const { errors } = await syncVolumeDiscountShopToShopify(admin, session.shop, {
       changedCampaignIds: [id],
       skipScheduleTransitions: true,
+      force: true,
     });
+    if (errors.length) {
+      return {
+        ok: false as const,
+        error: `Offer saved, but Shopify discount update failed: ${errors.join(" ")}`,
+      };
+    }
   } else if (syncPlan.kind === "storefront_only") {
     scheduleStorefrontWidgetRefresh(admin, session.shop);
   }
 
-  return { ok: true as const, campaignId: id, syncPending: true as const };
+  return { ok: true as const, campaignId: id };
 };
 
 const fallbackTier = {
@@ -280,13 +293,13 @@ const fallbackTier = {
 };
 
 export default function VolumeDiscountEditRoute() {
-  const { campaign, planCapabilities } =
+  const { campaign, planCapabilities, shopTimezone } =
     useLoaderData<VolumeDiscountEditLoaderData>();
   const navigate = useNavigate();
   const { search } = useLocation();
   const shopify = useAppBridge();
   const onSuccess = useCallback(() => {
-    shopify.toast.show("Offer saved — syncing to Shopify");
+    shopify.toast.show("Offer saved — updated on Shopify");
   }, [shopify]);
 
   const parsedTiers = normalizeTiersFromDb(campaign.tiers);
@@ -308,6 +321,7 @@ export default function VolumeDiscountEditRoute() {
         onBack={() => navigate(adminEmbeddedPath("/app/offers", search))}
         onSuccess={onSuccess}
         planCapabilities={planCapabilities}
+        shopTimezone={shopTimezone}
         initialCampaign={{
           id: campaign.id,
           campaignName: campaign.campaignName,

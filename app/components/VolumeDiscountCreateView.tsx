@@ -8,7 +8,6 @@ import {
   Card,
   Checkbox,
   ChoiceList,
-  Divider,
   Icon,
   InlineStack,
   RangeSlider,
@@ -41,6 +40,7 @@ import { useFetcher } from "react-router";
 import { useAdminI18n } from "./AdminI18nProvider";
 import { CampaignStatusScheduleCard } from "./CampaignStatusScheduleCard";
 import { CountdownTimerSettingsCard } from "./CountdownTimerSettingsCard";
+import { WidgetHeaderAlignFields } from "./WidgetHeaderAlignFields";
 import { PlanUpgradeBanner, PlanUpgradeHint } from "./PlanUpgradeBanner";
 import { PlanUpgradeBadge } from "./PlanUpgradeBadge";
 import { WidgetDisplayColorField } from "./WidgetDisplayColorField";
@@ -53,9 +53,11 @@ import { buyLabelsForQuantityTiers } from "../utils/buyLabelsForQuantityTiers";
 import {
   countdownDatetimeLocalFromNow,
   datetimeLocalToIsoUtc,
+  formatDatetimeLocalDisplay,
   isoToDatetimeLocalValue,
   parseOptionalIsoDate,
 } from "../utils/countdownTimes";
+import { formatShopTimezoneDisplay } from "../utils/shopTimezone";
 import {
   isCampaignScheduleExpired,
   isCampaignSchedulePendingStart,
@@ -68,9 +70,7 @@ import {
   BADGE_SIZE_SCALE_PERCENT_MIN,
   clampBadgeSizeScalePercent,
   isVolumeDiscountBadgePosition,
-  isVolumeDiscountWidgetHeaderLayout,
   isVolumeDiscountWidgetHeaderTextAlign,
-  WIDGET_HEADER_LAYOUT_OPTIONS_VOLUME_TABLE,
   WIDGET_HEADER_TEXT_ALIGN_OPTIONS,
   clampFontSizeScalePercent,
   clampRadioButtonSizePx,
@@ -249,9 +249,11 @@ function initialWidgetDisplayForNewCampaign(
 function initialCountdownEndsAtLocalForEditor(
   initialCampaign: VolumeDiscountInitialCampaign | undefined,
   newOfferPreset: VolumeDiscountNewOfferPreset | undefined,
+  shopTimezone: string,
 ): string {
   const fromStored = isoToDatetimeLocalValue(
     initialCampaign?.countdownEndsAt ?? null,
+    shopTimezone,
   );
   if (fromStored.trim() !== "") return fromStored;
   const wd = initialCampaign
@@ -261,6 +263,7 @@ function initialCountdownEndsAtLocalForEditor(
   return countdownDatetimeLocalFromNow(
     wd.countdownTimeAmount,
     wd.countdownTimeUnit,
+    shopTimezone,
   );
 }
 
@@ -406,6 +409,8 @@ type VolumeDiscountCreateViewProps = {
   newOfferPreset?: VolumeDiscountNewOfferPreset;
   /** Plan feature gates (defaults to Free if omitted). */
   planCapabilities?: PlanCapabilities;
+  /** Shopify shop IANA timezone for schedule pickers (e.g. Asia/Kolkata). */
+  shopTimezone?: string;
 };
 
 export function VolumeDiscountCreateView({
@@ -415,9 +420,12 @@ export function VolumeDiscountCreateView({
   defaultCampaignName,
   newOfferPreset,
   planCapabilities: planCapsProp,
+  shopTimezone: shopTimezoneProp,
 }: VolumeDiscountCreateViewProps) {
   const { t } = useAdminI18n();
   const planCaps = planCapsProp ?? defaultPlanCapabilities("free");
+  const shopTimezone = shopTimezoneProp?.trim() || "UTC";
+  const shopTimezoneLabel = formatShopTimezoneDisplay(shopTimezone);
   const shopify = useAppBridge();
   const fetcher = useFetcher<SaveResponse>();
   const [campaignName, setCampaignName] = useState(
@@ -472,28 +480,25 @@ export function VolumeDiscountCreateView({
         : initialWidgetDisplayForNewCampaign(newOfferPreset),
   );
   const [countdownEndsAtLocal, setCountdownEndsAtLocal] = useState(() =>
-    initialCountdownEndsAtLocalForEditor(initialCampaign, newOfferPreset),
+    initialCountdownEndsAtLocalForEditor(initialCampaign, newOfferPreset, shopTimezone),
   );
   const [countdownStartsAtLocal, setCountdownStartsAtLocal] = useState(() =>
-    isoToDatetimeLocalValue(initialCampaign?.countdownStartsAt ?? null),
+    isoToDatetimeLocalValue(initialCampaign?.countdownStartsAt ?? null, shopTimezone),
   );
   const [scheduleStartEnabled, setScheduleStartEnabled] = useState(() =>
     Boolean(
-      isoToDatetimeLocalValue(initialCampaign?.countdownStartsAt ?? null).trim(),
+      isoToDatetimeLocalValue(initialCampaign?.countdownStartsAt ?? null, shopTimezone).trim(),
     ),
   );
   const [scheduleEndEnabled, setScheduleEndEnabled] = useState(() =>
     Boolean(
-      isoToDatetimeLocalValue(initialCampaign?.countdownEndsAt ?? null).trim(),
+      isoToDatetimeLocalValue(initialCampaign?.countdownEndsAt ?? null, shopTimezone).trim(),
     ),
   );
-  /** Bumps preview countdown effect when user clicks “Reset timer” (same ISO within 1s). */
+  /** Bumps preview countdown when schedule end is re-seeded. */
   const [countdownPreviewNonce, setCountdownPreviewNonce] = useState(0);
-  /** Previous duration/unit/show for “reset end from now” when inputs change. */
-  const lastCountdownAmountRef = useRef<number | null>(null);
-  const lastCountdownUnitRef = useRef<string | null>(null);
   const lastShowCountdownRef = useRef<boolean | null>(null);
-  /** Skips one countdown duration auto-sync after undo/redo (or external snapshot apply). */
+  /** Skips one countdown auto-seed after undo/redo (or external snapshot apply). */
   const skipNextCountdownAutoSyncRef = useRef(false);
   const undoStackRef = useRef<string[]>([]);
   const redoStackRef = useRef<string[]>([]);
@@ -805,7 +810,7 @@ export function VolumeDiscountCreateView({
     const ends = o.countdownEndsAt;
     setCountdownEndsAtLocal(
       typeof ends === "string" && ends.trim()
-        ? isoToDatetimeLocalValue(ends)
+        ? isoToDatetimeLocalValue(ends, shopTimezone)
         : "",
     );
     setScheduleEndEnabled(
@@ -815,13 +820,13 @@ export function VolumeDiscountCreateView({
     const starts = o.countdownStartsAt;
     const startLocal =
       typeof starts === "string" && starts.trim()
-        ? isoToDatetimeLocalValue(starts)
+        ? isoToDatetimeLocalValue(starts, shopTimezone)
         : "";
     setCountdownStartsAtLocal(startLocal);
     setScheduleStartEnabled(startLocal.trim() !== "");
 
     setPreviewCampaignOn(o.campaignStatus === "active");
-  }, []);
+  }, [shopTimezone]);
 
   const bumpHistoryStacks = useCallback(() => {
     setHistoryVersion((v) => v + 1);
@@ -854,7 +859,7 @@ export function VolumeDiscountCreateView({
       planCaps.scheduling &&
         scheduleStartEnabled &&
         countdownStartsAtLocal.trim()
-        ? datetimeLocalToIsoUtc(countdownStartsAtLocal) ?? ""
+        ? datetimeLocalToIsoUtc(countdownStartsAtLocal, shopTimezone) ?? ""
         : "",
     );
     fd.set(
@@ -862,14 +867,14 @@ export function VolumeDiscountCreateView({
       planCaps.scheduling &&
         scheduleEndEnabled &&
         countdownEndsAtLocal.trim()
-        ? datetimeLocalToIsoUtc(countdownEndsAtLocal) ?? ""
+        ? datetimeLocalToIsoUtc(countdownEndsAtLocal, shopTimezone) ?? ""
         : "",
     );
     const startIsoForStatus =
       planCaps.scheduling &&
       scheduleStartEnabled &&
       countdownStartsAtLocal.trim()
-        ? datetimeLocalToIsoUtc(countdownStartsAtLocal)
+        ? datetimeLocalToIsoUtc(countdownStartsAtLocal, shopTimezone)
         : null;
     const pendingStart = isCampaignSchedulePendingStart(
       startIsoForStatus ? parseOptionalIsoDate(startIsoForStatus) : null,
@@ -901,6 +906,7 @@ export function VolumeDiscountCreateView({
     quantityCondition,
     scheduleEndEnabled,
     scheduleStartEnabled,
+    shopTimezone,
     tiers,
     widgetDisplay,
   ]);
@@ -909,8 +915,6 @@ export function VolumeDiscountCreateView({
     setSaveErrorDismissed(true);
     skipHistoryCommitRef.current = true;
     syncBaselineAfterDiscardRef.current = true;
-    lastCountdownAmountRef.current = null;
-    lastCountdownUnitRef.current = null;
     lastShowCountdownRef.current = null;
     if (initialCampaign) {
       setCampaignName(initialCampaign.campaignName);
@@ -937,15 +941,16 @@ export function VolumeDiscountCreateView({
           : { ...DEFAULT_WIDGET_DISPLAY },
       );
       setCountdownEndsAtLocal(
-        initialCountdownEndsAtLocalForEditor(initialCampaign, newOfferPreset),
+        initialCountdownEndsAtLocalForEditor(initialCampaign, newOfferPreset, shopTimezone),
       );
       const startLocal = isoToDatetimeLocalValue(
         initialCampaign.countdownStartsAt ?? null,
+        shopTimezone,
       );
       setCountdownStartsAtLocal(startLocal);
       setScheduleStartEnabled(startLocal.trim() !== "");
       setScheduleEndEnabled(
-        isoToDatetimeLocalValue(initialCampaign.countdownEndsAt ?? null).trim() !==
+        isoToDatetimeLocalValue(initialCampaign.countdownEndsAt ?? null, shopTimezone).trim() !==
           "",
       );
       setPreviewCampaignOn(initialCampaign.status === "active");
@@ -962,7 +967,7 @@ export function VolumeDiscountCreateView({
       setTiers(initialTiersForNewCampaign(newOfferPreset));
       setWidgetDisplay(initialWidgetDisplayForNewCampaign(newOfferPreset));
       setCountdownEndsAtLocal(
-        initialCountdownEndsAtLocalForEditor(undefined, newOfferPreset),
+        initialCountdownEndsAtLocalForEditor(undefined, newOfferPreset, shopTimezone),
       );
       setCountdownStartsAtLocal("");
       setScheduleStartEnabled(false);
@@ -972,111 +977,41 @@ export function VolumeDiscountCreateView({
       setPreviewCampaignOn(true);
     }
     setActiveTier(0);
-  }, [defaultCampaignName, initialCampaign, newOfferPreset]);
+  }, [defaultCampaignName, initialCampaign, newOfferPreset, shopTimezone]);
 
   useEffect(() => {
-    lastCountdownAmountRef.current = null;
-    lastCountdownUnitRef.current = null;
     lastShowCountdownRef.current = null;
   }, [initialCampaign?.id]);
 
+  // Countdown pill uses Schedule end. Turning countdown on seeds end if missing.
   useEffect(() => {
     if (skipNextCountdownAutoSyncRef.current) {
       skipNextCountdownAutoSyncRef.current = false;
+      lastShowCountdownRef.current = widgetDisplay.showCountdown;
       return;
     }
 
-    if (!widgetDisplay.showCountdown) {
-      setCountdownEndsAtLocal("");
-      setScheduleEndEnabled(false);
-      lastCountdownAmountRef.current = widgetDisplay.countdownTimeAmount;
-      lastCountdownUnitRef.current = widgetDisplay.countdownTimeUnit;
-      lastShowCountdownRef.current = false;
-      return;
-    }
-
-    const nextLocal = countdownDatetimeLocalFromNow(
-      widgetDisplay.countdownTimeAmount,
-      widgetDisplay.countdownTimeUnit,
-    );
-
-    const hadStoredEnd = Boolean(
-      initialCampaign?.countdownEndsAt &&
-        isoToDatetimeLocalValue(initialCampaign.countdownEndsAt).trim(),
-    );
-
-    const amountChanged =
-      lastCountdownAmountRef.current !== null &&
-      lastCountdownAmountRef.current !== widgetDisplay.countdownTimeAmount;
-    const unitChanged =
-      lastCountdownUnitRef.current !== null &&
-      lastCountdownUnitRef.current !== widgetDisplay.countdownTimeUnit;
-    const showCountdownTurnedOn =
+    const turnedOn =
       lastShowCountdownRef.current === false &&
       widgetDisplay.showCountdown === true;
 
-    const shouldSyncFromNow =
-      amountChanged || unitChanged || showCountdownTurnedOn;
-
-    const isFirstSyncRun =
-      lastCountdownAmountRef.current === null &&
-      lastCountdownUnitRef.current === null;
-
-    const shouldSkipInitialOverwrite = isFirstSyncRun && hadStoredEnd;
-
-    if (shouldSkipInitialOverwrite) {
-      lastCountdownAmountRef.current = widgetDisplay.countdownTimeAmount;
-      lastCountdownUnitRef.current = widgetDisplay.countdownTimeUnit;
-      lastShowCountdownRef.current = widgetDisplay.showCountdown;
-      return;
-    }
-
-    // useState already seeded end-from-duration when DB had no end; avoid a second
-    // Date.now() write that trips the Save bar as “unsaved” on load/refresh.
-    if (
-      isFirstSyncRun &&
-      !hadStoredEnd &&
-      countdownEndsAtLocal.trim() !== ""
-    ) {
-      lastCountdownAmountRef.current = widgetDisplay.countdownTimeAmount;
-      lastCountdownUnitRef.current = widgetDisplay.countdownTimeUnit;
-      lastShowCountdownRef.current = widgetDisplay.showCountdown;
-      return;
-    }
-
-    if (shouldSyncFromNow || !hadStoredEnd) {
-      setCountdownEndsAtLocal(nextLocal);
-    }
-
-    lastCountdownAmountRef.current = widgetDisplay.countdownTimeAmount;
-    lastCountdownUnitRef.current = widgetDisplay.countdownTimeUnit;
     lastShowCountdownRef.current = widgetDisplay.showCountdown;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit `initialCampaign.countdownEndsAt` so loader revalidation does not clobber local end time.
-  }, [
-    widgetDisplay.showCountdown,
-    widgetDisplay.countdownTimeAmount,
-    widgetDisplay.countdownTimeUnit,
-    initialCampaign?.id,
-  ]);
 
-  const handleResetCountdownTimer = useCallback(() => {
-    if (!widgetDisplay.showCountdown) return;
-    setCountdownEndsAtLocal(
-      countdownDatetimeLocalFromNow(
-        widgetDisplay.countdownTimeAmount,
-        widgetDisplay.countdownTimeUnit,
-      ),
-    );
+    if (!turnedOn) return;
+
     setScheduleEndEnabled(true);
-    lastCountdownAmountRef.current = widgetDisplay.countdownTimeAmount;
-    lastCountdownUnitRef.current = widgetDisplay.countdownTimeUnit;
-    lastShowCountdownRef.current = true;
-    setCountdownPreviewNonce((n) => n + 1);
-  }, [
-    widgetDisplay.showCountdown,
-    widgetDisplay.countdownTimeAmount,
-    widgetDisplay.countdownTimeUnit,
-  ]);
+    if (!countdownEndsAtLocal.trim()) {
+      setCountdownEndsAtLocal(
+        countdownDatetimeLocalFromNow(
+          widgetDisplay.countdownTimeAmount,
+          widgetDisplay.countdownTimeUnit,
+          shopTimezone,
+        ),
+      );
+      setCountdownPreviewNonce((n) => n + 1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to showCountdown edge; don't clobber an edited end.
+  }, [widgetDisplay.showCountdown]);
 
   useEffect(() => {
     if (fetcher.state !== "idle" || !fetcher.data) return;
@@ -1138,11 +1073,11 @@ export function VolumeDiscountCreateView({
   const formBaselineKey = initialCampaign?.id ?? "__new__";
   const countdownStartsSnapshot =
     scheduleStartEnabled && countdownStartsAtLocal.trim() !== ""
-      ? datetimeLocalToIsoUtc(countdownStartsAtLocal)
+      ? datetimeLocalToIsoUtc(countdownStartsAtLocal, shopTimezone)
       : null;
   const countdownEndsSnapshot =
     scheduleEndEnabled && countdownEndsAtLocal.trim() !== ""
-      ? datetimeLocalToIsoUtc(countdownEndsAtLocal)
+      ? datetimeLocalToIsoUtc(countdownEndsAtLocal, shopTimezone)
       : null;
 
   const scheduleStartsAtDate = useMemo(
@@ -1200,6 +1135,24 @@ export function VolumeDiscountCreateView({
     startsAt: scheduleStartsAtDate,
     endsAt: scheduleEndsAtDate,
   });
+
+  /** Why “Turn on” cannot activate the offer right now (shown under Campaign status). */
+  const turnOnBlockedReason = useMemo(() => {
+    if (editorCampaignStatus === "active") return null;
+    if (scheduleExpired) return "expired" as const;
+    return null;
+  }, [editorCampaignStatus, scheduleExpired]);
+
+  const goToScheduleSettings = useCallback(() => {
+    handleSettingsTabChange(0);
+    window.setTimeout(() => {
+      const el = document.getElementById("vd-offer-schedule");
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (!scheduleEndEnabled) {
+        setScheduleEndEnabled(true);
+      }
+    }, 80);
+  }, [handleSettingsTabChange, scheduleEndEnabled]);
 
   const currentFormSnapshot = useMemo(
     () =>
@@ -1891,6 +1844,7 @@ export function VolumeDiscountCreateView({
                   </Card>
 
                   {planCaps.scheduling ? (
+                    <div id="vd-offer-schedule">
                     <CampaignStatusScheduleCard
                       scheduleStartEnabled={scheduleStartEnabled}
                       onScheduleStartEnabledChange={(next) => {
@@ -1900,11 +1854,12 @@ export function VolumeDiscountCreateView({
                             countdownStartsAtLocal.trim() ||
                             isoToDatetimeLocalValue(
                               new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+                              shopTimezone,
                             );
                           if (!countdownStartsAtLocal.trim()) {
                             setCountdownStartsAtLocal(seed);
                           }
-                          const iso = datetimeLocalToIsoUtc(seed);
+                          const iso = datetimeLocalToIsoUtc(seed, shopTimezone);
                           const start = iso ? parseOptionalIsoDate(iso) : null;
                           if (isCampaignSchedulePendingStart(start)) {
                             setPreviewCampaignOn(false);
@@ -1914,7 +1869,7 @@ export function VolumeDiscountCreateView({
                       scheduleStartLocal={countdownStartsAtLocal}
                       onScheduleStartLocalChange={(v) => {
                         setCountdownStartsAtLocal(v);
-                        const iso = datetimeLocalToIsoUtc(v);
+                        const iso = datetimeLocalToIsoUtc(v, shopTimezone);
                         const start = iso ? parseOptionalIsoDate(iso) : null;
                         if (isCampaignSchedulePendingStart(start)) {
                           setPreviewCampaignOn(false);
@@ -1933,6 +1888,7 @@ export function VolumeDiscountCreateView({
                             countdownDatetimeLocalFromNow(
                               widgetDisplay.countdownTimeAmount,
                               widgetDisplay.countdownTimeUnit,
+                              shopTimezone,
                             ),
                           );
                         }
@@ -1942,8 +1898,9 @@ export function VolumeDiscountCreateView({
                             countdownDatetimeLocalFromNow(
                               widgetDisplay.countdownTimeAmount,
                               widgetDisplay.countdownTimeUnit,
+                              shopTimezone,
                             );
-                          const iso = datetimeLocalToIsoUtc(endLocal);
+                          const iso = datetimeLocalToIsoUtc(endLocal, shopTimezone);
                           const end = iso ? parseOptionalIsoDate(iso) : null;
                           if (isCampaignScheduleExpired(end)) {
                             setPreviewCampaignOn(false);
@@ -1954,7 +1911,7 @@ export function VolumeDiscountCreateView({
                       onScheduleEndLocalChange={(v) => {
                         setCountdownEndsAtLocal(v);
                         setScheduleEndEnabled(true);
-                        const iso = datetimeLocalToIsoUtc(v);
+                        const iso = datetimeLocalToIsoUtc(v, shopTimezone);
                         const end = iso ? parseOptionalIsoDate(iso) : null;
                         if (isCampaignScheduleExpired(end)) {
                           setPreviewCampaignOn(false);
@@ -1964,7 +1921,10 @@ export function VolumeDiscountCreateView({
                           setPreviewCampaignOn(true);
                         }
                       }}
+                      shopTimezone={shopTimezone}
+                      shopTimezoneLabel={shopTimezoneLabel}
                     />
+                    </div>
                   ) : (
                     <Card padding="400">
                       <BlockStack gap="300">
@@ -2299,23 +2259,25 @@ export function VolumeDiscountCreateView({
                               }
                               autoComplete="off"
                               multiline={2}
-                              placeholder="Empty = use theme block heading"
+                              placeholder="Empty = hide heading"
                             />
                             {!isVolumeTableOffer ? (
-                              <Select
-                                id="vd-widget-heading-align"
-                                label="Widget heading alignment"
-                                options={[...WIDGET_HEADER_TEXT_ALIGN_OPTIONS]}
-                                value={widgetDisplay.widgetHeadingAlign}
-                                onChange={(v) => {
-                                  if (
-                                    isVolumeDiscountWidgetHeaderTextAlign(v)
-                                  ) {
-                                    patchWidgetDisplay({
-                                      widgetHeadingAlign: v,
-                                    });
-                                  }
-                                }}
+                              <WidgetHeaderAlignFields
+                                idPrefix="vd-qb"
+                                widgetHeaderLayout={
+                                  widgetDisplay.widgetHeaderLayout
+                                }
+                                widgetHeadingAlign={
+                                  widgetDisplay.widgetHeadingAlign
+                                }
+                                countdownAlign={widgetDisplay.countdownAlign}
+                                widgetHeaderMobileStack={
+                                  widgetDisplay.widgetHeaderMobileStack
+                                }
+                                widgetHeaderSwapOrder={
+                                  widgetDisplay.widgetHeaderSwapOrder
+                                }
+                                patchWidgetDisplay={patchWidgetDisplay}
                               />
                             ) : (
                               <Text as="p" variant="bodySm" tone="subdued">
@@ -2346,8 +2308,10 @@ export function VolumeDiscountCreateView({
                         <CountdownTimerSettingsCard
                           widgetDisplay={widgetDisplay}
                           patchWidgetDisplay={patchWidgetDisplay}
-                          onResetTimer={handleResetCountdownTimer}
-                          showLayoutControls={!isVolumeTableOffer}
+                          scheduleStartEnabled={scheduleStartEnabled}
+                          scheduleStartLocal={countdownStartsAtLocal}
+                          scheduleEndEnabled={scheduleEndEnabled}
+                          scheduleEndLocal={countdownEndsAtLocal}
                           locked={!planCaps.countdown}
                         />
 
@@ -2364,8 +2328,8 @@ export function VolumeDiscountCreateView({
                                   : t("offerEditor.quantityBreaks")}
                               </Text>{" "}
                               app block on the product template (Online Store →
-                              Themes → Customize). If widget heading is empty, the
-                              block title is used.
+                              Themes → Customize). Leave widget heading empty to
+                              hide the title on the storefront.
                             </Text>
                             {!isVolumeTableOffer ? (
                               <Text as="p" variant="bodySm" tone="subdued">
@@ -2477,94 +2441,32 @@ export function VolumeDiscountCreateView({
 
                               <BlockStack gap="300">
                                 <Text as="h3" variant="headingSm">
-                                  Layout
+                                  Title &amp; countdown
                                 </Text>
                                 <Text as="p" variant="bodySm" tone="subdued">
-                                  Split = one row on desktop; stacked = title
-                                  above countdown. Order and narrow‑screen
-                                  behavior are separate from alignment.
+                                  Layout, order, and horizontal alignment of the
+                                  title and countdown.
                                 </Text>
-                                <Select
-                                  id="vd-widget-header-layout"
-                                  label="Heading and timer layout"
-                                  helpText="Wide screens: how the title and countdown share the row or stack vertically."
-                                  options={[
-                                    ...WIDGET_HEADER_LAYOUT_OPTIONS_VOLUME_TABLE,
-                                  ]}
-                                  value={widgetDisplay.widgetHeaderLayout}
-                                  onChange={(v) => {
-                                    if (
-                                      isVolumeDiscountWidgetHeaderLayout(v)
-                                    ) {
-                                      patchWidgetDisplay({
-                                        widgetHeaderLayout: v,
-                                      });
-                                    }
-                                  }}
-                                />
-                                <Checkbox
-                                  label="Timer before heading"
-                                  helpText="One row: countdown left of title. Stacked: countdown above title."
-                                  checked={widgetDisplay.widgetHeaderSwapOrder}
-                                  onChange={(checked) =>
-                                    patchWidgetDisplay({
-                                      widgetHeaderSwapOrder: checked,
-                                    })
+                                <WidgetHeaderAlignFields
+                                  idPrefix="vd-volume"
+                                  layoutOptionsVariant="volume_table"
+                                  widgetHeaderLayout={
+                                    widgetDisplay.widgetHeaderLayout
                                   }
-                                />
-                                <Checkbox
-                                  label="Stack heading and timer on small screens"
-                                  helpText="Narrow viewports: center title and countdown in a column. Off: same order as desktop (may wrap)."
-                                  checked={widgetDisplay.widgetHeaderMobileStack}
-                                  onChange={(checked) =>
-                                    patchWidgetDisplay({
-                                      widgetHeaderMobileStack: checked,
-                                    })
+                                  widgetHeadingAlign={
+                                    widgetDisplay.widgetHeadingAlign
                                   }
-                                />
-                              </BlockStack>
-
-                              <Divider />
-
-                              <BlockStack gap="300">
-                                <Text as="h3" variant="headingSm">
-                                  Alignment
-                                </Text>
-                                <Text as="p" variant="bodySm" tone="subdued">
-                                  Horizontal position of the title and of the
-                                  countdown (label + digits move together).
-                                </Text>
-                                <Select
-                                  id="vd-widget-heading-align-volume"
-                                  label="Widget heading alignment"
-                                  helpText="Title in the header."
-                                  options={[...WIDGET_HEADER_TEXT_ALIGN_OPTIONS]}
-                                  value={widgetDisplay.widgetHeadingAlign}
-                                  onChange={(v) => {
-                                    if (
-                                      isVolumeDiscountWidgetHeaderTextAlign(v)
-                                    ) {
-                                      patchWidgetDisplay({
-                                        widgetHeadingAlign: v,
-                                      });
-                                    }
-                                  }}
-                                />
-                                <Select
-                                  id="vd-widget-countdown-align"
-                                  label="Timer alignment"
-                                  helpText="Countdown label and pill together."
-                                  options={[...WIDGET_HEADER_TEXT_ALIGN_OPTIONS]}
-                                  value={widgetDisplay.countdownAlign}
-                                  onChange={(v) => {
-                                    if (
-                                      isVolumeDiscountWidgetHeaderTextAlign(v)
-                                    ) {
-                                      patchWidgetDisplay({
-                                        countdownAlign: v,
-                                      });
-                                    }
-                                  }}
+                                  countdownAlign={widgetDisplay.countdownAlign}
+                                  widgetHeaderMobileStack={
+                                    widgetDisplay.widgetHeaderMobileStack
+                                  }
+                                  widgetHeaderSwapOrder={
+                                    widgetDisplay.widgetHeaderSwapOrder
+                                  }
+                                  patchWidgetDisplay={patchWidgetDisplay}
+                                  layoutHelpText="Wide screens: how the title and countdown share the row or stack vertically."
+                                  headingHelpText="Title in the header."
+                                  timerHelpText="Countdown label and pill together."
                                 />
                               </BlockStack>
                             </BlockStack>
@@ -3583,42 +3485,70 @@ export function VolumeDiscountCreateView({
               <aside className={createStyles.previewColumn}>
                 <BlockStack gap="400">
                   <Card padding="400">
-                    <InlineStack
-                      align="space-between"
-                      blockAlign="center"
-                      gap="300"
-                      wrap
-                    >
-                      <InlineStack gap="200" blockAlign="center" wrap>
-                        <Text as="h3" variant="headingSm">
-                          Campaign status
-                        </Text>
-                        <Badge tone={statusBadgeTone(editorCampaignStatus)}>
-                          {statusLabel(editorCampaignStatus)}
-                        </Badge>
-                      </InlineStack>
-                      <Button
-                        variant="tertiary"
-                        onClick={() => {
-                          setPreviewCampaignOn((v) => {
-                            if (v || editorCampaignStatus === "scheduled") {
-                              /* Manual off — clear start so it becomes Draft, not Scheduled. */
-                              setScheduleStartEnabled(false);
-                              setCountdownStartsAtLocal("");
-                              return false;
-                            }
-                            if (scheduleExpired) {
-                              return false;
-                            }
-                            return true;
-                          });
-                        }}
+                    <BlockStack gap="200">
+                      <InlineStack
+                        align="space-between"
+                        blockAlign="center"
+                        gap="300"
+                        wrap
                       >
-                        {editorCampaignStatus === "active"
-                          ? "Turn off"
-                          : "Turn on"}
-                      </Button>
-                    </InlineStack>
+                        <InlineStack gap="200" blockAlign="center" wrap>
+                          <Text as="h3" variant="headingSm">
+                            Campaign status
+                          </Text>
+                          <Badge tone={statusBadgeTone(editorCampaignStatus)}>
+                            {statusLabel(editorCampaignStatus)}
+                          </Badge>
+                        </InlineStack>
+                        <Button
+                          variant="tertiary"
+                          disabled={Boolean(
+                            turnOnBlockedReason &&
+                              editorCampaignStatus !== "active",
+                          )}
+                          onClick={() => {
+                            setPreviewCampaignOn((v) => {
+                              if (v || editorCampaignStatus === "scheduled") {
+                                /* Manual off — clear start so it becomes Draft, not Scheduled. */
+                                setScheduleStartEnabled(false);
+                                setCountdownStartsAtLocal("");
+                                return false;
+                              }
+                              if (scheduleExpired) {
+                                return false;
+                              }
+                              return true;
+                            });
+                          }}
+                        >
+                          {editorCampaignStatus === "active"
+                            ? "Turn off"
+                            : "Turn on"}
+                        </Button>
+                      </InlineStack>
+                      {turnOnBlockedReason === "expired" ? (
+                        <InlineStack gap="100" blockAlign="center" wrap>
+                          <Text as="p" variant="bodySm" tone="critical">
+                            To turn on, set a future end time in
+                          </Text>
+                          <Button
+                            variant="plain"
+                            tone="critical"
+                            onClick={goToScheduleSettings}
+                          >
+                            Schedule
+                          </Button>
+                        </InlineStack>
+                      ) : editorCampaignStatus === "scheduled" ? (
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Waiting for start
+                          {formatDatetimeLocalDisplay(countdownStartsAtLocal)
+                            ? ` (${formatDatetimeLocalDisplay(countdownStartsAtLocal)})`
+                            : ""}
+                          .
+                        </Text>
+                      ) : null}
+                    </BlockStack>
                   </Card>
 
                   <Card padding="400">
@@ -3687,7 +3617,7 @@ export function VolumeDiscountCreateView({
                                 countdownEndsAtIso={
                                   scheduleEndEnabled &&
                                   countdownEndsAtLocal.trim()
-                                    ? datetimeLocalToIsoUtc(countdownEndsAtLocal)
+                                    ? datetimeLocalToIsoUtc(countdownEndsAtLocal, shopTimezone)
                                     : null
                                 }
                                 countdownStartsAtIso={
@@ -3695,6 +3625,7 @@ export function VolumeDiscountCreateView({
                                   countdownStartsAtLocal.trim()
                                     ? datetimeLocalToIsoUtc(
                                         countdownStartsAtLocal,
+                                        shopTimezone,
                                       )
                                     : null
                                 }

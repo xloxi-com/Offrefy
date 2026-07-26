@@ -2,6 +2,11 @@ import type { VolumeDiscountCampaignSyncRow } from "../utils/volumeDiscountCampa
 import { volumeDiscountCampaignSyncSelect } from "../utils/volumeDiscountCampaignSelect.server";
 import { prisma } from "../db.server";
 import { applyDueCampaignScheduleTransitions } from "./campaignScheduleTransitions.server";
+import {
+  discountSyncCampaignWhere,
+  isCampaignScheduleExpired,
+  isCampaignSchedulePendingStart,
+} from "../utils/campaignScheduleStatus";
 import { buildVolumeDiscountFunctionConfig } from "../utils/volumeDiscountFunctionConfig.server";
 import {
   isAutomaticDiscountLimitError,
@@ -265,6 +270,49 @@ function functionHandle(): string {
 
 const SHARED_DISCOUNT_TITLE = "Offrefy — Quantity breaks";
 
+/**
+ * Shopify Automatic Discount startsAt/endsAt (Functions cannot use Date.now —
+ * it returns epoch and incorrectly blocked schedule windows).
+ */
+function automaticDiscountScheduleBounds(
+  rows: ReadonlyArray<{
+    countdownStartsAt: Date | null;
+    countdownEndsAt: Date | null;
+  }>,
+  now: Date = new Date(),
+): { startsAt: string; endsAt?: string } {
+  let earliestStart: Date | null = null;
+  let latestEnd: Date | null = null;
+  let allHaveEnd = rows.length > 0;
+
+  for (const r of rows) {
+    if (r.countdownStartsAt) {
+      if (!earliestStart || r.countdownStartsAt.getTime() < earliestStart.getTime()) {
+        earliestStart = r.countdownStartsAt;
+      }
+    }
+    if (r.countdownEndsAt) {
+      if (!latestEnd || r.countdownEndsAt.getTime() > latestEnd.getTime()) {
+        latestEnd = r.countdownEndsAt;
+      }
+    } else {
+      allHaveEnd = false;
+    }
+  }
+
+  const startsAt =
+    earliestStart && earliestStart.getTime() > now.getTime()
+      ? earliestStart
+      : now;
+
+  return {
+    startsAt: startsAt.toISOString(),
+    ...(allHaveEnd && latestEnd && latestEnd.getTime() > now.getTime()
+      ? { endsAt: latestEnd.toISOString() }
+      : {}),
+  };
+}
+
 async function discountNodeExistsInShopify(
   admin: AdminGraphql,
   discountNodeId: string,
@@ -391,13 +439,13 @@ export async function ensureVolumeDiscountFunctionDiscount(
   shop: string,
 ): Promise<void> {
   if (verifiedShops.has(shop)) return;
-  const [activeCount, state] = await Promise.all([
+  const [liveCount, state] = await Promise.all([
     prisma.volumeDiscountCampaign.count({
-      where: { shop, status: "active" },
+      where: discountSyncCampaignWhere(shop),
     }),
     prisma.volumeDiscountShopState.findUnique({ where: { shop } }),
   ]);
-  if (activeCount === 0) {
+  if (liveCount === 0) {
     return;
   }
   if (state?.functionDiscountId) {
@@ -482,7 +530,7 @@ async function syncVolumeDiscountShopImpl(
 
   const [activeRows, stateRow, shopPlanCap] = await Promise.all([
     prisma.volumeDiscountCampaign.findMany({
-      where: { shop, status: "active" },
+      where: discountSyncCampaignWhere(shop),
       orderBy: { createdAt: "asc" },
       select: volumeDiscountCampaignSyncSelect,
     }),
@@ -525,8 +573,8 @@ async function syncVolumeDiscountShopImpl(
 
   const rowFp = rowSyncFingerprint(activeRows, {
     maxDiscountProducts,
-    // v2: rule_source always includes shopDomain for checkout gap-fill fetch
-    ruleSourceVersion: 2,
+    // v4: schedule via Automatic Discount startsAt/endsAt (Functions Date.now is epoch)
+    ruleSourceVersion: 4,
   });
 
   if (!force && !incrementalIds?.length && recursionDepth === 0) {
@@ -932,10 +980,18 @@ async function syncVolumeDiscountShopImpl(
           wildcard: productIndex["*"],
         };
       }),
-      buildStorefrontWidgetJsonString(
-        activeRows,
-        config.campaigns as unknown[],
-      ),
+      (() => {
+        const widgetRows = activeRows.filter(
+          (r) =>
+            !isCampaignSchedulePendingStart(r.countdownStartsAt) &&
+            !isCampaignScheduleExpired(r.countdownEndsAt),
+        );
+        const liveIds = new Set(widgetRows.map((r) => r.id));
+        const widgetCampaigns = (
+          config.campaigns as { id: string }[]
+        ).filter((c) => liveIds.has(c.id));
+        return buildStorefrontWidgetJsonString(widgetRows, widgetCampaigns);
+      })(),
     ]);
     widgetJsonFull = widgetJsonBuilt;
 
@@ -1035,10 +1091,15 @@ async function syncVolumeDiscountShopImpl(
     }
   }
 
+  const scheduleBounds = automaticDiscountScheduleBounds(activeRows);
+
   const baseInput = {
     title: SHARED_DISCOUNT_TITLE,
     functionHandle: functionHandle(),
     discountClasses: ["PRODUCT"],
+    startsAt: scheduleBounds.startsAt,
+    // Always send endsAt so a prior schedule end does not stick after clearing.
+    endsAt: scheduleBounds.endsAt ?? null,
     combinesWith: await (async () => {
       const { readDiscountCombinesWith } = await import(
         "../utils/discountCombinesWith.server"
@@ -1146,10 +1207,7 @@ async function syncVolumeDiscountShopImpl(
   } else {
     const res = await admin.graphql(CREATE_APP_DISCOUNT, {
       variables: {
-        d: {
-          ...baseInput,
-          startsAt: new Date().toISOString(),
-        },
+        d: baseInput,
       },
     });
     const parsed = (await res.json()) as {
@@ -1210,7 +1268,6 @@ async function syncVolumeDiscountShopImpl(
             d: {
               ...baseInput,
               title: uniqueSharedDiscountTitle(shop),
-              startsAt: new Date().toISOString(),
             },
           },
         });
@@ -1271,11 +1328,11 @@ async function syncVolumeDiscountShopImpl(
   await Promise.all([
     prisma.$transaction([
       prisma.volumeDiscountCampaign.updateMany({
-        where: { shop, status: "active" },
+        where: { shop, status: { in: ["active", "scheduled"] } },
         data: { shopifyDiscountIds: [discountId] },
       }),
       prisma.volumeDiscountCampaign.updateMany({
-        where: { shop, status: { not: "active" } },
+        where: { shop, status: { notIn: ["active", "scheduled"] } },
         data: { shopifyDiscountIds: [] },
       }),
     ]),

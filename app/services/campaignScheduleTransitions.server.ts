@@ -15,6 +15,7 @@ export type CampaignScheduleTransitionResult = {
 /**
  * Flip campaign status from schedule window:
  * - scheduled + start time due (+ end not passed) → active (respects plan active caps)
+ * - scheduled + end time due → draft (missed / expired window — never leave stuck Scheduled)
  * - active + end time due → draft
  * - draft + future start → scheduled (legacy promote)
  */
@@ -24,38 +25,48 @@ export async function applyDueCampaignScheduleTransitions(
   const now = new Date();
   const shopWhere = shopFilter ? { shop: shopFilter } : {};
 
-  const [toActivate, toDeactivate, toMarkScheduled] = await Promise.all([
-    prisma.volumeDiscountCampaign.findMany({
-      where: {
-        ...shopWhere,
-        status: "scheduled",
-        countdownStartsAt: { not: null, lte: now },
-        OR: [{ countdownEndsAt: null }, { countdownEndsAt: { gt: now } }],
-      },
-      select: { id: true, shop: true },
-      orderBy: { countdownStartsAt: "asc" },
-    }),
-    prisma.volumeDiscountCampaign.findMany({
-      where: {
-        ...shopWhere,
-        status: "active",
-        countdownEndsAt: { not: null, lte: now },
-      },
-      select: { id: true, shop: true },
-    }),
-    prisma.volumeDiscountCampaign.findMany({
-      where: {
-        ...shopWhere,
-        status: "draft",
-        countdownStartsAt: { not: null, gt: now },
-      },
-      select: { id: true, shop: true },
-    }),
-  ]);
+  const [toActivate, toDeactivate, toExpireScheduled, toMarkScheduled] =
+    await Promise.all([
+      prisma.volumeDiscountCampaign.findMany({
+        where: {
+          ...shopWhere,
+          status: "scheduled",
+          countdownStartsAt: { not: null, lte: now },
+          OR: [{ countdownEndsAt: null }, { countdownEndsAt: { gt: now } }],
+        },
+        select: { id: true, shop: true },
+        orderBy: { countdownStartsAt: "asc" },
+      }),
+      prisma.volumeDiscountCampaign.findMany({
+        where: {
+          ...shopWhere,
+          status: "active",
+          countdownEndsAt: { not: null, lte: now },
+        },
+        select: { id: true, shop: true },
+      }),
+      prisma.volumeDiscountCampaign.findMany({
+        where: {
+          ...shopWhere,
+          status: "scheduled",
+          countdownEndsAt: { not: null, lte: now },
+        },
+        select: { id: true, shop: true },
+      }),
+      prisma.volumeDiscountCampaign.findMany({
+        where: {
+          ...shopWhere,
+          status: "draft",
+          countdownStartsAt: { not: null, gt: now },
+        },
+        select: { id: true, shop: true },
+      }),
+    ]);
 
   const shopsNeedingShopifySync = new Set<string>();
   const shopsStatusOnly = new Set<string>();
   const activatedIds: string[] = [];
+  const deactivatedIds: string[] = [];
 
   if (toActivate.length) {
     const byShop = new Map<string, string[]>();
@@ -85,12 +96,15 @@ export async function applyDueCampaignScheduleTransitions(
     }
   }
 
-  if (toDeactivate.length) {
+  const toDraft = [...toDeactivate, ...toExpireScheduled];
+  if (toDraft.length) {
+    const draftIds = [...new Set(toDraft.map((r) => r.id))];
     await prisma.volumeDiscountCampaign.updateMany({
-      where: { id: { in: toDeactivate.map((r) => r.id) } },
+      where: { id: { in: draftIds } },
       data: { status: "draft" },
     });
-    for (const r of toDeactivate) shopsNeedingShopifySync.add(r.shop);
+    deactivatedIds.push(...draftIds);
+    for (const r of toDraft) shopsNeedingShopifySync.add(r.shop);
   }
 
   if (toMarkScheduled.length) {
@@ -107,7 +121,7 @@ export async function applyDueCampaignScheduleTransitions(
       (s) => !shopsNeedingShopifySync.has(s),
     ),
     activatedIds,
-    deactivatedIds: toDeactivate.map((r) => r.id),
+    deactivatedIds,
     markedScheduledIds: toMarkScheduled.map((r) => r.id),
   };
 }

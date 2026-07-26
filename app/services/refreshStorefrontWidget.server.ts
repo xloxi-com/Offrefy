@@ -16,6 +16,10 @@ import {
 } from "./shopStorefrontMetafield.server";
 import { getVolumeDiscountStorefrontPayload } from "./volumeDiscountStorefrontCache.server";
 import { applyDueCampaignScheduleTransitions } from "./campaignScheduleTransitions.server";
+import {
+  discountSyncCampaignWhere,
+  storefrontLiveCampaignWhere,
+} from "../utils/campaignScheduleStatus";
 
 type AdminGraphql = {
   graphql: (
@@ -65,7 +69,7 @@ export async function flushStorefrontWidgetPayloadNow(
   await applyDueCampaignScheduleTransitions(shop);
 
   const rows = await prisma.volumeDiscountCampaign.findMany({
-    where: { shop, status: "active" },
+    where: storefrontLiveCampaignWhere(shop),
     orderBy: { createdAt: "asc" },
     select: volumeDiscountCampaignSyncSelect,
   });
@@ -134,7 +138,7 @@ export async function refreshStorefrontWidgetForShop(
 
   const [rows, state] = await Promise.all([
     prisma.volumeDiscountCampaign.findMany({
-      where: { shop, status: "active" },
+      where: storefrontLiveCampaignWhere(shop),
       orderBy: { createdAt: "asc" },
       select: volumeDiscountCampaignSyncSelect,
     }),

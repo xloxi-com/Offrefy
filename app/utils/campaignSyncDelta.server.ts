@@ -67,19 +67,30 @@ export function discountFunctionFieldsChanged(
   return false;
 }
 
-/** Widget / countdown only — lightweight storefront cache refresh. */
+/** Widget styling only — lightweight storefront cache refresh. */
 export function storefrontPresentationChanged(
   before: CampaignSyncSnapshot,
   after: ParsedCampaignForm,
 ): boolean {
-  if (!jsonArraysEqual(before.widgetDisplay, after.widgetDisplay)) return true;
+  return !jsonArraysEqual(before.widgetDisplay, after.widgetDisplay);
+}
+
+/** Schedule start/end — embedded in Discount Function compact rules (sa/ea). */
+export function scheduleWindowChanged(
+  before: CampaignSyncSnapshot,
+  after: ParsedCampaignForm,
+): boolean {
   const bStart = before.countdownStartsAt?.toISOString() ?? null;
   const aStart = after.countdownStartsAt?.toISOString() ?? null;
   if (bStart !== aStart) return true;
   const bEnd = before.countdownEndsAt?.toISOString() ?? null;
   const aEnd = after.countdownEndsAt?.toISOString() ?? null;
-  if (bEnd !== aEnd) return true;
-  return false;
+  return bEnd !== aEnd;
+}
+
+function isDiscountSyncStatus(status: string): boolean {
+  const s = normCampaignStatus(status);
+  return s === "active" || s === "scheduled";
 }
 
 export type SaveSyncPlan =
@@ -95,31 +106,39 @@ export function planCampaignSaveSync(
   before: CampaignSyncSnapshot,
   after: ParsedCampaignForm,
 ): SaveSyncPlan {
-  const wasActive = normCampaignStatus(before.status) === "active";
-  const nowActive = normCampaignStatus(after.campaignStatus) === "active";
+  const wasLive = isDiscountSyncStatus(before.status);
+  const nowLive = isDiscountSyncStatus(after.campaignStatus);
   const statusChanged =
     normCampaignStatus(before.status) !==
     normCampaignStatus(after.campaignStatus);
 
-  /* Active membership flip (incl. Active ↔ Scheduled/Draft) → Function sync. */
-  if (wasActive !== nowActive) {
+  /* Active/Scheduled membership flip → Function sync (rules include schedule sa/ea). */
+  if (wasLive !== nowLive) {
     return { kind: "full" };
   }
 
-  if (wasActive && nowActive && discountFunctionFieldsChanged(before, after)) {
+  if (nowLive && discountFunctionFieldsChanged(before, after)) {
     return { kind: "full" };
   }
 
-  if (wasActive && nowActive && storefrontPresentationChanged(before, after)) {
+  if (nowLive && scheduleWindowChanged(before, after)) {
+    return { kind: "full" };
+  }
+
+  if (nowLive && storefrontPresentationChanged(before, after)) {
     return { kind: "storefront_only" };
   }
 
   /*
-   * Scheduled / Draft: still refresh storefront when schedule times or status change
-   * so countdown + listing stay consistent after save.
+   * Draft: still refresh storefront when schedule times or status change
+   * so listing stay consistent after save.
    */
-  if (!wasActive && !nowActive) {
-    if (storefrontPresentationChanged(before, after) || statusChanged) {
+  if (!wasLive && !nowLive) {
+    if (
+      storefrontPresentationChanged(before, after) ||
+      scheduleWindowChanged(before, after) ||
+      statusChanged
+    ) {
       return { kind: "storefront_only" };
     }
     return { kind: "none" };
@@ -129,7 +148,11 @@ export function planCampaignSaveSync(
     return { kind: "full" };
   }
 
-  if (storefrontPresentationChanged(before, after) || statusChanged) {
+  if (
+    storefrontPresentationChanged(before, after) ||
+    scheduleWindowChanged(before, after) ||
+    statusChanged
+  ) {
     return { kind: "storefront_only" };
   }
 

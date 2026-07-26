@@ -5,6 +5,11 @@ import { normalizeCatalogIdKey } from "./discountRules.server";
 import { discountRuleDb } from "./discountRuleDb.server";
 import { getVolumeDiscountStorefrontPayload } from "../services/volumeDiscountStorefrontCache.server";
 import { volumeDiscountCampaignSyncSelect } from "./volumeDiscountCampaignSelect.server";
+import {
+  isCampaignScheduleExpired,
+  isCampaignSchedulePendingStart,
+  storefrontLiveCampaignWhere,
+} from "./campaignScheduleStatus";
 import { getMemoryCachedJson, setMemoryCachedJson } from "./memoryCache.server";
 import {
   loadStorefrontTranslationsForShop,
@@ -428,12 +433,15 @@ async function pickActiveCampaignRowForProduct(
   productId: string,
   variantId: string | null,
 ): Promise<VolumeDiscountCampaignStorefrontRow | null> {
+  const now = new Date();
   const rows = await prisma.volumeDiscountCampaign.findMany({
-    where: { shop, status: "active" },
+    where: storefrontLiveCampaignWhere(shop, now),
     orderBy: { createdAt: "asc" },
     select: volumeDiscountCampaignSyncSelect,
   });
   for (const row of rows) {
+    if (isCampaignSchedulePendingStart(row.countdownStartsAt, now)) continue;
+    if (isCampaignScheduleExpired(row.countdownEndsAt, now)) continue;
     const built = buildCampaignConfigFromDbRow(
       {
         id: row.id,
@@ -605,10 +613,20 @@ export async function buildStorefrontWidgetForProduct(
   }
 
   const row = await prisma.volumeDiscountCampaign.findFirst({
-    where: { shop, id: campaignId, status: "active" },
+    where: {
+      ...storefrontLiveCampaignWhere(shop),
+      id: campaignId,
+    },
     select: volumeDiscountCampaignSyncSelect,
   });
   if (!row) {
+    return JSON.stringify({ version: 1, campaigns: [] });
+  }
+  const now = new Date();
+  if (isCampaignSchedulePendingStart(row.countdownStartsAt, now)) {
+    return JSON.stringify({ version: 1, campaigns: [] });
+  }
+  if (isCampaignScheduleExpired(row.countdownEndsAt, now)) {
     return JSON.stringify({ version: 1, campaigns: [] });
   }
 
