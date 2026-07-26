@@ -115,6 +115,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   const grantedScopes = parseSessionScopes(session.scope);
+  const hasWriteThemes = grantedScopes.includes("write_themes");
   const hasWriteScriptTags = grantedScopes.includes("write_script_tags");
 
   // Fast path: DB only. Theme / legacy ScriptTag cleanup runs after the response.
@@ -223,8 +224,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       scriptTagOk,
       storefrontReady,
       appEmbedErrors,
-      /* Offrefy never writes theme files — merchants enable embed in Theme editor. */
-      needsWriteThemes: false,
+      needsWriteThemes: !hasWriteThemes,
       setupStatusStale,
     } satisfies SetupStatus,
   };

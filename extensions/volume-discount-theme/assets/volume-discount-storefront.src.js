@@ -799,26 +799,18 @@
     var drawer =
       document.querySelector("cart-drawer") ||
       document.getElementById("CartDrawer") ||
-      document.querySelector("[id*='cart-drawer']") ||
-      document.querySelector("cart-notification") ||
-      document.querySelector("main-cart-items") ||
-      document.querySelector("[data-cart-drawer]") ||
-      document.querySelector("form[action*='/cart']");
+      document.querySelector("[id*='cart-drawer']");
     if (!drawer) return;
 
-    /* Only touch discount message nodes — never walk all drawer text. */
-    var nodes = drawer.querySelectorAll(
-      ".discounts__discount, .cart-item__discounted-prices, .cart-discount, [class*='discount'], [data-cart-discount], .totals__discount",
-    );
-    for (var i = 0; i < nodes.length; i++) {
-      var el = nodes[i];
-      if (!el || el.closest("[data-offrefy-root]")) continue;
-      var text = String(el.textContent || "").trim();
+    var walker = document.createTreeWalker(drawer, NodeFilter.SHOW_TEXT, null);
+    var node;
+    while ((node = walker.nextNode())) {
+      var text = String(node.textContent || "").trim();
       if (!text) continue;
       var parsed = parseVolumeDiscountBadgeText(text);
       if (!parsed) continue;
       var next = formatLocalizedCartBadgeLabel(parsed.percent, parsed.qty);
-      if (next !== text) el.textContent = next;
+      if (next !== text) node.textContent = next;
     }
   }
 
@@ -927,12 +919,10 @@
     offrefyNs().localeWatchBound = true;
     vdLastKnownStorefrontLocale = resolveStorefrontLocale(null) || "en";
 
-    var localeAttrObserver = null;
     if (typeof MutationObserver !== "undefined") {
-      localeAttrObserver = new MutationObserver(function () {
+      new MutationObserver(function () {
         handleStorefrontLocaleChange();
-      });
-      localeAttrObserver.observe(document.documentElement, {
+      }).observe(document.documentElement, {
         attributes: true,
         attributeFilter: ["lang"],
       });
@@ -940,24 +930,8 @@
 
     window.addEventListener("popstate", handleStorefrontLocaleChange);
     window.addEventListener("pageshow", handleStorefrontLocaleChange);
-    function onVisibility() {
+    document.addEventListener("visibilitychange", function () {
       if (!document.hidden) handleStorefrontLocaleChange();
-    }
-    document.addEventListener("visibilitychange", onVisibility);
-
-    offrefyRegisterTeardown(function () {
-      if (localeAttrObserver) {
-        try {
-          localeAttrObserver.disconnect();
-        } catch (e) {
-          void e;
-        }
-        localeAttrObserver = null;
-      }
-      window.removeEventListener("popstate", handleStorefrontLocaleChange);
-      window.removeEventListener("pageshow", handleStorefrontLocaleChange);
-      document.removeEventListener("visibilitychange", onVisibility);
-      offrefyNs().localeWatchBound = false;
     });
 
     document.addEventListener(
@@ -1384,70 +1358,43 @@
     return isVdAttributeOnlyCartUpdate(init, VD_CART_LOCALE_ATTR);
   }
 
-  /**
-   * Hook cart mutations without overriding window.fetch / XHR.
-   * Relies on form submits + theme cart events (works across OS 2.0 themes).
-   */
+  /** Sync locked discount slots immediately after any cart mutation (theme /cart/add.js, etc.). */
   function installCartMutationInterceptor() {
     if (offrefyNs().cartMutationHookBound) return;
     offrefyNs().cartMutationHookBound = true;
+    var nativeFetch = window.fetch;
+    if (typeof nativeFetch !== "function") return;
 
-    function afterCartMutation() {
-      if (vdCartAttrSyncBusy) return;
-      vdCartAttrSyncBusy = true;
-      var prevLocked = vdLastSyncedLockedProducts;
-      syncCartLockedProductsAttribute(null)
-        .then(function (cart) {
-          if (cart && vdLastSyncedLockedProducts !== prevLocked) {
-            scheduleCartDrawerDiscountLabelPatch();
-          }
-        })
-        .finally(function () {
-          vdCartAttrSyncBusy = false;
-        });
-    }
+    window.fetch = function (input, init) {
+      var url =
+        typeof input === "string"
+          ? input
+          : input && typeof input === "object" && input.url
+            ? input.url
+            : "";
+      var isMutation =
+        isCartMutationUrl(url) &&
+        !isVdLockedProductsOnlyUpdate(init) &&
+        !isVdLocaleOnlyUpdate(init);
+      var promise = nativeFetch.apply(this, arguments);
+      if (!isMutation) return promise;
 
-    function onCartEvent() {
-      scheduleLockedProductsSyncFromCartEvent();
-      scheduleCartDrawerDiscountLabelPatch();
-    }
-
-    var cartEvents = [
-      "cart:updated",
-      "cart:change",
-      "cart:refresh",
-      "theme:cart:change",
-      "ajaxProduct:added",
-      "product:added",
-    ];
-    for (var i = 0; i < cartEvents.length; i++) {
-      document.documentElement.addEventListener(cartEvents[i], onCartEvent);
-      document.addEventListener(cartEvents[i], onCartEvent);
-    }
-
-    function onCartFormSubmit(ev) {
-      try {
-        var form = ev.target;
-        if (!form || !form.getAttribute) return;
-        if (form.closest && form.closest("[data-offrefy-root]")) return;
-        var action = String(form.getAttribute("action") || form.action || "");
-        if (!/\/cart\/(add|change|update|clear)/i.test(action)) return;
-        setTimeout(afterCartMutation, 250);
-        setTimeout(afterCartMutation, 900);
-      } catch (e) {
-        void e;
-      }
-    }
-    document.addEventListener("submit", onCartFormSubmit, true);
-
-    offrefyRegisterTeardown(function () {
-      for (var j = 0; j < cartEvents.length; j++) {
-        document.documentElement.removeEventListener(cartEvents[j], onCartEvent);
-        document.removeEventListener(cartEvents[j], onCartEvent);
-      }
-      document.removeEventListener("submit", onCartFormSubmit, true);
-      offrefyNs().cartMutationHookBound = false;
-    });
+      return promise.then(function (res) {
+        if (!res || !res.ok || vdCartAttrSyncBusy) return res;
+        vdCartAttrSyncBusy = true;
+        var prevLocked = vdLastSyncedLockedProducts;
+        return syncCartLockedProductsAttribute(null)
+          .then(function (cart) {
+            if (cart && vdLastSyncedLockedProducts !== prevLocked) {
+              dispatchCartRefresh(cart);
+            }
+            return res;
+          })
+          .finally(function () {
+            vdCartAttrSyncBusy = false;
+          });
+      });
+    };
   }
 
   /** Persist active theme locale on the cart so the discount function badge matches /fr/, /de/, etc. */
@@ -1490,13 +1437,12 @@
 
   function dispatchCartRefresh(cart) {
     try {
-      /* Namespaced Offrefy event only — do not fan-out duplicate theme cart events. */
+      var detail = { cart: cart };
+      /* One primary event — themes listen to cart:updated; avoid triple fan-out storms. */
       document.documentElement.dispatchEvent(
-        new CustomEvent("offrefy:cart:updated", {
-          bubbles: true,
-          detail: { cart: cart },
-        }),
+        new CustomEvent("cart:updated", { bubbles: true, detail: detail }),
       );
+      window.dispatchEvent(new CustomEvent("cart:updated", { detail: cart }));
     } catch (e) {
       void e;
     }
@@ -1886,7 +1832,7 @@
   }
 
   function findVdLiquidProductForm(root) {
-    var el = root || document.querySelector("[data-offrefy-root]");
+    var el = root || document.querySelector(".offrefy-root");
     if (el) {
       var id = el.getAttribute("data-offrefy-product-form-id");
       if (id) {
@@ -1930,7 +1876,7 @@
     var forms = document.querySelectorAll(
       'form[action*="/cart/add"], form[action*="cart/add"], form[data-type="add-to-cart-form"], form.product-form, product-form form, form#product_form, form#AddToCartForm, form[id*="product-form"], form[id*="ProductForm"]',
     );
-    var widget = document.querySelector("[data-offrefy-root]");
+    var widget = document.querySelector(".offrefy-root");
     var widgetScope = widget
       ? widget.closest(
           "product-info, .product, [id^='MainProduct'], .shopify-section, .product__info, .product-single, .product-details",
@@ -1949,7 +1895,7 @@
       ) {
         continue;
       }
-      if (form.closest("[data-offrefy-root]")) continue;
+      if (form.closest(".offrefy-root")) continue;
       if (
         form.closest(
           "cart-drawer, cart-notification, #CartDrawer, .cart-drawer, cart-items, #main-cart-items",
@@ -1993,7 +1939,7 @@
       ) {
         continue;
       }
-      if (!all[j].closest("[data-offrefy-root]")) return all[j];
+      if (!all[j].closest(".offrefy-root")) return all[j];
     }
     return null;
   }
@@ -2054,7 +2000,7 @@
       var nodes = form.querySelectorAll(selectors[s]);
       for (var i = 0; i < nodes.length; i++) {
         var el = nodes[i];
-        if (el.closest("[data-offrefy-root]")) continue;
+        if (el.closest(".offrefy-root")) continue;
         if (isThemeBuyItNowButton(el)) continue;
         return el;
       }
@@ -2081,7 +2027,7 @@
       var ext = scope.querySelector(
         'button[name="add"], button.product-form__submit, [data-add-to-cart], .product-form__cart-submit, #AddToCart',
       );
-      if (ext && !ext.closest("[data-offrefy-root]") && !isThemeBuyItNowButton(ext)) {
+      if (ext && !ext.closest(".offrefy-root") && !isThemeBuyItNowButton(ext)) {
         return ext;
       }
     }
@@ -2194,7 +2140,7 @@
    * 2) Liquid {% form 'product' %} bridge via /cart/add.js (all free/premium themes)
    */
   function addByClickingThemeAtc(variantId, quantity, attribution) {
-    var root = document.querySelector("[data-offrefy-root]");
+    var root = document.querySelector(".offrefy-root");
     var liquidForm = findVdLiquidProductForm(root);
     var themeForm = findThemeProductAddForm();
     var themeBtn = findThemeAddToCartButton(themeForm);
@@ -2291,7 +2237,7 @@
           };
 
     function add(el) {
-      if (!el || (el.closest && el.closest("[data-offrefy-root]"))) return;
+      if (!el || (el.closest && el.closest(".offrefy-root"))) return;
       /* Include type=hidden — many themes keep qty only as a hidden input while
          the visible stepper is custom JS (and may stay at 1 after we hide it). */
       if (
@@ -2668,7 +2614,7 @@
             if (wasOpen || openDrawer) {
               el.setAttribute("data-open", "");
               el.removeAttribute("hidden");
-              /* Do not mutate document.body classes — let the theme drawer API own open state. */
+              document.body.classList.add("valor-cart-drawer-open");
             }
             try {
               if (neu.classList.contains("valor-cart-drawer--empty")) {
@@ -3060,13 +3006,13 @@
     var forms = document.querySelectorAll('form[action*="/cart/add"]');
     for (var i = 0; i < forms.length; i++) {
       var form = forms[i];
-      if (form.closest("[data-offrefy-root]")) continue;
+      if (form.closest(".offrefy-root")) continue;
       var btn =
         form.querySelector('button[name="add"]') ||
         form.querySelector('input[type="submit"][name="add"]') ||
         form.querySelector("button.product-form__submit");
       if (!btn) btn = form.querySelector('button[type="submit"]');
-      if (!btn || btn.closest("[data-offrefy-root]")) continue;
+      if (!btn || btn.closest(".offrefy-root")) continue;
       btn.style.setProperty("display", "none", "important");
       btn.setAttribute("aria-hidden", "true");
     }
@@ -3086,7 +3032,7 @@
       var nodes = document.querySelectorAll(selectors[si]);
       for (var i = 0; i < nodes.length; i++) {
         var n = nodes[i];
-        if (n.closest("[data-offrefy-root]")) continue;
+        if (n.closest(".offrefy-root")) continue;
         n.style.setProperty("display", "none", "important");
         n.setAttribute("aria-hidden", "true");
       }
@@ -3107,7 +3053,7 @@
         : { _a: [], has: function (el) { return this._a.indexOf(el) !== -1; }, add: function (el) { this._a.push(el); } };
 
     function hideBlock(el) {
-      if (!el || el.closest("[data-offrefy-root]")) return;
+      if (!el || el.closest(".offrefy-root")) return;
       if (seen.has(el)) return;
       seen.add(el);
       el.style.setProperty("display", "none", "important");
@@ -3139,7 +3085,7 @@
     var forms = document.querySelectorAll('form[action*="/cart/add"]');
     for (var fi = 0; fi < forms.length; fi++) {
       var form = forms[fi];
-      if (form.closest("[data-offrefy-root]")) continue;
+      if (form.closest(".offrefy-root")) continue;
 
       var hosts = form.querySelectorAll("variant-selects, variant-radios");
       for (var hi = 0; hi < hosts.length; hi++) {
@@ -3213,12 +3159,12 @@
     );
     for (var sr = 0; sr < sectionRoots.length; sr++) {
       var sec = sectionRoots[sr];
-      if (!sec || sec.closest("[data-offrefy-root]")) continue;
+      if (!sec || sec.closest(".offrefy-root")) continue;
 
       var extHosts = sec.querySelectorAll("variant-selects, variant-radios");
       for (var xi = 0; xi < extHosts.length; xi++) {
         var xh = extHosts[xi];
-        if (xh.closest("[data-offrefy-root]")) continue;
+        if (xh.closest(".offrefy-root")) continue;
         if (xh.closest('form[action*="/cart/add"]')) continue;
         hideBlock(xh);
       }
@@ -3226,7 +3172,7 @@
       var extFieldsets = sec.querySelectorAll("fieldset.product-form__input, fieldset.js.product-form__input");
       for (var fi2 = 0; fi2 < extFieldsets.length; fi2++) {
         var fs = extFieldsets[fi2];
-        if (fs.closest("[data-offrefy-root]")) continue;
+        if (fs.closest(".offrefy-root")) continue;
         if (fs.closest('form[action*="/cart/add"]')) continue;
         if (isQuantityOnlyBlock(fs)) continue;
         if (!blockHasVariantUi(fs)) continue;
@@ -3236,7 +3182,7 @@
       var extOptRadios = sec.querySelectorAll('input[type="radio"][name^="options"]');
       for (var er = 0; er < extOptRadios.length; er++) {
         var erEl = extOptRadios[er];
-        if (erEl.closest("[data-offrefy-root]")) continue;
+        if (erEl.closest(".offrefy-root")) continue;
         if (erEl.closest('form[action*="/cart/add"]')) continue;
         var erw =
           erEl.closest("fieldset.product-form__input") ||
@@ -3261,7 +3207,7 @@
         : { _a: [], has: function (el) { return this._a.indexOf(el) !== -1; }, add: function (el) { this._a.push(el); } };
 
     function hideBlock(el) {
-      if (!el || el.closest("[data-offrefy-root]")) return;
+      if (!el || el.closest(".offrefy-root")) return;
       if (seen.has(el)) return;
       seen.add(el);
       el.style.setProperty("display", "none", "important");
@@ -3284,7 +3230,7 @@
     var forms = document.querySelectorAll('form[action*="/cart/add"]');
     for (var fi = 0; fi < forms.length; fi++) {
       var form = forms[fi];
-      if (form.closest("[data-offrefy-root]")) continue;
+      if (form.closest(".offrefy-root")) continue;
 
       var qHosts = form.querySelectorAll("quantity-input");
       for (var hi = 0; hi < qHosts.length; hi++) {
@@ -3321,11 +3267,11 @@
     );
     for (var sr = 0; sr < sectionRoots.length; sr++) {
       var sec = sectionRoots[sr];
-      if (!sec || sec.closest("[data-offrefy-root]")) continue;
+      if (!sec || sec.closest(".offrefy-root")) continue;
       var extQ = sec.querySelectorAll("quantity-input");
       for (var xi = 0; xi < extQ.length; xi++) {
         var xq = extQ[xi];
-        if (xq.closest("[data-offrefy-root]")) continue;
+        if (xq.closest(".offrefy-root")) continue;
         if (xq.closest('form[action*="/cart/add"]')) continue;
         hideBlock(xq);
       }
@@ -3340,34 +3286,15 @@
   }
 
   var vdHidePurchaseUiScheduled = false;
-  function getOffrefyHideObserveRoots() {
-    var roots = [];
-    var widgets = document.querySelectorAll("[data-offrefy-root]");
-    for (var i = 0; i < widgets.length; i++) {
-      var w = widgets[i];
-      var section =
-        (w.closest && w.closest(".shopify-section")) ||
-        (w.closest && w.closest("product-info")) ||
-        (w.closest && w.closest("[id^='MainProduct']")) ||
-        (w.closest && w.closest("main")) ||
-        null;
-      if (section && roots.indexOf(section) === -1) roots.push(section);
-    }
-    return roots;
-  }
-
   function ensureThemePurchaseUiHideObserver() {
     if (vdHidePurchaseUiObserver || typeof MutationObserver === "undefined") return;
-    var observeRoots = getOffrefyHideObserveRoots();
-    if (!observeRoots.length) return;
-
     vdHidePurchaseUiObserver = new MutationObserver(function (mutations) {
       for (var i = 0; i < mutations.length; i++) {
         var t = mutations[i].target;
         if (
           t &&
           t.closest &&
-          (t.closest("[data-offrefy-root]") ||
+          (t.closest(".offrefy-root") ||
             t.closest("cart-drawer") ||
             t.closest("#CartDrawer") ||
             t.closest("cart-notification") ||
@@ -3384,26 +3311,7 @@
         return;
       }
     });
-    for (var r = 0; r < observeRoots.length; r++) {
-      try {
-        vdHidePurchaseUiObserver.observe(observeRoots[r], {
-          childList: true,
-          subtree: true,
-        });
-      } catch (eObs) {
-        void eObs;
-      }
-    }
-    offrefyRegisterTeardown(function () {
-      if (vdHidePurchaseUiObserver) {
-        try {
-          vdHidePurchaseUiObserver.disconnect();
-        } catch (e) {
-          void e;
-        }
-        vdHidePurchaseUiObserver = null;
-      }
-    });
+    vdHidePurchaseUiObserver.observe(document.body, { childList: true, subtree: true });
   }
 
   function scheduleThemePurchaseUiHides() {
@@ -3826,7 +3734,7 @@
     var forms = document.querySelectorAll('form[action*="/cart/add"]');
     for (var fi = 0; fi < forms.length; fi++) {
       var form = forms[fi];
-      if (form.closest("[data-offrefy-root]")) continue;
+      if (form.closest(".offrefy-root")) continue;
       var vs = form.querySelector('select[name="id"]');
       if (vs && vs.value) return String(vs.value);
       var hid = form.querySelector('input[name="id"][type="hidden"]');
@@ -4383,7 +4291,7 @@
       var forms = document.querySelectorAll('form[action*="/cart/add"]');
       for (var fi = 0; fi < forms.length; fi++) {
         var form = forms[fi];
-        if (form.closest("[data-offrefy-root]")) continue;
+        if (form.closest(".offrefy-root")) continue;
         var vs = form.querySelector('select[name="id"]');
         if (vs && vs.value) return String(vs.value);
         var hid = form.querySelector('input[name="id"][type="hidden"]');
@@ -4905,7 +4813,7 @@
 
     var h = [];
     h.push(
-      '<div data-offrefy-widget class="offrefy-bundle' +
+      '<div class="offrefy-bundle' +
         (isVolumeTable ? " offrefy-bundle--volume-table" : "") +
         '">',
     );
@@ -5336,7 +5244,7 @@
           var t = ev.target;
           if (!t || !t.name || String(t.name) !== "id") return;
           var form = t.closest && t.closest('form[action*="/cart/add"]');
-          if (!form || form.closest("[data-offrefy-root]")) return;
+          if (!form || form.closest(".offrefy-root")) return;
           var v = String(t.value || "");
           if (!v) return;
           currentUnitCents = readPriceForVariant(v);
@@ -5649,7 +5557,7 @@
   }
 
   function hideAllWidgetRoots() {
-    document.querySelectorAll("[data-offrefy-root]").forEach(function (el) {
+    document.querySelectorAll(".offrefy-root").forEach(function (el) {
       el.style.display = "none";
       el.removeAttribute("data-offrefy-inited");
       var mount = el.querySelector("[data-offrefy-mount]");
@@ -5657,149 +5565,66 @@
     });
   }
 
-  function destroyWidgetInstance(root) {
-    if (!root) return;
-    try {
-      var id = root.id || root.getAttribute("data-config-id") || "";
-      if (id && offrefyRuntime._instances && offrefyRuntime._instances.has(id)) {
-        var inst = offrefyRuntime._instances.get(id);
-        if (inst && typeof inst.destroy === "function") inst.destroy();
-        offrefyRuntime._instances.delete(id);
-      }
-      root.removeAttribute("data-offrefy-inited");
-      var mount = root.querySelector("[data-offrefy-mount]");
-      if (mount) {
-        /* Keep Liquid ATC bridge; clear painted tiers only. */
-        var painted = mount.querySelector("[data-offrefy-widget]");
-        if (painted) painted.remove();
-      }
-    } catch (e) {
-      offrefyWarn("destroyWidgetInstance", e);
-    }
-  }
-
   function scan(options) {
     var opts = options || {};
     var syncCartSideEffects = opts.syncCart !== false;
 
-    try {
-      /* App embed off → never mount (block markup alone must not show the widget). */
-      if (!offrefyNs().appEmbedActive) {
-        hideAllWidgetRoots();
-        return;
-      }
-
-      /* Widget first — never wait on cart network before mounting. */
-      document.querySelectorAll("[data-offrefy-root]").forEach(function (el) {
-        runWidget(el);
-      });
-
-      installCartMutationInterceptor();
-      bindCartDrawerDiscountLabelPatching();
-      bindStorefrontLocaleWatcher();
-      vdLastKnownStorefrontLocale = resolveStorefrontLocale(null) || "en";
-      refreshCartBadgeTemplatesForLocale();
-      try {
-        var storedLocale = sessionStorage.getItem("vd_locale_attr");
-        if (storedLocale && !vdLastSyncedCartLocale) {
-          vdLastSyncedCartLocale = storedLocale;
-        }
-      } catch (e) {
-        void e;
-      }
-
-      function runCartSideEffects() {
-        if (syncCartSideEffects) {
-          syncCartLocaleAttribute(false)
-            .then(function () {
-              return syncCartLockedProductsAttribute(null);
-            })
-            .then(function () {
-              scheduleCartDrawerDiscountLabelPatch();
-            })
-            .catch(function () {});
-        } else {
-          scheduleCartDrawerDiscountLabelPatch();
-        }
-      }
-
-      if (typeof requestIdleCallback === "function") {
-        requestIdleCallback(runCartSideEffects, { timeout: 2000 });
-      } else {
-        setTimeout(runCartSideEffects, syncCartSideEffects ? 400 : 0);
-      }
-    } catch (scanErr) {
-      offrefyWarn("scan failed", scanErr);
+    /* App embed off → never mount (block markup alone must not show the widget). */
+    if (!offrefyNs().appEmbedActive) {
+      hideAllWidgetRoots();
+      return;
     }
-  }
 
-  function safeScan(options) {
+    /* Widget first — never wait on cart network before mounting. */
+    document.querySelectorAll(".offrefy-root").forEach(function (el) {
+      runWidget(el);
+    });
+
+    installCartMutationInterceptor();
+    bindCartDrawerDiscountLabelPatching();
+    bindStorefrontLocaleWatcher();
+    vdLastKnownStorefrontLocale = resolveStorefrontLocale(null) || "en";
+    refreshCartBadgeTemplatesForLocale();
     try {
-      scan(options);
+      var storedLocale = sessionStorage.getItem("vd_locale_attr");
+      if (storedLocale && !vdLastSyncedCartLocale) {
+        vdLastSyncedCartLocale = storedLocale;
+      }
     } catch (e) {
-      offrefyWarn("safeScan", e);
+      void e;
+    }
+
+    function runCartSideEffects() {
+      if (syncCartSideEffects) {
+        syncCartLocaleAttribute(false)
+          .then(function () {
+            return syncCartLockedProductsAttribute(null);
+          })
+          .then(function () {
+            scheduleCartDrawerDiscountLabelPatch();
+          });
+      } else {
+        scheduleCartDrawerDiscountLabelPatch();
+      }
+    }
+
+    if (typeof requestIdleCallback === "function") {
+      requestIdleCallback(runCartSideEffects, { timeout: 2000 });
+    } else {
+      setTimeout(runCartSideEffects, syncCartSideEffects ? 400 : 0);
     }
   }
 
   /* Defer script runs after parse — mount immediately when roots exist. */
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () {
-      safeScan({ syncCart: true });
+      scan({ syncCart: true });
     });
   } else {
-    safeScan({ syncCart: true });
+    scan({ syncCart: true });
   }
-
-  /* Theme Editor: remount / teardown without leaking observers or duplicate UI. */
+  /* Section remounts only need widget roots — avoid cart/update storm on every variant section swap. */
   document.addEventListener("shopify:section:load", function () {
-    safeScan({ syncCart: false });
-  });
-  document.addEventListener("shopify:section:unload", function (ev) {
-    try {
-      var section = ev && ev.target;
-      if (!section || !section.querySelectorAll) return;
-      section.querySelectorAll("[data-offrefy-root]").forEach(destroyWidgetInstance);
-      if (!document.querySelector("[data-offrefy-root]")) {
-        try {
-          document.documentElement.removeAttribute("data-offrefy-hide-theme-variant");
-          document.documentElement.removeAttribute("data-offrefy-hide-theme-qty");
-          document.documentElement.removeAttribute("data-offrefy-hide-theme-atc");
-          document.documentElement.removeAttribute("data-offrefy-hide-theme-buy");
-        } catch (eFlags) {
-          void eFlags;
-        }
-      }
-    } catch (e) {
-      offrefyWarn("section:unload", e);
-    }
-  });
-  document.addEventListener("shopify:block:select", function (ev) {
-    try {
-      var block = ev && ev.target;
-      if (!block) return;
-      var root =
-        (block.matches && block.matches("[data-offrefy-root]") && block) ||
-        (block.closest && block.closest("[data-offrefy-root]")) ||
-        (block.querySelector && block.querySelector("[data-offrefy-root]"));
-      if (root) {
-        root.removeAttribute("data-offrefy-inited");
-        safeScan({ syncCart: false });
-      }
-    } catch (e) {
-      offrefyWarn("block:select", e);
-    }
-  });
-  document.addEventListener("shopify:block:deselect", function (ev) {
-    try {
-      var block = ev && ev.target;
-      if (!block) return;
-      var root =
-        (block.matches && block.matches("[data-offrefy-root]") && block) ||
-        (block.closest && block.closest("[data-offrefy-root]")) ||
-        (block.querySelector && block.querySelector("[data-offrefy-root]"));
-      if (root) destroyWidgetInstance(root);
-    } catch (e) {
-      offrefyWarn("block:deselect", e);
-    }
+    scan({ syncCart: false });
   });
 })();

@@ -48,8 +48,22 @@ const MAIN_THEME_SETTINGS_QUERY = `#graphql
   }
 `;
 
-/* Intentionally no themeFilesUpsert — Offrefy never writes merchant theme files.
-   Merchants enable the App Embed via Theme editor (deep link from admin). */
+const THEME_FILES_UPSERT = `#graphql
+  mutation OffrefyEnableAppEmbed(
+    $themeId: ID!
+    $files: [OnlineStoreThemeFilesUpsertFileInput!]!
+  ) {
+    themeFilesUpsert(themeId: $themeId, files: $files) {
+      upsertedThemeFiles {
+        filename
+      }
+      userErrors {
+        field
+        message
+      }
+    }
+  }
+`;
 
 type ThemeEmbedStatus = {
   themeId: string | null;
@@ -140,11 +154,10 @@ function isOurEmbedType(type: unknown, appHandle: string | null): boolean {
     if (t.includes(uid.toLowerCase())) return true;
   }
   if (appHandle && t.includes(`/apps/${appHandle.toLowerCase()}/`)) return true;
-  // Match Offrefy / volume-discount app block URIs only (never all shopify://apps/).
-  return (
-    (t.includes("offrefy") || t.includes("volume-discount")) &&
-    t.startsWith("shopify://apps/")
-  );
+  // Match even if app handle slug differs slightly (e.g. Offrefy vs offrefy).
+  if (t.includes("offrefy") || t.includes("volume-discount")) return true;
+  // Client-id style app block URI from Theme editor.
+  return t.startsWith("shopify://apps/");
 }
 
 function hasCurrentExtensionUid(type: unknown): boolean {
@@ -386,8 +399,8 @@ async function fetchMainThemeAppEmbedStatus(
 }
 
 /**
- * @deprecated Never writes merchant theme files (no themeFilesUpsert / Asset API).
- * Merchants enable Offrefy via Theme editor → App embeds. Kept for call-site compat.
+ * Enable Offrefy app embed on the live (MAIN) theme by updating settings_data.json.
+ * Requires `write_themes`. Rewrites stale extension UIDs from older deploys.
  */
 export async function ensureThemeAppEmbedEnabled(
   admin: AdminGraphql,
@@ -399,11 +412,93 @@ export async function ensureThemeAppEmbedEnabled(
   if (status.enabled && !status.staleUid) {
     return { ok: true, alreadyEnabled: true, errors: [] };
   }
-  return {
-    ok: false,
-    alreadyEnabled: false,
-    errors: [
-      "Open Theme editor → App embeds → turn on Offrefy (global) → Save.",
+  if (!status.themeId || !status.settingsRaw) {
+    return {
+      ok: false,
+      alreadyEnabled: false,
+      errors: ["Live theme settings unavailable"],
+    };
+  }
+
+  const appHandle = status.appHandle || "offrefy";
+  const parsed = parseSettingsData(status.settingsRaw);
+  if (!parsed || typeof parsed !== "object") {
+    return {
+      ok: false,
+      alreadyEnabled: false,
+      errors: ["Invalid settings_data.json"],
+    };
+  }
+
+  // Ensure we write into an object-shaped `current` (not a preset name string).
+  if (!parsed.current || typeof parsed.current !== "object") {
+    parsed.current = { blocks: {} };
+  }
+  if (!parsed.current.blocks || typeof parsed.current.blocks !== "object") {
+    parsed.current.blocks = {};
+  }
+
+  const blocks = parsed.current.blocks;
+  const blockType = buildThemeAppEmbedBlockType(appHandle);
+
+  let updated = false;
+  for (const [id, block] of Object.entries(blocks)) {
+    if (!isOurEmbedType(block?.type, appHandle)) continue;
+    blocks[id] = {
+      ...block,
+      /* Always rewrite to the current published extension UID. */
+      type: blockType,
+      disabled: false,
+      settings: block.settings ?? {},
+    };
+    updated = true;
+  }
+
+  if (!updated) {
+    const id = `offrefy-embed-${Date.now()}`;
+    blocks[id] = {
+      type: blockType,
+      disabled: false,
+      settings: {},
+    };
+  }
+
+  const { data, errors } = await adminJson<{
+    themeFilesUpsert?: {
+      userErrors?: Array<{ message: string }>;
+      upsertedThemeFiles?: Array<{ filename?: string }>;
+    };
+  }>(admin, THEME_FILES_UPSERT, {
+    themeId: status.themeId,
+    files: [
+      {
+        filename: "config/settings_data.json",
+        body: { type: "TEXT", value: JSON.stringify(parsed) },
+      },
     ],
-  };
+  });
+
+  const userErrors = (data?.themeFilesUpsert?.userErrors ?? []).map(
+    (e) => e.message,
+  );
+  const allErrors = [...errors, ...userErrors];
+  if (allErrors.length) {
+    // Apps without Shopify's themeFilesUpsert exemption always hit this —
+    // return a short, actionable message (no Google Form wall of text).
+    const accessDenied = allErrors.some((msg) =>
+      /access denied|exemption|themeFilesUpsert/i.test(msg),
+    );
+    return {
+      ok: false,
+      alreadyEnabled: false,
+      errors: accessDenied
+        ? [
+            "Open Theme editor → App embeds → turn on Offrefy (global) → Save.",
+          ]
+        : allErrors,
+    };
+  }
+
+  invalidateThemeAppEmbedStatusCache();
+  return { ok: true, alreadyEnabled: false, errors: [] };
 }
