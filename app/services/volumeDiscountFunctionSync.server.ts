@@ -645,6 +645,7 @@ async function syncVolumeDiscountShopImpl(
   let campaignMfEntries: { key: string; value: string }[];
   let needsRemoteLookup = false;
   let widgetJsonFull: string;
+  let wildcardCompact: Record<string, unknown> | undefined;
   try {
     const campaignsForRules = (config.campaigns as {
       id: string;
@@ -804,10 +805,14 @@ async function syncVolumeDiscountShopImpl(
         const productIndex = buildProductRuleIndex({
           campaigns: campaignsForRules,
         });
-        return splitProductRuleIndexIntoMetafieldChunks(
+        const split = splitProductRuleIndexIntoMetafieldChunks(
           productIndex,
           discountFunctionTranslations,
         );
+        return {
+          ...split,
+          wildcard: productIndex["*"],
+        };
       }),
       buildStorefrontWidgetJsonString(
         activeRows,
@@ -825,6 +830,9 @@ async function syncVolumeDiscountShopImpl(
 
     campaignMfEntries = built.chunks;
     needsRemoteLookup = built.needsRemoteLookup;
+    wildcardCompact = built.wildcard
+      ? (built.wildcard as unknown as Record<string, unknown>)
+      : undefined;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { discountIds: [], errors: [msg] };
@@ -846,6 +854,8 @@ async function syncVolumeDiscountShopImpl(
     shopDomain: shop,
     shopifyPlus: shopPlanCap.shopifyPlus,
     maxTargets: maxDiscountProducts,
+    // All-products offers: Function applies rule_source.w when product tiers MF is absent.
+    ...(wildcardCompact ? { w: wildcardCompact } : {}),
   };
   const metafields = [
     ...campaignMfEntries.map((entry) => ({

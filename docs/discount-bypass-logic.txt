@@ -79,14 +79,13 @@ A) METAFIELD MODE (small / standard catalogs)
      (campaigns … campaigns_4)
    - Checkout Function reads metafields directly — no network call
 
-B) API / PROXY MODE (large catalogs — bypass 128KB metafield size cap)
-   - Sync sets rule_source.mode = "api"
-   - fetch.js POSTs cart product IDs to:
-       /apps/volume-discount/cart-rules
-   - Server returns rules for those products only
-   - run.js uses API body to fill gaps / apply rules
-
-Switch happens automatically when rules exceed metafield size limits.
+B) API / PROXY MODE (legacy note — large catalogs)
+   - Sync still sets rule_source.mode = "api" when index shards overflow.
+   - Discount Function network_access is DISABLED (Basic plans error if enabled;
+     Plus development stores also block Function network access).
+   - Checkout therefore relies on product volume_discount.tiers metafields.
+   - productScope "all" uses DiscountRule productId "*" (no per-product MF);
+     compact rule is written to rule_source.w and applied by run.js as fallback.
 
 
 --------------------------------------------------------------------------------

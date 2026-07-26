@@ -4065,8 +4065,8 @@
         var u = tierUnitCents(uc, d);
         var card = cards[i];
         if (!card) continue;
-        var strike = card.querySelector("[data-vd-strike]");
-        var save = card.querySelector("[data-vd-you-save]");
+        var strike = card.querySelector("[data-ofd-tier-was]");
+        var save = card.querySelector("[data-ofd-tier-save]");
         var mainP = card.querySelector("[data-vd-main-price]");
         if (mainP) mainP.textContent = fmtMoney(perUnitCards ? u : lt.discounted, currency);
         var showStrikeSave = perUnitCards ? P > 0 && u < uc : minQ > 1 && P > 0;
@@ -4379,7 +4379,7 @@
             "</td>",
         );
         h.push(
-          '<td><span class="vd-price-strong" data-vd-main-price>' +
+          '<td><span class="ofd-tier-amt" data-vd-main-price>' +
             fmtMoney(uInit, currency) +
             "</span></td>",
         );
@@ -4451,16 +4451,16 @@
           );
         }
         h.push('<span class="vd-card__inner">');
-        h.push('<span class="vd-card__row">');
-        h.push('<span class="vd-row-main">');
+        h.push('<div class="ofd-tier-row">');
+        h.push('<div class="ofd-tier-main">');
         h.push('<span class="vd-radio-circle" aria-hidden="true"></span>');
-        h.push('<span class="vd-card__text-stack">');
-        h.push('<span class="vd-card__mid">');
-        h.push('<span class="vd-buy">' + esc(localizedTierBuyLabel(d.buyLabel, c2, tiers, ui.transBuy)) + "</span>");
+        h.push('<div class="ofd-tier-copy">');
+        h.push('<div class="ofd-tier-label-row">');
+        h.push('<span class="ofd-tier-qty">' + esc(localizedTierBuyLabel(d.buyLabel, c2, tiers, ui.transBuy)) + "</span>");
         if (badge && badgePos === "after_label") {
           h.push(tierBadgeHtml(badge, ""));
         }
-        h.push("</span>");
+        h.push("</div>");
         if (badge && badgePos === "below_label") {
           h.push(tierBadgeHtml(badge, "vd-badge-pill--row"));
         }
@@ -4478,33 +4478,33 @@
         }
         if (showStrikeInit) {
           h.push(
-            '<span class="vd-you-save vd-you-save--under" data-vd-you-save>' +
+            '<span class="ofd-tier-save ofd-tier-save--under" data-ofd-tier-save>' +
               esc(formatYouSaveText(P, currency, ui.transYouSave)) +
               "</span>",
           );
         } else {
-          h.push('<span class="vd-you-save vd-you-save--under" data-vd-you-save style="display:none"></span>');
+          h.push('<span class="ofd-tier-save ofd-tier-save--under" data-ofd-tier-save style="display:none"></span>');
         }
-        h.push("</span></span>");
-        h.push('<span class="vd-card__pricecol">');
+        h.push("</div></div>");
+        h.push('<div class="ofd-tier-prices">');
         if (badge && badgePos === "price_column") {
           h.push(tierBadgeHtml(badge, "vd-badge-pill--pricecol"));
         }
         if (showStrikeInit && !hideCompareInit) {
           h.push(
-            '<span class="vd-strike" data-vd-strike>' +
+            '<span class="ofd-tier-was" data-ofd-tier-was>' +
               fmtMoney(perUnitCardsInit ? currentUnitCents : lt.original, currency) +
               "</span>",
           );
         } else {
-          h.push('<span class="vd-strike" data-vd-strike style="display:none"></span>');
+          h.push('<span class="ofd-tier-was" data-ofd-tier-was style="display:none"></span>');
         }
         h.push(
-          '<span class="vd-price-strong" data-vd-main-price>' +
+          '<span class="ofd-tier-amt" data-vd-main-price>' +
             fmtMoney(perUnitCardsInit ? cardUnitCents : lt.discounted, currency) +
             "</span>",
         );
-        h.push("</span></span>");
+        h.push("</div></div>");
         h.push(expandHtml(c2, selVariantId));
         h.push("</span></label>");
       }

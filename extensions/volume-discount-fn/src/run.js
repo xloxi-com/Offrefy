@@ -129,8 +129,22 @@ function compactFromMetafield(mf) {
 }
 
 /**
+ * "All products" campaigns sync as DiscountRule productId "*" and do not write
+ * per-product tiers metafields. Compact rule lives on rule_source.w instead.
+ * @param {unknown} ruleSource
+ */
+function wildcardFromRuleSource(ruleSource) {
+  if (!ruleSource || typeof ruleSource !== "object") return null;
+  return compactFromMetafield(
+    /** @type {{ w?: unknown }} */ (ruleSource).w,
+  );
+}
+
+/**
  * Metafield-only run. No fetch/network (Basic plan cannot use Discount
  * Function network access — it errors and clears all Remise discounts).
+ * Plus / Basic both use product tiers MF; wildcard rule_source.w covers
+ * productScope "all" offers (needed on Plus DEV stores where network is blocked).
  *
  * @param {RunInput} input
  * @returns {CartLinesDiscountsGenerateRunResult}
@@ -156,6 +170,10 @@ function runMetafieldDiscounts(input) {
   if (!classes || !classes.includes(DiscountClass.Product)) {
     return { operations: [] };
   }
+
+  const wildcard = wildcardFromRuleSource(
+    input.discount?.ruleSource?.jsonValue,
+  );
 
   /** @type {{ pid: string, lineIndexes: number[] }[]} */
   const products = [];
@@ -184,9 +202,10 @@ function runMetafieldDiscounts(input) {
     if (targetCount >= MAX_TARGETS) break;
     const { lineIndexes } = products[p];
 
-    const compact = compactFromMetafield(
-      lines[lineIndexes[0]]?.merchandise?.product?.tiersMetafield?.jsonValue,
-    );
+    const compact =
+      compactFromMetafield(
+        lines[lineIndexes[0]]?.merchandise?.product?.tiersMetafield?.jsonValue,
+      ) || wildcard;
     if (!compact) continue;
 
     const ct = compact.ct;

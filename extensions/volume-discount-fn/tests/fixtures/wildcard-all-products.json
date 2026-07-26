@@ -1,0 +1,74 @@
+{
+  "payload": {
+    "export": "cart-lines-discounts-generate-run",
+    "target": "cart.lines.discounts.generate.run",
+    "input": {
+      "cart": {
+        "lines": [
+          {
+            "id": "gid://shopify/CartLine/0",
+            "quantity": 11,
+            "cost": {
+              "subtotalAmount": {
+                "amount": "311.74"
+              }
+            },
+            "merchandise": {
+              "product": {
+                "id": "gid://shopify/Product/8040248016986",
+                "tiersMetafield": null
+              }
+            }
+          }
+        ]
+      },
+      "discount": {
+        "discountClasses": ["PRODUCT"],
+        "ruleSource": {
+          "jsonValue": {
+            "mode": "metafield",
+            "shopifyPlus": true,
+            "maxTargets": 500,
+            "w": {
+              "c": "cms1lc33b0005jp04cn4bcjuc",
+              "m": "{{ discount }} OFF",
+              "q": "a",
+              "ct": "e",
+              "t": [
+                { "m": 1, "p": 0 },
+                { "m": 11, "p": 10 },
+                { "m": 25, "p": 10 }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "output": {
+      "operations": [
+        {
+          "productDiscountsAdd": {
+            "candidates": [
+              {
+                "message": "10% OFF",
+                "targets": [
+                  {
+                    "cartLine": {
+                      "id": "gid://shopify/CartLine/0"
+                    }
+                  }
+                ],
+                "value": {
+                  "percentage": {
+                    "value": "10"
+                  }
+                }
+              }
+            ],
+            "selectionStrategy": "ALL"
+          }
+        }
+      ]
+    }
+  }
+}

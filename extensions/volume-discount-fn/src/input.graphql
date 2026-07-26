@@ -1,4 +1,5 @@
 # Metafield-only cart discount input (no fetchResult — avoids fuel burn).
+# ruleSource.w = compact "all products" wildcard when product tiers MF is missing.
 query CartInput {
   cart {
     lines {
@@ -23,5 +24,8 @@ query CartInput {
   }
   discount {
     discountClasses
+    ruleSource: metafield(namespace: "volume_discount", key: "rule_source") {
+      jsonValue
+    }
   }
 }

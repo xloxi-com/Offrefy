@@ -48,6 +48,8 @@
   max-width: 100%;
   min-width: 0;
   padding-inline: 0;
+  /* Stable box when tier expand opens — reduces horizontal jump with page scrollbar */
+  overflow-x: clip;
 
   /*
    * Match the storefront body font (theme settings → typography).
@@ -154,9 +156,23 @@
 
 .vd-bundle {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   font-size: var(--vd-fs-buy, 16px);
   font-weight: var(--vd-fw-normal, 400);
   font-variant-numeric: tabular-nums;
+}
+
+.vd-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: visible;
 }
 
 .vd-section-title {
@@ -299,14 +315,6 @@
 }
 
 /* Cards — clear rhythm + elevation */
-.vd-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  width: 100%;
-  overflow: visible;
-}
-
 /* Room for floating top badge (half pill sits above card top) */
 .vd-cards > label.vd-card--badge-top-float:first-of-type {
   margin-top: 0.4rem;
@@ -348,16 +356,26 @@
   margin: 0;
   cursor: pointer;
   border-radius: var(--vd-radius-card);
-  border: 1px solid var(--vd-card-border);
+  /* Always 2px — swapping 1↔2 on select shifts layout (widget “shake”). */
+  border: 2px solid var(--vd-card-border);
   background: var(--vd-surface);
   box-shadow: var(--vd-shadow-card);
   transition:
     background 0.2s ease,
     border-color 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.2s ease;
+    box-shadow 0.2s ease;
   -webkit-tap-highlight-color: transparent;
   overflow: visible;
+  box-sizing: border-box;
+}
+
+/* Themes often set product labels to inline/auto width — unselected cards
+   then shrink-wrap (prices look inset) while selected expand forces 100%. */
+.volume-discount-embed label.vd-card {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 /* Floating badge on top edge (badge position: top left / center / right) */
@@ -368,24 +386,26 @@ label.vd-card.vd-card--badge-top-float {
 .vd-card:hover:not(.vd-card--selected) {
   border-color: #cfcfcf;
   box-shadow: var(--vd-shadow-card-hover);
-  transform: translateY(-1px);
 }
 
 /*
  * Tier <label> borders: themes often add blue/accent borders or ring shadows on
  * product form labels. Force our neutral border + shadow inside the embed.
+ * Keep border-width identical selected/unselected to avoid horizontal jump.
  */
 .volume-discount-embed label.vd-card:not(.vd-card--selected) {
-  border-width: 1px !important;
+  border-width: 2px !important;
   border-style: solid !important;
   border-color: var(--vd-card-border) !important;
   box-shadow: var(--vd-shadow-card) !important;
   outline: none !important;
+  transform: none !important;
 }
 
 .volume-discount-embed label.vd-card:not(.vd-card--selected):hover {
   border-color: #cfcfcf !important;
   box-shadow: var(--vd-shadow-card-hover) !important;
+  transform: none !important;
 }
 
 .volume-discount-embed label.vd-card.vd-card--selected {
@@ -394,11 +414,13 @@ label.vd-card.vd-card--badge-top-float {
   border-color: var(--vd-maroon) !important;
   box-shadow: var(--vd-shadow-selected) !important;
   outline: none !important;
+  transform: none !important;
 }
 
 .volume-discount-embed label.vd-card.vd-card--selected:hover {
   border-color: var(--vd-maroon) !important;
   box-shadow: var(--vd-shadow-selected) !important;
+  transform: none !important;
 }
 
 .volume-discount-embed label.vd-card:focus,
@@ -435,19 +457,50 @@ label.vd-card.vd-card--badge-top-float {
 
 .vd-card__inner {
   display: block;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: var(--vd-card-pad);
 }
 
-.vd-card__row {
+.volume-discount-embed .vd-card__inner {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.ofd-tier-row {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--vd-gap);
   min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
-.vd-row-main {
+/* Some themes reset `span { display:inline }` / flex inside product forms —
+   prices then pack next to the label (short labels → gap on the right). */
+.volume-discount-embed .ofd-tier-row,
+.volume-discount-embed .ofd-tier-main,
+.volume-discount-embed .ofd-tier-copy,
+.volume-discount-embed .ofd-tier-prices {
+  display: flex !important;
+}
+
+.volume-discount-embed .ofd-tier-row {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  flex-wrap: nowrap;
+}
+
+.ofd-tier-main {
   display: flex;
   align-items: center;
   gap: var(--vd-gap);
@@ -455,12 +508,21 @@ label.vd-card.vd-card--badge-top-float {
   min-width: 0;
 }
 
-.vd-card__text-stack {
+.volume-discount-embed .ofd-tier-main {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+}
+
+.ofd-tier-copy {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 0.35rem;
   min-width: 0;
+}
+
+.volume-discount-embed .ofd-tier-copy {
+  flex-direction: column !important;
 }
 
 .vd-radio-circle {
@@ -494,7 +556,7 @@ label.vd-card.vd-card--badge-top-float {
   box-sizing: border-box;
 }
 
-.vd-card__mid {
+.ofd-tier-label-row {
   flex: 0 1 auto;
   min-width: 0;
   display: flex;
@@ -503,7 +565,7 @@ label.vd-card.vd-card--badge-top-float {
   gap: 0.35rem 0.55rem;
 }
 
-.vd-buy {
+.ofd-tier-qty {
   font-weight: var(--vd-fw-strong, 700);
   font-size: var(--vd-fs-buy, 16px);
   line-height: 1.25;
@@ -528,7 +590,7 @@ label.vd-card.vd-card--badge-top-float {
   box-shadow: 0 1px 2px rgba(107, 29, 30, 0.2);
 }
 
-/* Badge on its own row (below label or after subtext) — not inline with .vd-buy */
+/* Badge on its own row (below label or after subtext) — not inline with .ofd-tier-qty */
 .vd-badge-pill--row {
   align-self: flex-start;
   margin-top: 0.05rem;
@@ -581,7 +643,7 @@ label.vd-card.vd-card--badge-top-float {
   margin-bottom: 0.18rem;
 }
 
-.vd-card__pricecol {
+.ofd-tier-prices {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -590,9 +652,20 @@ label.vd-card.vd-card--badge-top-float {
   text-align: right;
   min-width: 0;
   gap: 0.15rem;
+  /* Stick to the card’s inline-end even if theme breaks space-between */
+  margin-inline-start: auto;
 }
 
-.vd-strike {
+.volume-discount-embed .ofd-tier-prices {
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  justify-content: center !important;
+  text-align: right !important;
+  margin-inline-start: auto !important;
+  flex-shrink: 0 !important;
+}
+
+.ofd-tier-was {
   display: inline-block;
   max-width: 100%;
   text-decoration: none;
@@ -604,7 +677,7 @@ label.vd-card.vd-card--badge-top-float {
   font-variant-numeric: tabular-nums;
 }
 
-.vd-strike::after {
+.ofd-tier-was::after {
   content: "";
   position: absolute;
   left: 0;
@@ -615,7 +688,7 @@ label.vd-card.vd-card--badge-top-float {
   pointer-events: none;
 }
 
-.vd-price-strong {
+.ofd-tier-amt {
   font-weight: var(--vd-fw-strong, 700);
   font-size: var(--vd-fs-price, 17px);
   line-height: 1.25;
@@ -623,7 +696,7 @@ label.vd-card.vd-card--badge-top-float {
   color: #111;
 }
 
-.vd-you-save--under {
+.ofd-tier-save--under {
   display: block;
   margin-top: 0;
   font-size: var(--vd-fs-save, 12px);
@@ -1012,8 +1085,9 @@ input.vd-qty-value:focus {
   opacity: 0.92;
 }
 
-/* Narrow: stack header + price block */
-@media (max-width: 24rem) {
+/* Narrow phones: stack label row then prices (avoid Buy/price overlap).
+   30rem ≈ 480px — covers ~383px preview and typical mobile columns. */
+@media (max-width: 30rem) {
   .vd-topbar {
     flex-direction: column;
     align-items: stretch;
@@ -1024,17 +1098,61 @@ input.vd-qty-value:focus {
     text-align: left;
   }
 
-  .vd-card__row {
-    flex-wrap: wrap;
+  .ofd-tier-row,
+  .volume-discount-embed .ofd-tier-row {
+    flex-wrap: wrap !important;
+    align-items: flex-start !important;
+    row-gap: 0.4rem;
   }
 
-  .vd-card__pricecol {
-    width: 100%;
-    flex-basis: 100%;
-    align-items: flex-start;
-    text-align: left;
-    padding-left: var(--vd-leader);
-    margin-top: 0.35rem;
+  .ofd-tier-main,
+  .volume-discount-embed .ofd-tier-main {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    max-width: calc(100% - 5.5rem);
+  }
+
+  .ofd-tier-copy,
+  .volume-discount-embed .ofd-tier-copy {
+    min-width: 0 !important;
+    max-width: 100%;
+  }
+
+  .ofd-tier-qty {
+    overflow-wrap: anywhere;
+  }
+
+  .ofd-tier-prices,
+  .volume-discount-embed .ofd-tier-prices {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    max-width: 45%;
+    margin-inline-start: auto !important;
+    margin-top: 0 !important;
+    padding-left: 0.35rem;
+    align-items: flex-end !important;
+    text-align: right !important;
+  }
+
+  /* Very tight (~≤400px): full-width price stack under label */
+  @media (max-width: 25rem) {
+    .ofd-tier-main,
+    .volume-discount-embed .ofd-tier-main {
+      flex: 1 1 100% !important;
+      max-width: 100%;
+    }
+
+    .ofd-tier-prices,
+    .volume-discount-embed .ofd-tier-prices {
+      width: 100% !important;
+      max-width: 100%;
+      flex-basis: 100% !important;
+      align-items: flex-start !important;
+      text-align: left !important;
+      margin-inline-start: 0 !important;
+      padding-left: var(--vd-leader, 2.1rem);
+      margin-top: 0.15rem !important;
+    }
   }
 
   .vd-expand-compact {
@@ -1230,7 +1348,7 @@ html[data-vd-hide-theme-qty="1"] product-info quantity-input {
   font-size: inherit;
 }
 
-.vd-volume-table .vd-price-strong {
+.vd-volume-table .ofd-tier-amt {
   font-size: var(--vd-fs-price, 1rem);
   font-weight: var(--vd-fw-strong, 600);
   line-height: 1.3;
