@@ -130,24 +130,25 @@
       {%- comment -%}
         Platform product form — valid on all Shopify themes (free + premium).
         Always visually hidden; used by +Add / Grab This Deal when theme ATC is missing.
+        Do NOT set name="id"/name="quantity" in HTML — Valor (and similar) themes use
+        product-info querySelector('input[name="quantity"]') and would bind +/- to
+        this hidden field when the app block is above the theme qty selector.
+        JS arms the names only right before submit/sync.
       {%- endcomment -%}
       {% form 'product', vd_product, id: vd_product_form_id, class: 'xloxi-liquid-product-form', data-xloxi-liquid-product-form: '1' %}
         <input
           type="hidden"
-          name="id"
           value="{{ vd_product.selected_or_first_available_variant.id }}"
           data-xloxi-liquid-variant-id
         >
         <input
           type="hidden"
-          name="quantity"
           value="1"
           min="1"
           data-xloxi-liquid-qty
         >
         <button
           type="submit"
-          name="add"
           class="xloxi-liquid-submit"
           hidden
           tabindex="-1"

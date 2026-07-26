@@ -863,10 +863,24 @@
         var link =
           ev.target && ev.target.closest
             ? ev.target.closest(
-                'a[href], button[data-locale], [data-value], [data-language], .disclosure__link',
+                'a[href], button[data-locale], [data-language], .disclosure__link',
               )
             : null;
         if (!link) return;
+        /* Never treat product qty +/- (or other data-value controls) as locale switches —
+           that fired cart/update.js and reset theme quantity steppers. */
+        if (
+          link.closest &&
+          (link.closest("quantity-input") ||
+            link.closest(".quantity") ||
+            link.closest(".product-form__quantity") ||
+            link.closest("[data-quantity-selector]") ||
+            link.getAttribute("name") === "plus" ||
+            link.getAttribute("name") === "minus" ||
+            link.getAttribute("name") === "increase")
+        ) {
+          return;
+        }
         var href = String(link.getAttribute("href") || "");
         if (href) {
           var pathOnly = href.replace(/^https?:\/\/[^/]+/i, "");
@@ -881,8 +895,7 @@
         }
         var dataLocale =
           link.getAttribute("data-locale") ||
-          link.getAttribute("data-language") ||
-          link.getAttribute("data-value");
+          link.getAttribute("data-language");
         if (dataLocale) {
           window.__xloxiStorefrontLocale = normalizeLocaleCode(dataLocale);
           vdLastKnownStorefrontLocale = "";
@@ -1746,14 +1759,19 @@
     var vid = String(variantId || "");
     var qty = parseInt(String(quantity), 10) || 1;
     qty = Math.min(VD_MAX_LINE_QTY, Math.max(1, qty));
-    var idInput =
-      form.querySelector("[data-xloxi-liquid-variant-id]") ||
-      form.querySelector('input[name="id"]');
-    if (idInput && vid) idInput.value = vid;
-    var qtyInput =
-      form.querySelector("[data-xloxi-liquid-qty]") ||
-      form.querySelector('input[name="quantity"]');
-    if (qtyInput) qtyInput.value = String(qty);
+    var idInput = form.querySelector("[data-xloxi-liquid-variant-id]");
+    if (idInput) {
+      /* Arm names only when syncing for submit — keeps theme qty/variant querySelectors clean. */
+      idInput.setAttribute("name", "id");
+      if (vid) idInput.value = vid;
+    }
+    var qtyInput = form.querySelector("[data-xloxi-liquid-qty]");
+    if (qtyInput) {
+      qtyInput.setAttribute("name", "quantity");
+      qtyInput.value = String(qty);
+    }
+    var submitBtn = form.querySelector("[data-xloxi-liquid-submit]");
+    if (submitBtn) submitBtn.setAttribute("name", "add");
     applyOffrefyPropertiesToForm(form, attribution);
     return true;
   }
@@ -2185,10 +2203,10 @@
     for (var i = 0; i < inputs.length; i++) {
       var inp = inputs[i];
       try {
+        /* Set property only — setAttribute("value") breaks Dawn/Horizon
+           quantity-input steppers (plus/minus stop updating). */
+        if (String(inp.value) === str) continue;
         inp.value = str;
-        if (typeof inp.setAttribute === "function") {
-          inp.setAttribute("value", str);
-        }
         inp.dispatchEvent(new Event("input", { bubbles: true }));
         inp.dispatchEvent(new Event("change", { bubbles: true }));
       } catch (e) {
@@ -4090,15 +4108,23 @@
 
     if (ui.hideThemeAddToCart) {
       document.documentElement.setAttribute("data-xloxi-hide-theme-atc", "1");
+    } else {
+      document.documentElement.removeAttribute("data-xloxi-hide-theme-atc");
     }
     if (ui.hideThemeBuyItNow) {
       document.documentElement.setAttribute("data-xloxi-hide-theme-bin", "1");
+    } else {
+      document.documentElement.removeAttribute("data-xloxi-hide-theme-bin");
     }
     if (ui.hideThemeVariantSelector) {
       document.documentElement.setAttribute("data-xloxi-hide-theme-variant", "1");
+    } else {
+      document.documentElement.removeAttribute("data-xloxi-hide-theme-variant");
     }
     if (ui.hideThemeQuantitySelector) {
       document.documentElement.setAttribute("data-xloxi-hide-theme-qty", "1");
+    } else {
+      document.documentElement.removeAttribute("data-xloxi-hide-theme-qty");
     }
     if (
       ui.hideThemeAddToCart ||
@@ -4512,8 +4538,25 @@
       syncQtyToForm();
     }
 
-    function syncQtyToForm() {
-      setThemeProductFormQuantity(stateQty);
+    function syncQtyToForm(forceTheme) {
+      var qty = parseInt(String(stateQty), 10) || 1;
+      qty = Math.min(VD_MAX_LINE_QTY, Math.max(1, qty));
+      var str = String(qty);
+      var liquid = findVdLiquidProductForm(null);
+      if (liquid) {
+        var lq =
+          liquid.querySelector("[data-xloxi-liquid-qty]") ||
+          liquid.querySelector('input[name="quantity"]');
+        if (lq) lq.value = str;
+      }
+      /*
+       * Never overwrite theme qty on widget paint — that freezes Dawn/Horizon/+
+       * custom steppers on the offer min qty (e.g. stuck at 12).
+       * Push to theme only immediately before widget ATC.
+       */
+      if (forceTheme) {
+        setThemeProductFormQuantity(stateQty);
+      }
     }
 
     function syncFormVariant(vid) {
@@ -4541,7 +4584,7 @@
 
     function scrollToAtc() {
       clampQty();
-      syncQtyToForm();
+      syncQtyToForm(true);
       var sel = mountEl.querySelector(".xloxi-card--selected .xloxi-variant-select");
       if (sel) {
         syncFormVariant(sel.value);
@@ -5025,7 +5068,7 @@
         ev.preventDefault();
         ev.stopPropagation();
         clampQty();
-        syncQtyToForm();
+        syncQtyToForm(true);
         var vidAdd = resolveActiveVariantIdForCart();
         if (!vidAdd) {
           scrollToAtc();
@@ -5067,7 +5110,7 @@
         ev.preventDefault();
         ev.stopPropagation();
         clampQty();
-        syncQtyToForm();
+        syncQtyToForm(true);
         var vidC = resolveActiveVariantIdForCart();
         if (!vidC) {
           scrollToAtc();
@@ -5129,7 +5172,7 @@
     trackImpression(campaign, root.getAttribute("data-product-id"));
     window.Xloxi = window.Xloxi || {};
     window.Xloxi.embed = window.Xloxi.embed || {};
-    window.Xloxi.embed.version = "1.29.2";
+    window.Xloxi.embed.version = "1.29.5";
 
   }
   /**
@@ -5382,7 +5425,7 @@
       "https://offrey.xloxi.com";
     var ver =
       (typeof window.__xloxiAssetVersion === "string" && window.__xloxiAssetVersion) ||
-      "1.29.2";
+      "1.29.5";
     var link = document.createElement("link");
     link.rel = "stylesheet";
     link.href =
