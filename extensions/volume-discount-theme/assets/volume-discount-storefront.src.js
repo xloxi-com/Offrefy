@@ -1716,13 +1716,13 @@
   }
 
   function forceOpenThemeCartDrawer() {
+    /* One-shot open only. Delayed icon clicks re-open after the merchant
+       closes the drawer (Valor / Dawn race with section HTML refresh). */
     openThemeCartDrawer();
+    if (isThemeCartDrawerOpen()) return;
     setTimeout(function () {
       if (!isThemeCartDrawerOpen()) clickHeaderCartIcon();
-    }, 100);
-    setTimeout(function () {
-      if (!isThemeCartDrawerOpen()) clickHeaderCartIcon();
-    }, 350);
+    }, 80);
   }
 
   function updateCartCountBubbles(cart) {
@@ -2192,9 +2192,12 @@
             if (afterQty <= prevVariantQty) {
               return Promise.reject(new Error("Theme ATC qty mismatch"));
             }
-            return refreshThemeCartSectionsAndOpen(true).then(function () {
-              return cart;
-            });
+            /* Theme ATC usually opened the drawer already — refresh only. */
+            return refreshThemeCartSectionsAndOpen(!isThemeCartDrawerOpen()).then(
+              function () {
+                return cart;
+              },
+            );
           });
         });
       }).catch(function () {
@@ -2892,18 +2895,22 @@
               throw new Error("Could not add to cart");
             }
             /* Prefer sections from /cart/add.js response (Valor + Dawn) */
+            var openedFromAdd = false;
             if (body && body.sections && cartResponseHasSectionHtml(body.sections)) {
               applyThemeCartSectionsFromResponse(body, openDrawer);
               dispatchValorCartAdded(body);
+              if (openDrawer) openedFromAdd = isThemeCartDrawerOpen();
             } else if (openDrawer) {
               dispatchValorCartAdded(body || {});
             }
             publishThemeCartUpdate(cart);
             if (!openDrawer) return body;
-            /* Always re-fetch live section HTML so drawer/badge stay in sync. */
-            return refreshThemeCartSectionsAndOpen(true).then(function () {
-              publishThemeCartUpdate(cart);
-              if (!isThemeCartDrawerOpen()) forceOpenThemeCartDrawer();
+            /* Re-sync drawer HTML without force-reopening — a second
+               openDrawer=true fights the theme close button (Valor). */
+            return refreshThemeCartSectionsAndOpen(!openedFromAdd).then(function () {
+              if (!openedFromAdd && !isThemeCartDrawerOpen()) {
+                forceOpenThemeCartDrawer();
+              }
               return body;
             });
           });
@@ -5263,7 +5270,7 @@
     bindNativeThemeAtcAnalytics();
     trackImpression(campaign, root.getAttribute("data-product-id"));
     offrefyNs().embed = offrefyNs().embed || {};
-    offrefyNs().embed.version = "1.29.5";
+    offrefyNs().embed.version = "1.29.8";
 
   }
   /**
@@ -5516,7 +5523,7 @@
       "https://offrey.xloxi.com";
     var ver =
       (typeof offrefyNs().assetVersion === "string" && offrefyNs().assetVersion) ||
-      "1.29.5";
+      "1.29.8";
     var link = document.createElement("link");
     link.rel = "stylesheet";
     link.href =
