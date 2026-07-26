@@ -12,19 +12,36 @@
     "routeIdToServerBundleId": {
       "routes/apps.volume-discount.widget-config": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/apps.volume-discount.cart-rules": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/apps.volume-discount.analytics": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/webhooks.app.scopes_update": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/apps.volume-discount.calc": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/webhooks.app.uninstalled": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/api.cron.scheduled-sync": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/webhooks.orders.paid": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/vd-storefront[.]css": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/webhooks.compliance": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/vd-storefront[.]js": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/vd-loader[.]js": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/widget-config": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/auth.login": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/cart-rules": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/analytics": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/auth.$": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/_index": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/calc": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/app.volume-discount.$id": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/app.volume-discount.new": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/app.additional": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/app.analytics": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/app.settings": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/app.pricing": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/app.offers": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/app.offers.export": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/app.offers.import": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
-      "routes/app.additional": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
-      "routes/app._index": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0"
+      "routes/app._index": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/app.setup": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/app.$": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/$": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0"
     },
     "routes": {
       "root": {
@@ -47,6 +64,15 @@
         "parentId": "root",
         "file": "app/routes/apps.volume-discount.cart-rules.tsx",
         "path": "apps/volume-discount/cart-rules",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/apps.volume-discount.analytics": {
+        "id": "routes/apps.volume-discount.analytics",
+        "parentId": "root",
+        "file": "app/routes/apps.volume-discount.analytics.tsx",
+        "path": "apps/volume-discount/analytics",
         "config": {
           "runtime": "nodejs"
         }
@@ -78,6 +104,69 @@
           "runtime": "nodejs"
         }
       },
+      "routes/api.cron.scheduled-sync": {
+        "id": "routes/api.cron.scheduled-sync",
+        "parentId": "root",
+        "file": "app/routes/api.cron.scheduled-sync.ts",
+        "path": "api/cron/scheduled-sync",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/webhooks.orders.paid": {
+        "id": "routes/webhooks.orders.paid",
+        "parentId": "root",
+        "file": "app/routes/webhooks.orders.paid.tsx",
+        "path": "webhooks/orders/paid",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/vd-storefront[.]css": {
+        "id": "routes/vd-storefront[.]css",
+        "parentId": "root",
+        "file": "app/routes/vd-storefront[.]css.tsx",
+        "path": "vd-storefront.css",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/webhooks.compliance": {
+        "id": "routes/webhooks.compliance",
+        "parentId": "root",
+        "file": "app/routes/webhooks.compliance.tsx",
+        "path": "webhooks/compliance",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/vd-storefront[.]js": {
+        "id": "routes/vd-storefront[.]js",
+        "parentId": "root",
+        "file": "app/routes/vd-storefront[.]js.tsx",
+        "path": "vd-storefront.js",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/vd-loader[.]js": {
+        "id": "routes/vd-loader[.]js",
+        "parentId": "root",
+        "file": "app/routes/vd-loader[.]js.tsx",
+        "path": "vd-loader.js",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/widget-config": {
+        "id": "routes/widget-config",
+        "parentId": "root",
+        "file": "app/routes/widget-config.tsx",
+        "path": "widget-config",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
       "routes/auth.login": {
         "id": "routes/auth.login",
         "parentId": "root",
@@ -96,6 +185,15 @@
           "runtime": "nodejs"
         }
       },
+      "routes/analytics": {
+        "id": "routes/analytics",
+        "parentId": "root",
+        "file": "app/routes/analytics.tsx",
+        "path": "analytics",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
       "routes/auth.$": {
         "id": "routes/auth.$",
         "parentId": "root",
@@ -110,6 +208,15 @@
         "parentId": "root",
         "file": "app/routes/_index/route.tsx",
         "index": true,
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/calc": {
+        "id": "routes/calc",
+        "parentId": "root",
+        "file": "app/routes/calc.tsx",
+        "path": "calc",
         "config": {
           "runtime": "nodejs"
         }
@@ -139,24 +246,6 @@
           "runtime": "nodejs"
         }
       },
-      "routes/app.offers.export": {
-        "id": "routes/app.offers.export",
-        "parentId": "routes/app",
-        "file": "app/routes/app.offers.export.tsx",
-        "path": "offers/export",
-        "config": {
-          "runtime": "nodejs"
-        }
-      },
-      "routes/app.offers.import": {
-        "id": "routes/app.offers.import",
-        "parentId": "routes/app",
-        "file": "app/routes/app.offers.import.tsx",
-        "path": "offers/import",
-        "config": {
-          "runtime": "nodejs"
-        }
-      },
       "routes/app.additional": {
         "id": "routes/app.additional",
         "parentId": "routes/app",
@@ -166,11 +255,88 @@
           "runtime": "nodejs"
         }
       },
+      "routes/app.analytics": {
+        "id": "routes/app.analytics",
+        "parentId": "routes/app",
+        "file": "app/routes/app.analytics.tsx",
+        "path": "analytics",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/app.settings": {
+        "id": "routes/app.settings",
+        "parentId": "routes/app",
+        "file": "app/routes/app.settings.tsx",
+        "path": "settings",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/app.pricing": {
+        "id": "routes/app.pricing",
+        "parentId": "routes/app",
+        "file": "app/routes/app.pricing.tsx",
+        "path": "pricing",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/app.offers": {
+        "id": "routes/app.offers",
+        "parentId": "routes/app",
+        "file": "app/routes/app.offers.tsx",
+        "path": "offers",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/app.offers.export": {
+        "id": "routes/app.offers.export",
+        "parentId": "routes/app.offers",
+        "file": "app/routes/app.offers.export.tsx",
+        "path": "export",
+        "config": {}
+      },
+      "routes/app.offers.import": {
+        "id": "routes/app.offers.import",
+        "parentId": "routes/app.offers",
+        "file": "app/routes/app.offers.import.tsx",
+        "path": "import",
+        "config": {}
+      },
       "routes/app._index": {
         "id": "routes/app._index",
         "parentId": "routes/app",
         "file": "app/routes/app._index.tsx",
         "index": true,
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/app.setup": {
+        "id": "routes/app.setup",
+        "parentId": "routes/app",
+        "file": "app/routes/app.setup.tsx",
+        "path": "setup",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/app.$": {
+        "id": "routes/app.$",
+        "parentId": "routes/app",
+        "file": "app/routes/app.$.tsx",
+        "path": "*",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/$": {
+        "id": "routes/$",
+        "parentId": "root",
+        "file": "app/routes/$.tsx",
+        "path": "*",
         "config": {
           "runtime": "nodejs"
         }
@@ -209,6 +375,12 @@
         "file": "routes/apps.volume-discount.cart-rules.tsx",
         "path": "apps/volume-discount/cart-rules"
       },
+      "routes/apps.volume-discount.analytics": {
+        "id": "routes/apps.volume-discount.analytics",
+        "parentId": "root",
+        "file": "routes/apps.volume-discount.analytics.tsx",
+        "path": "apps/volume-discount/analytics"
+      },
       "routes/webhooks.app.scopes_update": {
         "id": "routes/webhooks.app.scopes_update",
         "parentId": "root",
@@ -227,6 +399,48 @@
         "file": "routes/webhooks.app.uninstalled.tsx",
         "path": "webhooks/app/uninstalled"
       },
+      "routes/api.cron.scheduled-sync": {
+        "id": "routes/api.cron.scheduled-sync",
+        "parentId": "root",
+        "file": "routes/api.cron.scheduled-sync.ts",
+        "path": "api/cron/scheduled-sync"
+      },
+      "routes/webhooks.orders.paid": {
+        "id": "routes/webhooks.orders.paid",
+        "parentId": "root",
+        "file": "routes/webhooks.orders.paid.tsx",
+        "path": "webhooks/orders/paid"
+      },
+      "routes/vd-storefront[.]css": {
+        "id": "routes/vd-storefront[.]css",
+        "parentId": "root",
+        "file": "routes/vd-storefront[.]css.tsx",
+        "path": "vd-storefront.css"
+      },
+      "routes/webhooks.compliance": {
+        "id": "routes/webhooks.compliance",
+        "parentId": "root",
+        "file": "routes/webhooks.compliance.tsx",
+        "path": "webhooks/compliance"
+      },
+      "routes/vd-storefront[.]js": {
+        "id": "routes/vd-storefront[.]js",
+        "parentId": "root",
+        "file": "routes/vd-storefront[.]js.tsx",
+        "path": "vd-storefront.js"
+      },
+      "routes/vd-loader[.]js": {
+        "id": "routes/vd-loader[.]js",
+        "parentId": "root",
+        "file": "routes/vd-loader[.]js.tsx",
+        "path": "vd-loader.js"
+      },
+      "routes/widget-config": {
+        "id": "routes/widget-config",
+        "parentId": "root",
+        "file": "routes/widget-config.tsx",
+        "path": "widget-config"
+      },
       "routes/auth.login": {
         "id": "routes/auth.login",
         "parentId": "root",
@@ -239,6 +453,12 @@
         "file": "routes/cart-rules.tsx",
         "path": "cart-rules"
       },
+      "routes/analytics": {
+        "id": "routes/analytics",
+        "parentId": "root",
+        "file": "routes/analytics.tsx",
+        "path": "analytics"
+      },
       "routes/auth.$": {
         "id": "routes/auth.$",
         "parentId": "root",
@@ -250,6 +470,12 @@
         "parentId": "root",
         "file": "routes/_index/route.tsx",
         "index": true
+      },
+      "routes/calc": {
+        "id": "routes/calc",
+        "parentId": "root",
+        "file": "routes/calc.tsx",
+        "path": "calc"
       },
       "routes/app": {
         "id": "routes/app",
@@ -269,29 +495,71 @@
         "file": "routes/app.volume-discount.new.tsx",
         "path": "volume-discount/new"
       },
-      "routes/app.offers.export": {
-        "id": "routes/app.offers.export",
-        "parentId": "routes/app",
-        "file": "routes/app.offers.export.tsx",
-        "path": "offers/export"
-      },
-      "routes/app.offers.import": {
-        "id": "routes/app.offers.import",
-        "parentId": "routes/app",
-        "file": "routes/app.offers.import.tsx",
-        "path": "offers/import"
-      },
       "routes/app.additional": {
         "id": "routes/app.additional",
         "parentId": "routes/app",
         "file": "routes/app.additional.tsx",
         "path": "additional"
       },
+      "routes/app.analytics": {
+        "id": "routes/app.analytics",
+        "parentId": "routes/app",
+        "file": "routes/app.analytics.tsx",
+        "path": "analytics"
+      },
+      "routes/app.settings": {
+        "id": "routes/app.settings",
+        "parentId": "routes/app",
+        "file": "routes/app.settings.tsx",
+        "path": "settings"
+      },
+      "routes/app.pricing": {
+        "id": "routes/app.pricing",
+        "parentId": "routes/app",
+        "file": "routes/app.pricing.tsx",
+        "path": "pricing"
+      },
+      "routes/app.offers": {
+        "id": "routes/app.offers",
+        "parentId": "routes/app",
+        "file": "routes/app.offers.tsx",
+        "path": "offers"
+      },
+      "routes/app.offers.export": {
+        "id": "routes/app.offers.export",
+        "parentId": "routes/app.offers",
+        "file": "routes/app.offers.export.tsx",
+        "path": "export"
+      },
+      "routes/app.offers.import": {
+        "id": "routes/app.offers.import",
+        "parentId": "routes/app.offers",
+        "file": "routes/app.offers.import.tsx",
+        "path": "import"
+      },
       "routes/app._index": {
         "id": "routes/app._index",
         "parentId": "routes/app",
         "file": "routes/app._index.tsx",
         "index": true
+      },
+      "routes/app.setup": {
+        "id": "routes/app.setup",
+        "parentId": "routes/app",
+        "file": "routes/app.setup.tsx",
+        "path": "setup"
+      },
+      "routes/app.$": {
+        "id": "routes/app.$",
+        "parentId": "routes/app",
+        "file": "routes/app.$.tsx",
+        "path": "*"
+      },
+      "routes/$": {
+        "id": "routes/$",
+        "parentId": "root",
+        "file": "routes/$.tsx",
+        "path": "*"
       }
     },
     "routeDiscovery": {
@@ -319,6 +587,11 @@
             "path": "apps/volume-discount/cart-rules"
           },
           {
+            "id": "routes/apps.volume-discount.analytics",
+            "file": "routes/apps.volume-discount.analytics.tsx",
+            "path": "apps/volume-discount/analytics"
+          },
+          {
             "id": "routes/webhooks.app.scopes_update",
             "file": "routes/webhooks.app.scopes_update.tsx",
             "path": "webhooks/app/scopes_update"
@@ -334,6 +607,41 @@
             "path": "webhooks/app/uninstalled"
           },
           {
+            "id": "routes/api.cron.scheduled-sync",
+            "file": "routes/api.cron.scheduled-sync.ts",
+            "path": "api/cron/scheduled-sync"
+          },
+          {
+            "id": "routes/webhooks.orders.paid",
+            "file": "routes/webhooks.orders.paid.tsx",
+            "path": "webhooks/orders/paid"
+          },
+          {
+            "id": "routes/vd-storefront[.]css",
+            "file": "routes/vd-storefront[.]css.tsx",
+            "path": "vd-storefront.css"
+          },
+          {
+            "id": "routes/webhooks.compliance",
+            "file": "routes/webhooks.compliance.tsx",
+            "path": "webhooks/compliance"
+          },
+          {
+            "id": "routes/vd-storefront[.]js",
+            "file": "routes/vd-storefront[.]js.tsx",
+            "path": "vd-storefront.js"
+          },
+          {
+            "id": "routes/vd-loader[.]js",
+            "file": "routes/vd-loader[.]js.tsx",
+            "path": "vd-loader.js"
+          },
+          {
+            "id": "routes/widget-config",
+            "file": "routes/widget-config.tsx",
+            "path": "widget-config"
+          },
+          {
             "id": "routes/auth.login",
             "file": "routes/auth.login/route.tsx",
             "path": "auth/login"
@@ -344,6 +652,11 @@
             "path": "cart-rules"
           },
           {
+            "id": "routes/analytics",
+            "file": "routes/analytics.tsx",
+            "path": "analytics"
+          },
+          {
             "id": "routes/auth.$",
             "file": "routes/auth.$.tsx",
             "path": "auth/*"
@@ -352,6 +665,11 @@
             "id": "routes/_index",
             "file": "routes/_index/route.tsx",
             "index": true
+          },
+          {
+            "id": "routes/calc",
+            "file": "routes/calc.tsx",
+            "path": "calc"
           },
           {
             "id": "routes/app",
@@ -369,26 +687,63 @@
                 "path": "volume-discount/new"
               },
               {
-                "id": "routes/app.offers.export",
-                "file": "routes/app.offers.export.tsx",
-                "path": "offers/export"
-              },
-              {
-                "id": "routes/app.offers.import",
-                "file": "routes/app.offers.import.tsx",
-                "path": "offers/import"
-              },
-              {
                 "id": "routes/app.additional",
                 "file": "routes/app.additional.tsx",
                 "path": "additional"
               },
               {
+                "id": "routes/app.analytics",
+                "file": "routes/app.analytics.tsx",
+                "path": "analytics"
+              },
+              {
+                "id": "routes/app.settings",
+                "file": "routes/app.settings.tsx",
+                "path": "settings"
+              },
+              {
+                "id": "routes/app.pricing",
+                "file": "routes/app.pricing.tsx",
+                "path": "pricing"
+              },
+              {
+                "id": "routes/app.offers",
+                "file": "routes/app.offers.tsx",
+                "path": "offers",
+                "children": [
+                  {
+                    "id": "routes/app.offers.export",
+                    "file": "routes/app.offers.export.tsx",
+                    "path": "export"
+                  },
+                  {
+                    "id": "routes/app.offers.import",
+                    "file": "routes/app.offers.import.tsx",
+                    "path": "import"
+                  }
+                ]
+              },
+              {
                 "id": "routes/app._index",
                 "file": "routes/app._index.tsx",
                 "index": true
+              },
+              {
+                "id": "routes/app.setup",
+                "file": "routes/app.setup.tsx",
+                "path": "setup"
+              },
+              {
+                "id": "routes/app.$",
+                "file": "routes/app.$.tsx",
+                "path": "*"
               }
             ]
+          },
+          {
+            "id": "routes/$",
+            "file": "routes/$.tsx",
+            "path": "*"
           }
         ]
       }

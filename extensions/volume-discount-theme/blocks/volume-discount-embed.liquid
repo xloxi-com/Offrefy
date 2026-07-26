@@ -4,7 +4,25 @@
   inject). Storefront assets load from the Quantity breaks app block.
 {% endcomment %}
 {% if request.page_type == 'product' or template.name == 'product' %}
-  <script>window.__xloxiAppEmbedActive = true;</script>
+  <script>
+    (function () {
+      var o = window.Offrefy;
+      if (!o || typeof o !== "object") {
+        o = {};
+        try {
+          Object.defineProperty(window, "Offrefy", {
+            value: o,
+            writable: true,
+            configurable: true,
+            enumerable: false,
+          });
+        } catch (e) {
+          window.Offrefy = o;
+        }
+      }
+      o.appEmbedActive = true;
+    })();
+  </script>
 {% endif %}
 
 {% schema %}

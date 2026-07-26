@@ -1,6 +1,106 @@
 "use strict";
 (function () {
   "use strict";
+
+  /** Single Offrefy namespace — never pollute window with generic globals. */
+  function offrefyNs() {
+    var o = window.Offrefy;
+    if (!o || typeof o !== "object") {
+      o = {};
+      try {
+        Object.defineProperty(window, "Offrefy", {
+          value: o,
+          writable: true,
+          configurable: true,
+          enumerable: false,
+        });
+      } catch (e) {
+        window.Offrefy = o;
+      }
+    }
+    return o;
+  }
+
+  /** Quiet in production; prefix all logs with [Offrefy]. */
+  function offrefyLog() {
+    try {
+      if (window.Shopify && window.Shopify.designMode) {
+        var args = ["[Offrefy]"].concat([].slice.call(arguments));
+        if (typeof console !== "undefined" && console.log) console.log.apply(console, args);
+      }
+    } catch (e) {
+      void e;
+    }
+  }
+
+  function offrefyWarn() {
+    try {
+      var args = ["[Offrefy]"].concat([].slice.call(arguments));
+      if (typeof console !== "undefined" && console.warn) console.warn.apply(console, args);
+    } catch (e) {
+      void e;
+    }
+  }
+
+  /* One-time migrate legacy __xloxi* flags from older asset snippets. */
+  (function migrateLegacyOffrefyGlobals() {
+    var o = offrefyNs();
+    var legacy = [
+      ["appEmbedActive", "__xloxiAppEmbedActive"],
+      ["configRev", "__xloxiConfigRev"],
+      ["appOrigin", "__xloxiAppOrigin"],
+      ["assetVersion", "__xloxiAssetVersion"],
+      ["configPrefetchKey", "__xloxiConfigPrefetchKey"],
+      ["configPrefetch", "__xloxiConfigPrefetch"],
+      ["customer", "__xloxiCustomer"],
+      ["storefrontTranslations", "__xloxiStorefrontTranslations"],
+      ["cartBadgeTemplates", "__xloxiCartBadgeTemplates"],
+      ["storefrontLocale", "__xloxiStorefrontLocale"],
+      ["maxDiscountProducts", "__xloxiMaxDiscountProducts"],
+      ["storefrontAssetsLoaded", "__xloxiStorefrontAssetsLoaded"],
+    ];
+    for (var i = 0; i < legacy.length; i++) {
+      var key = legacy[i][0];
+      var old = legacy[i][1];
+      try {
+        if (o[key] === undefined && typeof window[old] !== "undefined") {
+          o[key] = window[old];
+        }
+      } catch (e) {
+        void e;
+      }
+    }
+  })();
+
+  /** Registry for Theme Editor unload / multi-instance teardown. */
+  var offrefyRuntime = offrefyNs();
+  if (!offrefyRuntime._teardown) offrefyRuntime._teardown = [];
+  if (!offrefyRuntime._instances) offrefyRuntime._instances = new Map();
+
+  function offrefyRegisterTeardown(fn) {
+    if (typeof fn !== "function") return;
+    offrefyRuntime._teardown.push(fn);
+  }
+
+  function offrefyRunTeardown() {
+    var list = offrefyRuntime._teardown.splice(0, offrefyRuntime._teardown.length);
+    for (var i = 0; i < list.length; i++) {
+      try {
+        list[i]();
+      } catch (e) {
+        offrefyWarn("teardown", e);
+      }
+    }
+    try {
+      document.documentElement.removeAttribute("data-offrefy-hide-theme-variant");
+      document.documentElement.removeAttribute("data-offrefy-hide-theme-qty");
+      document.documentElement.removeAttribute("data-offrefy-hide-theme-atc");
+      document.documentElement.removeAttribute("data-offrefy-hide-theme-buy");
+    } catch (e2) {
+      void e2;
+    }
+  }
+
   var PROXY = "/apps/volume-discount/widget-config";
   var ANALYTICS_PROXY = "/apps/volume-discount/analytics";
   var OFFREFY_LINE_PROP = "_offrefy";
@@ -21,9 +121,7 @@
 
   function fetchConfigKey(productId, variantId) {
     var rev =
-      typeof window.__xloxiConfigRev !== "undefined" && window.__xloxiConfigRev != null
-        ? String(window.__xloxiConfigRev)
-        : "";
+      offrefyNs().configRev != null ? String(offrefyNs().configRev) : "";
     return rev + "|" + String(productId || "") + "|" + String(variantId || "");
   }
 
@@ -41,9 +139,7 @@
 
   function withRevQuery(url) {
     var rev =
-      typeof window.__xloxiConfigRev !== "undefined" && window.__xloxiConfigRev != null
-        ? String(window.__xloxiConfigRev)
-        : "";
+      offrefyNs().configRev != null ? String(offrefyNs().configRev) : "";
     /* Always bust HTTP caches with a coarse bucket so admin edits show on next page load. */
     var bucket = String(Math.floor(Date.now() / 5000));
     var out =
@@ -92,8 +188,8 @@
       urls.push(withRevQuery(withShopQuery(PROXY + q)));
     }
     var abs =
-      typeof window.__xloxiAppOrigin === "string"
-        ? String(window.__xloxiAppOrigin).replace(/\/$/, "")
+      typeof offrefyNs().appOrigin === "string"
+        ? String(offrefyNs().appOrigin).replace(/\/$/, "")
         : "";
     if (abs) {
       urls.push(withRevQuery(withShopQuery(abs + "/widget-config" + q)));
@@ -161,13 +257,13 @@
     var existing = fetchPromiseByKey.get(key);
     if (existing) return existing;
 
-    var prefetchKey = window.__xloxiConfigPrefetchKey;
+    var prefetchKey = offrefyNs().configPrefetchKey;
     var prefetchPromise =
       prefetchKey &&
       prefetchKey === key &&
-      window.__xloxiConfigPrefetch &&
-      typeof window.__xloxiConfigPrefetch.then === "function"
-        ? window.__xloxiConfigPrefetch.then(function (body) {
+      offrefyNs().configPrefetch &&
+      typeof offrefyNs().configPrefetch.then === "function"
+        ? offrefyNs().configPrefetch.then(function (body) {
             return isUsableWidgetConfig(body) ? body : null;
           })
         : Promise.resolve(null);
@@ -212,7 +308,7 @@
   function applyOffrefyPropertiesToForm(form, attribution) {
     var props = offrefyCartProperties(attribution);
     if (!form || !props) return;
-    var existing = form.querySelectorAll("[data-xloxi-prop]");
+    var existing = form.querySelectorAll("[data-offrefy-prop]");
     for (var ei = 0; ei < existing.length; ei++) {
       existing[ei].remove();
     }
@@ -222,7 +318,7 @@
       input.type = "hidden";
       input.name = "properties[" + key + "]";
       input.value = props[key];
-      input.setAttribute("data-xloxi-prop", "1");
+      input.setAttribute("data-offrefy-prop", "1");
       form.appendChild(input);
     }
   }
@@ -425,7 +521,7 @@
   function customerAllowsCampaign(campaign) {
     var ct = String((campaign && campaign.customerType) || "everyone");
     if (ct === "everyone" || !ct) return true;
-    var cust = window.__xloxiCustomer || {};
+    var cust = offrefyNs().customer || {};
     var loggedIn = cust.loggedIn === true;
     if (ct === "logged-in") return loggedIn;
     if (ct === "logged-in-tag-any") {
@@ -575,7 +671,7 @@
 
   function rememberStorefrontTranslations(transMap) {
     if (transMap && typeof transMap === "object" && !Array.isArray(transMap)) {
-      window.__xloxiStorefrontTranslations = transMap;
+      offrefyNs().storefrontTranslations = transMap;
     }
   }
 
@@ -595,7 +691,7 @@
 
   function resolveCartBadgeTemplates() {
     var locale = resolveStorefrontLocale(null) || "en";
-    var fromWindow = window.__xloxiCartBadgeTemplates;
+    var fromWindow = offrefyNs().cartBadgeTemplates;
     if (
       fromWindow &&
       fromWindow.discount &&
@@ -608,7 +704,7 @@
       };
     }
 
-    var transMap = window.__xloxiStorefrontTranslations || {};
+    var transMap = offrefyNs().storefrontTranslations || {};
     var entry = transMap[locale] || {};
     var preset = CART_BADGE_JS_FALLBACKS[locale];
     var discount =
@@ -655,7 +751,7 @@
   function refreshCartBadgeTemplatesForLocale() {
     var locale = resolveStorefrontLocale(null) || "en";
     var templates = resolveCartBadgeTemplates();
-    window.__xloxiCartBadgeTemplates = {
+    offrefyNs().cartBadgeTemplates = {
       locale: locale,
       discount: templates.discount,
       qty: templates.qty,
@@ -703,18 +799,26 @@
     var drawer =
       document.querySelector("cart-drawer") ||
       document.getElementById("CartDrawer") ||
-      document.querySelector("[id*='cart-drawer']");
+      document.querySelector("[id*='cart-drawer']") ||
+      document.querySelector("cart-notification") ||
+      document.querySelector("main-cart-items") ||
+      document.querySelector("[data-cart-drawer]") ||
+      document.querySelector("form[action*='/cart']");
     if (!drawer) return;
 
-    var walker = document.createTreeWalker(drawer, NodeFilter.SHOW_TEXT, null);
-    var node;
-    while ((node = walker.nextNode())) {
-      var text = String(node.textContent || "").trim();
+    /* Only touch discount message nodes — never walk all drawer text. */
+    var nodes = drawer.querySelectorAll(
+      ".discounts__discount, .cart-item__discounted-prices, .cart-discount, [class*='discount'], [data-cart-discount], .totals__discount",
+    );
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      if (!el || el.closest("[data-offrefy-root]")) continue;
+      var text = String(el.textContent || "").trim();
       if (!text) continue;
       var parsed = parseVolumeDiscountBadgeText(text);
       if (!parsed) continue;
       var next = formatLocalizedCartBadgeLabel(parsed.percent, parsed.qty);
-      if (next !== text) node.textContent = next;
+      if (next !== text) el.textContent = next;
     }
   }
 
@@ -741,8 +845,8 @@
   }
 
   function bindCartDrawerDiscountLabelPatching() {
-    if (window.__xloxiCartBadgePatchBound) return;
-    window.__xloxiCartBadgePatchBound = true;
+    if (offrefyNs().cartBadgePatchBound) return;
+    offrefyNs().cartBadgePatchBound = true;
     ["cart:updated", "cart:change", "cart:refresh"].forEach(function (evt) {
       document.documentElement.addEventListener(evt, scheduleCartDrawerDiscountLabelPatch);
     });
@@ -768,8 +872,8 @@
           scheduleCartDrawerDiscountLabelPatch();
         });
         drawerObserver.observe(drawer, { childList: true, subtree: true });
-        if (drawer.getAttribute("data-xloxi-open-watch") === "1") return;
-        drawer.setAttribute("data-xloxi-open-watch", "1");
+        if (drawer.getAttribute("data-offrefy-open-watch") === "1") return;
+        drawer.setAttribute("data-offrefy-open-watch", "1");
         if (openWatchObserver) {
           try {
             openWatchObserver.disconnect();
@@ -804,7 +908,7 @@
       return;
     }
     vdLastKnownStorefrontLocale = next;
-    window.__xloxiStorefrontLocale = next;
+    offrefyNs().storefrontLocale = next;
     vdLastSyncedCartLocale = "";
     refreshCartBadgeTemplatesForLocale();
     syncCartLocaleAttribute(true)
@@ -819,14 +923,16 @@
   }
 
   function bindStorefrontLocaleWatcher() {
-    if (window.__xloxiLocaleWatchBound) return;
-    window.__xloxiLocaleWatchBound = true;
+    if (offrefyNs().localeWatchBound) return;
+    offrefyNs().localeWatchBound = true;
     vdLastKnownStorefrontLocale = resolveStorefrontLocale(null) || "en";
 
+    var localeAttrObserver = null;
     if (typeof MutationObserver !== "undefined") {
-      new MutationObserver(function () {
+      localeAttrObserver = new MutationObserver(function () {
         handleStorefrontLocaleChange();
-      }).observe(document.documentElement, {
+      });
+      localeAttrObserver.observe(document.documentElement, {
         attributes: true,
         attributeFilter: ["lang"],
       });
@@ -834,8 +940,24 @@
 
     window.addEventListener("popstate", handleStorefrontLocaleChange);
     window.addEventListener("pageshow", handleStorefrontLocaleChange);
-    document.addEventListener("visibilitychange", function () {
+    function onVisibility() {
       if (!document.hidden) handleStorefrontLocaleChange();
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+
+    offrefyRegisterTeardown(function () {
+      if (localeAttrObserver) {
+        try {
+          localeAttrObserver.disconnect();
+        } catch (e) {
+          void e;
+        }
+        localeAttrObserver = null;
+      }
+      window.removeEventListener("popstate", handleStorefrontLocaleChange);
+      window.removeEventListener("pageshow", handleStorefrontLocaleChange);
+      document.removeEventListener("visibilitychange", onVisibility);
+      offrefyNs().localeWatchBound = false;
     });
 
     document.addEventListener(
@@ -886,7 +1008,7 @@
           var pathOnly = href.replace(/^https?:\/\/[^/]+/i, "");
           var pathLocale = localeCodeFromPathPrefix(pathOnly);
           if (pathLocale) {
-            window.__xloxiStorefrontLocale = pathLocale;
+            offrefyNs().storefrontLocale = pathLocale;
             vdLastKnownStorefrontLocale = "";
             setTimeout(handleStorefrontLocaleChange, 0);
             setTimeout(handleStorefrontLocaleChange, 400);
@@ -897,7 +1019,7 @@
           link.getAttribute("data-locale") ||
           link.getAttribute("data-language");
         if (dataLocale) {
-          window.__xloxiStorefrontLocale = normalizeLocaleCode(dataLocale);
+          offrefyNs().storefrontLocale = normalizeLocaleCode(dataLocale);
           vdLastKnownStorefrontLocale = "";
           setTimeout(handleStorefrontLocaleChange, 0);
           setTimeout(refreshCartDrawerForLocaleChange, 500);
@@ -910,9 +1032,9 @@
   function tierStringsFromRoot(root) {
     if (!root || !root.getAttribute) return {};
     return {
-      transBuy: root.getAttribute("data-xloxi-trans-buy") || "",
-      transYouSave: root.getAttribute("data-xloxi-trans-you-save") || "",
-      transAdd: root.getAttribute("data-xloxi-trans-add") || "",
+      transBuy: root.getAttribute("data-offrefy-trans-buy") || "",
+      transYouSave: root.getAttribute("data-offrefy-trans-you-save") || "",
+      transAdd: root.getAttribute("data-offrefy-trans-add") || "",
     };
   }
 
@@ -1000,10 +1122,10 @@
   }
 
   function clearCountdown(root) {
-    var id = root.getAttribute("data-xloxi-cd-iv");
+    var id = root.getAttribute("data-offrefy-cd-iv");
     if (id) {
       clearInterval(parseInt(id, 10));
-      root.removeAttribute("data-xloxi-cd-iv");
+      root.removeAttribute("data-offrefy-cd-iv");
     }
   }
 
@@ -1067,8 +1189,8 @@
     );
     if (pathLocale) return pathLocale;
 
-    if (typeof window.__xloxiStorefrontLocale === "string" && window.__xloxiStorefrontLocale) {
-      return normalizeLocaleCode(window.__xloxiStorefrontLocale);
+    if (typeof offrefyNs().storefrontLocale === "string" && offrefyNs().storefrontLocale) {
+      return normalizeLocaleCode(offrefyNs().storefrontLocale);
     }
 
     var fromRoot =
@@ -1102,8 +1224,8 @@
     ) {
       return cfg.maxDiscountProducts | 0;
     }
-    if (typeof window.__xloxiMaxDiscountProducts === "number" && window.__xloxiMaxDiscountProducts > 0) {
-      return window.__xloxiMaxDiscountProducts | 0;
+    if (typeof offrefyNs().maxDiscountProducts === "number" && offrefyNs().maxDiscountProducts > 0) {
+      return offrefyNs().maxDiscountProducts | 0;
     }
     return vdCachedMaxDiscountProducts > 0
       ? vdCachedMaxDiscountProducts
@@ -1114,7 +1236,7 @@
     var n = resolveMaxDiscountProducts(cfg);
     if (n > 0) {
       vdCachedMaxDiscountProducts = n;
-      window.__xloxiMaxDiscountProducts = n;
+      offrefyNs().maxDiscountProducts = n;
     }
     return n;
   }
@@ -1262,43 +1384,70 @@
     return isVdAttributeOnlyCartUpdate(init, VD_CART_LOCALE_ATTR);
   }
 
-  /** Sync locked discount slots immediately after any cart mutation (theme /cart/add.js, etc.). */
+  /**
+   * Hook cart mutations without overriding window.fetch / XHR.
+   * Relies on form submits + theme cart events (works across OS 2.0 themes).
+   */
   function installCartMutationInterceptor() {
-    if (window.__xloxiCartMutationIntercept) return;
-    window.__xloxiCartMutationIntercept = true;
-    var nativeFetch = window.fetch;
-    if (typeof nativeFetch !== "function") return;
+    if (offrefyNs().cartMutationHookBound) return;
+    offrefyNs().cartMutationHookBound = true;
 
-    window.fetch = function (input, init) {
-      var url =
-        typeof input === "string"
-          ? input
-          : input && typeof input === "object" && input.url
-            ? input.url
-            : "";
-      var isMutation =
-        isCartMutationUrl(url) &&
-        !isVdLockedProductsOnlyUpdate(init) &&
-        !isVdLocaleOnlyUpdate(init);
-      var promise = nativeFetch.apply(this, arguments);
-      if (!isMutation) return promise;
+    function afterCartMutation() {
+      if (vdCartAttrSyncBusy) return;
+      vdCartAttrSyncBusy = true;
+      var prevLocked = vdLastSyncedLockedProducts;
+      syncCartLockedProductsAttribute(null)
+        .then(function (cart) {
+          if (cart && vdLastSyncedLockedProducts !== prevLocked) {
+            scheduleCartDrawerDiscountLabelPatch();
+          }
+        })
+        .finally(function () {
+          vdCartAttrSyncBusy = false;
+        });
+    }
 
-      return promise.then(function (res) {
-        if (!res || !res.ok || vdCartAttrSyncBusy) return res;
-        vdCartAttrSyncBusy = true;
-        var prevLocked = vdLastSyncedLockedProducts;
-        return syncCartLockedProductsAttribute(null)
-          .then(function (cart) {
-            if (cart && vdLastSyncedLockedProducts !== prevLocked) {
-              dispatchCartRefresh(cart);
-            }
-            return res;
-          })
-          .finally(function () {
-            vdCartAttrSyncBusy = false;
-          });
-      });
-    };
+    function onCartEvent() {
+      scheduleLockedProductsSyncFromCartEvent();
+      scheduleCartDrawerDiscountLabelPatch();
+    }
+
+    var cartEvents = [
+      "cart:updated",
+      "cart:change",
+      "cart:refresh",
+      "theme:cart:change",
+      "ajaxProduct:added",
+      "product:added",
+    ];
+    for (var i = 0; i < cartEvents.length; i++) {
+      document.documentElement.addEventListener(cartEvents[i], onCartEvent);
+      document.addEventListener(cartEvents[i], onCartEvent);
+    }
+
+    function onCartFormSubmit(ev) {
+      try {
+        var form = ev.target;
+        if (!form || !form.getAttribute) return;
+        if (form.closest && form.closest("[data-offrefy-root]")) return;
+        var action = String(form.getAttribute("action") || form.action || "");
+        if (!/\/cart\/(add|change|update|clear)/i.test(action)) return;
+        setTimeout(afterCartMutation, 250);
+        setTimeout(afterCartMutation, 900);
+      } catch (e) {
+        void e;
+      }
+    }
+    document.addEventListener("submit", onCartFormSubmit, true);
+
+    offrefyRegisterTeardown(function () {
+      for (var j = 0; j < cartEvents.length; j++) {
+        document.documentElement.removeEventListener(cartEvents[j], onCartEvent);
+        document.removeEventListener(cartEvents[j], onCartEvent);
+      }
+      document.removeEventListener("submit", onCartFormSubmit, true);
+      offrefyNs().cartMutationHookBound = false;
+    });
   }
 
   /** Persist active theme locale on the cart so the discount function badge matches /fr/, /de/, etc. */
@@ -1341,12 +1490,13 @@
 
   function dispatchCartRefresh(cart) {
     try {
-      var detail = { cart: cart };
-      /* One primary event — themes listen to cart:updated; avoid triple fan-out storms. */
+      /* Namespaced Offrefy event only — do not fan-out duplicate theme cart events. */
       document.documentElement.dispatchEvent(
-        new CustomEvent("cart:updated", { bubbles: true, detail: detail }),
+        new CustomEvent("offrefy:cart:updated", {
+          bubbles: true,
+          detail: { cart: cart },
+        }),
       );
-      window.dispatchEvent(new CustomEvent("cart:updated", { detail: cart }));
     } catch (e) {
       void e;
     }
@@ -1736,21 +1886,21 @@
   }
 
   function findVdLiquidProductForm(root) {
-    var el = root || document.querySelector(".xloxi-root");
+    var el = root || document.querySelector("[data-offrefy-root]");
     if (el) {
-      var id = el.getAttribute("data-xloxi-product-form-id");
+      var id = el.getAttribute("data-offrefy-product-form-id");
       if (id) {
         var byId = document.getElementById(id);
         if (byId) return byId;
       }
       var inRoot =
-        el.querySelector("form[data-xloxi-liquid-product-form]") ||
-        el.querySelector("form.xloxi-liquid-product-form");
+        el.querySelector("form[data-offrefy-liquid-product-form]") ||
+        el.querySelector("form.offrefy-liquid-product-form");
       if (inRoot) return inRoot;
     }
     return (
-      document.querySelector("form[data-xloxi-liquid-product-form]") ||
-      document.querySelector("form.xloxi-liquid-product-form")
+      document.querySelector("form[data-offrefy-liquid-product-form]") ||
+      document.querySelector("form.offrefy-liquid-product-form")
     );
   }
 
@@ -1759,18 +1909,18 @@
     var vid = String(variantId || "");
     var qty = parseInt(String(quantity), 10) || 1;
     qty = Math.min(VD_MAX_LINE_QTY, Math.max(1, qty));
-    var idInput = form.querySelector("[data-xloxi-liquid-variant-id]");
+    var idInput = form.querySelector("[data-offrefy-liquid-variant-id]");
     if (idInput) {
       /* Arm names only when syncing for submit — keeps theme qty/variant querySelectors clean. */
       idInput.setAttribute("name", "id");
       if (vid) idInput.value = vid;
     }
-    var qtyInput = form.querySelector("[data-xloxi-liquid-qty]");
+    var qtyInput = form.querySelector("[data-offrefy-liquid-qty]");
     if (qtyInput) {
       qtyInput.setAttribute("name", "quantity");
       qtyInput.value = String(qty);
     }
-    var submitBtn = form.querySelector("[data-xloxi-liquid-submit]");
+    var submitBtn = form.querySelector("[data-offrefy-liquid-submit]");
     if (submitBtn) submitBtn.setAttribute("name", "add");
     applyOffrefyPropertiesToForm(form, attribution);
     return true;
@@ -1780,7 +1930,7 @@
     var forms = document.querySelectorAll(
       'form[action*="/cart/add"], form[action*="cart/add"], form[data-type="add-to-cart-form"], form.product-form, product-form form, form#product_form, form#AddToCartForm, form[id*="product-form"], form[id*="ProductForm"]',
     );
-    var widget = document.querySelector(".xloxi-root");
+    var widget = document.querySelector("[data-offrefy-root]");
     var widgetScope = widget
       ? widget.closest(
           "product-info, .product, [id^='MainProduct'], .shopify-section, .product__info, .product-single, .product-details",
@@ -1794,12 +1944,12 @@
       if (!form) continue;
       /* Skip our Liquid bridge form — theme ATC must be the theme's own form. */
       if (
-        form.hasAttribute("data-xloxi-liquid-product-form") ||
-        (form.classList && form.classList.contains("xloxi-liquid-product-form"))
+        form.hasAttribute("data-offrefy-liquid-product-form") ||
+        (form.classList && form.classList.contains("offrefy-liquid-product-form"))
       ) {
         continue;
       }
-      if (form.closest(".xloxi-root")) continue;
+      if (form.closest("[data-offrefy-root]")) continue;
       if (
         form.closest(
           "cart-drawer, cart-notification, #CartDrawer, .cart-drawer, cart-items, #main-cart-items",
@@ -1838,12 +1988,12 @@
     var all = document.querySelectorAll('form[action*="/cart/add"]');
     for (var j = 0; j < all.length; j++) {
       if (
-        all[j].hasAttribute("data-xloxi-liquid-product-form") ||
-        (all[j].classList && all[j].classList.contains("xloxi-liquid-product-form"))
+        all[j].hasAttribute("data-offrefy-liquid-product-form") ||
+        (all[j].classList && all[j].classList.contains("offrefy-liquid-product-form"))
       ) {
         continue;
       }
-      if (!all[j].closest(".xloxi-root")) return all[j];
+      if (!all[j].closest("[data-offrefy-root]")) return all[j];
     }
     return null;
   }
@@ -1904,7 +2054,7 @@
       var nodes = form.querySelectorAll(selectors[s]);
       for (var i = 0; i < nodes.length; i++) {
         var el = nodes[i];
-        if (el.closest(".xloxi-root")) continue;
+        if (el.closest("[data-offrefy-root]")) continue;
         if (isThemeBuyItNowButton(el)) continue;
         return el;
       }
@@ -1931,7 +2081,7 @@
       var ext = scope.querySelector(
         'button[name="add"], button.product-form__submit, [data-add-to-cart], .product-form__cart-submit, #AddToCart',
       );
-      if (ext && !ext.closest(".xloxi-root") && !isThemeBuyItNowButton(ext)) {
+      if (ext && !ext.closest("[data-offrefy-root]") && !isThemeBuyItNowButton(ext)) {
         return ext;
       }
     }
@@ -1947,7 +2097,7 @@
     if (!form || !btn) return false;
 
     var restoreHide =
-      document.documentElement.getAttribute("data-xloxi-hide-theme-atc") === "1" ||
+      document.documentElement.getAttribute("data-offrefy-hide-theme-atc") === "1" ||
       window.getComputedStyle(btn).display === "none" ||
       btn.getAttribute("aria-hidden") === "true";
 
@@ -2024,7 +2174,7 @@
           else btn.style.removeProperty("opacity");
           if (prev.ariaHidden != null) btn.setAttribute("aria-hidden", prev.ariaHidden);
           else if (restoreHide) btn.setAttribute("aria-hidden", "true");
-          if (document.documentElement.getAttribute("data-xloxi-hide-theme-atc") === "1") {
+          if (document.documentElement.getAttribute("data-offrefy-hide-theme-atc") === "1") {
             try {
               hideThemeNativeAddToCartButtons();
             } catch (eHide) {
@@ -2044,7 +2194,7 @@
    * 2) Liquid {% form 'product' %} bridge via /cart/add.js (all free/premium themes)
    */
   function addByClickingThemeAtc(variantId, quantity, attribution) {
-    var root = document.querySelector(".xloxi-root");
+    var root = document.querySelector("[data-offrefy-root]");
     var liquidForm = findVdLiquidProductForm(root);
     var themeForm = findThemeProductAddForm();
     var themeBtn = findThemeAddToCartButton(themeForm);
@@ -2141,7 +2291,7 @@
           };
 
     function add(el) {
-      if (!el || (el.closest && el.closest(".xloxi-root"))) return;
+      if (!el || (el.closest && el.closest("[data-offrefy-root]"))) return;
       /* Include type=hidden — many themes keep qty only as a hidden input while
          the visible stepper is custom JS (and may stay at 1 after we hide it). */
       if (
@@ -2216,7 +2366,7 @@
     var liquid = findVdLiquidProductForm(null);
     if (liquid) {
       var lq =
-        liquid.querySelector("[data-xloxi-liquid-qty]") ||
+        liquid.querySelector("[data-offrefy-liquid-qty]") ||
         liquid.querySelector('input[name="quantity"]');
       if (lq) lq.value = str;
     }
@@ -2308,7 +2458,7 @@
     /* Theme ATC may be visually hidden — keep it clickable off-screen so the
        theme ProductForm submit runs (Shopify default add + cart drawer). */
     var restoreHide =
-      document.documentElement.getAttribute("data-xloxi-hide-theme-atc") === "1";
+      document.documentElement.getAttribute("data-offrefy-hide-theme-atc") === "1";
     var prev = {
       display: btn.style.getPropertyValue("display"),
       position: btn.style.getPropertyValue("position"),
@@ -2518,7 +2668,7 @@
             if (wasOpen || openDrawer) {
               el.setAttribute("data-open", "");
               el.removeAttribute("hidden");
-              document.body.classList.add("valor-cart-drawer-open");
+              /* Do not mutate document.body classes — let the theme drawer API own open state. */
             }
             try {
               if (neu.classList.contains("valor-cart-drawer--empty")) {
@@ -2717,7 +2867,7 @@
 
     var form = findThemeProductAddForm() || findVdLiquidProductForm(null);
     if (form) {
-      if (form.hasAttribute("data-xloxi-liquid-product-form") || (form.classList && form.classList.contains("xloxi-liquid-product-form"))) {
+      if (form.hasAttribute("data-offrefy-liquid-product-form") || (form.classList && form.classList.contains("offrefy-liquid-product-form"))) {
         syncVdLiquidProductForm(form, id, qty, attribution);
       } else {
         syncThemeProductFormFields(form, id, qty, attribution);
@@ -2904,26 +3054,26 @@
   }
 
   function hideThemeNativeAddToCartButtons() {
-    if (document.documentElement.getAttribute("data-xloxi-hide-theme-atc") !== "1") {
+    if (document.documentElement.getAttribute("data-offrefy-hide-theme-atc") !== "1") {
       return;
     }
     var forms = document.querySelectorAll('form[action*="/cart/add"]');
     for (var i = 0; i < forms.length; i++) {
       var form = forms[i];
-      if (form.closest(".xloxi-root")) continue;
+      if (form.closest("[data-offrefy-root]")) continue;
       var btn =
         form.querySelector('button[name="add"]') ||
         form.querySelector('input[type="submit"][name="add"]') ||
         form.querySelector("button.product-form__submit");
       if (!btn) btn = form.querySelector('button[type="submit"]');
-      if (!btn || btn.closest(".xloxi-root")) continue;
+      if (!btn || btn.closest("[data-offrefy-root]")) continue;
       btn.style.setProperty("display", "none", "important");
       btn.setAttribute("aria-hidden", "true");
     }
   }
 
   function hideThemeNativeBuyItNowButtons() {
-    if (document.documentElement.getAttribute("data-xloxi-hide-theme-bin") !== "1") {
+    if (document.documentElement.getAttribute("data-offrefy-hide-theme-bin") !== "1") {
       return;
     }
     var selectors = [
@@ -2936,7 +3086,7 @@
       var nodes = document.querySelectorAll(selectors[si]);
       for (var i = 0; i < nodes.length; i++) {
         var n = nodes[i];
-        if (n.closest(".xloxi-root")) continue;
+        if (n.closest("[data-offrefy-root]")) continue;
         n.style.setProperty("display", "none", "important");
         n.setAttribute("aria-hidden", "true");
       }
@@ -2948,7 +3098,7 @@
    * Covers: variant id (select/radio name="id"), split options (name^="options"), Dawn variant-selects / variant-radios, .product-form__input rows.
    */
   function hideThemeNativeVariantSelectors() {
-    if (document.documentElement.getAttribute("data-xloxi-hide-theme-variant") !== "1") {
+    if (document.documentElement.getAttribute("data-offrefy-hide-theme-variant") !== "1") {
       return;
     }
     var seen =
@@ -2957,7 +3107,7 @@
         : { _a: [], has: function (el) { return this._a.indexOf(el) !== -1; }, add: function (el) { this._a.push(el); } };
 
     function hideBlock(el) {
-      if (!el || el.closest(".xloxi-root")) return;
+      if (!el || el.closest("[data-offrefy-root]")) return;
       if (seen.has(el)) return;
       seen.add(el);
       el.style.setProperty("display", "none", "important");
@@ -2989,7 +3139,7 @@
     var forms = document.querySelectorAll('form[action*="/cart/add"]');
     for (var fi = 0; fi < forms.length; fi++) {
       var form = forms[fi];
-      if (form.closest(".xloxi-root")) continue;
+      if (form.closest("[data-offrefy-root]")) continue;
 
       var hosts = form.querySelectorAll("variant-selects, variant-radios");
       for (var hi = 0; hi < hosts.length; hi++) {
@@ -3063,12 +3213,12 @@
     );
     for (var sr = 0; sr < sectionRoots.length; sr++) {
       var sec = sectionRoots[sr];
-      if (!sec || sec.closest(".xloxi-root")) continue;
+      if (!sec || sec.closest("[data-offrefy-root]")) continue;
 
       var extHosts = sec.querySelectorAll("variant-selects, variant-radios");
       for (var xi = 0; xi < extHosts.length; xi++) {
         var xh = extHosts[xi];
-        if (xh.closest(".xloxi-root")) continue;
+        if (xh.closest("[data-offrefy-root]")) continue;
         if (xh.closest('form[action*="/cart/add"]')) continue;
         hideBlock(xh);
       }
@@ -3076,7 +3226,7 @@
       var extFieldsets = sec.querySelectorAll("fieldset.product-form__input, fieldset.js.product-form__input");
       for (var fi2 = 0; fi2 < extFieldsets.length; fi2++) {
         var fs = extFieldsets[fi2];
-        if (fs.closest(".xloxi-root")) continue;
+        if (fs.closest("[data-offrefy-root]")) continue;
         if (fs.closest('form[action*="/cart/add"]')) continue;
         if (isQuantityOnlyBlock(fs)) continue;
         if (!blockHasVariantUi(fs)) continue;
@@ -3086,7 +3236,7 @@
       var extOptRadios = sec.querySelectorAll('input[type="radio"][name^="options"]');
       for (var er = 0; er < extOptRadios.length; er++) {
         var erEl = extOptRadios[er];
-        if (erEl.closest(".xloxi-root")) continue;
+        if (erEl.closest("[data-offrefy-root]")) continue;
         if (erEl.closest('form[action*="/cart/add"]')) continue;
         var erw =
           erEl.closest("fieldset.product-form__input") ||
@@ -3102,7 +3252,7 @@
    * Hides theme product-form quantity UI (+/−, number input, quantity-input host). Cart qty still syncs from the widget.
    */
   function hideThemeNativeQuantitySelectors() {
-    if (document.documentElement.getAttribute("data-xloxi-hide-theme-qty") !== "1") {
+    if (document.documentElement.getAttribute("data-offrefy-hide-theme-qty") !== "1") {
       return;
     }
     var seen =
@@ -3111,7 +3261,7 @@
         : { _a: [], has: function (el) { return this._a.indexOf(el) !== -1; }, add: function (el) { this._a.push(el); } };
 
     function hideBlock(el) {
-      if (!el || el.closest(".xloxi-root")) return;
+      if (!el || el.closest("[data-offrefy-root]")) return;
       if (seen.has(el)) return;
       seen.add(el);
       el.style.setProperty("display", "none", "important");
@@ -3134,7 +3284,7 @@
     var forms = document.querySelectorAll('form[action*="/cart/add"]');
     for (var fi = 0; fi < forms.length; fi++) {
       var form = forms[fi];
-      if (form.closest(".xloxi-root")) continue;
+      if (form.closest("[data-offrefy-root]")) continue;
 
       var qHosts = form.querySelectorAll("quantity-input");
       for (var hi = 0; hi < qHosts.length; hi++) {
@@ -3171,11 +3321,11 @@
     );
     for (var sr = 0; sr < sectionRoots.length; sr++) {
       var sec = sectionRoots[sr];
-      if (!sec || sec.closest(".xloxi-root")) continue;
+      if (!sec || sec.closest("[data-offrefy-root]")) continue;
       var extQ = sec.querySelectorAll("quantity-input");
       for (var xi = 0; xi < extQ.length; xi++) {
         var xq = extQ[xi];
-        if (xq.closest(".xloxi-root")) continue;
+        if (xq.closest("[data-offrefy-root]")) continue;
         if (xq.closest('form[action*="/cart/add"]')) continue;
         hideBlock(xq);
       }
@@ -3190,15 +3340,34 @@
   }
 
   var vdHidePurchaseUiScheduled = false;
+  function getOffrefyHideObserveRoots() {
+    var roots = [];
+    var widgets = document.querySelectorAll("[data-offrefy-root]");
+    for (var i = 0; i < widgets.length; i++) {
+      var w = widgets[i];
+      var section =
+        (w.closest && w.closest(".shopify-section")) ||
+        (w.closest && w.closest("product-info")) ||
+        (w.closest && w.closest("[id^='MainProduct']")) ||
+        (w.closest && w.closest("main")) ||
+        null;
+      if (section && roots.indexOf(section) === -1) roots.push(section);
+    }
+    return roots;
+  }
+
   function ensureThemePurchaseUiHideObserver() {
     if (vdHidePurchaseUiObserver || typeof MutationObserver === "undefined") return;
+    var observeRoots = getOffrefyHideObserveRoots();
+    if (!observeRoots.length) return;
+
     vdHidePurchaseUiObserver = new MutationObserver(function (mutations) {
       for (var i = 0; i < mutations.length; i++) {
         var t = mutations[i].target;
         if (
           t &&
           t.closest &&
-          (t.closest(".xloxi-root") ||
+          (t.closest("[data-offrefy-root]") ||
             t.closest("cart-drawer") ||
             t.closest("#CartDrawer") ||
             t.closest("cart-notification") ||
@@ -3215,7 +3384,26 @@
         return;
       }
     });
-    vdHidePurchaseUiObserver.observe(document.body, { childList: true, subtree: true });
+    for (var r = 0; r < observeRoots.length; r++) {
+      try {
+        vdHidePurchaseUiObserver.observe(observeRoots[r], {
+          childList: true,
+          subtree: true,
+        });
+      } catch (eObs) {
+        void eObs;
+      }
+    }
+    offrefyRegisterTeardown(function () {
+      if (vdHidePurchaseUiObserver) {
+        try {
+          vdHidePurchaseUiObserver.disconnect();
+        } catch (e) {
+          void e;
+        }
+        vdHidePurchaseUiObserver = null;
+      }
+    });
   }
 
   function scheduleThemePurchaseUiHides() {
@@ -3447,9 +3635,9 @@
   }
 
   function badgeTopFloatAlignClass(pos) {
-    if (pos === "top_left") return "xloxi-card__badge-top--align-start";
-    if (pos === "top_center") return "xloxi-card__badge-top--align-center";
-    return "xloxi-card__badge-top--align-end";
+    if (pos === "top_left") return "offrefy-card__badge-top--align-start";
+    if (pos === "top_center") return "offrefy-card__badge-top--align-center";
+    return "offrefy-card__badge-top--align-end";
   }
 
   var BADGE_SIZE_PCT_MIN = 60;
@@ -3463,25 +3651,25 @@
 
   function applyWidgetHeaderDisplayToRoot(root, d) {
     var layout = effectiveWidgetHeaderLayout(d);
-    root.setAttribute("data-xloxi-header-layout", layout);
+    root.setAttribute("data-offrefy-header-layout", layout);
     if (d.widgetHeaderMobileStack === true) {
-      root.setAttribute("data-xloxi-header-mobile-stack", "1");
+      root.setAttribute("data-offrefy-header-mobile-stack", "1");
     } else {
-      root.removeAttribute("data-xloxi-header-mobile-stack");
+      root.removeAttribute("data-offrefy-header-mobile-stack");
     }
     if (effectiveWidgetHeaderSwapOrder(d)) {
-      root.setAttribute("data-xloxi-header-swap", "1");
+      root.setAttribute("data-offrefy-header-swap", "1");
     } else {
-      root.removeAttribute("data-xloxi-header-swap");
+      root.removeAttribute("data-offrefy-header-swap");
     }
     var ha = pickWidgetHeaderTextAlign(d.widgetHeadingAlign, "center");
     var ca = pickWidgetHeaderTextAlign(d.countdownAlign, "center");
     // Heading "Right" → pin timer to the trailing edge (matches merchant intent).
     if (ha === "end") ca = "end";
-    root.setAttribute("data-xloxi-heading-align", ha);
-    root.setAttribute("data-xloxi-countdown-align", ca);
-    root.style.setProperty("--vd-heading-text-align", ha);
-    root.style.setProperty("--vd-countdown-justify", countdownAlignToJustify(ca));
+    root.setAttribute("data-offrefy-heading-align", ha);
+    root.setAttribute("data-offrefy-countdown-align", ca);
+    root.style.setProperty("--offrefy-heading-text-align", ha);
+    root.style.setProperty("--offrefy-countdown-justify", countdownAlignToJustify(ca));
   }
 
   function clampRadiusPx(n, fallback) {
@@ -3594,7 +3782,7 @@
   };
 
   function parseVariantsFromRoot(root) {
-    var el = root.querySelector("script[data-xloxi-variants-json]");
+    var el = root.querySelector("script[data-offrefy-variants-json]");
     if (!el || !el.textContent) return [];
     try {
       var arr = JSON.parse(el.textContent.trim());
@@ -3638,7 +3826,7 @@
     var forms = document.querySelectorAll('form[action*="/cart/add"]');
     for (var fi = 0; fi < forms.length; fi++) {
       var form = forms[fi];
-      if (form.closest(".xloxi-root")) continue;
+      if (form.closest("[data-offrefy-root]")) continue;
       var vs = form.querySelector('select[name="id"]');
       if (vs && vs.value) return String(vs.value);
       var hid = form.querySelector('input[name="id"][type="hidden"]');
@@ -3660,10 +3848,10 @@
     if (existingPid && (!forcePrice || (existingPrice && existingPrice > 0))) {
       return Promise.resolve(true);
     }
-    if (root.getAttribute("data-xloxi-hydrating") === "1") {
+    if (root.getAttribute("data-offrefy-hydrating") === "1") {
       return Promise.resolve(false);
     }
-    root.setAttribute("data-xloxi-hydrating", "1");
+    root.setAttribute("data-offrefy-hydrating", "1");
     return fetchProductJsonForPage()
       .then(function (pj) {
         if (!pj || !pj.id) return false;
@@ -3702,11 +3890,11 @@
           return false;
         }
 
-        var variantsScript = root.querySelector("script[data-xloxi-variants-json]");
+        var variantsScript = root.querySelector("script[data-offrefy-variants-json]");
         if (!variantsScript) {
           variantsScript = document.createElement("script");
           variantsScript.type = "application/json";
-          variantsScript.setAttribute("data-xloxi-variants-json", "");
+          variantsScript.setAttribute("data-offrefy-variants-json", "");
           root.insertBefore(variantsScript, root.firstChild);
         }
         variantsScript.textContent = JSON.stringify(
@@ -3725,7 +3913,7 @@
         return false;
       })
       .then(function (ok) {
-        root.removeAttribute("data-xloxi-hydrating");
+        root.removeAttribute("data-offrefy-hydrating");
         return ok;
       });
   }
@@ -3830,14 +4018,14 @@
     var text = String(css != null ? css : "")
       .slice(0, VD_CUSTOM_CSS_MAX_CHARS)
       .trim();
-    var el = root.querySelector("style[data-xloxi-custom-css]");
+    var el = root.querySelector("style[data-offrefy-custom-css]");
     if (!text) {
       if (el && el.parentNode) el.parentNode.removeChild(el);
       return;
     }
     if (!el) {
       el = document.createElement("style");
-      el.setAttribute("data-xloxi-custom-css", "");
+      el.setAttribute("data-offrefy-custom-css", "");
       el.setAttribute("type", "text/css");
       root.insertBefore(el, root.firstChild);
     }
@@ -3846,57 +4034,57 @@
 
   function applyWidgetDisplayToRoot(root, disp, _themeHeading) {
     var d = mergeWidgetDisplay(disp);
-    root.removeAttribute("data-xloxi-font-scale");
-    if (d.fontScale === "compact") root.setAttribute("data-xloxi-font-scale", "compact");
-    else if (d.fontScale === "comfortable") root.setAttribute("data-xloxi-font-scale", "comfortable");
+    root.removeAttribute("data-offrefy-font-scale");
+    if (d.fontScale === "compact") root.setAttribute("data-offrefy-font-scale", "compact");
+    else if (d.fontScale === "comfortable") root.setAttribute("data-offrefy-font-scale", "comfortable");
 
     applyWidgetHeaderDisplayToRoot(root, d);
 
-    root.style.setProperty("--vd-maroon", String(d.primaryColor));
-    root.style.setProperty("--vd-maroon-cta-hover", String(d.primaryHoverColor));
-    root.style.setProperty("--vd-pink-bg", String(d.selectedBgColor));
-    root.style.setProperty("--vd-countdown-bg", String(d.countdownBgColor));
-    root.style.setProperty("--vd-countdown-text", String(d.countdownTextColor));
-    root.style.setProperty("--vd-save", String(d.savingsColor));
+    root.style.setProperty("--offrefy-maroon", String(d.primaryColor));
+    root.style.setProperty("--offrefy-maroon-cta-hover", String(d.primaryHoverColor));
+    root.style.setProperty("--offrefy-pink-bg", String(d.selectedBgColor));
+    root.style.setProperty("--offrefy-countdown-bg", String(d.countdownBgColor));
+    root.style.setProperty("--offrefy-countdown-text", String(d.countdownTextColor));
+    root.style.setProperty("--offrefy-save", String(d.savingsColor));
     root.style.setProperty(
-      "--vd-vt-discount-fg",
+      "--offrefy-vt-discount-fg",
       String(d.volumeTableDiscountColor || d.savingsColor),
     );
     root.style.setProperty(
-      "--vd-option-subtext",
+      "--offrefy-option-subtext",
       String(d.optionSubtextColor || d.savingsColor),
     );
-    root.style.setProperty("--vd-muted", String(d.mutedColor));
-    root.style.setProperty("--vd-card-border", String(d.cardBorderColor));
+    root.style.setProperty("--offrefy-muted", String(d.mutedColor));
+    root.style.setProperty("--offrefy-card-border", String(d.cardBorderColor));
     root.style.setProperty(
-      "--vd-radius-card",
+      "--offrefy-radius-card",
       String(clampRadiusPx(d.cardBorderRadiusPx, 14)) + "px",
     );
     root.style.setProperty(
-      "--vd-radius-cta",
+      "--offrefy-radius-cta",
       String(clampRadiusPx(d.buttonBorderRadiusPx, 14)) + "px",
     );
     root.style.setProperty(
-      "--vd-radius-control",
+      "--offrefy-radius-control",
       String(clampRadiusPx(d.controlBorderRadiusPx, WD_DEFAULT.controlBorderRadiusPx)) + "px",
     );
-    root.style.setProperty("--vd-maroon-border", String(d.primaryColor));
-    root.style.setProperty("--vd-badge-bg", String(d.badgeBackgroundColor));
-    root.style.setProperty("--vd-badge-text", String(d.badgeTextColor));
+    root.style.setProperty("--offrefy-maroon-border", String(d.primaryColor));
+    root.style.setProperty("--offrefy-badge-bg", String(d.badgeBackgroundColor));
+    root.style.setProperty("--offrefy-badge-text", String(d.badgeTextColor));
     root.style.setProperty(
-      "--vd-badge-size-scale",
+      "--offrefy-badge-size-scale",
       String(clampBadgeSizeScalePct(d.badgeSizeScalePercent) / 100),
     );
     root.style.setProperty(
-      "--vd-radio",
+      "--offrefy-radio",
       String(clampRadioPx(d.radioButtonSizePx, WD_DEFAULT.radioButtonSizePx)) + "px",
     );
     root.style.setProperty(
-      "--vd-radio-border",
+      "--offrefy-radio-border",
       String(d.radioButtonBorderColor != null ? d.radioButtonBorderColor : "#bdbdbd"),
     );
     root.style.setProperty(
-      "--vd-radio-accent",
+      "--offrefy-radio-accent",
       String(
         d.radioButtonAccentColor != null && String(d.radioButtonAccentColor).trim() !== ""
           ? d.radioButtonAccentColor
@@ -3905,43 +4093,43 @@
     );
 
     var sp = d.fontSizeScalePercent;
-    root.style.setProperty("--vd-fs-title", fontSizeToCssScaled(d.fontSizeTitle, sp));
-    root.style.setProperty("--vd-fs-buy", fontSizeToCssScaled(d.fontSizeBuyLabel, sp));
-    root.style.setProperty("--vd-fs-badge", fontSizeToCssScaled(d.fontSizeBadge, sp));
-    root.style.setProperty("--vd-fs-price", fontSizeToCssScaled(d.fontSizePrice, sp));
-    root.style.setProperty("--vd-fs-compare", fontSizeToCssScaled(d.fontSizeComparePrice, sp));
-    root.style.setProperty("--vd-fs-save", fontSizeToCssScaled(d.fontSizeSavings, sp));
+    root.style.setProperty("--offrefy-fs-title", fontSizeToCssScaled(d.fontSizeTitle, sp));
+    root.style.setProperty("--offrefy-fs-buy", fontSizeToCssScaled(d.fontSizeBuyLabel, sp));
+    root.style.setProperty("--offrefy-fs-badge", fontSizeToCssScaled(d.fontSizeBadge, sp));
+    root.style.setProperty("--offrefy-fs-price", fontSizeToCssScaled(d.fontSizePrice, sp));
+    root.style.setProperty("--offrefy-fs-compare", fontSizeToCssScaled(d.fontSizeComparePrice, sp));
+    root.style.setProperty("--offrefy-fs-save", fontSizeToCssScaled(d.fontSizeSavings, sp));
     root.style.setProperty(
-      "--vd-fs-option-subtext",
+      "--offrefy-fs-option-subtext",
       fontSizeToCssScaled(d.fontSizeOptionSubtext, sp),
     );
-    root.style.setProperty("--vd-fs-cta", fontSizeToCssScaled(d.fontSizeButton, sp));
-    root.style.setProperty("--vd-fs-cd-label", fontSizeToCssScaled(d.fontSizeCountdownLabel, sp));
-    root.style.setProperty("--vd-fs-cd-badge", fontSizeToCssScaled(d.fontSizeCountdownValue, sp));
-    root.style.setProperty("--vd-fs-footnote", fontSizeToCssScaled(d.fontSizeFootnote, sp));
-    root.style.setProperty("--vd-fw-strong", String(d.fontWeightStrong));
-    root.style.setProperty("--vd-fw-accent", String(d.fontWeightAccent));
-    root.style.setProperty("--vd-fw-body", String(d.fontWeightBody));
-    root.style.setProperty("--vd-fw-normal", String(d.fontWeightNormal));
+    root.style.setProperty("--offrefy-fs-cta", fontSizeToCssScaled(d.fontSizeButton, sp));
+    root.style.setProperty("--offrefy-fs-cd-label", fontSizeToCssScaled(d.fontSizeCountdownLabel, sp));
+    root.style.setProperty("--offrefy-fs-cd-badge", fontSizeToCssScaled(d.fontSizeCountdownValue, sp));
+    root.style.setProperty("--offrefy-fs-footnote", fontSizeToCssScaled(d.fontSizeFootnote, sp));
+    root.style.setProperty("--offrefy-fw-strong", String(d.fontWeightStrong));
+    root.style.setProperty("--offrefy-fw-accent", String(d.fontWeightAccent));
+    root.style.setProperty("--offrefy-fw-body", String(d.fontWeightBody));
+    root.style.setProperty("--offrefy-fw-normal", String(d.fontWeightNormal));
     root.style.setProperty(
-      "--vd-vt-cell-pad-block",
+      "--offrefy-vt-cell-pad-block",
       String(clampVtCellPadPx(d.volumeTableCellPaddingPx, WD_DEFAULT.volumeTableCellPaddingPx)) +
         "px",
     );
     root.style.setProperty(
-      "--vd-vt-col1-text-align",
+      "--offrefy-vt-col1-text-align",
       String(pickWidgetHeaderTextAlign(d.volumeTableQuantityColumnAlign, "start")),
     );
     root.style.setProperty(
-      "--vd-vt-col2-text-align",
+      "--offrefy-vt-col2-text-align",
       String(pickWidgetHeaderTextAlign(d.volumeTableDiscountColumnAlign, "center")),
     );
     root.style.setProperty(
-      "--vd-vt-col3-text-align",
+      "--offrefy-vt-col3-text-align",
       String(pickWidgetHeaderTextAlign(d.volumeTablePriceColumnAlign, "end")),
     );
     root.style.setProperty(
-      "--vd-vt-col1-pad-inline-start",
+      "--offrefy-vt-col1-pad-inline-start",
       String(
         clampVtColInlinePadPx(
           d.volumeTableQuantityColPaddingStartPx,
@@ -3950,7 +4138,7 @@
       ) + "px",
     );
     root.style.setProperty(
-      "--vd-vt-col1-pad-inline-end",
+      "--offrefy-vt-col1-pad-inline-end",
       String(
         clampVtColInlinePadPx(
           d.volumeTableQuantityColPaddingEndPx,
@@ -3959,7 +4147,7 @@
       ) + "px",
     );
     root.style.setProperty(
-      "--vd-vt-col2-pad-inline-start",
+      "--offrefy-vt-col2-pad-inline-start",
       String(
         clampVtColInlinePadPx(
           d.volumeTableDiscountColPaddingStartPx,
@@ -3968,7 +4156,7 @@
       ) + "px",
     );
     root.style.setProperty(
-      "--vd-vt-col2-pad-inline-end",
+      "--offrefy-vt-col2-pad-inline-end",
       String(
         clampVtColInlinePadPx(
           d.volumeTableDiscountColPaddingEndPx,
@@ -3977,7 +4165,7 @@
       ) + "px",
     );
     root.style.setProperty(
-      "--vd-vt-col3-pad-inline-start",
+      "--offrefy-vt-col3-pad-inline-start",
       String(
         clampVtColInlinePadPx(
           d.volumeTablePriceColPaddingStartPx,
@@ -3986,7 +4174,7 @@
       ) + "px",
     );
     root.style.setProperty(
-      "--vd-vt-col3-pad-inline-end",
+      "--offrefy-vt-col3-pad-inline-end",
       String(
         clampVtColInlinePadPx(
           d.volumeTablePriceColPaddingEndPx,
@@ -4107,24 +4295,24 @@
     var isVolumeTable = ui.widgetPresentation === "volume_table";
 
     if (ui.hideThemeAddToCart) {
-      document.documentElement.setAttribute("data-xloxi-hide-theme-atc", "1");
+      document.documentElement.setAttribute("data-offrefy-hide-theme-atc", "1");
     } else {
-      document.documentElement.removeAttribute("data-xloxi-hide-theme-atc");
+      document.documentElement.removeAttribute("data-offrefy-hide-theme-atc");
     }
     if (ui.hideThemeBuyItNow) {
-      document.documentElement.setAttribute("data-xloxi-hide-theme-bin", "1");
+      document.documentElement.setAttribute("data-offrefy-hide-theme-bin", "1");
     } else {
-      document.documentElement.removeAttribute("data-xloxi-hide-theme-bin");
+      document.documentElement.removeAttribute("data-offrefy-hide-theme-bin");
     }
     if (ui.hideThemeVariantSelector) {
-      document.documentElement.setAttribute("data-xloxi-hide-theme-variant", "1");
+      document.documentElement.setAttribute("data-offrefy-hide-theme-variant", "1");
     } else {
-      document.documentElement.removeAttribute("data-xloxi-hide-theme-variant");
+      document.documentElement.removeAttribute("data-offrefy-hide-theme-variant");
     }
     if (ui.hideThemeQuantitySelector) {
-      document.documentElement.setAttribute("data-xloxi-hide-theme-qty", "1");
+      document.documentElement.setAttribute("data-offrefy-hide-theme-qty", "1");
     } else {
-      document.documentElement.removeAttribute("data-xloxi-hide-theme-qty");
+      document.documentElement.removeAttribute("data-offrefy-hide-theme-qty");
     }
     if (
       ui.hideThemeAddToCart ||
@@ -4189,13 +4377,13 @@
       campaignId: campaign.id,
       productId: root.getAttribute("data-product-id"),
     };
-    var rn = "xloxi-tier-" + String(radioName).replace(/[^a-zA-Z0-9_-]/g, "-");
+    var rn = "offrefy-tier-" + String(radioName).replace(/[^a-zA-Z0-9_-]/g, "-");
 
     function readThemeProductFormVariantId() {
       var forms = document.querySelectorAll('form[action*="/cart/add"]');
       for (var fi = 0; fi < forms.length; fi++) {
         var form = forms[fi];
-        if (form.closest(".xloxi-root")) continue;
+        if (form.closest("[data-offrefy-root]")) continue;
         var vs = form.querySelector('select[name="id"]');
         if (vs && vs.value) return String(vs.value);
         var hid = form.querySelector('input[name="id"][type="hidden"]');
@@ -4206,9 +4394,9 @@
 
     function resolveActiveVariantIdForCart() {
       if (vdShowVariant) {
-        var selAdd = mountEl.querySelector(".xloxi-card--selected .xloxi-variant-select");
+        var selAdd = mountEl.querySelector(".offrefy-card--selected .offrefy-variant-select");
         if (!selAdd) {
-          selAdd = mountEl.querySelector(".xloxi-variant-select");
+          selAdd = mountEl.querySelector(".offrefy-variant-select");
         }
         if (selAdd) return String(selAdd.value);
       }
@@ -4283,54 +4471,54 @@
 
     function expandHtml(c, selId) {
       var selectBlock = vdShowVariant
-        ? '<div class="xloxi-select-wrap"><select class="xloxi-variant-select" aria-label="Variant">' +
+        ? '<div class="offrefy-select-wrap"><select class="offrefy-variant-select" aria-label="Variant">' +
           variantOptionsHtml(selId) +
           "</select></div>"
         : "";
       var qtyBlock = ui.hideWidgetQuantitySelector
         ? ""
-        : '<div class="xloxi-qty-group" role="group" aria-label="Quantity">' +
-          '<button type="button" class="xloxi-qty-btn" data-xloxi-qty-dec aria-label="Decrease quantity"><span aria-hidden="true">−</span></button>' +
-          '<input type="text" class="xloxi-qty-value" data-xloxi-qty-display inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="' +
+        : '<div class="offrefy-qty-group" role="group" aria-label="Quantity">' +
+          '<button type="button" class="offrefy-qty-btn" data-offrefy-qty-dec aria-label="Decrease quantity"><span aria-hidden="true">−</span></button>' +
+          '<input type="text" class="offrefy-qty-value" data-offrefy-qty-display inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="' +
           String(String(VD_MAX_LINE_QTY).length) +
           '" aria-label="Quantity" value="' +
           stateQty +
           '" />' +
-          '<button type="button" class="xloxi-qty-btn" data-xloxi-qty-inc aria-label="Increase quantity"><span aria-hidden="true">+</span></button>' +
+          '<button type="button" class="offrefy-qty-btn" data-offrefy-qty-inc aria-label="Increase quantity"><span aria-hidden="true">+</span></button>' +
           "</div>";
       var qtyStack =
         qtyBlock === ""
           ? ""
-          : '<div class="xloxi-qty-stack">' +
+          : '<div class="offrefy-qty-stack">' +
             qtyBlock +
-            '<p class="xloxi-cart-qty-alert" data-xloxi-cart-qty-alert hidden tabindex="-1"></p>' +
+            '<p class="offrefy-cart-qty-alert" data-offrefy-cart-qty-alert hidden tabindex="-1"></p>' +
             "</div>";
       var lineTotalBlock = ui.hideWidgetLineTotal
         ? ""
-        : '<span class="xloxi-line-total" data-xloxi-line-total></span>';
+        : '<span class="offrefy-line-total" data-offrefy-line-total></span>';
       var tierAddBtn = ui.hideWidgetTierAddButton
         ? ""
-        : '<button type="button" class="xloxi-add-outline" data-xloxi-tier-add>+ ' +
+        : '<button type="button" class="offrefy-add-outline" data-offrefy-tier-add>+ ' +
           esc(ui.transAdd || "Add") +
           "</button>";
       var trailingInner = qtyStack + tierAddBtn;
       var trailingHtml = trailingInner
-        ? '<div class="xloxi-expand-trailing">' + trailingInner + "</div>"
+        ? '<div class="offrefy-expand-trailing">' + trailingInner + "</div>"
         : "";
       if (!selectBlock && !lineTotalBlock && !trailingHtml) {
         return "";
       }
-      var expandClasses = "xloxi-expand-compact";
-      if (!vdShowVariant) expandClasses += " xloxi-expand-compact--no-variant";
-      if (ui.hideWidgetQuantitySelector) expandClasses += " xloxi-expand-compact--no-qty";
-      if (ui.hideWidgetLineTotal) expandClasses += " xloxi-expand-compact--no-line-total";
+      var expandClasses = "offrefy-expand-compact";
+      if (!vdShowVariant) expandClasses += " offrefy-expand-compact--no-variant";
+      if (ui.hideWidgetQuantitySelector) expandClasses += " offrefy-expand-compact--no-qty";
+      if (ui.hideWidgetLineTotal) expandClasses += " offrefy-expand-compact--no-line-total";
       return (
-        '<div class="xloxi-card__expand">' +
-        '<div class="xloxi-card__divider" aria-hidden="true"></div>' +
+        '<div class="offrefy-card__expand">' +
+        '<div class="offrefy-card__divider" aria-hidden="true"></div>' +
         '<div class="' +
         expandClasses +
         '">' +
-        '<span class="xloxi-tier-idx">#' +
+        '<span class="offrefy-tier-idx">#' +
         (c + 1) +
         "</span>" +
         selectBlock +
@@ -4406,8 +4594,8 @@
     }
 
     function bindNativeThemeAtcAnalytics() {
-      if (root.getAttribute("data-xloxi-native-atc-bound") === "1") return;
-      root.setAttribute("data-xloxi-native-atc-bound", "1");
+      if (root.getAttribute("data-offrefy-native-atc-bound") === "1") return;
+      root.setAttribute("data-offrefy-native-atc-bound", "1");
       var form = findThemeProductAddForm();
       if (!form) return;
       form.addEventListener(
@@ -4428,21 +4616,21 @@
     function updateAllPrices() {
       var uc = currentUnitCents;
       if (isVolumeTable) {
-        var trows = mountEl.querySelectorAll(".xloxi-volume-tier-row");
+        var trows = mountEl.querySelectorAll(".offrefy-volume-tier-row");
         for (var vi = 0; vi < tiers.length; vi++) {
           var vt = tiers[vi];
           var vu = tierUnitCents(uc, vt);
           var vrow = trows[vi];
           if (!vrow) continue;
-          var vmain = vrow.querySelector("[data-xloxi-main-price]");
+          var vmain = vrow.querySelector("[data-offrefy-main-price]");
           if (vmain) vmain.textContent = fmtMoney(vu, currency);
-          var vdisc = vrow.querySelector("[data-xloxi-discount-cell]");
+          var vdisc = vrow.querySelector("[data-offrefy-discount-cell]");
           if (vdisc) vdisc.textContent = tierVolumeTableDiscountLabel(vt);
         }
         return;
       }
       var perUnitCards = ui.cardPriceShowsUnit === true;
-      var cards = mountEl.querySelectorAll(".xloxi-card");
+      var cards = mountEl.querySelectorAll(".offrefy-card");
       for (var i = 0; i < tiers.length; i++) {
         var d = tiers[i];
         var lt = lineTotals(uc, d);
@@ -4451,9 +4639,9 @@
         var u = tierUnitCents(uc, d);
         var card = cards[i];
         if (!card) continue;
-        var strike = card.querySelector("[data-ofd-tier-was]");
-        var save = card.querySelector("[data-ofd-tier-save]");
-        var mainP = card.querySelector("[data-xloxi-main-price]");
+        var strike = card.querySelector("[data-offrefy-tier-was]");
+        var save = card.querySelector("[data-offrefy-tier-save]");
+        var mainP = card.querySelector("[data-offrefy-main-price]");
         if (mainP) mainP.textContent = fmtMoney(perUnitCards ? u : lt.discounted, currency);
         var showStrikeSave = perUnitCards ? P > 0 && u < uc : minQ > 1 && P > 0;
         var hideCompare = ui.hideWidgetComparePrice === true;
@@ -4479,11 +4667,11 @@
 
     function updateAllLineTotals() {
       var uc = currentUnitCents;
-      var cards = mountEl.querySelectorAll(".xloxi-card");
+      var cards = mountEl.querySelectorAll(".offrefy-card");
       for (var i = 0; i < tiers.length; i++) {
         var card = cards[i];
         if (!card) continue;
-        var el = card.querySelector("[data-xloxi-line-total]");
+        var el = card.querySelector("[data-offrefy-line-total]");
         if (!el) continue;
         var per = tierUnitCents(uc, tiers[i]);
         el.textContent = fmtMoney(per * stateQty, currency);
@@ -4519,7 +4707,7 @@
       clampQty();
       var m = getTierMinQty();
       var str = String(stateQty);
-      var nodes = mountEl.querySelectorAll("[data-xloxi-qty-display]");
+      var nodes = mountEl.querySelectorAll("[data-offrefy-qty-display]");
       for (var qi = 0; qi < nodes.length; qi++) {
         var n = nodes[qi];
         if (n.tagName === "INPUT") {
@@ -4530,7 +4718,7 @@
           n.textContent = str;
         }
       }
-      var decs = mountEl.querySelectorAll("[data-xloxi-qty-dec]");
+      var decs = mountEl.querySelectorAll("[data-offrefy-qty-dec]");
       for (var dj = 0; dj < decs.length; dj++) {
         decs[dj].disabled = stateQty <= m;
       }
@@ -4545,7 +4733,7 @@
       var liquid = findVdLiquidProductForm(null);
       if (liquid) {
         var lq =
-          liquid.querySelector("[data-xloxi-liquid-qty]") ||
+          liquid.querySelector("[data-offrefy-liquid-qty]") ||
           liquid.querySelector('input[name="quantity"]');
         if (lq) lq.value = str;
       }
@@ -4576,7 +4764,7 @@
 
     function syncAllVariantSelects(vid) {
       if (!vdShowVariant) return;
-      var sels = mountEl.querySelectorAll(".xloxi-variant-select");
+      var sels = mountEl.querySelectorAll(".offrefy-variant-select");
       for (var si = 0; si < sels.length; si++) {
         sels[si].value = String(vid);
       }
@@ -4585,7 +4773,7 @@
     function scrollToAtc() {
       clampQty();
       syncQtyToForm(true);
-      var sel = mountEl.querySelector(".xloxi-card--selected .xloxi-variant-select");
+      var sel = mountEl.querySelector(".offrefy-card--selected .offrefy-variant-select");
       if (sel) {
         syncFormVariant(sel.value);
         root.setAttribute("data-variant-id", String(sel.value));
@@ -4606,11 +4794,11 @@
     }
 
     function syncSelectedCard() {
-      var labels = mountEl.querySelectorAll(".xloxi-card");
+      var labels = mountEl.querySelectorAll(".offrefy-card");
       for (var i = 0; i < labels.length; i++) {
         var lab = labels[i];
         var inp = lab.querySelector("input[type=radio]");
-        lab.classList.toggle("xloxi-card--selected", !!(inp && inp.checked));
+        lab.classList.toggle("offrefy-card--selected", !!(inp && inp.checked));
       }
     }
 
@@ -4638,7 +4826,7 @@
         vdCartMaxQtyRedirectTimer = null;
       }
       var nodes = mountEl.querySelectorAll(
-        "[data-xloxi-cart-qty-alert], [data-xloxi-cart-qty-alert-global]",
+        "[data-offrefy-cart-qty-alert], [data-offrefy-cart-qty-alert-global]",
       );
       for (var ci = 0; ci < nodes.length; ci++) {
         nodes[ci].setAttribute("hidden", "");
@@ -4647,18 +4835,16 @@
     }
 
     function getVdActiveCartQtyAlertEl() {
-      var per = mountEl.querySelector(".xloxi-card--selected [data-xloxi-cart-qty-alert]");
+      var per = mountEl.querySelector(".offrefy-card--selected [data-offrefy-cart-qty-alert]");
       if (per) return per;
-      return mountEl.querySelector("[data-xloxi-cart-qty-alert-global]");
+      return mountEl.querySelector("[data-offrefy-cart-qty-alert-global]");
     }
 
     function showVdCartMaxQtyMessageAndGoToCart() {
       clearVdCartQtyAlert();
       var alertEl = getVdActiveCartQtyAlertEl();
       var msg =
-        (typeof window.Xloxi !== "undefined" &&
-          window.Xloxi.messages &&
-          window.Xloxi.messages.cartMaxQty) ||
+        (offrefyNs().messages && offrefyNs().messages.cartMaxQty) ||
         VD_MSG_CART_MAX_QTY;
       if (alertEl) {
         alertEl.textContent = msg;
@@ -4676,12 +4862,10 @@
     }
 
     function showVdOutOfStockMessage() {
-      var el = mountEl.querySelector("[data-xloxi-stock-alert]");
+      var el = mountEl.querySelector("[data-offrefy-stock-alert]");
       if (!el) return;
       el.textContent =
-        (typeof window.Xloxi !== "undefined" &&
-          window.Xloxi.messages &&
-          window.Xloxi.messages.soldOut) ||
+        (offrefyNs().messages && offrefyNs().messages.soldOut) ||
         "This variant is sold out.";
       el.removeAttribute("hidden");
       try {
@@ -4699,13 +4883,13 @@
     function updatePurchaseControlsAvailability() {
       var vidNow = resolveActiveVariantIdForCart();
       var purchasable = isVariantAvailableForCart(vidNow);
-      var ctaEl = mountEl.querySelector("[data-xloxi-cta]");
+      var ctaEl = mountEl.querySelector("[data-offrefy-cta]");
       if (ctaEl) ctaEl.disabled = !purchasable;
-      var tierAdds = mountEl.querySelectorAll("[data-xloxi-tier-add]");
+      var tierAdds = mountEl.querySelectorAll("[data-offrefy-tier-add]");
       for (var tax = 0; tax < tierAdds.length; tax++) {
         tierAdds[tax].disabled = !purchasable;
       }
-      var ael = mountEl.querySelector("[data-xloxi-stock-alert]");
+      var ael = mountEl.querySelector("[data-offrefy-stock-alert]");
       if (ael && purchasable) {
         clearTimeout(ael._vdStockT);
         ael.setAttribute("hidden", "");
@@ -4721,19 +4905,19 @@
 
     var h = [];
     h.push(
-      '<div class="xloxi-bundle' +
-        (isVolumeTable ? " xloxi-bundle--volume-table" : "") +
+      '<div data-offrefy-widget class="offrefy-bundle' +
+        (isVolumeTable ? " offrefy-bundle--volume-table" : "") +
         '">',
     );
     var sec = String(sectionHeading || "").trim();
     if (sec) {
-      h.push('<h2 class="xloxi-section-title">' + esc(sec) + "</h2>");
+      h.push('<h2 class="offrefy-section-title">' + esc(sec) + "</h2>");
     }
     var titleText = String(ui.title || "").trim();
     if (titleText || cdLive) {
-      h.push('<div class="xloxi-topbar">');
+      h.push('<div class="offrefy-topbar">');
       if (titleText) {
-        h.push('<p class="xloxi-title">' + esc(titleText) + "</p>");
+        h.push('<p class="offrefy-title">' + esc(titleText) + "</p>");
       }
       if (cdLive) {
         var noticeRaw = String(ui.countdownLabel || "").trim();
@@ -4742,9 +4926,9 @@
             .replace(/\s*%c\s*/gi, " ")
             .replace(/\s+/g, " ")
             .trim() || "Sale end in";
-        h.push('<div class="xloxi-countdown">');
-        h.push('<span class="xloxi-countdown-muted">' + esc(notice) + "</span> ");
-        h.push('<span class="xloxi-countdown-badge" data-xloxi-cd></span>');
+        h.push('<div class="offrefy-countdown">');
+        h.push('<span class="offrefy-countdown-muted">' + esc(notice) + "</span> ");
+        h.push('<span class="offrefy-countdown-badge" data-offrefy-cd></span>');
         h.push("</div>");
       }
       h.push("</div>");
@@ -4761,13 +4945,13 @@
 
     if (isVolumeTable) {
       h.push(
-        '<div class="xloxi-cards xloxi-cards--volume-table" role="radiogroup" aria-label="' +
+        '<div class="offrefy-cards offrefy-cards--volume-table" role="radiogroup" aria-label="' +
           esc(String(ui.title || "").trim() || "Quantity breaks") +
           '">',
       );
-      h.push('<div class="xloxi-volume-table-scroll">');
-      h.push('<div class="xloxi-volume-table-scroll-inner">');
-      h.push('<table class="xloxi-volume-table"><thead><tr>');
+      h.push('<div class="offrefy-volume-table-scroll">');
+      h.push('<div class="offrefy-volume-table-scroll-inner">');
+      h.push('<table class="offrefy-volume-table"><thead><tr>');
       h.push("<th>" + esc(ui.transQty) + "</th>");
       h.push("<th>" + esc(ui.transDiscount) + "</th>");
       h.push("<th>" + esc(ui.transPrice) + "</th>");
@@ -4775,15 +4959,15 @@
       for (var c = 0; c < tiers.length; c++) {
         var d = tiers[c];
         var uInit = tierUnitCents(currentUnitCents, d);
-        h.push('<tr class="xloxi-volume-tier-row">');
+        h.push('<tr class="offrefy-volume-tier-row">');
         h.push("<td>" + esc(localizedTierBuyLabel(d.buyLabel, c, tiers, ui.transBuy)) + "</td>");
         h.push(
-          '<td data-xloxi-discount-cell>' +
+          '<td data-offrefy-discount-cell>' +
             esc(tierVolumeTableDiscountLabel(d)) +
             "</td>",
         );
         h.push(
-          '<td><span class="ofd-tier-amt" data-xloxi-main-price>' +
+          '<td><span class="offrefy-tier-amt" data-offrefy-main-price>' +
             fmtMoney(uInit, currency) +
             "</span></td>",
         );
@@ -4791,7 +4975,7 @@
       }
       h.push("</tbody></table></div></div></div>");
     } else {
-      h.push('<div class="xloxi-cards" role="radiogroup" aria-label="' + esc(String(ui.title || "").trim() || "Quantity breaks") + '">');
+      h.push('<div class="offrefy-cards" role="radiogroup" aria-label="' + esc(String(ui.title || "").trim() || "Quantity breaks") + '">');
       var perUnitCardsInit = ui.cardPriceShowsUnit === true;
       var hideCompareInit = ui.hideWidgetComparePrice === true;
       var badgePos = String(ui.badgePosition || "after_label");
@@ -4812,7 +4996,7 @@
       var tierBadgeHtml = function (badgeText, rowClass) {
         if (!badgeText) return "";
         return (
-          '<span class="xloxi-badge-pill' +
+          '<span class="offrefy-badge-pill' +
           (rowClass ? " " + rowClass : "") +
           '">' +
           esc(badgeText) +
@@ -4831,13 +5015,13 @@
           : minQ > 1 && P > 0;
 
         h.push(
-          '<label class="xloxi-card' +
-            (c2 === defaultIdx ? " xloxi-card--selected" : "") +
-            (badge && isBadgeTopFloat(badgePos) ? " xloxi-card--badge-top-float" : "") +
+          '<label class="offrefy-card' +
+            (c2 === defaultIdx ? " offrefy-card--selected" : "") +
+            (badge && isBadgeTopFloat(badgePos) ? " offrefy-card--badge-top-float" : "") +
             '">',
         );
         h.push(
-          '<input class="xloxi-sr-only" type="radio" name="' +
+          '<input class="offrefy-sr-only" type="radio" name="' +
             rn +
             '" value="' +
             d.minQty +
@@ -4847,64 +5031,64 @@
         );
         if (badge && isBadgeTopFloat(badgePos)) {
           h.push(
-            '<div class="xloxi-card__badge-top xloxi-card__badge-top--float ' +
+            '<div class="offrefy-card__badge-top offrefy-card__badge-top--float ' +
               badgeTopFloatAlignClass(badgePos) +
               '">' +
               tierBadgeHtml(badge, "") +
               "</div>",
           );
         }
-        h.push('<span class="xloxi-card__inner">');
-        h.push('<div class="ofd-tier-row">');
-        h.push('<div class="ofd-tier-main">');
-        h.push('<span class="xloxi-radio-circle" aria-hidden="true"></span>');
-        h.push('<div class="ofd-tier-copy">');
-        h.push('<div class="ofd-tier-label-row">');
-        h.push('<span class="ofd-tier-qty">' + esc(localizedTierBuyLabel(d.buyLabel, c2, tiers, ui.transBuy)) + "</span>");
+        h.push('<span class="offrefy-card__inner">');
+        h.push('<div class="offrefy-tier-row">');
+        h.push('<div class="offrefy-tier-main">');
+        h.push('<span class="offrefy-radio-circle" aria-hidden="true"></span>');
+        h.push('<div class="offrefy-tier-copy">');
+        h.push('<div class="offrefy-tier-label-row">');
+        h.push('<span class="offrefy-tier-qty">' + esc(localizedTierBuyLabel(d.buyLabel, c2, tiers, ui.transBuy)) + "</span>");
         if (badge && badgePos === "after_label") {
           h.push(tierBadgeHtml(badge, ""));
         }
         h.push("</div>");
         if (badge && badgePos === "below_label") {
-          h.push(tierBadgeHtml(badge, "xloxi-badge-pill--row"));
+          h.push(tierBadgeHtml(badge, "offrefy-badge-pill--row"));
         }
         var optSub =
           d.optionSubtext && String(d.optionSubtext).trim();
         if (optSub) {
           h.push(
-            '<span class="xloxi-option-subtext xloxi-option-subtext--under">' +
+            '<span class="offrefy-option-subtext offrefy-option-subtext--under">' +
               esc(optSub) +
               "</span>",
           );
         }
         if (badge && badgePos === "after_subtext") {
-          h.push(tierBadgeHtml(badge, "xloxi-badge-pill--row"));
+          h.push(tierBadgeHtml(badge, "offrefy-badge-pill--row"));
         }
         if (showStrikeInit) {
           h.push(
-            '<span class="ofd-tier-save ofd-tier-save--under" data-ofd-tier-save>' +
+            '<span class="offrefy-tier-save offrefy-tier-save--under" data-offrefy-tier-save>' +
               esc(formatYouSaveText(P, currency, ui.transYouSave)) +
               "</span>",
           );
         } else {
-          h.push('<span class="ofd-tier-save ofd-tier-save--under" data-ofd-tier-save style="display:none"></span>');
+          h.push('<span class="offrefy-tier-save offrefy-tier-save--under" data-offrefy-tier-save style="display:none"></span>');
         }
         h.push("</div></div>");
-        h.push('<div class="ofd-tier-prices">');
+        h.push('<div class="offrefy-tier-prices">');
         if (badge && badgePos === "price_column") {
-          h.push(tierBadgeHtml(badge, "xloxi-badge-pill--pricecol"));
+          h.push(tierBadgeHtml(badge, "offrefy-badge-pill--pricecol"));
         }
         if (showStrikeInit && !hideCompareInit) {
           h.push(
-            '<span class="ofd-tier-was" data-ofd-tier-was>' +
+            '<span class="offrefy-tier-was" data-offrefy-tier-was>' +
               fmtMoney(perUnitCardsInit ? currentUnitCents : lt.original, currency) +
               "</span>",
           );
         } else {
-          h.push('<span class="ofd-tier-was" data-ofd-tier-was style="display:none"></span>');
+          h.push('<span class="offrefy-tier-was" data-offrefy-tier-was style="display:none"></span>');
         }
         h.push(
-          '<span class="ofd-tier-amt" data-xloxi-main-price>' +
+          '<span class="offrefy-tier-amt" data-offrefy-main-price>' +
             fmtMoney(perUnitCardsInit ? cardUnitCents : lt.discounted, currency) +
             "</span>",
         );
@@ -4918,33 +5102,33 @@
     var hideVolCta = isVolumeTable && ui.hideWidgetMainCta === true;
     if (!hideVolCta) {
       h.push(
-        '<button type="button" class="xloxi-cta" data-xloxi-cta>' +
+        '<button type="button" class="offrefy-cta" data-offrefy-cta>' +
           esc(ui.ctaLabel) +
           "</button>",
       );
     }
     h.push(
-      '<p class="xloxi-stock-alert" data-xloxi-stock-alert hidden tabindex="-1"></p>',
+      '<p class="offrefy-stock-alert" data-offrefy-stock-alert hidden tabindex="-1"></p>',
     );
     h.push(
-      '<p class="xloxi-cart-qty-alert xloxi-cart-qty-alert--global" data-xloxi-cart-qty-alert-global hidden tabindex="-1"></p>',
+      '<p class="offrefy-cart-qty-alert offrefy-cart-qty-alert--global" data-offrefy-cart-qty-alert-global hidden tabindex="-1"></p>',
     );
-    h.push('<p class="xloxi-footnote">' + esc(ui.footnote) + "</p>");
+    h.push('<p class="offrefy-footnote">' + esc(ui.footnote) + "</p>");
     h.push("</div>");
 
-    /* Keep Liquid ATC bridge form across re-mount (lives inside [data-xloxi-mount]
+    /* Keep Liquid ATC bridge form across re-mount (lives inside [data-offrefy-mount]
        so it stays hidden until the widget paints — do not wipe it with innerHTML). */
     var liquidBridge =
-      mountEl.querySelector("form[data-xloxi-liquid-product-form]") ||
-      mountEl.querySelector("form.xloxi-liquid-product-form");
+      mountEl.querySelector("form[data-offrefy-liquid-product-form]") ||
+      mountEl.querySelector("form.offrefy-liquid-product-form");
     mountEl.innerHTML = h.join("");
     if (liquidBridge) {
       mountEl.insertBefore(liquidBridge, mountEl.firstChild);
     }
 
-    var cdEl = mountEl.querySelector("[data-xloxi-cd]");
+    var cdEl = mountEl.querySelector("[data-offrefy-cd]");
     if (cdEl && cdLive) {
-      var cdWrap = cdEl.closest(".xloxi-countdown");
+      var cdWrap = cdEl.closest(".offrefy-countdown");
       var tickCd = function () {
         var now = Date.now();
         // Countdown always targets end — schedule start only gates offer status, not the pill.
@@ -4954,7 +5138,7 @@
       };
       tickCd();
       var iv = setInterval(tickCd, 1000);
-      root.setAttribute("data-xloxi-cd-iv", String(iv));
+      root.setAttribute("data-offrefy-cd-iv", String(iv));
     }
 
     var initVid = selVariantId;
@@ -4971,7 +5155,7 @@
       if (
         !t ||
         !t.getAttribute ||
-        t.getAttribute("data-xloxi-qty-display") == null ||
+        t.getAttribute("data-offrefy-qty-display") == null ||
         t.tagName !== "INPUT"
       ) {
         return;
@@ -4988,7 +5172,7 @@
       if (
         t &&
         t.getAttribute &&
-        t.getAttribute("data-xloxi-qty-display") != null &&
+        t.getAttribute("data-offrefy-qty-display") != null &&
         t.tagName === "INPUT"
       ) {
         applyQtyFromInput(t);
@@ -4998,7 +5182,7 @@
         vdShowVariant &&
         t &&
         t.classList &&
-        t.classList.contains("xloxi-variant-select")
+        t.classList.contains("offrefy-variant-select")
       ) {
         var v = t.value;
         currentUnitCents = readPriceForVariant(v);
@@ -5024,7 +5208,7 @@
       if (
         !t ||
         !t.getAttribute ||
-        t.getAttribute("data-xloxi-qty-display") == null ||
+        t.getAttribute("data-offrefy-qty-display") == null ||
         t.tagName !== "INPUT"
       ) {
         return;
@@ -5037,7 +5221,7 @@
       if (
         !t ||
         !t.getAttribute ||
-        t.getAttribute("data-xloxi-qty-display") == null ||
+        t.getAttribute("data-offrefy-qty-display") == null ||
         t.tagName !== "INPUT"
       ) {
         return;
@@ -5049,22 +5233,22 @@
     });
 
     mountEl.addEventListener("click", function (ev) {
-      var btn = ev.target && ev.target.closest ? ev.target.closest("[data-xloxi-qty-dec],[data-xloxi-qty-inc],[data-xloxi-tier-add]") : null;
+      var btn = ev.target && ev.target.closest ? ev.target.closest("[data-offrefy-qty-dec],[data-offrefy-qty-inc],[data-offrefy-tier-add]") : null;
       if (!btn) return;
-      if (btn.hasAttribute("data-xloxi-qty-dec")) {
+      if (btn.hasAttribute("data-offrefy-qty-dec")) {
         ev.preventDefault();
         var mq = getTierMinQty();
         stateQty = Math.max(mq, stateQty - 1);
         updateQtyDisplay();
         return;
       }
-      if (btn.hasAttribute("data-xloxi-qty-inc")) {
+      if (btn.hasAttribute("data-offrefy-qty-inc")) {
         ev.preventDefault();
         stateQty = Math.min(VD_MAX_LINE_QTY, stateQty + 1);
         updateQtyDisplay();
         return;
       }
-      if (btn.hasAttribute("data-xloxi-tier-add")) {
+      if (btn.hasAttribute("data-offrefy-tier-add")) {
         ev.preventDefault();
         ev.stopPropagation();
         clampQty();
@@ -5104,7 +5288,7 @@
       }
     });
 
-    var cta = mountEl.querySelector("[data-xloxi-cta]");
+    var cta = mountEl.querySelector("[data-offrefy-cta]");
     if (cta) {
       cta.addEventListener("click", function (ev) {
         ev.preventDefault();
@@ -5152,7 +5336,7 @@
           var t = ev.target;
           if (!t || !t.name || String(t.name) !== "id") return;
           var form = t.closest && t.closest('form[action*="/cart/add"]');
-          if (!form || form.closest(".xloxi-root")) return;
+          if (!form || form.closest("[data-offrefy-root]")) return;
           var v = String(t.value || "");
           if (!v) return;
           currentUnitCents = readPriceForVariant(v);
@@ -5167,12 +5351,11 @@
 
     root.style.display = "";
     mountEl.hidden = false;
-    root.setAttribute("data-xloxi-inited", "1");
+    root.setAttribute("data-offrefy-inited", "1");
     bindNativeThemeAtcAnalytics();
     trackImpression(campaign, root.getAttribute("data-product-id"));
-    window.Xloxi = window.Xloxi || {};
-    window.Xloxi.embed = window.Xloxi.embed || {};
-    window.Xloxi.embed.version = "1.29.5";
+    offrefyNs().embed = offrefyNs().embed || {};
+    offrefyNs().embed.version = "1.29.5";
 
   }
   /**
@@ -5231,7 +5414,7 @@
   }
 
   function readCompactProductRule(root) {
-    var el = root && root.querySelector("script[data-xloxi-product-rule]");
+    var el = root && root.querySelector("script[data-offrefy-product-rule]");
     if (!el) return null;
     try {
       return expandCompactProductRule(JSON.parse(String(el.textContent || "").trim()));
@@ -5241,9 +5424,9 @@
   }
 
   function runWidget(root) {
-    if (root.getAttribute("data-xloxi-inited") === "1") return;
+    if (root.getAttribute("data-offrefy-inited") === "1") return;
     var configId = root.getAttribute("data-config-id");
-    var mount = root.querySelector("[data-xloxi-mount]");
+    var mount = root.querySelector("[data-offrefy-mount]");
     var scriptEl = configId ? document.getElementById(configId) : null;
     if (!mount) return;
 
@@ -5296,7 +5479,7 @@
               mount.hidden = true;
               return;
             }
-            root.removeAttribute("data-xloxi-inited");
+            root.removeAttribute("data-offrefy-inited");
             runWidget(root);
           },
         );
@@ -5395,7 +5578,7 @@
 
     function finishFetch(remote) {
       if (!root.isConnected) return;
-      if (root.getAttribute("data-xloxi-inited") === "1") return;
+      if (root.getAttribute("data-offrefy-inited") === "1") return;
       var cfg = sanitizeWidgetConfig(
         remote || { version: 1, campaigns: [] },
         designMode,
@@ -5418,13 +5601,13 @@
   }
 
   function ensureHostedStorefrontCss() {
-    if (document.querySelector('link[data-xloxi-hosted-css="1"]')) return;
+    if (document.querySelector('link[data-offrefy-hosted-css="1"]')) return;
     if (document.querySelector('link[href*="volume-discount-storefront.css"]')) return;
     var origin =
-      (typeof window.__xloxiAppOrigin === "string" && window.__xloxiAppOrigin) ||
+      (typeof offrefyNs().appOrigin === "string" && offrefyNs().appOrigin) ||
       "https://offrey.xloxi.com";
     var ver =
-      (typeof window.__xloxiAssetVersion === "string" && window.__xloxiAssetVersion) ||
+      (typeof offrefyNs().assetVersion === "string" && offrefyNs().assetVersion) ||
       "1.29.5";
     var link = document.createElement("link");
     link.rel = "stylesheet";
@@ -5432,7 +5615,7 @@
       String(origin).replace(/\/$/, "") +
       "/vd-storefront.css?v=" +
       encodeURIComponent(ver);
-    link.setAttribute("data-xloxi-hosted-css", "1");
+    link.setAttribute("data-offrefy-hosted-css", "1");
     (document.head || document.documentElement).appendChild(link);
   }
 
@@ -5466,74 +5649,157 @@
   }
 
   function hideAllWidgetRoots() {
-    document.querySelectorAll(".xloxi-root").forEach(function (el) {
+    document.querySelectorAll("[data-offrefy-root]").forEach(function (el) {
       el.style.display = "none";
-      el.removeAttribute("data-xloxi-inited");
-      var mount = el.querySelector("[data-xloxi-mount]");
+      el.removeAttribute("data-offrefy-inited");
+      var mount = el.querySelector("[data-offrefy-mount]");
       if (mount) mount.hidden = true;
     });
+  }
+
+  function destroyWidgetInstance(root) {
+    if (!root) return;
+    try {
+      var id = root.id || root.getAttribute("data-config-id") || "";
+      if (id && offrefyRuntime._instances && offrefyRuntime._instances.has(id)) {
+        var inst = offrefyRuntime._instances.get(id);
+        if (inst && typeof inst.destroy === "function") inst.destroy();
+        offrefyRuntime._instances.delete(id);
+      }
+      root.removeAttribute("data-offrefy-inited");
+      var mount = root.querySelector("[data-offrefy-mount]");
+      if (mount) {
+        /* Keep Liquid ATC bridge; clear painted tiers only. */
+        var painted = mount.querySelector("[data-offrefy-widget]");
+        if (painted) painted.remove();
+      }
+    } catch (e) {
+      offrefyWarn("destroyWidgetInstance", e);
+    }
   }
 
   function scan(options) {
     var opts = options || {};
     var syncCartSideEffects = opts.syncCart !== false;
 
-    /* App embed off → never mount (block markup alone must not show the widget). */
-    if (!window.__xloxiAppEmbedActive) {
-      hideAllWidgetRoots();
-      return;
-    }
-
-    /* Widget first — never wait on cart network before mounting. */
-    document.querySelectorAll(".xloxi-root").forEach(function (el) {
-      runWidget(el);
-    });
-
-    installCartMutationInterceptor();
-    bindCartDrawerDiscountLabelPatching();
-    bindStorefrontLocaleWatcher();
-    vdLastKnownStorefrontLocale = resolveStorefrontLocale(null) || "en";
-    refreshCartBadgeTemplatesForLocale();
     try {
-      var storedLocale = sessionStorage.getItem("vd_locale_attr");
-      if (storedLocale && !vdLastSyncedCartLocale) {
-        vdLastSyncedCartLocale = storedLocale;
+      /* App embed off → never mount (block markup alone must not show the widget). */
+      if (!offrefyNs().appEmbedActive) {
+        hideAllWidgetRoots();
+        return;
       }
-    } catch (e) {
-      void e;
-    }
 
-    function runCartSideEffects() {
-      if (syncCartSideEffects) {
-        syncCartLocaleAttribute(false)
-          .then(function () {
-            return syncCartLockedProductsAttribute(null);
-          })
-          .then(function () {
-            scheduleCartDrawerDiscountLabelPatch();
-          });
+      /* Widget first — never wait on cart network before mounting. */
+      document.querySelectorAll("[data-offrefy-root]").forEach(function (el) {
+        runWidget(el);
+      });
+
+      installCartMutationInterceptor();
+      bindCartDrawerDiscountLabelPatching();
+      bindStorefrontLocaleWatcher();
+      vdLastKnownStorefrontLocale = resolveStorefrontLocale(null) || "en";
+      refreshCartBadgeTemplatesForLocale();
+      try {
+        var storedLocale = sessionStorage.getItem("vd_locale_attr");
+        if (storedLocale && !vdLastSyncedCartLocale) {
+          vdLastSyncedCartLocale = storedLocale;
+        }
+      } catch (e) {
+        void e;
+      }
+
+      function runCartSideEffects() {
+        if (syncCartSideEffects) {
+          syncCartLocaleAttribute(false)
+            .then(function () {
+              return syncCartLockedProductsAttribute(null);
+            })
+            .then(function () {
+              scheduleCartDrawerDiscountLabelPatch();
+            })
+            .catch(function () {});
+        } else {
+          scheduleCartDrawerDiscountLabelPatch();
+        }
+      }
+
+      if (typeof requestIdleCallback === "function") {
+        requestIdleCallback(runCartSideEffects, { timeout: 2000 });
       } else {
-        scheduleCartDrawerDiscountLabelPatch();
+        setTimeout(runCartSideEffects, syncCartSideEffects ? 400 : 0);
       }
+    } catch (scanErr) {
+      offrefyWarn("scan failed", scanErr);
     }
+  }
 
-    if (typeof requestIdleCallback === "function") {
-      requestIdleCallback(runCartSideEffects, { timeout: 2000 });
-    } else {
-      setTimeout(runCartSideEffects, syncCartSideEffects ? 400 : 0);
+  function safeScan(options) {
+    try {
+      scan(options);
+    } catch (e) {
+      offrefyWarn("safeScan", e);
     }
   }
 
   /* Defer script runs after parse — mount immediately when roots exist. */
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () {
-      scan({ syncCart: true });
+      safeScan({ syncCart: true });
     });
   } else {
-    scan({ syncCart: true });
+    safeScan({ syncCart: true });
   }
-  /* Section remounts only need widget roots — avoid cart/update storm on every variant section swap. */
+
+  /* Theme Editor: remount / teardown without leaking observers or duplicate UI. */
   document.addEventListener("shopify:section:load", function () {
-    scan({ syncCart: false });
+    safeScan({ syncCart: false });
+  });
+  document.addEventListener("shopify:section:unload", function (ev) {
+    try {
+      var section = ev && ev.target;
+      if (!section || !section.querySelectorAll) return;
+      section.querySelectorAll("[data-offrefy-root]").forEach(destroyWidgetInstance);
+      if (!document.querySelector("[data-offrefy-root]")) {
+        try {
+          document.documentElement.removeAttribute("data-offrefy-hide-theme-variant");
+          document.documentElement.removeAttribute("data-offrefy-hide-theme-qty");
+          document.documentElement.removeAttribute("data-offrefy-hide-theme-atc");
+          document.documentElement.removeAttribute("data-offrefy-hide-theme-buy");
+        } catch (eFlags) {
+          void eFlags;
+        }
+      }
+    } catch (e) {
+      offrefyWarn("section:unload", e);
+    }
+  });
+  document.addEventListener("shopify:block:select", function (ev) {
+    try {
+      var block = ev && ev.target;
+      if (!block) return;
+      var root =
+        (block.matches && block.matches("[data-offrefy-root]") && block) ||
+        (block.closest && block.closest("[data-offrefy-root]")) ||
+        (block.querySelector && block.querySelector("[data-offrefy-root]"));
+      if (root) {
+        root.removeAttribute("data-offrefy-inited");
+        safeScan({ syncCart: false });
+      }
+    } catch (e) {
+      offrefyWarn("block:select", e);
+    }
+  });
+  document.addEventListener("shopify:block:deselect", function (ev) {
+    try {
+      var block = ev && ev.target;
+      if (!block) return;
+      var root =
+        (block.matches && block.matches("[data-offrefy-root]") && block) ||
+        (block.closest && block.closest("[data-offrefy-root]")) ||
+        (block.querySelector && block.querySelector("[data-offrefy-root]"));
+      if (root) destroyWidgetInstance(root);
+    } catch (e) {
+      offrefyWarn("block:deselect", e);
+    }
   });
 })();

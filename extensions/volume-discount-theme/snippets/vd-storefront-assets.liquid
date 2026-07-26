@@ -35,37 +35,55 @@
 %}
 <script>
 (function () {
-  var VD_ASSET_VERSION = "1.29.5";
+  var VD_ASSET_VERSION = "1.29.6";
+  /* App host for rare hosted-asset fallback — not the merchant shop origin. */
   var APP_ORIGIN = "https://offrey.xloxi.com";
-  window.__xloxiStorefrontLocale = {{ request.locale.iso_code | json }};
-  window.__xloxiAssetVersion = VD_ASSET_VERSION;
-  window.__xloxiAppOrigin = APP_ORIGIN;
+
+  var o = window.Offrefy;
+  if (!o || typeof o !== "object") {
+    o = {};
+    try {
+      Object.defineProperty(window, "Offrefy", {
+        value: o,
+        writable: true,
+        configurable: true,
+        enumerable: false,
+      });
+    } catch (e) {
+      window.Offrefy = o;
+    }
+  }
+
+  o.storefrontLocale = {{ request.locale.iso_code | json }};
+  o.assetVersion = VD_ASSET_VERSION;
+  o.appOrigin = String(APP_ORIGIN).replace(/\/$/, "");
   {% if vd_widget and vd_widget.rev %}
-  window.__xloxiConfigRev = {{ vd_widget.rev | json }};
+  o.configRev = {{ vd_widget.rev | json }};
   {% else %}
-  window.__xloxiConfigRev = "";
+  o.configRev = "";
   {% endif %}
   {% if vd_widget and vd_widget.maxDiscountProducts %}
-  window.__xloxiMaxDiscountProducts = {{ vd_widget.maxDiscountProducts | json }};
+  o.maxDiscountProducts = {{ vd_widget.maxDiscountProducts | json }};
   {% else %}
-  window.__xloxiMaxDiscountProducts = 500;
+  o.maxDiscountProducts = 500;
   {% endif %}
-  window.__xloxiCartBadgeTemplates = {
+  o.cartBadgeTemplates = {
     locale: {{ locale_base | json }},
     discount: {{ vd_cart_discount | json }},
     qty: {{ vd_cart_discount_qty | json }}
   };
   {% if vd_widget and vd_widget.translations %}
-  window.__xloxiStorefrontTranslations = {{ vd_widget.translations | json }};
+  o.storefrontTranslations = {{ vd_widget.translations | json }};
   {% endif %}
-  window.__xloxiCustomer = {
+  /* Customer logged-in + tags (Liquid only) for tagged-offer eligibility — not Admin secrets. */
+  o.customer = {
     loggedIn: {% if customer %}true{% else %}false{% endif %},
     tags: {% if customer %}{{ customer.tags | json }}{% else %}[]{% endif %}
   };
 
   {% if vd_is_product and vd_product != blank %}
   /* Start widget-config before the main bundle parses — biggest TTI win on product pages.
-     Skip in theme editor to keep preview iframe stable. */
+     Prefer signed app-proxy; fall back to direct origin only for prefetch. */
   (function prefetchVdConfig() {
     try {
       if (window.Shopify && window.Shopify.designMode) return;
@@ -74,21 +92,26 @@
     var pid = {{ vd_product.id | json }};
     var vid = {{ vd_product.selected_or_first_available_variant.id | json }};
     if (!shop || !pid) return;
-    var rev = window.__xloxiConfigRev ? String(window.__xloxiConfigRev) : "";
+    var rev = o.configRev ? String(o.configRev) : "";
     var key = rev + "|" + String(pid) + "|" + String(vid || "");
-    window.__xloxiConfigPrefetchKey = key;
-    var u =
-      APP_ORIGIN +
-      "/widget-config?shop=" +
-      encodeURIComponent(shop) +
-      "&product_id=" +
+    o.configPrefetchKey = key;
+    var root = "/";
+    try {
+      if (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) {
+        root = window.Shopify.routes.root;
+        if (root.slice(-1) !== "/") root += "/";
+      }
+    } catch (e) {}
+    var proxyUrl =
+      root +
+      "apps/volume-discount/widget-config?product_id=" +
       encodeURIComponent(String(pid)) +
       (vid ? "&variant_id=" + encodeURIComponent(String(vid)) : "") +
       (rev ? "&rev=" + encodeURIComponent(rev) : "") +
       "&_=" +
       encodeURIComponent(String(Math.floor(Date.now() / 5000)));
-    window.__xloxiConfigPrefetch = fetch(u, {
-      credentials: "omit",
+    o.configPrefetch = fetch(proxyUrl, {
+      credentials: "same-origin",
       cache: "no-store",
       headers: { Accept: "application/json" },
       priority: "high",
@@ -108,7 +131,7 @@
     try {
       if (window.Shopify && window.Shopify.designMode) return;
     } catch (e) {}
-    var loc = window.__xloxiStorefrontLocale;
+    var loc = o.storefrontLocale;
     if (!loc && document.documentElement) {
       var lang = document.documentElement.getAttribute("lang");
       if (lang) loc = lang;
@@ -161,27 +184,30 @@
   var existing = document.querySelector('script[src*="volume-discount-storefront.js"]');
   if (existing) {
     if (existing.getAttribute("data-vd-asset-version") === VD_ASSET_VERSION) {
-      window.__xloxiStorefrontAssetsLoaded = true;
+      o.storefrontAssetsLoaded = true;
       return;
     }
     existing.parentNode && existing.parentNode.removeChild(existing);
   }
 
-  window.__xloxiStorefrontAssetsLoaded = true;
+  o.storefrontAssetsLoaded = true;
   var head = document.head || document.getElementsByTagName("head")[0];
-  var cssHref = {{ 'volume-discount-storefront.css' | asset_url | json }};
-  cssHref +=
-    (cssHref.indexOf("?") === -1 ? "?" : "&") +
-    "vd=" +
-    encodeURIComponent(VD_ASSET_VERSION);
-  var css = document.createElement("link");
-  css.rel = "stylesheet";
-  css.href = cssHref;
-  css.setAttribute("data-vd-asset-version", VD_ASSET_VERSION);
-  {% if vd_is_product %}
-  css.fetchPriority = "high";
-  {% endif %}
-  head.appendChild(css);
+  /* CSS is also declared via block schema "stylesheet" — skip duplicate <link> when present. */
+  if (!document.querySelector('link[href*="volume-discount-storefront.css"]')) {
+    var cssHref = {{ 'volume-discount-storefront.css' | asset_url | json }};
+    cssHref +=
+      (cssHref.indexOf("?") === -1 ? "?" : "&") +
+      "vd=" +
+      encodeURIComponent(VD_ASSET_VERSION);
+    var css = document.createElement("link");
+    css.rel = "stylesheet";
+    css.href = cssHref;
+    css.setAttribute("data-vd-asset-version", VD_ASSET_VERSION);
+    {% if vd_is_product %}
+    css.fetchPriority = "high";
+    {% endif %}
+    head.appendChild(css);
+  }
 
   {% if vd_is_product %}
   var pre = document.createElement("link");

@@ -6,7 +6,7 @@
 /* Liquid {% form 'product' %} ATC bridge — visually hidden, all themes.
    Themes often force button[name="add"] { display:flex !important }, so we
    hide the whole form + submit with !important (inline style is backup). */
-.xloxi-liquid-product-form {
+.offrefy-liquid-product-form {
   position: absolute !important;
   left: -9999px !important;
   top: 0 !important;
@@ -23,9 +23,9 @@
   pointer-events: none !important;
 }
 
-.xloxi-liquid-product-form .xloxi-liquid-submit,
-.xloxi-liquid-product-form button[name="add"],
-.xloxi-liquid-product-form [data-xloxi-liquid-submit] {
+.offrefy-liquid-product-form .offrefy-liquid-submit,
+.offrefy-liquid-product-form button[name="add"],
+.offrefy-liquid-product-form [data-offrefy-liquid-submit] {
   display: none !important;
   visibility: hidden !important;
   position: absolute !important;
@@ -39,7 +39,7 @@
   pointer-events: none !important;
 }
 
-.xloxi-qb {
+[data-offrefy-root][data-offrefy-root].offrefy-qb {
   box-sizing: border-box;
   /* Fill the theme product column — no inner max-width so CTA/cards align with form buttons */
   margin-block: clamp(0.75rem, 3vw, 1.25rem);
@@ -50,124 +50,107 @@
   padding-inline: 0;
   /* Stable box when tier expand opens — reduces horizontal jump with page scrollbar */
   overflow-x: clip;
-
-  /*
-   * Match the storefront body font (theme settings → typography).
-   * Dawn / many OS 2.0: --font-body-family
-   * Horizon / double-dash tokens: --font-body--family
-   * Some themes: --font-paragraph-family
-   */
-  --vd-theme-font-body: var(
-    --font-body-family,
-    var(--font-body--family, var(--font-paragraph-family, inherit))
-  );
-  --vd-theme-font-heading: var(
-    --font-heading-family,
-    var(--font-heading--family, var(--vd-theme-font-body))
-  );
-  /* Theme heading fonts often omit emoji glyphs — keep color emoji as fallback. */
-  --vd-font-emoji: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji",
-    "Twemoji Mozilla", "EmojiOne Color", emoji;
-  font-family: var(--vd-theme-font-body);
+  /* Inherit merchant theme fonts — never override theme typography tokens. */
+  font-family: inherit;
   line-height: 1.5;
   color: #1a1a1a;
   -webkit-font-smoothing: antialiased;
 
-  /* Palette (overridden per campaign via inline --vd-* on this node) */
-  --vd-maroon: #6b1d1e;
-  --vd-maroon-border: #9e2a2b;
-  --vd-maroon-cta-hover: #551618;
-  --vd-badge-bg: #6b1d1e;
-  --vd-badge-text: #ffffff;
-  --vd-badge-size-scale: 1;
-  --vd-pink-bg: #fdf6f6;
-  --vd-countdown-bg: #fce8e8;
-  --vd-countdown-text: #b42318;
-  --vd-muted: #5c5c5c;
-  --vd-save: #784a4f;
-  --vd-option-subtext: #784a4f;
-  --vd-card-border: #e3e3e3;
+  /* Palette (overridden per campaign via inline --offrefy-* on this node) */
+  --offrefy-maroon: #6b1d1e;
+  --offrefy-maroon-border: #9e2a2b;
+  --offrefy-maroon-cta-hover: #551618;
+  --offrefy-badge-bg: #6b1d1e;
+  --offrefy-badge-text: #ffffff;
+  --offrefy-badge-size-scale: 1;
+  --offrefy-pink-bg: #fdf6f6;
+  --offrefy-countdown-bg: #fce8e8;
+  --offrefy-countdown-text: #b42318;
+  --offrefy-muted: #5c5c5c;
+  --offrefy-save: #784a4f;
+  --offrefy-option-subtext: #784a4f;
+  --offrefy-card-border: #e3e3e3;
 
   /* Surfaces & elevation */
-  --vd-surface: #ffffff;
-  --vd-surface-muted: #fafafa;
-  --vd-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04),
+  --offrefy-surface: #ffffff;
+  --offrefy-surface-muted: #fafafa;
+  --offrefy-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04),
     0 2px 8px rgba(15, 23, 42, 0.05);
-  --vd-shadow-card-hover: 0 2px 6px rgba(15, 23, 42, 0.06),
+  --offrefy-shadow-card-hover: 0 2px 6px rgba(15, 23, 42, 0.06),
     0 8px 20px rgba(15, 23, 42, 0.07);
-  --vd-shadow-selected: 0 1px 2px rgba(107, 29, 30, 0.06),
+  --offrefy-shadow-selected: 0 1px 2px rgba(107, 29, 30, 0.06),
     0 6px 20px rgba(107, 29, 30, 0.1);
-  --vd-radius-card: 14px;
+  --offrefy-radius-card: 14px;
   /* Main CTA; set from widget display (separate from tier cards). */
-  --vd-radius-cta: 14px;
-  --vd-radius-control: 10px;
-  --vd-radius-pill: 999px;
+  --offrefy-radius-cta: 14px;
+  --offrefy-radius-control: 10px;
+  --offrefy-radius-pill: 999px;
 
   /* Fluid type (mobile floor → desktop cap) */
-  --vd-text-xs: clamp(0.8125rem, 0.35vw + 0.74rem, 0.875rem); /* 13–14px */
-  --vd-text-sm: clamp(0.875rem, 0.45vw + 0.78rem, 0.9375rem); /* 14–15px */
-  --vd-text-md: clamp(0.9375rem, 0.55vw + 0.82rem, 1.0625rem); /* 15–17px */
-  --vd-text-lg: clamp(1.0625rem, 0.75vw + 0.85rem, 1.25rem); /* 17–20px */
-  --vd-text-xl: clamp(1.125rem, 1vw + 0.88rem, 1.375rem); /* 18–22px */
+  --offrefy-text-xs: clamp(0.8125rem, 0.35vw + 0.74rem, 0.875rem); /* 13–14px */
+  --offrefy-text-sm: clamp(0.875rem, 0.45vw + 0.78rem, 0.9375rem); /* 14–15px */
+  --offrefy-text-md: clamp(0.9375rem, 0.55vw + 0.82rem, 1.0625rem); /* 15–17px */
+  --offrefy-text-lg: clamp(1.0625rem, 0.75vw + 0.85rem, 1.25rem); /* 17–20px */
+  --offrefy-text-xl: clamp(1.125rem, 1vw + 0.88rem, 1.375rem); /* 18–22px */
 
   /* Layout rhythm — align with admin preview (~Polaris space-300/400) */
-  --vd-gap: 0.875rem;
-  --vd-card-pad: clamp(14px, 2.8vw, 18px);
-  --vd-radio: 24px;
-  --vd-leader: calc(var(--vd-radio) + var(--vd-gap));
+  --offrefy-gap: 0.875rem;
+  --offrefy-card-pad: clamp(14px, 2.8vw, 18px);
+  --offrefy-radio: 24px;
+  --offrefy-leader: calc(var(--offrefy-radio) + var(--offrefy-gap));
 
   /* Weight scale — aligns heading/price/CTA vs secondary copy */
-  --vd-fw-strong: 700;
-  --vd-fw-accent: 600;
-  --vd-fw-body: 500;
-  --vd-fw-normal: 400;
+  --offrefy-fw-strong: 700;
+  --offrefy-fw-accent: 600;
+  --offrefy-fw-body: 500;
+  --offrefy-fw-normal: 400;
 }
 
-.xloxi-qb[data-xloxi-font-scale="compact"] {
-  --vd-text-xs: clamp(0.75rem, 0.28vw + 0.7rem, 0.8125rem);
-  --vd-text-sm: clamp(0.8125rem, 0.32vw + 0.74rem, 0.875rem);
-  --vd-text-md: clamp(0.875rem, 0.4vw + 0.78rem, 0.9375rem);
-  --vd-text-lg: clamp(0.9375rem, 0.55vw + 0.8rem, 1.0625rem);
-  --vd-text-xl: clamp(1rem, 0.65vw + 0.82rem, 1.125rem);
+.offrefy-qb[data-offrefy-font-scale="compact"] {
+  --offrefy-text-xs: clamp(0.75rem, 0.28vw + 0.7rem, 0.8125rem);
+  --offrefy-text-sm: clamp(0.8125rem, 0.32vw + 0.74rem, 0.875rem);
+  --offrefy-text-md: clamp(0.875rem, 0.4vw + 0.78rem, 0.9375rem);
+  --offrefy-text-lg: clamp(0.9375rem, 0.55vw + 0.8rem, 1.0625rem);
+  --offrefy-text-xl: clamp(1rem, 0.65vw + 0.82rem, 1.125rem);
 }
 
-.xloxi-qb[data-xloxi-font-scale="comfortable"] {
-  --vd-text-xs: clamp(0.875rem, 0.4vw + 0.78rem, 0.9375rem);
-  --vd-text-sm: clamp(0.9375rem, 0.5vw + 0.82rem, 1rem);
-  --vd-text-md: clamp(1rem, 0.6vw + 0.86rem, 1.125rem);
-  --vd-text-lg: clamp(1.125rem, 0.8vw + 0.9rem, 1.375rem);
-  --vd-text-xl: clamp(1.25rem, 1.05vw + 0.92rem, 1.5rem);
+.offrefy-qb[data-offrefy-font-scale="comfortable"] {
+  --offrefy-text-xs: clamp(0.875rem, 0.4vw + 0.78rem, 0.9375rem);
+  --offrefy-text-sm: clamp(0.9375rem, 0.5vw + 0.82rem, 1rem);
+  --offrefy-text-md: clamp(1rem, 0.6vw + 0.86rem, 1.125rem);
+  --offrefy-text-lg: clamp(1.125rem, 0.8vw + 0.9rem, 1.375rem);
+  --offrefy-text-xl: clamp(1.25rem, 1.05vw + 0.92rem, 1.5rem);
 }
 
 /* Tight horizontal inset only on very narrow viewports (edge-to-edge in product column otherwise) */
 @media (max-width: 379px) {
-  .xloxi-qb {
+  [data-offrefy-root][data-offrefy-root].offrefy-qb {
     padding-inline: clamp(0.25rem, 2.5vw, 0.5rem);
   }
 }
 
-.xloxi-qb *,
-.xloxi-qb *::before,
-.xloxi-qb *::after {
+.offrefy-qb *,
+.offrefy-qb *::before,
+.offrefy-qb *::after {
   box-sizing: border-box;
 }
 
-.xloxi-qb__inner {
+.offrefy-qb__inner {
   width: 100%;
   max-width: 100%;
 }
 
-.xloxi-bundle {
+.offrefy-bundle {
   width: 100%;
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
-  font-size: var(--vd-fs-buy, 16px);
-  font-weight: var(--vd-fw-normal, 400);
+  font-size: var(--offrefy-fs-buy, 16px);
+  font-weight: var(--offrefy-fw-normal, 400);
   font-variant-numeric: tabular-nums;
 }
 
-.xloxi-cards {
+.offrefy-cards {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -178,81 +161,81 @@
   overflow: visible;
 }
 
-.xloxi-section-title {
+.offrefy-section-title {
   margin: 0 0 clamp(0.45rem, 2vw, 0.65rem);
   padding: 0;
   text-align: center;
-  font-family: var(--vd-theme-font-heading), var(--vd-font-emoji);
-  font-size: var(--vd-fs-title, 20px);
-  font-weight: var(--vd-fw-strong, 700);
+  font-family: inherit;
+  font-size: var(--offrefy-fs-title, 20px);
+  font-weight: var(--offrefy-fw-strong, 700);
   line-height: 1.25;
   color: inherit;
 }
 
-/* Header — layout from widgetDisplay (data-xloxi-header-*, --vd-heading-text-align, --vd-countdown-justify) */
-.xloxi-topbar {
+/* Header — layout from widgetDisplay (data-offrefy-header-*, --offrefy-heading-text-align, --offrefy-countdown-justify) */
+.offrefy-topbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--vd-gap) clamp(0.75rem, 3vw, 1.25rem);
+  gap: var(--offrefy-gap) clamp(0.75rem, 3vw, 1.25rem);
   margin-bottom: clamp(0.85rem, 2.2vw, 1.15rem);
   padding-bottom: clamp(0.65rem, 2vw, 0.85rem);
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
-.xloxi-qb[data-xloxi-header-layout="stacked"] .xloxi-topbar {
+.offrefy-qb[data-offrefy-header-layout="stacked"] .offrefy-topbar {
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
 }
 
-.xloxi-topbar .xloxi-title {
+.offrefy-topbar .offrefy-title {
   order: 1;
 }
 
-.xloxi-topbar .xloxi-countdown {
+.offrefy-topbar .offrefy-countdown {
   order: 2;
 }
 
-.xloxi-qb[data-xloxi-header-swap="1"] .xloxi-topbar .xloxi-title {
+.offrefy-qb[data-offrefy-header-swap="1"] .offrefy-topbar .offrefy-title {
   order: 2;
 }
 
-.xloxi-qb[data-xloxi-header-swap="1"] .xloxi-topbar .xloxi-countdown {
+.offrefy-qb[data-offrefy-header-swap="1"] .offrefy-topbar .offrefy-countdown {
   order: 1;
 }
 
-.xloxi-qb[data-xloxi-header-layout="stacked"] .xloxi-topbar .xloxi-title {
+.offrefy-qb[data-offrefy-header-layout="stacked"] .offrefy-topbar .offrefy-title {
   flex: 0 0 auto;
   width: 100%;
 }
 
-.xloxi-qb[data-xloxi-header-layout="stacked"] .xloxi-topbar .xloxi-countdown {
+.offrefy-qb[data-offrefy-header-layout="stacked"] .offrefy-topbar .offrefy-countdown {
   flex: 0 0 auto;
   width: 100%;
   min-width: 0;
 }
 
-/* Narrow screens: stack + center when enabled in app (data-xloxi-header-mobile-stack="1") */
+/* Narrow screens: stack + center when enabled in app (data-offrefy-header-mobile-stack="1") */
 @media (max-width: 749px) {
-  .xloxi-qb[data-xloxi-header-mobile-stack="1"][data-xloxi-header-layout="split"]
-    .xloxi-topbar,
-  .xloxi-qb[data-xloxi-header-mobile-stack="1"][data-xloxi-header-layout="stacked"]
-    .xloxi-topbar {
+  .offrefy-qb[data-offrefy-header-mobile-stack="1"][data-offrefy-header-layout="split"]
+    .offrefy-topbar,
+  .offrefy-qb[data-offrefy-header-mobile-stack="1"][data-offrefy-header-layout="stacked"]
+    .offrefy-topbar {
     flex-direction: column;
     align-items: center;
     justify-content: center;
   }
 
-  .xloxi-qb[data-xloxi-header-mobile-stack="1"] .xloxi-topbar .xloxi-title {
+  .offrefy-qb[data-offrefy-header-mobile-stack="1"] .offrefy-topbar .offrefy-title {
     flex: 0 0 auto;
     width: 100%;
     min-width: 0;
     text-align: center;
   }
 
-  .xloxi-qb[data-xloxi-header-mobile-stack="1"] .xloxi-topbar .xloxi-countdown {
+  .offrefy-qb[data-offrefy-header-mobile-stack="1"] .offrefy-topbar .offrefy-countdown {
     flex: 0 0 auto;
     width: 100%;
     min-width: 0;
@@ -260,24 +243,24 @@
   }
 }
 
-.xloxi-title {
+.offrefy-title {
   margin: 0;
-  font-family: var(--vd-theme-font-heading), var(--vd-font-emoji);
-  font-size: var(--vd-fs-title, 20px);
-  font-weight: var(--vd-fw-strong, 700);
+  font-family: inherit;
+  font-size: var(--offrefy-fs-title, 20px);
+  font-weight: var(--offrefy-fw-strong, 700);
   line-height: 1.25;
   letter-spacing: -0.02em;
   flex: 1 1 auto;
   min-width: 0;
   color: #141414;
-  text-align: var(--vd-heading-text-align, start);
+  text-align: var(--offrefy-heading-text-align, start);
 }
 
-.xloxi-countdown {
+.offrefy-countdown {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: var(--vd-countdown-justify, flex-end);
+  justify-content: var(--offrefy-countdown-justify, flex-end);
   gap: 0.35rem 0.5rem;
   /* Content-sized so space-between pins the timer to the topbar edge (no 11rem gap). */
   flex: 0 0 auto;
@@ -287,9 +270,9 @@
 }
 
 /* Timer Right: hug the trailing edge of the widget (same as cards / CTA). */
-.xloxi-qb[data-xloxi-header-layout="split"][data-xloxi-countdown-align="end"]
-  .xloxi-topbar
-  .xloxi-countdown {
+.offrefy-qb[data-offrefy-header-layout="split"][data-offrefy-countdown-align="end"]
+  .offrefy-topbar
+  .offrefy-countdown {
   margin-inline-start: auto;
   margin-inline-end: 0;
   justify-content: flex-end;
@@ -299,32 +282,32 @@
  * Heading Right (+ timer Right): pack title + countdown against the trailing edge
  * so the timer starts at the widget’s right end (no gutter).
  */
-.xloxi-qb[data-xloxi-header-layout="split"][data-xloxi-heading-align="end"]
-  .xloxi-topbar {
+.offrefy-qb[data-offrefy-header-layout="split"][data-offrefy-heading-align="end"]
+  .offrefy-topbar {
   justify-content: flex-end;
 }
 
-.xloxi-qb[data-xloxi-header-layout="split"][data-xloxi-heading-align="end"]
-  .xloxi-topbar
-  .xloxi-title {
+.offrefy-qb[data-offrefy-header-layout="split"][data-offrefy-heading-align="end"]
+  .offrefy-topbar
+  .offrefy-title {
   flex: 0 1 auto;
   text-align: end;
 }
 
-.xloxi-qb[data-xloxi-header-layout="stacked"][data-xloxi-countdown-align="end"]
-  .xloxi-topbar
-  .xloxi-countdown {
+.offrefy-qb[data-offrefy-header-layout="stacked"][data-offrefy-countdown-align="end"]
+  .offrefy-topbar
+  .offrefy-countdown {
   justify-content: flex-end;
 }
 
-.xloxi-qb[data-xloxi-header-layout="stacked"][data-xloxi-heading-align="end"]
-  .xloxi-topbar
-  .xloxi-title {
+.offrefy-qb[data-offrefy-header-layout="stacked"][data-offrefy-heading-align="end"]
+  .offrefy-topbar
+  .offrefy-title {
   text-align: end;
   width: 100%;
 }
 
-.xloxi-countdown-line {
+.offrefy-countdown-line {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
@@ -332,27 +315,27 @@
   max-width: 100%;
 }
 
-.xloxi-qb[data-xloxi-header-layout="stacked"] .xloxi-countdown {
+.offrefy-qb[data-offrefy-header-layout="stacked"] .offrefy-countdown {
   text-align: inherit;
 }
 
-.xloxi-countdown-muted {
-  font-size: var(--vd-fs-cd-label, 13px);
-  font-weight: var(--vd-fw-normal, 400);
-  color: var(--vd-muted);
+.offrefy-countdown-muted {
+  font-size: var(--offrefy-fs-cd-label, 13px);
+  font-weight: var(--offrefy-fw-normal, 400);
+  color: var(--offrefy-muted);
   line-height: 1.3;
 }
 
-.xloxi-countdown-badge {
+.offrefy-countdown-badge {
   display: inline-flex;
   align-items: center;
   min-height: 1.75rem;
   padding: 0.25rem 0.65rem;
-  border-radius: var(--vd-radius-pill);
-  background: var(--vd-countdown-bg);
-  color: var(--vd-countdown-text);
-  font-weight: var(--vd-fw-accent, 600);
-  font-size: var(--vd-fs-cd-badge, 13px);
+  border-radius: var(--offrefy-radius-pill);
+  background: var(--offrefy-countdown-bg);
+  color: var(--offrefy-countdown-text);
+  font-weight: var(--offrefy-fw-accent, 600);
+  font-size: var(--offrefy-fs-cd-badge, 13px);
   white-space: nowrap;
   border: 1px solid rgba(180, 35, 24, 0.12);
   box-shadow: 0 1px 2px rgba(180, 35, 24, 0.06);
@@ -362,16 +345,16 @@
 /* Room for floating top badge (half pill sits above card top).
    Apply to EVERY badge card — not only badge→badge siblings — so a
    non-badge card above does not leave the pill stuck to its bottom edge. */
-.xloxi-cards > label.xloxi-card--badge-top-float {
+.offrefy-cards > label.offrefy-card--badge-top-float {
   margin-top: 0.75rem;
 }
 
-.xloxi-cards > label.xloxi-card--badge-top-float:first-of-type {
+.offrefy-cards > label.offrefy-card--badge-top-float:first-of-type {
   margin-top: 0.55rem;
 }
 
 /* Hide native radio — theme CSS often restyles inputs and caused a “double circle” */
-.xloxi-sr-only {
+.offrefy-sr-only {
   position: absolute !important;
   width: 1px !important;
   height: 1px !important;
@@ -387,7 +370,7 @@
   -webkit-appearance: none !important;
 }
 
-.xloxi-qb label.xloxi-card > input[type="radio"].xloxi-sr-only {
+.offrefy-qb label.offrefy-card > input[type="radio"].offrefy-sr-only {
   position: absolute !important;
   left: -9999px !important;
   top: auto !important;
@@ -395,17 +378,17 @@
   height: 1px !important;
 }
 
-.xloxi-card {
+.offrefy-card {
   display: block;
   width: 100%;
   min-width: 0;
   margin: 0;
   cursor: pointer;
-  border-radius: var(--vd-radius-card);
+  border-radius: var(--offrefy-radius-card);
   /* Always 2px — swapping 1↔2 on select shifts layout (widget “shake”). */
-  border: 2px solid var(--vd-card-border);
-  background: var(--vd-surface);
-  box-shadow: var(--vd-shadow-card);
+  border: 2px solid var(--offrefy-card-border);
+  background: var(--offrefy-surface);
+  box-shadow: var(--offrefy-shadow-card);
   transition:
     background 0.2s ease,
     border-color 0.2s ease,
@@ -417,7 +400,7 @@
 
 /* Themes often set product labels to inline/auto width — unselected cards
    then shrink-wrap (prices look inset) while selected expand forces 100%. */
-.xloxi-qb label.xloxi-card {
+.offrefy-qb label.offrefy-card {
   display: block !important;
   width: 100% !important;
   max-width: 100% !important;
@@ -425,13 +408,13 @@
 }
 
 /* Floating badge on top edge (badge position: top left / center / right) */
-.xloxi-qb label.xloxi-card.xloxi-card--badge-top-float {
+.offrefy-qb label.offrefy-card.offrefy-card--badge-top-float {
   position: relative;
 }
 
-.xloxi-card:hover:not(.xloxi-card--selected) {
+.offrefy-card:hover:not(.offrefy-card--selected) {
   border-color: #cfcfcf;
-  box-shadow: var(--vd-shadow-card-hover);
+  box-shadow: var(--offrefy-shadow-card-hover);
 }
 
 /*
@@ -439,89 +422,89 @@
  * product form labels. Force our neutral border + shadow inside the embed.
  * Keep border-width identical selected/unselected to avoid horizontal jump.
  */
-.xloxi-qb label.xloxi-card:not(.xloxi-card--selected) {
+.offrefy-qb label.offrefy-card:not(.offrefy-card--selected) {
   border-width: 2px !important;
   border-style: solid !important;
-  border-color: var(--vd-card-border) !important;
-  box-shadow: var(--vd-shadow-card) !important;
+  border-color: var(--offrefy-card-border) !important;
+  box-shadow: var(--offrefy-shadow-card) !important;
   outline: none !important;
   transform: none !important;
 }
 
-.xloxi-qb label.xloxi-card:not(.xloxi-card--selected):hover {
+.offrefy-qb label.offrefy-card:not(.offrefy-card--selected):hover {
   border-color: #cfcfcf !important;
-  box-shadow: var(--vd-shadow-card-hover) !important;
+  box-shadow: var(--offrefy-shadow-card-hover) !important;
   transform: none !important;
 }
 
-.xloxi-qb label.xloxi-card.xloxi-card--selected {
+.offrefy-qb label.offrefy-card.offrefy-card--selected {
   border-width: 2px !important;
   border-style: solid !important;
-  border-color: var(--vd-maroon) !important;
-  box-shadow: var(--vd-shadow-selected) !important;
+  border-color: var(--offrefy-maroon) !important;
+  box-shadow: var(--offrefy-shadow-selected) !important;
   outline: none !important;
   transform: none !important;
 }
 
-.xloxi-qb label.xloxi-card.xloxi-card--selected:hover {
-  border-color: var(--vd-maroon) !important;
-  box-shadow: var(--vd-shadow-selected) !important;
+.offrefy-qb label.offrefy-card.offrefy-card--selected:hover {
+  border-color: var(--offrefy-maroon) !important;
+  box-shadow: var(--offrefy-shadow-selected) !important;
   transform: none !important;
 }
 
-.xloxi-qb label.xloxi-card:focus,
-.xloxi-qb label.xloxi-card:focus-within,
-.xloxi-qb label.xloxi-card:focus-visible {
+.offrefy-qb label.offrefy-card:focus,
+.offrefy-qb label.offrefy-card:focus-within,
+.offrefy-qb label.offrefy-card:focus-visible {
   outline: none !important;
 }
 
 /* Keyboard focus — brand color (not theme blue) */
-.xloxi-card:focus-within input.xloxi-sr-only:focus-visible ~ .xloxi-card__inner {
-  outline: 2px solid var(--vd-maroon);
+.offrefy-card:focus-within input.offrefy-sr-only:focus-visible ~ .offrefy-card__inner {
+  outline: 2px solid var(--offrefy-maroon);
   outline-offset: 2px;
-  border-radius: calc(var(--vd-radius-card) - 4px);
+  border-radius: calc(var(--offrefy-radius-card) - 4px);
 }
 
-.xloxi-card--selected {
+.offrefy-card--selected {
   background: linear-gradient(
     165deg,
     #fffefb 0%,
-    var(--vd-pink-bg) 55%,
-    var(--vd-pink-bg) 100%
+    var(--offrefy-pink-bg) 55%,
+    var(--offrefy-pink-bg) 100%
   );
   border-width: 2px;
-  border-color: var(--vd-maroon);
-  box-shadow: var(--vd-shadow-selected);
+  border-color: var(--offrefy-maroon);
+  box-shadow: var(--offrefy-shadow-selected);
   transform: none;
 }
 
-.xloxi-card--selected:hover {
-  border-color: var(--vd-maroon);
-  box-shadow: var(--vd-shadow-selected);
+.offrefy-card--selected:hover {
+  border-color: var(--offrefy-maroon);
+  box-shadow: var(--offrefy-shadow-selected);
   transform: none;
 }
 
-.xloxi-card__inner {
+.offrefy-card__inner {
   display: block;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  padding: var(--vd-card-pad);
+  padding: var(--offrefy-card-pad);
 }
 
-.xloxi-qb .xloxi-card__inner {
+.offrefy-qb .offrefy-card__inner {
   display: block !important;
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
 }
 
-.ofd-tier-row {
+[data-offrefy-root] .offrefy-tier-row {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--vd-gap);
+  gap: var(--offrefy-gap);
   min-width: 0;
   width: 100%;
   max-width: 100%;
@@ -530,14 +513,14 @@
 
 /* Some themes reset `span { display:inline }` / flex inside product forms —
    prices then pack next to the label (short labels → gap on the right). */
-.xloxi-qb .ofd-tier-row,
-.xloxi-qb .ofd-tier-main,
-.xloxi-qb .ofd-tier-copy,
-.xloxi-qb .ofd-tier-prices {
+.offrefy-qb .offrefy-tier-row,
+.offrefy-qb .offrefy-tier-main,
+.offrefy-qb .offrefy-tier-copy,
+.offrefy-qb .offrefy-tier-prices {
   display: flex !important;
 }
 
-.xloxi-qb .ofd-tier-row {
+.offrefy-qb .offrefy-tier-row {
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
@@ -546,20 +529,20 @@
   flex-wrap: nowrap;
 }
 
-.ofd-tier-main {
+[data-offrefy-root] .offrefy-tier-main {
   display: flex;
   align-items: center;
-  gap: var(--vd-gap);
+  gap: var(--offrefy-gap);
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.xloxi-qb .ofd-tier-main {
+.offrefy-qb .offrefy-tier-main {
   flex: 1 1 auto !important;
   min-width: 0 !important;
 }
 
-.ofd-tier-copy {
+[data-offrefy-root] .offrefy-tier-copy {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -567,42 +550,42 @@
   min-width: 0;
 }
 
-.xloxi-qb .ofd-tier-copy {
+.offrefy-qb .offrefy-tier-copy {
   flex-direction: column !important;
 }
 
-.xloxi-radio-circle {
+.offrefy-radio-circle {
   flex-shrink: 0;
-  width: var(--vd-radio);
-  height: var(--vd-radio);
+  width: var(--offrefy-radio);
+  height: var(--offrefy-radio);
   margin-top: 0;
   border-radius: 50%;
-  border: 2px solid var(--vd-radio-border, #bdbdbd);
+  border: 2px solid var(--offrefy-radio-border, #bdbdbd);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--vd-surface);
+  background: var(--offrefy-surface);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
-.xloxi-card--selected .xloxi-radio-circle {
-  border-color: var(--vd-radio-accent, var(--vd-maroon));
+.offrefy-card--selected .offrefy-radio-circle {
+  border-color: var(--offrefy-radio-accent, var(--offrefy-maroon));
 }
 
-/* Inner dot: 50% of outer circle (percent avoids fragile calc() on --vd-radio). */
-.xloxi-card--selected .xloxi-radio-circle::after {
+/* Inner dot: 50% of outer circle (percent avoids fragile calc() on --offrefy-radio). */
+.offrefy-card--selected .offrefy-radio-circle::after {
   content: "";
   width: 50%;
   height: 50%;
   max-width: 100%;
   max-height: 100%;
   border-radius: 50%;
-  background: var(--vd-radio-accent, var(--vd-maroon));
+  background: var(--offrefy-radio-accent, var(--offrefy-maroon));
   flex-shrink: 0;
   box-sizing: border-box;
 }
 
-.ofd-tier-label-row {
+[data-offrefy-root] .offrefy-tier-label-row {
   flex: 0 1 auto;
   min-width: 0;
   display: flex;
@@ -611,22 +594,22 @@
   gap: 0.35rem 0.55rem;
 }
 
-.ofd-tier-qty {
-  font-weight: var(--vd-fw-strong, 700);
-  font-size: var(--vd-fs-buy, 16px);
+[data-offrefy-root] .offrefy-tier-qty {
+  font-weight: var(--offrefy-fw-strong, 700);
+  font-size: var(--offrefy-fs-buy, 16px);
   line-height: 1.25;
 }
 
-.xloxi-badge-pill {
+.offrefy-badge-pill {
   display: inline-flex;
   align-items: center;
   max-width: 100%;
   padding: 2px 20px;
-  border-radius: var(--vd-radius-pill);
-  background: var(--vd-badge-bg);
-  color: var(--vd-badge-text);
-  font-size: calc(var(--vd-fs-badge, 12px) * var(--vd-badge-size-scale, 1));
-  font-weight: var(--vd-fw-accent, 600);
+  border-radius: var(--offrefy-radius-pill);
+  background: var(--offrefy-badge-bg);
+  color: var(--offrefy-badge-text);
+  font-size: calc(var(--offrefy-fs-badge, 12px) * var(--offrefy-badge-size-scale, 1));
+  font-weight: var(--offrefy-fw-accent, 600);
   line-height: 1.25;
   letter-spacing: 0.01em;
   overflow: hidden;
@@ -636,14 +619,14 @@
   box-shadow: 0 1px 2px rgba(107, 29, 30, 0.2);
 }
 
-/* Badge on its own row (below label or after subtext) — not inline with .ofd-tier-qty */
-.xloxi-badge-pill--row {
+/* Badge on its own row (below label or after subtext) — not inline with [data-offrefy-root] .offrefy-tier-qty */
+.offrefy-badge-pill--row {
   align-self: flex-start;
   margin-top: 0.05rem;
 }
 
 /* Top-edge badge overlapping card top border — align via modifier class */
-.xloxi-card__badge-top--float {
+.offrefy-card__badge-top--float {
   position: absolute;
   top: 0;
   z-index: 2;
@@ -653,43 +636,43 @@
   box-sizing: border-box;
 }
 
-.xloxi-card__badge-top--float.xloxi-card__badge-top--align-end {
-  right: var(--vd-card-pad);
+.offrefy-card__badge-top--float.offrefy-card__badge-top--align-end {
+  right: var(--offrefy-card-pad);
   left: auto;
   transform: translateY(-50%);
   justify-content: flex-end;
-  max-width: calc(100% - 2 * var(--vd-card-pad));
+  max-width: calc(100% - 2 * var(--offrefy-card-pad));
 }
 
-.xloxi-card__badge-top--float.xloxi-card__badge-top--align-start {
-  left: var(--vd-card-pad);
+.offrefy-card__badge-top--float.offrefy-card__badge-top--align-start {
+  left: var(--offrefy-card-pad);
   right: auto;
   transform: translateY(-50%);
   justify-content: flex-start;
-  max-width: calc(100% - 2 * var(--vd-card-pad));
+  max-width: calc(100% - 2 * var(--offrefy-card-pad));
 }
 
-.xloxi-card__badge-top--float.xloxi-card__badge-top--align-center {
+.offrefy-card__badge-top--float.offrefy-card__badge-top--align-center {
   left: 50%;
   right: auto;
   transform: translate(-50%, -50%);
   justify-content: center;
   width: max-content;
-  max-width: calc(100% - 2 * var(--vd-card-pad));
+  max-width: calc(100% - 2 * var(--offrefy-card-pad));
 }
 
-.xloxi-card__badge-top--float .xloxi-badge-pill {
+.offrefy-card__badge-top--float .offrefy-badge-pill {
   pointer-events: auto;
   max-width: 100%;
 }
 
 /* Stacked above strike/price in the right column */
-.xloxi-badge-pill--pricecol {
+.offrefy-badge-pill--pricecol {
   align-self: flex-end;
   margin-bottom: 0.18rem;
 }
 
-.ofd-tier-prices {
+[data-offrefy-root] .offrefy-tier-prices {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -702,7 +685,7 @@
   margin-inline-start: auto;
 }
 
-.xloxi-qb .ofd-tier-prices {
+.offrefy-qb .offrefy-tier-prices {
   flex-direction: column !important;
   align-items: flex-end !important;
   justify-content: center !important;
@@ -711,19 +694,19 @@
   flex-shrink: 0 !important;
 }
 
-.ofd-tier-was {
+[data-offrefy-root] .offrefy-tier-was {
   display: inline-block;
   max-width: 100%;
   text-decoration: none;
-  color: var(--vd-muted);
-  font-weight: var(--vd-fw-normal, 400);
-  font-size: var(--vd-fs-compare, 13px);
+  color: var(--offrefy-muted);
+  font-weight: var(--offrefy-fw-normal, 400);
+  font-size: var(--offrefy-fs-compare, 13px);
   line-height: 1.15;
   position: relative;
   font-variant-numeric: tabular-nums;
 }
 
-.ofd-tier-was::after {
+[data-offrefy-root] .offrefy-tier-was::after {
   content: "";
   position: absolute;
   left: 0;
@@ -734,32 +717,32 @@
   pointer-events: none;
 }
 
-.ofd-tier-amt {
-  font-weight: var(--vd-fw-strong, 700);
-  font-size: var(--vd-fs-price, 17px);
+[data-offrefy-root] .offrefy-tier-amt {
+  font-weight: var(--offrefy-fw-strong, 700);
+  font-size: var(--offrefy-fs-price, 17px);
   line-height: 1.25;
   font-variant-numeric: tabular-nums;
   color: #111;
 }
 
-.ofd-tier-save--under {
+[data-offrefy-root] .offrefy-tier-save--under {
   display: block;
   margin-top: 0;
-  font-size: var(--vd-fs-save, 12px);
-  color: var(--vd-save);
-  font-weight: var(--vd-fw-body, 500);
+  font-size: var(--offrefy-fs-save, 12px);
+  color: var(--offrefy-save);
+  font-weight: var(--offrefy-fw-body, 500);
   line-height: 1.4;
   letter-spacing: 0.01em;
   text-align: left;
   max-width: 100%;
 }
 
-.xloxi-option-subtext--under {
+.offrefy-option-subtext--under {
   display: block;
   margin-top: 0;
-  font-size: var(--vd-fs-option-subtext, var(--vd-fs-save, 12px));
-  color: var(--vd-option-subtext, var(--vd-save));
-  font-weight: var(--vd-fw-body, 500);
+  font-size: var(--offrefy-fs-option-subtext, var(--offrefy-fs-save, 12px));
+  color: var(--offrefy-option-subtext, var(--offrefy-save));
+  font-weight: var(--offrefy-fw-body, 500);
   line-height: 1.4;
   letter-spacing: 0.01em;
   text-align: left;
@@ -767,18 +750,18 @@
 }
 
 /* Expanded tier — single compact row (# · variant · total · qty · Add) */
-.xloxi-card__expand {
+.offrefy-card__expand {
   display: none;
   width: 100%;
   margin-top: 0.45rem;
   padding-top: 0.45rem;
 }
 
-.xloxi-card:has(input.xloxi-sr-only:checked) .xloxi-card__expand {
+.offrefy-card:has(input.offrefy-sr-only:checked) .offrefy-card__expand {
   display: block;
 }
 
-.xloxi-card__divider {
+.offrefy-card__divider {
   height: 1px;
   margin: 0 0 0.4rem;
   border: 0;
@@ -791,30 +774,30 @@
   );
 }
 
-.xloxi-expand-compact {
+.offrefy-expand-compact {
   /* One height for variant select, qty strip, and “+ Add” (30px incl. borders via box-sizing) */
-  --vd-compact-control-h: 30px;
+  --offrefy-compact-control-h: 30px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.3rem 0.45rem;
   width: 100%;
   padding: 0.35rem 0.45rem;
-  border-radius: var(--vd-radius-control);
+  border-radius: var(--offrefy-radius-control);
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-.xloxi-expand-compact--no-variant .xloxi-line-total,
-.xloxi-expand-compact--no-qty .xloxi-line-total {
+.offrefy-expand-compact--no-variant .offrefy-line-total,
+.offrefy-expand-compact--no-qty .offrefy-line-total {
   margin-inline-start: 0.25rem;
 }
 
-.xloxi-expand-compact--no-line-total .xloxi-expand-trailing {
+.offrefy-expand-compact--no-line-total .offrefy-expand-trailing {
   margin-inline-start: auto;
 }
 
-.xloxi-expand-trailing {
+.offrefy-expand-trailing {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
@@ -822,46 +805,46 @@
   margin-inline-start: auto;
 }
 
-.xloxi-tier-idx {
-  font-size: var(--vd-fs-cd-label, 12px);
-  font-weight: var(--vd-fw-normal, 400);
-  color: var(--vd-muted);
-  line-height: var(--vd-compact-control-h, 30px);
+[data-offrefy-root] .offrefy-tier-idx {
+  font-size: var(--offrefy-fs-cd-label, 12px);
+  font-weight: var(--offrefy-fw-normal, 400);
+  color: var(--offrefy-muted);
+  line-height: var(--offrefy-compact-control-h, 30px);
   flex: 0 0 auto;
 }
 
-.xloxi-select-wrap {
+.offrefy-select-wrap {
   flex: 1 1 6.5rem;
   min-width: min(100%, 5.5rem);
   max-width: 12rem;
 }
 
-.xloxi-variant-select {
+.offrefy-variant-select {
   box-sizing: border-box;
   width: 100%;
-  min-height: var(--vd-compact-control-h, 30px);
+  min-height: var(--offrefy-compact-control-h, 30px);
   padding: 0 0.45rem;
-  border-radius: var(--vd-radius-control);
-  border: 1px solid var(--vd-card-border);
+  border-radius: var(--offrefy-radius-control);
+  border: 1px solid var(--offrefy-card-border);
   font: inherit;
-  font-size: var(--vd-fs-buy, 16px);
-  background: var(--vd-surface);
+  font-size: var(--offrefy-fs-buy, 16px);
+  background: var(--offrefy-surface);
   color: inherit;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.xloxi-variant-select:hover {
+.offrefy-variant-select:hover {
   border-color: #c8c8c8;
 }
 
-.xloxi-variant-select:focus {
+.offrefy-variant-select:focus {
   outline: none;
-  border-color: var(--vd-maroon);
+  border-color: var(--offrefy-maroon);
   box-shadow: 0 0 0 3px rgba(107, 29, 30, 0.12);
 }
 
-.xloxi-qty-stack {
+.offrefy-qty-stack {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -870,53 +853,53 @@
   max-width: 100%;
 }
 
-.xloxi-cart-qty-alert {
+.offrefy-cart-qty-alert {
   margin: 0;
   padding: 0;
-  font-size: var(--vd-fs-save, 12px);
-  font-weight: var(--vd-fw-body, 500);
-  color: var(--vd-countdown-text, #b42318);
+  font-size: var(--offrefy-fs-save, 12px);
+  font-weight: var(--offrefy-fw-body, 500);
+  color: var(--offrefy-countdown-text, #b42318);
   line-height: 1.45;
   text-align: left;
   max-width: 14rem;
   box-sizing: border-box;
 }
 
-.xloxi-cart-qty-alert[hidden] {
+.offrefy-cart-qty-alert[hidden] {
   display: none !important;
 }
 
-.xloxi-cart-qty-alert--global {
+.offrefy-cart-qty-alert--global {
   margin: 0.55rem 0 0;
   padding: 0.55rem 0.85rem;
   max-width: none;
   text-align: center;
-  border-radius: var(--vd-radius-control, 10px);
-  background: var(--vd-countdown-bg, #fce8e8);
-  font-size: var(--vd-text-sm, 0.9375rem);
+  border-radius: var(--offrefy-radius-control, 10px);
+  background: var(--offrefy-countdown-bg, #fce8e8);
+  font-size: var(--offrefy-text-sm, 0.9375rem);
 }
 
-.xloxi-qty-group {
+.offrefy-qty-group {
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
   flex-shrink: 0;
   min-width: 9.75rem;
-  height: var(--vd-compact-control-h, 30px);
-  min-height: var(--vd-compact-control-h, 30px);
-  border-radius: var(--vd-radius-control);
+  height: var(--offrefy-compact-control-h, 30px);
+  min-height: var(--offrefy-compact-control-h, 30px);
+  border-radius: var(--offrefy-radius-control);
   border: 1px solid rgba(107, 29, 30, 0.16);
   overflow: hidden;
-  background: var(--vd-surface);
+  background: var(--offrefy-surface);
 }
 
-.xloxi-qty-btn {
+.offrefy-qty-btn {
   box-sizing: border-box;
-  width: var(--vd-compact-control-h, 30px);
-  min-width: var(--vd-compact-control-h, 30px);
-  height: var(--vd-compact-control-h, 30px);
-  min-height: var(--vd-compact-control-h, 30px);
+  width: var(--offrefy-compact-control-h, 30px);
+  min-width: var(--offrefy-compact-control-h, 30px);
+  height: var(--offrefy-compact-control-h, 30px);
+  min-height: var(--offrefy-compact-control-h, 30px);
   flex: 0 0 auto;
   padding: 0;
   border: none;
@@ -924,7 +907,7 @@
   color: #2a2a2a;
   cursor: pointer;
   font-size: 0.9375rem;
-  font-weight: var(--vd-fw-accent, 600);
+  font-weight: var(--offrefy-fw-accent, 600);
   line-height: 1;
   display: inline-flex;
   align-items: center;
@@ -934,37 +917,37 @@
     color 0.15s ease;
 }
 
-.xloxi-qty-btn:hover:not(:disabled) {
+.offrefy-qty-btn:hover:not(:disabled) {
   background: linear-gradient(180deg, #fdf8f8 0%, #f5eded 100%);
-  color: var(--vd-maroon);
+  color: var(--offrefy-maroon);
 }
 
-.xloxi-qty-btn:active:not(:disabled) {
+.offrefy-qty-btn:active:not(:disabled) {
   background: #efe8e8;
 }
 
-.xloxi-qty-btn:focus-visible {
+.offrefy-qty-btn:focus-visible {
   position: relative;
   z-index: 1;
-  outline: 2px solid var(--vd-maroon);
+  outline: 2px solid var(--offrefy-maroon);
   outline-offset: -2px;
 }
 
-.xloxi-qty-btn:disabled {
+.offrefy-qty-btn:disabled {
   cursor: not-allowed;
   opacity: 0.38;
   color: #888;
 }
 
-.xloxi-qty-value {
+.offrefy-qty-value {
   box-sizing: border-box;
   min-width: 2.25rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   align-self: stretch;
-  font-weight: var(--vd-fw-strong, 700);
-  font-size: var(--vd-fs-buy, 16px);
+  font-weight: var(--offrefy-fw-strong, 700);
+  font-size: var(--offrefy-fs-buy, 16px);
   font-variant-numeric: tabular-nums;
   line-height: 1;
   border-left: 1px solid rgba(107, 29, 30, 0.1);
@@ -975,7 +958,7 @@
   letter-spacing: 0.02em;
 }
 
-.xloxi-qb input.xloxi-qty-value {
+.offrefy-qb input.offrefy-qty-value {
   box-sizing: border-box;
   display: block;
   flex: 0 0 auto;
@@ -998,34 +981,34 @@
   text-align: center;
 }
 
-.xloxi-qb input.xloxi-qty-value:focus {
+.offrefy-qb input.offrefy-qty-value:focus {
   outline: none;
   background: rgba(255, 255, 255, 0.35);
 }
 
-.xloxi-line-total {
-  font-weight: var(--vd-fw-strong, 700);
-  font-size: var(--vd-fs-price, 16px);
-  line-height: var(--vd-compact-control-h, 30px);
+.offrefy-line-total {
+  font-weight: var(--offrefy-fw-strong, 700);
+  font-size: var(--offrefy-fs-price, 16px);
+  line-height: var(--offrefy-compact-control-h, 30px);
   flex: 0 0 auto;
   text-align: right;
 }
 
-.xloxi-add-outline {
+.offrefy-add-outline {
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   margin-top: 0;
-  height: var(--vd-compact-control-h, 30px);
-  min-height: var(--vd-compact-control-h, 30px);
+  height: var(--offrefy-compact-control-h, 30px);
+  min-height: var(--offrefy-compact-control-h, 30px);
   padding: 0 0.65rem;
-  border-radius: var(--vd-radius-control);
+  border-radius: var(--offrefy-radius-control);
   border: 1px solid rgba(107, 29, 30, 0.2);
   background: linear-gradient(180deg, #ffffff 0%, #fdfbfb 100%);
-  color: var(--vd-maroon);
-  font-weight: var(--vd-fw-strong, 700);
-  font-size: var(--vd-fs-compare, 13px);
+  color: var(--offrefy-maroon);
+  font-weight: var(--offrefy-fw-strong, 700);
+  font-size: var(--offrefy-fs-compare, 13px);
   font-family: inherit;
   line-height: 1;
   letter-spacing: 0.04em;
@@ -1036,27 +1019,27 @@
     border-color 0.15s ease;
 }
 
-.xloxi-add-outline:hover:not(:disabled) {
+.offrefy-add-outline:hover:not(:disabled) {
   background: linear-gradient(180deg, #fff8f8 0%, #fceeee 100%);
-  border-color: var(--vd-maroon);
+  border-color: var(--offrefy-maroon);
 }
 
-.xloxi-add-outline:active:not(:disabled) {
+.offrefy-add-outline:active:not(:disabled) {
   transform: translateY(1px);
 }
 
-.xloxi-add-outline:disabled {
+.offrefy-add-outline:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.xloxi-add-outline:focus-visible {
-  outline: 2px solid var(--vd-maroon);
+.offrefy-add-outline:focus-visible {
+  outline: 2px solid var(--offrefy-maroon);
   outline-offset: 2px;
 }
 
 /* CTA — min 48px tap height on touch */
-.xloxi-cta {
+.offrefy-cta {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1065,11 +1048,11 @@
   margin-top: clamp(1rem, 2.8vw, 1.35rem);
   padding: 0.8rem 1.15rem;
   border: none;
-  border-radius: var(--vd-radius-cta, var(--vd-radius-card));
-  background: var(--vd-maroon);
+  border-radius: var(--offrefy-radius-cta, var(--offrefy-radius-card));
+  background: var(--offrefy-maroon);
   color: #fff;
-  font-size: var(--vd-fs-cta, 17px);
-  font-weight: var(--vd-fw-strong, 700);
+  font-size: var(--offrefy-fs-cta, 17px);
+  font-weight: var(--offrefy-fw-strong, 700);
   font-family: inherit;
   letter-spacing: 0.03em;
   cursor: pointer;
@@ -1079,39 +1062,39 @@
     transform 0.12s ease;
 }
 
-.xloxi-cta:hover:not(:disabled) {
-  background: var(--vd-maroon-cta-hover);
+.offrefy-cta:hover:not(:disabled) {
+  background: var(--offrefy-maroon-cta-hover);
 }
 
-.xloxi-cta:active:not(:disabled) {
+.offrefy-cta:active:not(:disabled) {
   transform: translateY(1px);
 }
 
-.xloxi-cta:disabled {
+.offrefy-cta:disabled {
   opacity: 0.55;
   cursor: not-allowed;
   transform: none;
 }
 
-.xloxi-cta:focus-visible {
-  outline: 2px solid var(--vd-maroon);
+.offrefy-cta:focus-visible {
+  outline: 2px solid var(--offrefy-maroon);
   outline-offset: 2px;
 }
 
-.xloxi-stock-alert {
+.offrefy-stock-alert {
   margin: 0.65rem 0 0;
   padding: 0.55rem 0.85rem;
-  border-radius: var(--vd-radius-control, 10px);
-  background: var(--vd-countdown-bg, #fce8e8);
-  color: var(--vd-countdown-text, #b42318);
-  font-size: var(--vd-text-sm, 0.9375rem);
-  font-weight: var(--vd-fw-body, 500);
+  border-radius: var(--offrefy-radius-control, 10px);
+  background: var(--offrefy-countdown-bg, #fce8e8);
+  color: var(--offrefy-countdown-text, #b42318);
+  font-size: var(--offrefy-text-sm, 0.9375rem);
+  font-weight: var(--offrefy-fw-body, 500);
   text-align: center;
   line-height: 1.45;
   box-sizing: border-box;
 }
 
-.xloxi-stock-alert[hidden] {
+.offrefy-stock-alert[hidden] {
   display: none !important;
   margin: 0;
   padding: 0;
@@ -1119,11 +1102,11 @@
   overflow: hidden;
 }
 
-.xloxi-footnote {
+.offrefy-footnote {
   margin: clamp(0.55rem, 2vw, 0.75rem) 0 0;
-  font-size: var(--vd-fs-footnote, 12px);
-  font-weight: var(--vd-fw-normal, 400);
-  color: var(--vd-muted);
+  font-size: var(--offrefy-fs-footnote, 12px);
+  font-weight: var(--offrefy-fw-normal, 400);
+  color: var(--offrefy-muted);
   text-align: center;
   line-height: 1.5;
   max-width: 28rem;
@@ -1134,80 +1117,80 @@
 /* Narrow phones (~≤480px): keep label | prices on one row (flush right),
    expand as select-full + controls row — no overlap / no empty right gutter. */
 @media (max-width: 30rem) {
-  .xloxi-qb {
-    --vd-card-pad: 10px;
-    --vd-gap: 0.5rem;
-    --vd-radio: 18px;
+  [data-offrefy-root][data-offrefy-root].offrefy-qb {
+    --offrefy-card-pad: 10px;
+    --offrefy-gap: 0.5rem;
+    --offrefy-radio: 18px;
   }
 
-  .xloxi-cards {
+  .offrefy-cards {
     gap: 0.65rem;
   }
 
-  .xloxi-cards > label.xloxi-card--badge-top-float {
+  .offrefy-cards > label.offrefy-card--badge-top-float {
     margin-top: 0.95rem;
   }
 
-  .xloxi-cards > label.xloxi-card--badge-top-float:first-of-type {
+  .offrefy-cards > label.offrefy-card--badge-top-float:first-of-type {
     margin-top: 0.65rem;
   }
 
-  .xloxi-topbar {
+  .offrefy-topbar {
     flex-direction: column;
     align-items: stretch;
     gap: 0.4rem;
     margin-bottom: 0.5rem;
   }
 
-  .xloxi-countdown {
-    justify-content: var(--vd-countdown-justify, flex-end);
+  .offrefy-countdown {
+    justify-content: var(--offrefy-countdown-justify, flex-end);
   }
 
-  .xloxi-qb[data-xloxi-countdown-align="end"] .xloxi-countdown {
+  .offrefy-qb[data-offrefy-countdown-align="end"] .offrefy-countdown {
     justify-content: flex-end;
   }
 
-  .xloxi-qb[data-xloxi-countdown-align="start"] .xloxi-countdown {
+  .offrefy-qb[data-offrefy-countdown-align="start"] .offrefy-countdown {
     justify-content: flex-start;
   }
 
-  .xloxi-qb[data-xloxi-countdown-align="center"] .xloxi-countdown {
+  .offrefy-qb[data-offrefy-countdown-align="center"] .offrefy-countdown {
     justify-content: center;
   }
 
-  .ofd-tier-row,
-  .xloxi-qb .ofd-tier-row {
+  [data-offrefy-root] .offrefy-tier-row,
+  .offrefy-qb .offrefy-tier-row {
     flex-wrap: nowrap !important;
     align-items: center !important;
     gap: 0.4rem !important;
   }
 
-  .ofd-tier-main,
-  .xloxi-qb .ofd-tier-main {
+  [data-offrefy-root] .offrefy-tier-main,
+  .offrefy-qb .offrefy-tier-main {
     flex: 1 1 auto !important;
     min-width: 0 !important;
     max-width: none !important;
   }
 
-  .ofd-tier-copy,
-  .xloxi-qb .ofd-tier-copy {
+  [data-offrefy-root] .offrefy-tier-copy,
+  .offrefy-qb .offrefy-tier-copy {
     min-width: 0 !important;
     max-width: 100%;
     gap: 0.15rem;
   }
 
-  .ofd-tier-qty {
+  [data-offrefy-root] .offrefy-tier-qty {
     overflow-wrap: anywhere;
   }
 
-  .ofd-tier-save--under,
-  .xloxi-option-subtext--under {
+  [data-offrefy-root] .offrefy-tier-save--under,
+  .offrefy-option-subtext--under {
     font-size: 11px;
     line-height: 1.3;
   }
 
-  .ofd-tier-prices,
-  .xloxi-qb .ofd-tier-prices {
+  [data-offrefy-root] .offrefy-tier-prices,
+  .offrefy-qb .offrefy-tier-prices {
     flex: 0 0 auto !important;
     flex-shrink: 0 !important;
     width: auto !important;
@@ -1220,28 +1203,28 @@
     gap: 0.08rem;
   }
 
-  .ofd-tier-was {
+  [data-offrefy-root] .offrefy-tier-was {
     font-size: 11px;
   }
 
-  .ofd-tier-amt {
-    font-size: var(--vd-fs-price, 15px);
+  [data-offrefy-root] .offrefy-tier-amt {
+    font-size: var(--offrefy-fs-price, 15px);
     white-space: nowrap;
   }
 
   /* Expanded tier: variant full-width, then # · price · qty · Add */
-  .xloxi-card__expand {
+  .offrefy-card__expand {
     margin-top: 0.3rem;
     padding-top: 0.25rem;
   }
 
-  .xloxi-card__divider {
+  .offrefy-card__divider {
     margin-bottom: 0.25rem;
   }
 
-  .xloxi-expand-compact,
-  .xloxi-qb .xloxi-expand-compact {
-    --vd-compact-control-h: 34px;
+  .offrefy-expand-compact,
+  .offrefy-qb .offrefy-expand-compact {
+    --offrefy-compact-control-h: 34px;
     display: grid !important;
     grid-template-columns: auto auto minmax(0, 1fr);
     grid-template-areas:
@@ -1256,15 +1239,15 @@
     box-sizing: border-box;
   }
 
-  .xloxi-expand-compact .xloxi-tier-idx,
-  .xloxi-qb .xloxi-expand-compact .xloxi-tier-idx {
+  .offrefy-expand-compact [data-offrefy-root] .offrefy-tier-idx,
+  .offrefy-qb .offrefy-expand-compact [data-offrefy-root] .offrefy-tier-idx {
     grid-area: idx;
-    line-height: var(--vd-compact-control-h, 34px);
+    line-height: var(--offrefy-compact-control-h, 34px);
     flex: none;
   }
 
-  .xloxi-expand-compact .xloxi-select-wrap,
-  .xloxi-qb .xloxi-expand-compact .xloxi-select-wrap {
+  .offrefy-expand-compact .offrefy-select-wrap,
+  .offrefy-qb .offrefy-expand-compact .offrefy-select-wrap {
     grid-area: select;
     flex: none;
     width: 100%;
@@ -1272,14 +1255,14 @@
     max-width: none !important;
   }
 
-  .xloxi-expand-compact .xloxi-variant-select,
-  .xloxi-qb .xloxi-expand-compact .xloxi-variant-select {
+  .offrefy-expand-compact .offrefy-variant-select,
+  .offrefy-qb .offrefy-expand-compact .offrefy-variant-select {
     width: 100%;
     max-width: none;
   }
 
-  .xloxi-expand-compact .xloxi-line-total,
-  .xloxi-qb .xloxi-expand-compact .xloxi-line-total {
+  .offrefy-expand-compact .offrefy-line-total,
+  .offrefy-qb .offrefy-expand-compact .offrefy-line-total {
     grid-area: total;
     margin: 0 !important;
     width: auto;
@@ -1293,8 +1276,8 @@
     text-overflow: ellipsis;
   }
 
-  .xloxi-expand-trailing,
-  .xloxi-qb .xloxi-expand-trailing {
+  .offrefy-expand-trailing,
+  .offrefy-qb .offrefy-expand-trailing {
     grid-area: trailing;
     display: inline-flex !important;
     flex-wrap: nowrap;
@@ -1308,62 +1291,62 @@
     max-width: 100%;
   }
 
-  .xloxi-expand-compact .xloxi-qty-stack {
+  .offrefy-expand-compact .offrefy-qty-stack {
     align-items: stretch;
     max-width: none;
     flex: 0 0 auto;
   }
 
-  .xloxi-expand-compact .xloxi-qty-group {
+  .offrefy-expand-compact .offrefy-qty-group {
     width: auto;
     flex: 0 0 auto;
   }
 
-  .xloxi-expand-compact .xloxi-add-outline {
+  .offrefy-expand-compact .offrefy-add-outline {
     flex: 0 0 auto;
     white-space: nowrap;
     padding-inline: 0.5rem;
     font-size: 12px;
   }
 
-  .xloxi-expand-compact input.xloxi-qty-value,
-  .xloxi-qb .xloxi-expand-compact input.xloxi-qty-value {
+  .offrefy-expand-compact input.offrefy-qty-value,
+  .offrefy-qb .offrefy-expand-compact input.offrefy-qty-value {
     width: 2.35rem !important;
     min-width: 2.2rem !important;
     max-width: 2.75rem !important;
   }
 
   /* No variant: single controls row */
-  .xloxi-expand-compact--no-variant,
-  .xloxi-qb .xloxi-expand-compact--no-variant {
+  .offrefy-expand-compact--no-variant,
+  .offrefy-qb .offrefy-expand-compact--no-variant {
     grid-template-columns: auto auto minmax(0, 1fr);
     grid-template-areas: "idx total trailing";
   }
 
   /* No line total */
-  .xloxi-expand-compact--no-line-total,
-  .xloxi-qb .xloxi-expand-compact--no-line-total {
+  .offrefy-expand-compact--no-line-total,
+  .offrefy-qb .offrefy-expand-compact--no-line-total {
     grid-template-columns: auto minmax(0, 1fr);
     grid-template-areas:
       "select select"
       "idx trailing";
   }
 
-  .xloxi-expand-compact--no-variant.xloxi-expand-compact--no-line-total,
-  .xloxi-qb .xloxi-expand-compact--no-variant.xloxi-expand-compact--no-line-total {
+  .offrefy-expand-compact--no-variant.offrefy-expand-compact--no-line-total,
+  .offrefy-qb .offrefy-expand-compact--no-variant.offrefy-expand-compact--no-line-total {
     grid-template-columns: auto minmax(0, 1fr);
     grid-template-areas: "idx trailing";
   }
 
-  .xloxi-expand-compact--no-variant.xloxi-expand-compact--no-line-total .xloxi-expand-trailing {
+  .offrefy-expand-compact--no-variant.offrefy-expand-compact--no-line-total .offrefy-expand-trailing {
     justify-content: flex-end;
     width: 100%;
   }
 
   /* Ultra-narrow: qty row under price so nothing clips */
   @media (max-width: 22.5rem) {
-    .xloxi-expand-compact,
-    .xloxi-qb .xloxi-expand-compact {
+    .offrefy-expand-compact,
+    .offrefy-qb .offrefy-expand-compact {
       grid-template-columns: auto minmax(0, 1fr);
       grid-template-areas:
         "select select"
@@ -1371,41 +1354,41 @@
         "trailing trailing";
     }
 
-    .xloxi-expand-trailing,
-    .xloxi-qb .xloxi-expand-trailing {
+    .offrefy-expand-trailing,
+    .offrefy-qb .offrefy-expand-trailing {
       justify-self: stretch;
       justify-content: space-between;
       width: 100%;
     }
 
-    .xloxi-expand-compact--no-variant,
-    .xloxi-qb .xloxi-expand-compact--no-variant {
+    .offrefy-expand-compact--no-variant,
+    .offrefy-qb .offrefy-expand-compact--no-variant {
       grid-template-areas:
         "idx total"
         "trailing trailing";
     }
 
-    .xloxi-expand-compact--no-line-total,
-    .xloxi-qb .xloxi-expand-compact--no-line-total {
+    .offrefy-expand-compact--no-line-total,
+    .offrefy-qb .offrefy-expand-compact--no-line-total {
       grid-template-areas:
         "select select"
         "idx trailing";
     }
 
-    .xloxi-expand-compact--no-variant.xloxi-expand-compact--no-line-total,
-    .xloxi-qb
-      .xloxi-expand-compact--no-variant.xloxi-expand-compact--no-line-total {
+    .offrefy-expand-compact--no-variant.offrefy-expand-compact--no-line-total,
+    .offrefy-qb
+      .offrefy-expand-compact--no-variant.offrefy-expand-compact--no-line-total {
       grid-template-areas: "idx trailing";
     }
   }
 
-  .xloxi-cta {
+  .offrefy-cta {
     margin-top: 0.75rem;
     min-height: 2.65rem;
     padding: 0.65rem 1rem;
   }
 
-  .xloxi-footnote {
+  .offrefy-footnote {
     margin-top: 0.4rem;
     max-width: none;
   }
@@ -1413,76 +1396,76 @@
 
 /*
  * Hide theme variant UI when Display → “Hide variant selector in theme” is on.
- * Only while an Offrefy widget root is on the page (:has(.xloxi-root)) so collection
+ * Only while an Offrefy widget root is on the page (:has([data-offrefy-root])) so collection
  * / other templates are never affected by leftover html flags.
  * JS also sets display:none on nodes; these rules catch Dawn/Horizon pickers and reduce FOUC.
  */
-html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+html[data-offrefy-hide-theme-variant="1"]:has([data-offrefy-root])
   .shopify-section--main-product
   form[action*="/cart/add"]
   variant-selects,
-html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+html[data-offrefy-hide-theme-variant="1"]:has([data-offrefy-root])
   .shopify-section--main-product
   form[action*="/cart/add"]
   variant-radios,
-html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+html[data-offrefy-hide-theme-variant="1"]:has([data-offrefy-root])
   product-info
   form[action*="/cart/add"]
   variant-selects,
-html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+html[data-offrefy-hide-theme-variant="1"]:has([data-offrefy-root])
   product-info
   form[action*="/cart/add"]
   variant-radios {
   display: none !important;
 }
 
-html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+html[data-offrefy-hide-theme-variant="1"]:has([data-offrefy-root])
   .shopify-section--main-product
   form[action*="/cart/add"]
   fieldset.product-form__input:has(input[type="radio"][name^="options"]),
-html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+html[data-offrefy-hide-theme-variant="1"]:has([data-offrefy-root])
   .shopify-section--main-product
   form[action*="/cart/add"]
   fieldset.product-form__input:has(select[name^="options"]),
-html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+html[data-offrefy-hide-theme-variant="1"]:has([data-offrefy-root])
   .shopify-section--main-product
   form[action*="/cart/add"]
   fieldset.product-form__input:has(select[name="id"]),
-html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+html[data-offrefy-hide-theme-variant="1"]:has([data-offrefy-root])
   .shopify-section--main-product
   form[action*="/cart/add"]
   .product-form__input:has(input[type="radio"][name^="options"]),
-html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+html[data-offrefy-hide-theme-variant="1"]:has([data-offrefy-root])
   .shopify-section--main-product
   form[action*="/cart/add"]
   .product-form__input:has(select[name^="options"]) {
   display: none !important;
 }
 
-html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+html[data-offrefy-hide-theme-variant="1"]:has([data-offrefy-root])
   .shopify-section--main-product
   variant-selects,
-html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root)
+html[data-offrefy-hide-theme-variant="1"]:has([data-offrefy-root])
   .shopify-section--main-product
   variant-radios,
-html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root) product-info variant-selects,
-html[data-xloxi-hide-theme-variant="1"]:has(.xloxi-root) product-info variant-radios {
+html[data-offrefy-hide-theme-variant="1"]:has([data-offrefy-root]) product-info variant-selects,
+html[data-offrefy-hide-theme-variant="1"]:has([data-offrefy-root]) product-info variant-radios {
   display: none !important;
 }
 
 /* Theme quantity control — Display → “Hide quantity selector in theme” */
-html[data-xloxi-hide-theme-qty="1"]:has(.xloxi-root)
+html[data-offrefy-hide-theme-qty="1"]:has([data-offrefy-root])
   .shopify-section--main-product
   form[action*="/cart/add"]
   quantity-input,
-html[data-xloxi-hide-theme-qty="1"]:has(.xloxi-root)
+html[data-offrefy-hide-theme-qty="1"]:has([data-offrefy-root])
   .shopify-section--main-product
   form[action*="/cart/add"]
   .product-form__quantity {
   display: none !important;
 }
 
-html[data-xloxi-hide-theme-qty="1"]:has(.xloxi-root)
+html[data-offrefy-hide-theme-qty="1"]:has([data-offrefy-root])
   .shopify-section--main-product
   form[action*="/cart/add"]
   fieldset.product-form__input:has(input[name="quantity"]:not([type="hidden"])):not(
@@ -1491,7 +1474,7 @@ html[data-xloxi-hide-theme-qty="1"]:has(.xloxi-root)
   display: none !important;
 }
 
-html[data-xloxi-hide-theme-qty="1"]:has(.xloxi-root)
+html[data-offrefy-hide-theme-qty="1"]:has([data-offrefy-root])
   .shopify-section--main-product
   form[action*="/cart/add"]
   .product-form__input:has(input[name="quantity"]:not([type="hidden"])):not(
@@ -1500,23 +1483,23 @@ html[data-xloxi-hide-theme-qty="1"]:has(.xloxi-root)
   display: none !important;
 }
 
-html[data-xloxi-hide-theme-qty="1"]:has(.xloxi-root)
+html[data-offrefy-hide-theme-qty="1"]:has([data-offrefy-root])
   .shopify-section--main-product
   quantity-input,
-html[data-xloxi-hide-theme-qty="1"]:has(.xloxi-root) product-info quantity-input {
+html[data-offrefy-hide-theme-qty="1"]:has([data-offrefy-root]) product-info quantity-input {
   display: none !important;
 }
 
 /*
  * Volume table — parity with admin Product Page preview
  * (`QuantityBreaksTailwindPreview` → `.volumeTableWrap` / `.volumeTable`).
- * Do not override `.xloxi-topbar` here: use Display “Heading layout” + data-xloxi-header-* like the preview.
+ * Do not override `.offrefy-topbar` here: use Display “Heading layout” + data-offrefy-header-* like the preview.
  */
-.xloxi-bundle--volume-table .xloxi-title {
-  color: var(--vd-maroon);
+.offrefy-bundle--volume-table .offrefy-title {
+  color: var(--offrefy-maroon);
 }
 
-.xloxi-cards--volume-table {
+.offrefy-cards--volume-table {
   display: block;
   margin-top: 0.15rem;
   width: 100%;
@@ -1527,17 +1510,17 @@ html[data-xloxi-hide-theme-qty="1"]:has(.xloxi-root) product-info quantity-input
  * Outer clips backgrounds/borders to border-radius. Inner handles horizontal scroll.
  * (Same pattern as admin `.volumeTableWrap` / `.volumeTableScroll`.)
  */
-.xloxi-volume-table-scroll {
+.offrefy-volume-table-scroll {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
-  border: 1px solid var(--vd-card-border);
-  border-radius: var(--vd-radius-card);
-  background: var(--vd-surface);
+  border: 1px solid var(--offrefy-card-border);
+  border-radius: var(--offrefy-radius-card);
+  background: var(--offrefy-surface);
   overflow: hidden;
 }
 
-.xloxi-volume-table-scroll-inner {
+.offrefy-volume-table-scroll-inner {
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
@@ -1547,92 +1530,92 @@ html[data-xloxi-hide-theme-qty="1"]:has(.xloxi-root) product-info quantity-input
 }
 
 /* Mirrors admin `.volumeTable` */
-.xloxi-volume-table {
+.offrefy-volume-table {
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
-  font-size: var(--vd-fs-buy, 0.9375rem);
+  font-size: var(--offrefy-fs-buy, 0.9375rem);
   background: transparent;
   border: none;
   margin: 0;
 }
 
-.xloxi-volume-table thead th {
-  padding-block: var(--vd-vt-cell-pad-block, 0.65rem);
-  font-size: var(--vd-fs-buy, 0.9375rem);
-  font-weight: var(--vd-fw-strong, 600);
+.offrefy-volume-table thead th {
+  padding-block: var(--offrefy-vt-cell-pad-block, 0.65rem);
+  font-size: var(--offrefy-fs-buy, 0.9375rem);
+  font-weight: var(--offrefy-fw-strong, 600);
   text-align: center;
   vertical-align: middle;
-  color: var(--vd-maroon);
-  background: var(--vd-countdown-bg);
-  border: 1px solid var(--vd-card-border);
+  color: var(--offrefy-maroon);
+  background: var(--offrefy-countdown-bg);
+  border: 1px solid var(--offrefy-card-border);
 }
 
-.xloxi-volume-table thead th:nth-child(1) {
+.offrefy-volume-table thead th:nth-child(1) {
   width: 36%;
-  text-align: var(--vd-vt-col1-text-align, start);
-  padding-inline-start: var(--vd-vt-col1-pad-inline-start, 0.75rem);
-  padding-inline-end: var(--vd-vt-col1-pad-inline-end, 0.6rem);
+  text-align: var(--offrefy-vt-col1-text-align, start);
+  padding-inline-start: var(--offrefy-vt-col1-pad-inline-start, 0.75rem);
+  padding-inline-end: var(--offrefy-vt-col1-pad-inline-end, 0.6rem);
 }
 
-.xloxi-volume-table thead th:nth-child(2) {
+.offrefy-volume-table thead th:nth-child(2) {
   width: 28%;
-  text-align: var(--vd-vt-col2-text-align, center);
-  padding-inline-start: var(--vd-vt-col2-pad-inline-start, 0.6rem);
-  padding-inline-end: var(--vd-vt-col2-pad-inline-end, 0.6rem);
-  color: var(--vd-vt-discount-fg, var(--vd-save));
+  text-align: var(--offrefy-vt-col2-text-align, center);
+  padding-inline-start: var(--offrefy-vt-col2-pad-inline-start, 0.6rem);
+  padding-inline-end: var(--offrefy-vt-col2-pad-inline-end, 0.6rem);
+  color: var(--offrefy-vt-discount-fg, var(--offrefy-save));
 }
 
-.xloxi-volume-table thead th:nth-child(3) {
+.offrefy-volume-table thead th:nth-child(3) {
   width: 36%;
-  text-align: var(--vd-vt-col3-text-align, end);
-  padding-inline-start: var(--vd-vt-col3-pad-inline-start, 0.6rem);
-  padding-inline-end: var(--vd-vt-col3-pad-inline-end, 0.75rem);
+  text-align: var(--offrefy-vt-col3-text-align, end);
+  padding-inline-start: var(--offrefy-vt-col3-pad-inline-start, 0.6rem);
+  padding-inline-end: var(--offrefy-vt-col3-pad-inline-end, 0.75rem);
 }
 
-.xloxi-volume-table td {
-  padding-block: var(--vd-vt-cell-pad-block, 0.7rem);
+.offrefy-volume-table td {
+  padding-block: var(--offrefy-vt-cell-pad-block, 0.7rem);
   text-align: center;
   vertical-align: middle;
-  background: var(--vd-surface);
-  border: 1px solid var(--vd-card-border);
+  background: var(--offrefy-surface);
+  border: 1px solid var(--offrefy-card-border);
 }
 
-.xloxi-volume-table tbody td:nth-child(1) {
-  text-align: var(--vd-vt-col1-text-align, start);
-  padding-inline-start: var(--vd-vt-col1-pad-inline-start, 0.75rem);
-  padding-inline-end: var(--vd-vt-col1-pad-inline-end, 0.6rem);
-  color: var(--vd-muted);
+.offrefy-volume-table tbody td:nth-child(1) {
+  text-align: var(--offrefy-vt-col1-text-align, start);
+  padding-inline-start: var(--offrefy-vt-col1-pad-inline-start, 0.75rem);
+  padding-inline-end: var(--offrefy-vt-col1-pad-inline-end, 0.6rem);
+  color: var(--offrefy-muted);
 }
 
-.xloxi-volume-table tbody td:nth-child(2) {
-  text-align: var(--vd-vt-col2-text-align, center);
-  padding-inline-start: var(--vd-vt-col2-pad-inline-start, 0.6rem);
-  padding-inline-end: var(--vd-vt-col2-pad-inline-end, 0.6rem);
-  color: var(--vd-vt-discount-fg, var(--vd-save));
-  font-weight: var(--vd-fw-accent, 600);
+.offrefy-volume-table tbody td:nth-child(2) {
+  text-align: var(--offrefy-vt-col2-text-align, center);
+  padding-inline-start: var(--offrefy-vt-col2-pad-inline-start, 0.6rem);
+  padding-inline-end: var(--offrefy-vt-col2-pad-inline-end, 0.6rem);
+  color: var(--offrefy-vt-discount-fg, var(--offrefy-save));
+  font-weight: var(--offrefy-fw-accent, 600);
 }
 
-.xloxi-volume-table tbody td:nth-child(3) {
-  text-align: var(--vd-vt-col3-text-align, end);
-  padding-inline-start: var(--vd-vt-col3-pad-inline-start, 0.6rem);
-  padding-inline-end: var(--vd-vt-col3-pad-inline-end, 0.75rem);
+.offrefy-volume-table tbody td:nth-child(3) {
+  text-align: var(--offrefy-vt-col3-text-align, end);
+  padding-inline-start: var(--offrefy-vt-col3-pad-inline-start, 0.6rem);
+  padding-inline-end: var(--offrefy-vt-col3-pad-inline-end, 0.75rem);
 }
 
-.xloxi-volume-table td[data-xloxi-discount-cell] {
+.offrefy-volume-table td[data-offrefy-discount-cell] {
   font-size: inherit;
 }
 
-.xloxi-volume-table .ofd-tier-amt {
-  font-size: var(--vd-fs-price, 1rem);
-  font-weight: var(--vd-fw-strong, 600);
+.offrefy-volume-table .offrefy-tier-amt {
+  font-size: var(--offrefy-fs-price, 1rem);
+  font-weight: var(--offrefy-fw-strong, 600);
   line-height: 1.3;
-  color: var(--vd-maroon);
+  color: var(--offrefy-maroon);
 }
 
 /* Volume table rows are informational only (no tier radio / selection). */
 
 /* Main CTA padding matches admin Product Page preview button */
-.xloxi-bundle--volume-table .xloxi-cta {
+.offrefy-bundle--volume-table .offrefy-cta {
   padding: 0.875rem 1rem;
 }

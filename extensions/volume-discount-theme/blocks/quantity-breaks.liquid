@@ -18,7 +18,25 @@
 %}
 {% if vd_is_product_page or request.design_mode %}
   {% if request.design_mode %}
-    <script>window.__xloxiAppEmbedActive = true;</script>
+    <script>
+      (function () {
+        var o = window.Offrefy;
+        if (!o || typeof o !== "object") {
+          o = {};
+          try {
+            Object.defineProperty(window, "Offrefy", {
+              value: o,
+              writable: true,
+              configurable: true,
+              enumerable: false,
+            });
+          } catch (e) {
+            window.Offrefy = o;
+          }
+        }
+        o.appEmbedActive = true;
+      })();
+    </script>
   {% endif %}
   {% render 'vd-storefront-assets', vd_product: vd_product %}
   {% render 'vd-quantity-breaks', block: block, vd_product: vd_product %}
