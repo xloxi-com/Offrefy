@@ -1706,18 +1706,40 @@
       ) {
         continue;
       }
+      /* Payment-terms / wallet stubs are not the main ATC form. */
+      if (
+        (form.classList && form.classList.contains("valor-product-payment-terms__form")) ||
+        (form.id && String(form.id).indexOf("payment-terms") !== -1)
+      ) {
+        continue;
+      }
       var score = 0;
       if (form.querySelector('[name="id"]')) score += 3;
       if (
         form.querySelector(
-          'button[type="submit"], [type="submit"], button[name="add"], input[name="add"]',
+          'button[type="submit"][name="add"], button[name="add"], [data-add-button]',
         )
       ) {
-        score += 5;
+        score += 8;
+      } else if (
+        form.querySelector(
+          'button[type="submit"], [type="submit"], input[name="add"]',
+        )
+      ) {
+        score += 4;
       }
       if (
+        form.classList &&
+        (form.classList.contains("valor-mp__form") ||
+          form.classList.contains("product-form") ||
+          form.classList.contains("form"))
+      ) {
+        score += 4;
+      }
+      if (form.id && String(form.id).indexOf("product-form") !== -1) score += 5;
+      if (
         form.closest(
-          "product-info, .product, [id^='MainProduct'], .product-form, .product__info",
+          "product-info, .product, [id^='MainProduct'], .product-form, .product__info, .valor-mp__buy",
         )
       ) {
         score += 6;
@@ -1735,6 +1757,7 @@
     if (!form) return null;
     return (
       form.querySelector('button[type="submit"][name="add"]') ||
+      form.querySelector("button[data-add-button]") ||
       form.querySelector('button[name="add"]') ||
       form.querySelector('input[type="submit"][name="add"]') ||
       form.querySelector("button.product-form__submit") ||
@@ -1743,12 +1766,83 @@
     );
   }
 
-  function syncThemeCartAddForm(form, variantId, quantity, attribution) {
-    if (!form) return false;
-    var vid = String(variantId || "");
+  /**
+   * Ensure theme form posts the widget qty.
+   * Valor (and similar) often omit name="quantity" — inject a hidden field then.
+   */
+  function ensureThemeFormQuantity(form, quantity) {
     var qty = parseInt(String(quantity), 10) || 1;
     qty = Math.min(VD_MAX_LINE_QTY, Math.max(1, qty));
     var strQty = String(qty);
+    var updated = 0;
+
+    function setQtyEl(el) {
+      if (!el) return;
+      try {
+        el.value = strQty;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+        updated += 1;
+      } catch (e) {
+        void e;
+      }
+    }
+
+    var qtyNodes = form.querySelectorAll(
+      'input[name="quantity"], select[name="quantity"]',
+    );
+    for (var qi = 0; qi < qtyNodes.length; qi++) setQtyEl(qtyNodes[qi]);
+
+    var formId = form.getAttribute("id");
+    if (formId) {
+      var linked = document.querySelectorAll(
+        'input[name="quantity"][form="' +
+          formId +
+          '"], select[name="quantity"][form="' +
+          formId +
+          '"]',
+      );
+      for (var li = 0; li < linked.length; li++) setQtyEl(linked[li]);
+    }
+
+    /* Valor quantity-input custom element (data-quantity-field, often outside form). */
+    var scope =
+      form.closest(".valor-mp__buy") ||
+      form.closest("product-info") ||
+      form.closest("[id^='MainProduct']") ||
+      form.closest(".shopify-section") ||
+      form.parentElement;
+    if (scope) {
+      var customQty = scope.querySelectorAll(
+        "quantity-input [data-quantity-field], [data-quantity-field]",
+      );
+      for (var ci = 0; ci < customQty.length; ci++) {
+        if (customQty[ci].closest(".offrefy-root")) continue;
+        setQtyEl(customQty[ci]);
+      }
+    }
+
+    var injected = form.querySelector('input[data-offrefy-qty-inject="1"]');
+    if (!updated) {
+      if (!injected) {
+        injected = document.createElement("input");
+        injected.type = "hidden";
+        injected.name = "quantity";
+        injected.setAttribute("data-offrefy-qty-inject", "1");
+        form.appendChild(injected);
+      }
+      injected.value = strQty;
+      updated = 1;
+    } else if (injected && injected.parentNode) {
+      /* Theme already has qty — remove our previous inject so we don't double. */
+      injected.parentNode.removeChild(injected);
+    }
+    return updated > 0;
+  }
+
+  function syncThemeCartAddForm(form, variantId, quantity, attribution) {
+    if (!form) return false;
+    var vid = String(variantId || "");
 
     var idSelect = form.querySelector('select[name="id"]');
     if (idSelect) {
@@ -1769,46 +1863,15 @@
       }
     }
 
-    var qtyNodes = form.querySelectorAll(
-      'input[name="quantity"], select[name="quantity"]',
-    );
-    for (var qi = 0; qi < qtyNodes.length; qi++) {
-      try {
-        qtyNodes[qi].value = strQty;
-        qtyNodes[qi].dispatchEvent(new Event("input", { bubbles: true }));
-        qtyNodes[qi].dispatchEvent(new Event("change", { bubbles: true }));
-      } catch (e3) {
-        void e3;
-      }
-    }
-    var formId = form.getAttribute("id");
-    if (formId) {
-      var linked = document.querySelectorAll(
-        'input[name="quantity"][form="' +
-          formId +
-          '"], select[name="quantity"][form="' +
-          formId +
-          '"]',
-      );
-      for (var li = 0; li < linked.length; li++) {
-        try {
-          linked[li].value = strQty;
-          linked[li].dispatchEvent(new Event("input", { bubbles: true }));
-          linked[li].dispatchEvent(new Event("change", { bubbles: true }));
-        } catch (e4) {
-          void e4;
-        }
-      }
-    }
-
+    ensureThemeFormQuantity(form, quantity);
     applyOffrefyPropertiesToForm(form, attribution);
     return true;
   }
 
   /**
-   * Widget ATC → theme native submit only.
-   * form[action*="/cart/add"] [type="submit"] — theme opens its own drawer.
-   * We never fetch /cart/add.js or force-open an empty drawer.
+   * Widget ATC → theme native submit.
+   * form[action*="/cart/add"] [type="submit"]
+   * If theme has no qty field, inject hidden quantity from the widget.
    */
   function addVariantToCartByThemeSubmit(variantId, quantity, attribution) {
     var id = parseInt(String(variantId), 10);
@@ -3756,7 +3819,7 @@
     root.setAttribute("data-offrefy-inited", "1");
     trackImpression(campaign, root.getAttribute("data-product-id"));
     offrefyNs().embed = offrefyNs().embed || {};
-    offrefyNs().embed.version = "1.30.4";
+    offrefyNs().embed.version = "1.30.5";
 
   }
   /**
@@ -4015,7 +4078,7 @@
       "https://offrey.xloxi.com";
     var ver =
       (typeof offrefyNs().assetVersion === "string" && offrefyNs().assetVersion) ||
-      "1.30.4";
+      "1.30.5";
     var link = document.createElement("link");
     link.rel = "stylesheet";
     link.href =
