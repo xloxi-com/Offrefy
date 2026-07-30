@@ -4273,18 +4273,185 @@
       }
     }
 
+    function unportalVdVariantPanel(panel) {
+      if (!panel || !panel.classList.contains("is-portaled")) return;
+      var home = panel._offrefyPortalHome;
+      panel.classList.remove("is-portaled", "is-dropup");
+      panel.style.removeProperty("top");
+      panel.style.removeProperty("left");
+      panel.style.removeProperty("right");
+      panel.style.removeProperty("width");
+      panel.style.removeProperty("bottom");
+      panel.style.removeProperty("max-height");
+      panel.style.removeProperty("--offrefy-maroon");
+      panel.style.removeProperty("--offrefy-card-border");
+      panel.style.removeProperty("--offrefy-text");
+      panel.style.removeProperty("--offrefy-surface-muted");
+      panel.style.removeProperty("--offrefy-selected-bg");
+      panel.style.removeProperty("--offrefy-radius-control");
+      panel.style.removeProperty("--offrefy-fs-buy");
+      panel.style.removeProperty("--offrefy-fw-body");
+      panel.style.removeProperty("--offrefy-fw-strong");
+      panel._offrefyOnPick = null;
+      panel._offrefyOwnerBox = null;
+      panel._offrefyOwnerMount = null;
+      panel._offrefyPortalHome = null;
+      if (home && home.parent) {
+        if (home.nextSibling && home.nextSibling.parentNode === home.parent) {
+          home.parent.insertBefore(panel, home.nextSibling);
+        } else {
+          home.parent.appendChild(panel);
+        }
+      }
+    }
+
+    function copyOffrefyVarsToPanel(panel) {
+      if (!panel || !root) return;
+      var cs = window.getComputedStyle(root);
+      var keys = [
+        "--offrefy-maroon",
+        "--offrefy-card-border",
+        "--offrefy-text",
+        "--offrefy-surface-muted",
+        "--offrefy-selected-bg",
+        "--offrefy-radius-control",
+        "--offrefy-fs-buy",
+        "--offrefy-fw-body",
+        "--offrefy-fw-strong",
+      ];
+      for (var i = 0; i < keys.length; i++) {
+        var v = cs.getPropertyValue(keys[i]);
+        if (v && String(v).trim()) panel.style.setProperty(keys[i], String(v).trim());
+      }
+    }
+
+    function positionPortaledVdPanel(panel, trigger) {
+      if (!panel || !trigger) return;
+      var rect = trigger.getBoundingClientRect();
+      var gap = 6;
+      var edge = 8;
+      var maxH = Math.min(260, Math.round(window.innerHeight * 0.45));
+      var spaceBelow = window.innerHeight - rect.bottom - gap - edge;
+      var spaceAbove = rect.top - gap - edge;
+      var dropUp =
+        spaceBelow < Math.min(160, maxH) && spaceAbove > spaceBelow;
+      var avail = dropUp ? spaceAbove : spaceBelow;
+      var height = Math.min(maxH, Math.max(96, avail));
+      var left = Math.max(edge, Math.round(rect.left));
+      var width = Math.round(rect.width);
+      panel.style.setProperty("left", left + "px", "important");
+      panel.style.setProperty("right", "auto", "important");
+      panel.style.setProperty("width", width + "px", "important");
+      panel.style.setProperty("max-height", Math.round(height) + "px", "important");
+      if (dropUp) {
+        panel.classList.add("is-dropup");
+        panel.style.setProperty("top", "auto", "important");
+        panel.style.setProperty(
+          "bottom",
+          Math.round(window.innerHeight - rect.top + gap) + "px",
+          "important",
+        );
+      } else {
+        panel.classList.remove("is-dropup");
+        panel.style.setProperty("bottom", "auto", "important");
+        panel.style.setProperty(
+          "top",
+          Math.round(rect.bottom + gap) + "px",
+          "important",
+        );
+      }
+    }
+
+    function portalVdVariantPanel(box, panel, trigger) {
+      if (!box || !panel || !trigger) return;
+      if (!panel.classList.contains("is-portaled")) {
+        panel._offrefyPortalHome = {
+          parent: panel.parentNode,
+          nextSibling: panel.nextSibling,
+        };
+        document.body.appendChild(panel);
+        panel.classList.add("is-portaled");
+      }
+      panel._offrefyOwnerBox = box;
+      panel._offrefyOwnerMount = mountEl;
+      copyOffrefyVarsToPanel(panel);
+      panel._offrefyOnPick = function (vid, node) {
+        applyVdVariantChoice(vid, node);
+      };
+      positionPortaledVdPanel(panel, trigger);
+    }
+
     function closeAllVdVariantPickers() {
       var pickers = mountEl.querySelectorAll("[data-offrefy-vd-vsel]");
       for (var i = 0; i < pickers.length; i++) {
         var panel = pickers[i].querySelector("[data-offrefy-vd-vsel-panel]");
+        /* Panel may already be portaled on body — also find by owner link. */
+        if (!panel) {
+          var portaled = document.querySelectorAll(
+            ".offrefy-vd-vsel__panel.is-portaled",
+          );
+          for (var pi = 0; pi < portaled.length; pi++) {
+            if (portaled[pi]._offrefyOwnerBox === pickers[i]) {
+              panel = portaled[pi];
+              break;
+            }
+          }
+        }
         var trig = pickers[i].querySelector("[data-offrefy-vd-vsel-trigger]");
-        if (panel) panel.setAttribute("hidden", "");
+        if (panel) {
+          panel.setAttribute("hidden", "");
+          unportalVdVariantPanel(panel);
+        }
         if (trig) trig.setAttribute("aria-expanded", "false");
         pickers[i].classList.remove("is-open");
+      }
+      /* Safety: any orphaned portaled panels for this mount. */
+      var orphans = document.querySelectorAll(".offrefy-vd-vsel__panel.is-portaled");
+      for (var oi = 0; oi < orphans.length; oi++) {
+        if (orphans[oi]._offrefyOwnerMount === mountEl) {
+          orphans[oi].setAttribute("hidden", "");
+          unportalVdVariantPanel(orphans[oi]);
+        }
       }
       var cardsWrap = mountEl.querySelector(".offrefy-cards");
       if (cardsWrap) cardsWrap.classList.remove("offrefy-cards--vsel-open");
       if (root) root.classList.remove("offrefy-theme--vsel-open");
+      teardownVdPortalListeners();
+    }
+
+    function repositionOpenVdPortal() {
+      var openBox = mountEl.querySelector("[data-offrefy-vd-vsel].is-open");
+      if (!openBox) return;
+      var trigger = openBox.querySelector("[data-offrefy-vd-vsel-trigger]");
+      var panel =
+        document.querySelector(".offrefy-vd-vsel__panel.is-portaled") ||
+        openBox.querySelector("[data-offrefy-vd-vsel-panel]");
+      if (panel && trigger && panel._offrefyOwnerBox === openBox) {
+        positionPortaledVdPanel(panel, trigger);
+      }
+    }
+
+    function teardownVdPortalListeners() {
+      /* Global scroll/resize listener is shared — nothing per-mount to remove. */
+    }
+
+    function setupVdPortalListeners() {
+      if (offrefyNs()._offrefyVdPortalReposition) return;
+      offrefyNs()._offrefyVdPortalReposition = true;
+      var tick = function () {
+        var panels = document.querySelectorAll(
+          ".offrefy-vd-vsel__panel.is-portaled",
+        );
+        for (var i = 0; i < panels.length; i++) {
+          var panel = panels[i];
+          var box = panel._offrefyOwnerBox;
+          var trigger =
+            box && box.querySelector("[data-offrefy-vd-vsel-trigger]");
+          if (panel && trigger) positionPortaledVdPanel(panel, trigger);
+        }
+      };
+      window.addEventListener("scroll", tick, true);
+      window.addEventListener("resize", tick);
     }
 
     function scrollToAtc() {
@@ -4904,12 +5071,11 @@
           var open = box.classList.contains("is-open");
           closeAllVdVariantPickers();
           if (!open && panel) {
-            panel.removeAttribute("hidden");
             trigger.setAttribute("aria-expanded", "true");
             box.classList.add("is-open");
-            var cardsWrap = mountEl.querySelector(".offrefy-cards");
-            if (cardsWrap) cardsWrap.classList.add("offrefy-cards--vsel-open");
-            if (root) root.classList.add("offrefy-theme--vsel-open");
+            portalVdVariantPanel(box, panel, trigger);
+            panel.removeAttribute("hidden");
+            setupVdPortalListeners();
           }
           ensureCardSelectedFromNode(trigger);
           return;
@@ -5000,20 +5166,87 @@
           if (
             ev.target &&
             ev.target.closest &&
-            ev.target.closest("[data-offrefy-vd-vsel]")
+            (ev.target.closest("[data-offrefy-vd-vsel]") ||
+              ev.target.closest(".offrefy-vd-vsel__panel.is-portaled"))
           ) {
             return;
           }
-          var roots = document.querySelectorAll("[data-offrefy-root] [data-offrefy-mount]");
+          var roots = document.querySelectorAll(
+            "[data-offrefy-root] [data-offrefy-mount]",
+          );
           for (var ri = 0; ri < roots.length; ri++) {
-            var boxes = roots[ri].querySelectorAll("[data-offrefy-vd-vsel].is-open");
+            var boxes = roots[ri].querySelectorAll(
+              "[data-offrefy-vd-vsel].is-open",
+            );
             for (var bi = 0; bi < boxes.length; bi++) {
               var panel = boxes[bi].querySelector("[data-offrefy-vd-vsel-panel]");
-              var trig = boxes[bi].querySelector("[data-offrefy-vd-vsel-trigger]");
-              if (panel) panel.setAttribute("hidden", "");
+              if (!panel) {
+                var portaled = document.querySelectorAll(
+                  ".offrefy-vd-vsel__panel.is-portaled",
+                );
+                for (var pi = 0; pi < portaled.length; pi++) {
+                  if (portaled[pi]._offrefyOwnerBox === boxes[bi]) {
+                    panel = portaled[pi];
+                    break;
+                  }
+                }
+              }
+              var trig = boxes[bi].querySelector(
+                "[data-offrefy-vd-vsel-trigger]",
+              );
+              if (panel) {
+                panel.setAttribute("hidden", "");
+                if (panel.classList.contains("is-portaled")) {
+                  var home = panel._offrefyPortalHome;
+                  panel.classList.remove("is-portaled", "is-dropup");
+                  panel.style.removeProperty("top");
+                  panel.style.removeProperty("left");
+                  panel.style.removeProperty("right");
+                  panel.style.removeProperty("width");
+                  panel.style.removeProperty("bottom");
+                  panel.style.removeProperty("max-height");
+                  panel._offrefyOnPick = null;
+                  panel._offrefyOwnerBox = null;
+                  panel._offrefyOwnerMount = null;
+                  panel._offrefyPortalHome = null;
+                  if (home && home.parent) {
+                    if (
+                      home.nextSibling &&
+                      home.nextSibling.parentNode === home.parent
+                    ) {
+                      home.parent.insertBefore(panel, home.nextSibling);
+                    } else {
+                      home.parent.appendChild(panel);
+                    }
+                  }
+                }
+              }
               if (trig) trig.setAttribute("aria-expanded", "false");
               boxes[bi].classList.remove("is-open");
             }
+            var cardsWrap = roots[ri].querySelector(".offrefy-cards");
+            if (cardsWrap) cardsWrap.classList.remove("offrefy-cards--vsel-open");
+            var rootEl = roots[ri].closest("[data-offrefy-root]");
+            if (rootEl) rootEl.classList.remove("offrefy-theme--vsel-open");
+          }
+        },
+        true,
+      );
+      document.addEventListener(
+        "click",
+        function (ev) {
+          var panel =
+            ev.target &&
+            ev.target.closest &&
+            ev.target.closest(".offrefy-vd-vsel__panel.is-portaled");
+          if (!panel) return;
+          var opt =
+            ev.target.closest && ev.target.closest("[data-offrefy-vd-vid]");
+          if (!opt || opt.disabled) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (typeof panel._offrefyOnPick === "function") {
+            panel._offrefyOnPick(opt.getAttribute("data-offrefy-vd-vid"), opt);
           }
         },
         true,

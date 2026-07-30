@@ -11,12 +11,10 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "../db.server";
-import {
-  scheduleStorefrontWidgetRefresh,
-  syncVolumeDiscountShopToShopify,
-} from "../services/deferredShopSync.server";
+import { syncVolumeDiscountShopToShopify } from "../services/deferredShopSync.server";
 import { applyDueCampaignScheduleTransitions } from "../services/campaignScheduleTransitions.server";
 import { authenticate } from "../shopify.server";
+import { touchShopLastSyncedAt } from "../utils/shopSyncState.server";
 import {
   canActivateAnotherCampaign,
   canCreateAnotherOffer,
@@ -242,29 +240,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
-  const transition = await applyDueCampaignScheduleTransitions(session.shop);
-  const needsFunctionSync =
-    d.campaignStatus === "active" ||
-    d.campaignStatus === "scheduled" ||
-    transition.activatedIds.includes(record.id) ||
-    transition.shopsNeedingShopifySync.includes(session.shop);
+  await applyDueCampaignScheduleTransitions(session.shop);
 
-  /* Push Automatic Discount + widget to Shopify before responding (no manual Sync). */
-  if (needsFunctionSync) {
-    const { errors } = await syncVolumeDiscountShopToShopify(admin, session.shop, {
-      changedCampaignIds: [record.id],
-      skipScheduleTransitions: true,
-      force: true,
-    });
-    if (errors.length) {
-      return {
-        ok: false as const,
-        error: `Offer saved, but Shopify discount update failed: ${errors.join(" ")}`,
-      };
-    }
-  } else if (d.countdownStartsAt || d.countdownEndsAt) {
-    scheduleStorefrontWidgetRefresh(admin, session.shop);
+  /* Same as Manual Sync — every create pushes Automatic Discount + widget to Shopify. */
+  const { errors } = await syncVolumeDiscountShopToShopify(admin, session.shop, {
+    skipScheduleTransitions: true,
+    force: true,
+    purgeLegacy: true,
+  });
+  if (errors.length) {
+    return {
+      ok: false as const,
+      error: `Offer saved, but Shopify discount update failed: ${errors.join(" ")}`,
+    };
   }
+  await touchShopLastSyncedAt(session.shop).catch(() => {});
 
   return { ok: true as const, campaignId: record.id };
 };

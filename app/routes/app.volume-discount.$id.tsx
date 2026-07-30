@@ -10,14 +10,11 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "../db.server";
-import { planCampaignSaveSync } from "../utils/campaignSyncDelta.server";
 import { applyDueCampaignScheduleTransitions } from "../services/campaignScheduleTransitions.server";
-import {
-  scheduleStorefrontWidgetRefresh,
-  syncVolumeDiscountShopToShopify,
-} from "../services/deferredShopSync.server";
+import { syncVolumeDiscountShopToShopify } from "../services/deferredShopSync.server";
 import { deleteAutomaticDiscounts } from "../services/volumeDiscountShopify.server";
 import { authenticate } from "../shopify.server";
+import { touchShopLastSyncedAt } from "../utils/shopSyncState.server";
 import {
   type VolumeDiscountProductScope,
   isVolumeDiscountQuantityCondition,
@@ -329,16 +326,14 @@ export const action = async ({
     } as unknown as Prisma.VolumeDiscountCampaignUpdateInput,
   });
 
-  let cartTranslationsUpdated = false;
   if (isCartDiscountDisplayTemplate(nextDisplayName)) {
     try {
-      const syncResult = await syncCartDiscountTranslationsFromDisplayName(
+      await syncCartDiscountTranslationsFromDisplayName(
         session.shop,
         admin,
         nextDisplayName,
         { autoTranslate: planCtx.capabilities.translations },
       );
-      cartTranslationsUpdated = syncResult.updated;
     } catch (error) {
       console.error(
         "[volume-discount] Cart badge translation sync after display name save",
@@ -347,56 +342,21 @@ export const action = async ({
     }
   }
 
-  /* If start/end already due at save time, flip Scheduled↔Active/Draft before sync plan. */
-  const transition = await applyDueCampaignScheduleTransitions(session.shop);
-  const afterStatus =
-    transition.activatedIds.includes(id)
-      ? "active"
-      : transition.deactivatedIds.includes(id)
-        ? "draft"
-        : d.campaignStatus;
+  /* Flip Scheduled↔Active/Draft when start/end is already due, then push like Manual Sync. */
+  await applyDueCampaignScheduleTransitions(session.shop);
 
-  const syncPlan = planCampaignSaveSync(
-    {
-      status: existing.status,
-      campaignName: existing.campaignName,
-      displayName: existing.displayName,
-      productScope: existing.productScope,
-      quantityCondition: existing.quantityCondition,
-      customerType: existing.customerType,
-      customerTags: existing.customerTags,
-      productIds: existing.productIds,
-      collectionIds: existing.collectionIds,
-      tiers: existing.tiers,
-      widgetDisplay: existing.widgetDisplay,
-      displayNameTranslations: existing.displayNameTranslations,
-      countdownStartsAt: existing.countdownStartsAt,
-      countdownEndsAt: existing.countdownEndsAt,
-    },
-    { ...d, displayNameTranslations, campaignStatus: afterStatus },
-  );
-
-  if (
-    syncPlan.kind === "full" ||
-    afterStatus === "active" ||
-    afterStatus === "scheduled" ||
-    transition.shopsNeedingShopifySync.includes(session.shop) ||
-    cartTranslationsUpdated
-  ) {
-    const { errors } = await syncVolumeDiscountShopToShopify(admin, session.shop, {
-      changedCampaignIds: [id],
-      skipScheduleTransitions: true,
-      force: true,
-    });
-    if (errors.length) {
-      return {
-        ok: false as const,
-        error: `Offer saved, but Shopify discount update failed: ${errors.join(" ")}`,
-      };
-    }
-  } else if (syncPlan.kind === "storefront_only") {
-    scheduleStorefrontWidgetRefresh(admin, session.shop);
+  const { errors } = await syncVolumeDiscountShopToShopify(admin, session.shop, {
+    skipScheduleTransitions: true,
+    force: true,
+    purgeLegacy: true,
+  });
+  if (errors.length) {
+    return {
+      ok: false as const,
+      error: `Offer saved, but Shopify discount update failed: ${errors.join(" ")}`,
+    };
   }
+  await touchShopLastSyncedAt(session.shop).catch(() => {});
 
   return { ok: true as const, campaignId: id };
 };

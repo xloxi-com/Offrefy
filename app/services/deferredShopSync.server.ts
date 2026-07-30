@@ -73,7 +73,8 @@ export function scheduleVolumeDiscountShopSync(
 
 /**
  * Flush storefront cache + push Automatic Discount / metafields to Shopify now.
- * Used on offer save so merchants do not need a manual Sync button.
+ * Used on every offer save (same force path as Manual Sync) so merchants do not
+ * need a separate Sync button after editing.
  */
 export async function syncVolumeDiscountShopToShopify(
   admin: AdminGraphql,
