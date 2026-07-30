@@ -294,42 +294,93 @@
     return promise;
   }
 
-  function offrefyCartProperties(attribution) {
-    if (!attribution || !attribution.campaignId) return null;
-    var props = {};
-    props[OFFREFY_LINE_PROP] = "1";
-    props[OFFREFY_CAMPAIGN_PROP] = String(attribution.campaignId);
-    if (attribution.productId) {
-      props[OFFREFY_PRODUCT_PROP] = String(attribution.productId);
-    }
-    return props;
+  /**
+   * Never attach Offrefy keys as line item properties — Shopify admin always
+   * shows them on the order. Attribution is analytics ATC events (+ discount
+   * title / product→campaign resolve on the server).
+   */
+  function offrefyCartProperties() {
+    return null;
   }
 
-  function applyOffrefyPropertiesToForm(form, attribution) {
-    var props = offrefyCartProperties(attribution);
-    if (!form || !props) return;
+  function applyOffrefyPropertiesToForm(form) {
+    if (!form) return;
     var existing = form.querySelectorAll("[data-offrefy-prop]");
     for (var ei = 0; ei < existing.length; ei++) {
       existing[ei].remove();
-    }
-    for (var key in props) {
-      if (!Object.prototype.hasOwnProperty.call(props, key)) continue;
-      var input = document.createElement("input");
-      input.type = "hidden";
-      input.name = "properties[" + key + "]";
-      input.value = props[key];
-      input.setAttribute("data-offrefy-prop", "1");
-      form.appendChild(input);
     }
   }
 
   /**
    * Do not write Offrefy keys onto cart attributes — they become order
-   * "Additional details". Attribution stays on private line item properties
-   * (`_offrefy*`) plus analytics events.
+   * "Additional details". Sales attribution uses ATC analytics events.
    */
   function syncOffrefyCartAttributes() {
     return Promise.resolve();
+  }
+
+  var VD_ATC_ATTR_SESSION_KEY = "vd_atc_attribution";
+
+  function rememberAtcAttribution(campaignId, productId, variantId) {
+    if (!campaignId) return;
+    try {
+      var map = {};
+      try {
+        map = JSON.parse(sessionStorage.getItem(VD_ATC_ATTR_SESSION_KEY) || "{}") || {};
+      } catch (eParse) {
+        map = {};
+      }
+      var key = String(variantId || productId || "");
+      if (!key) return;
+      map[key] = {
+        campaignId: String(campaignId),
+        productId: productId ? String(productId) : undefined,
+        variantId: variantId ? String(variantId) : undefined,
+        t: Date.now(),
+      };
+      sessionStorage.setItem(VD_ATC_ATTR_SESSION_KEY, JSON.stringify(map));
+    } catch (e) {
+      void e;
+    }
+  }
+
+  /** Re-send ATC beacons before checkout so order matching stays reliable. */
+  function flushAtcAttributionBeacons() {
+    try {
+      var raw = sessionStorage.getItem(VD_ATC_ATTR_SESSION_KEY);
+      if (!raw) return;
+      var map = JSON.parse(raw) || {};
+      for (var key in map) {
+        if (!Object.prototype.hasOwnProperty.call(map, key)) continue;
+        var row = map[key];
+        if (!row || !row.campaignId) continue;
+        trackAnalyticsEvent({
+          type: "add_to_cart",
+          campaignId: String(row.campaignId),
+          productId: row.productId ? String(row.productId) : undefined,
+          variantId: row.variantId ? String(row.variantId) : undefined,
+        });
+      }
+    } catch (e) {
+      void e;
+    }
+  }
+
+  function bindAtcAttributionFlush() {
+    if (offrefyNs().atcAttrFlushBound) return;
+    offrefyNs().atcAttrFlushBound = true;
+    document.addEventListener(
+      "click",
+      function (ev) {
+        var t = ev.target;
+        if (!t || !t.closest) return;
+        var a = t.closest('a[href*="/checkout"], button[name="checkout"], [name="checkout"]');
+        if (!a) return;
+        flushAtcAttributionBeacons();
+      },
+      true,
+    );
+    window.addEventListener("pagehide", flushAtcAttributionBeacons);
   }
 
   function trackAnalyticsEvent(payload) {
@@ -382,6 +433,7 @@
 
   function trackAddToCart(campaign, productId, variantId, quantity, revenueCents) {
     if (!campaign || !campaign.id || campaign.id === "_preview") return;
+    rememberAtcAttribution(campaign.id, productId, variantId);
     trackAnalyticsEvent({
       type: "add_to_cart",
       campaignId: String(campaign.id),
@@ -1235,6 +1287,16 @@
   var vdCachedMaxDiscountProducts = VD_MAX_DISCOUNT_PRODUCTS_STANDARD;
   var vdLegacyCartAttrClearInFlight = null;
   var vdLegacyCartAttrsCleared = false;
+  var vdLegacyLinePropsStripInFlight = null;
+  var vdLegacyLinePropsStripped = false;
+  var VD_ORDER_VISIBLE_LINE_PROPS = [
+    OFFREFY_LINE_PROP,
+    OFFREFY_CAMPAIGN_PROP,
+    OFFREFY_PRODUCT_PROP,
+    OFFREFY_CART_FLAG_ATTR,
+    OFFREFY_CART_CAMPAIGN_ATTR,
+    OFFREFY_CART_PRODUCT_ATTR,
+  ];
 
   function readLockedProductsSession() {
     try {
@@ -1255,9 +1317,141 @@
     }
   }
 
+  function linePropertiesObject(raw) {
+    if (!raw) return {};
+    if (Array.isArray(raw)) {
+      var fromArr = {};
+      for (var i = 0; i < raw.length; i++) {
+        var row = raw[i];
+        if (!row) continue;
+        var name = row.name != null ? row.name : row.key;
+        if (name == null) continue;
+        fromArr[String(name)] = row.value != null ? row.value : "";
+      }
+      return fromArr;
+    }
+    if (typeof raw === "object") return raw;
+    return {};
+  }
+
+  function lineHasOffrefyVisibleProps(props) {
+    for (var i = 0; i < VD_ORDER_VISIBLE_LINE_PROPS.length; i++) {
+      var key = VD_ORDER_VISIBLE_LINE_PROPS[i];
+      if (Object.prototype.hasOwnProperty.call(props, key) && props[key] != null) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function stripOffrefyKeysFromProps(props) {
+    var next = {};
+    var changed = false;
+    for (var key in props) {
+      if (!Object.prototype.hasOwnProperty.call(props, key)) continue;
+      var drop = false;
+      for (var i = 0; i < VD_ORDER_VISIBLE_LINE_PROPS.length; i++) {
+        if (key === VD_ORDER_VISIBLE_LINE_PROPS[i]) {
+          drop = true;
+          break;
+        }
+      }
+      if (drop) {
+        changed = true;
+        continue;
+      }
+      next[key] = props[key];
+    }
+    return changed ? next : null;
+  }
+
+  /** Remove leftover _offrefy* line props from cart lines (admin order UI). */
+  function stripOffrefyLinePropertiesFromCart(cart) {
+    if (vdLegacyLinePropsStripped) return Promise.resolve(cart || null);
+    if (vdLegacyLinePropsStripInFlight) {
+      return vdLegacyLinePropsStripInFlight.then(function () {
+        return cart || null;
+      });
+    }
+
+    var work = (
+      cart
+        ? Promise.resolve(cart)
+        : fetch(cartJsUrl(), {
+            credentials: "same-origin",
+            headers: { Accept: "application/json" },
+          })
+            .then(function (r) {
+              return r.ok ? r.json() : null;
+            })
+            .catch(function () {
+              return null;
+            })
+    ).then(function (c) {
+      if (!c || !Array.isArray(c.items) || !c.items.length) {
+        vdLegacyLinePropsStripped = true;
+        return c;
+      }
+      var chain = Promise.resolve();
+      var any = false;
+      for (var i = 0; i < c.items.length; i++) {
+        (function (item) {
+          var props = linePropertiesObject(item && item.properties);
+          if (!lineHasOffrefyVisibleProps(props)) return;
+          var cleaned = stripOffrefyKeysFromProps(props);
+          if (!cleaned) return;
+          any = true;
+          var lineKey = item.key || item.id;
+          var qty = item.quantity | 0;
+          chain = chain.then(function () {
+            return fetch(shopifyRoutesRoot() + "cart/change.js", {
+              method: "POST",
+              credentials: "same-origin",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+              },
+              body: JSON.stringify({
+                id: lineKey,
+                quantity: qty,
+                properties: cleaned,
+              }),
+            }).catch(function () {});
+          });
+        })(c.items[i]);
+      }
+      if (!any) {
+        vdLegacyLinePropsStripped = true;
+        return c;
+      }
+      return chain.then(function () {
+        vdLegacyLinePropsStripped = true;
+        return c;
+      });
+    });
+
+    vdLegacyLinePropsStripInFlight = work.then(
+      function (result) {
+        if (vdLegacyLinePropsStripInFlight === work) {
+          vdLegacyLinePropsStripInFlight = null;
+        }
+        return result;
+      },
+      function (err) {
+        if (vdLegacyLinePropsStripInFlight === work) {
+          vdLegacyLinePropsStripInFlight = null;
+        }
+        throw err;
+      },
+    );
+    return vdLegacyLinePropsStripInFlight;
+  }
+
   /** Strip app cart attributes so they never copy onto new orders. */
   function clearOrderVisibleVdCartAttributes(cart) {
-    if (vdLegacyCartAttrsCleared) return Promise.resolve(cart || null);
+    if (vdLegacyCartAttrsCleared && vdLegacyLinePropsStripped) {
+      return Promise.resolve(cart || null);
+    }
     if (vdLegacyCartAttrClearInFlight) {
       return vdLegacyCartAttrClearInFlight.then(function () {
         return cart || null;
@@ -1287,42 +1481,45 @@
               return null;
             })
     ).then(function (c) {
-      if (!c || !hasLegacy(c.attributes)) {
-        vdLegacyCartAttrsCleared = true;
-        return c;
-      }
-      /* migrate locked list into session before wiping cart attr */
-      try {
-        var legacyLocked = String(
-          (c.attributes && c.attributes[VD_LOCKED_PRODUCTS_ATTR]) || "",
-        );
-        if (legacyLocked && !readLockedProductsSession()) {
-          writeLockedProductsSession(legacyLocked);
-          vdLastSyncedLockedProducts = legacyLocked;
+      var attrWork = Promise.resolve(c);
+      if (c && hasLegacy(c.attributes)) {
+        try {
+          var legacyLocked = String(
+            (c.attributes && c.attributes[VD_LOCKED_PRODUCTS_ATTR]) || "",
+          );
+          if (legacyLocked && !readLockedProductsSession()) {
+            writeLockedProductsSession(legacyLocked);
+            vdLastSyncedLockedProducts = legacyLocked;
+          }
+        } catch (eMig) {
+          void eMig;
         }
-      } catch (eMig) {
-        void eMig;
-      }
-      var attrs = {};
-      for (var j = 0; j < VD_ORDER_VISIBLE_CART_ATTRS.length; j++) {
-        attrs[VD_ORDER_VISIBLE_CART_ATTRS[j]] = "";
-      }
-      return fetch(shopifyRoutesRoot() + "cart/update.js", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({ attributes: attrs }),
-      })
-        .then(function () {
-          vdLegacyCartAttrsCleared = true;
-          return c;
+        var attrs = {};
+        for (var j = 0; j < VD_ORDER_VISIBLE_CART_ATTRS.length; j++) {
+          attrs[VD_ORDER_VISIBLE_CART_ATTRS[j]] = "";
+        }
+        attrWork = fetch(shopifyRoutesRoot() + "cart/update.js", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({ attributes: attrs }),
         })
-        .catch(function () {
-          return c;
-        });
+          .then(function () {
+            vdLegacyCartAttrsCleared = true;
+            return c;
+          })
+          .catch(function () {
+            return c;
+          });
+      } else {
+        vdLegacyCartAttrsCleared = true;
+      }
+      return attrWork.then(function (cartAfterAttrs) {
+        return stripOffrefyLinePropertiesFromCart(cartAfterAttrs || c);
+      });
     });
 
     vdLegacyCartAttrClearInFlight = work.then(
@@ -5828,6 +6025,7 @@
 
     bindCartDrawerDiscountLabelPatching();
     bindStorefrontLocaleWatcher();
+    bindAtcAttributionFlush();
     vdLastKnownStorefrontLocale = resolveStorefrontLocale(null) || "en";
     refreshCartBadgeTemplatesForLocale();
     try {
