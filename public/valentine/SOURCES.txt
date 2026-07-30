@@ -1,0 +1,10 @@
+Valentine's Day assets:
+
+PNGs (Fluent Emoji MIT, copied from christmas):
+- heart.png, ribbon.png, chocolate.png, candy.png, lollipop.png
+- sparkles.png, gem.png, crown.png, gift.png, herb.png
+
+PNGs (Fluent Emoji MIT, downloaded):
+- rose.png — Rose 3D (Pearl & rose template)
+
+Theme copies: extensions/.../assets/vd-vl-*

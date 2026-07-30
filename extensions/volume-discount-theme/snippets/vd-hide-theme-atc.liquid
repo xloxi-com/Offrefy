@@ -1,0 +1,235 @@
+{% comment %}
+  Early theme-form hide — Liquid injects flags + CSS before/with first paint.
+  Prefer calling from the head app embed so price/variants/ATC never flash on refresh.
+  JS still hard-hides for unusual theme markup.
+{% endcomment %}
+{% liquid
+  assign vd_hide_theme_atc = false
+  assign vd_hide_theme_bin = false
+  assign vd_hide_theme_variant = false
+  assign vd_hide_theme_qty = false
+  assign vd_hide_theme_price = false
+
+  if vd_product != blank
+    assign vd_rule = vd_product.metafields.volume_discount.tiers.value
+    assign vd_widget_mf = shop.metafields.volume_discount.storefront_widget.value
+    if vd_widget_mf != blank and vd_widget_mf.campaigns != blank and vd_widget_mf.campaigns.size > 0
+      if vd_rule != blank and vd_rule.c != blank
+        for c in vd_widget_mf.campaigns
+          if c.id == vd_rule.c
+            if c.widgetDisplay.hideThemeAddToCart == true
+              assign vd_hide_theme_atc = true
+            endif
+            if c.widgetDisplay.hideThemeBuyItNow == true
+              assign vd_hide_theme_bin = true
+            endif
+            if c.widgetDisplay.hideThemeVariantSelector == true
+              assign vd_hide_theme_variant = true
+            endif
+            if c.widgetDisplay.hideThemeQuantitySelector == true
+              assign vd_hide_theme_qty = true
+            endif
+            if c.widgetDisplay.hideThemePrice == true
+              assign vd_hide_theme_price = true
+            endif
+            break
+          endif
+        endfor
+      else
+        assign vd_pid = vd_product.id | append: ''
+        for c in vd_widget_mf.campaigns
+          assign vd_camp_match = false
+          if c.productScope == 'all'
+            assign vd_camp_match = true
+          elsif c.productIds != blank
+            for raw in c.productIds
+              assign raw_s = raw | append: ''
+              if raw_s == vd_pid or raw_s contains vd_pid
+                assign vd_camp_match = true
+                break
+              endif
+            endfor
+          endif
+          if vd_camp_match
+            if c.widgetDisplay.hideThemeAddToCart == true
+              assign vd_hide_theme_atc = true
+            endif
+            if c.widgetDisplay.hideThemeBuyItNow == true
+              assign vd_hide_theme_bin = true
+            endif
+            if c.widgetDisplay.hideThemeVariantSelector == true
+              assign vd_hide_theme_variant = true
+            endif
+            if c.widgetDisplay.hideThemeQuantitySelector == true
+              assign vd_hide_theme_qty = true
+            endif
+            if c.widgetDisplay.hideThemePrice == true
+              assign vd_hide_theme_price = true
+            endif
+            break
+          endif
+        endfor
+      endif
+    endif
+  endif
+%}
+{% if vd_hide_theme_atc or vd_hide_theme_bin or vd_hide_theme_variant or vd_hide_theme_qty or vd_hide_theme_price %}
+  <script>
+    (function () {
+      try {
+        var html = document.documentElement;
+        {% if vd_hide_theme_atc %}html.setAttribute("data-offrefy-hide-theme-atc", "1");{% endif %}
+        {% if vd_hide_theme_bin %}html.setAttribute("data-offrefy-hide-theme-bin", "1");{% endif %}
+        {% if vd_hide_theme_variant %}html.setAttribute("data-offrefy-hide-theme-variant", "1");{% endif %}
+        {% if vd_hide_theme_qty %}html.setAttribute("data-offrefy-hide-theme-qty", "1");{% endif %}
+        {% if vd_hide_theme_price %}html.setAttribute("data-offrefy-hide-theme-price", "1");{% endif %}
+      } catch (e) {}
+    })();
+  </script>
+  <style id="offrefy-hide-theme-form-early">
+    /* Instant hide — no widget-ready wait (anti-FOUC on refresh). */
+    {% if vd_hide_theme_atc %}
+    product-info form[action*="/cart/add"] button[name="add"],
+    product-info form[action*="/cart/add"] button[type="submit"][name="add"],
+    product-info form[action*="/cart/add"] .product-form__submit,
+    product-info form[action*="/cart/add"] button.product-form__cart-submit,
+    product-info form[action*="/cart/add"] [data-add-to-cart],
+    product-info form[action*="/cart/add"] .add-to-cart,
+    .product__info-container form[action*="/cart/add"] button[name="add"],
+    .product__info-container form[action*="/cart/add"] .product-form__submit,
+    .product-information form[action*="/cart/add"] button[name="add"],
+    .product-details form[action*="/cart/add"] button[name="add"],
+    .shopify-section--main-product form[action*="/cart/add"] button[name="add"],
+    .shopify-section--main-product form[action*="/cart/add"] .product-form__submit,
+    .shopify-section--main-product form[action*="/cart/add"] [data-add-to-cart],
+    form[action*="/cart/add"] button[name="add"]:not([data-offrefy-cta]):not(.offrefy-cta),
+    form[action*="/cart/add"] .product-form__submit:not(.offrefy-cta) {
+      display: none !important;
+    }
+    {% endif %}
+    {% if vd_hide_theme_bin %}
+    product-info .shopify-payment-button,
+    product-info shopify-accelerated-checkout,
+    product-info buy-buttons,
+    product-info [data-shopify="payment-button"],
+    .product__info-container .shopify-payment-button,
+    .product__info-container shopify-accelerated-checkout,
+    .product-information .shopify-payment-button,
+    .product-details .shopify-payment-button,
+    .shopify-section--main-product .shopify-payment-button,
+    .shopify-section--main-product shopify-accelerated-checkout,
+    form[action*="/cart/add"] .shopify-payment-button,
+    form[action*="/cart/add"] shopify-accelerated-checkout,
+    buy-buttons {
+      display: none !important;
+    }
+    {% endif %}
+    {% if vd_hide_theme_variant %}
+    product-info variant-selects,
+    product-info variant-radios,
+    product-info variant-picker,
+    product-info product-variant-picker,
+    product-info [data-variant-picker],
+    product-info .product-form__input:has(input[name^="options"]),
+    product-info .product-form__input:has(select[name^="options"]),
+    product-info fieldset.product-form__input,
+    product-info .variant-wrapper,
+    product-info .product-form__variants,
+    product-info .product__variants,
+    product-info .swatch-attribute,
+    .product__info-container variant-selects,
+    .product__info-container variant-radios,
+    .product__info-container variant-picker,
+    .product__info-container [data-variant-picker],
+    .product__info-container fieldset.product-form__input,
+    .product-information variant-selects,
+    .product-information variant-radios,
+    .product-details variant-selects,
+    .shopify-section--main-product variant-selects,
+    .shopify-section--main-product variant-radios,
+    .shopify-section--main-product variant-picker,
+    .shopify-section--main-product [data-variant-picker],
+    .shopify-section--main-product fieldset.product-form__input {
+      display: none !important;
+    }
+    {% endif %}
+    {% if vd_hide_theme_qty %}
+    product-info quantity-input,
+    product-info quantity-selector,
+    product-info .product-form__quantity,
+    product-info .quantity__label,
+    product-info label[for*="Quantity"],
+    product-info label[for*="quantity"],
+    product-info .quantity:has(.quantity__button),
+    product-info .quantity:has(.quantity__input),
+    product-info .price-per-item__container,
+    .product__info-container quantity-input,
+    .product__info-container .product-form__quantity,
+    .product__info-container .quantity__label,
+    .product-information quantity-input,
+    .product-details quantity-input,
+    .shopify-section--main-product quantity-input,
+    .shopify-section--main-product .product-form__quantity,
+    .shopify-section--main-product .quantity__label,
+    .shopify-section--main-product label[for*="Quantity"],
+    form[action*="/cart/add"] .quantity,
+    form[action*="/cart/add"] quantity-input {
+      display: none !important;
+    }
+    {% endif %}
+    {% if vd_hide_theme_price %}
+    product-info [id^="price-"],
+    product-info .price,
+    product-info .price__container,
+    product-info .price-item,
+    product-info .money,
+    product-info .product__price,
+    product-info .product-price,
+    product-info .product-single__price,
+    product-info .product-info__price,
+    product-info .price-wrapper,
+    product-info [data-product-price],
+    product-info [data-price],
+    product-info [itemprop="price"],
+    product-info [itemprop="offers"],
+    product-info .product__sku,
+    product-info .product-sku,
+    product-info .sku,
+    product-info [itemprop="sku"],
+    product-info .product-meta__sku,
+    product-info .product-block--price,
+    product-info .product-block-price,
+    product-info .product-form__price,
+    .product__info-container [id^="price-"],
+    .product__info-container .price,
+    .product__info-container .money,
+    .product__info-container .product__price,
+    .product__info-container .product-price,
+    .product__info-container .product__sku,
+    .product__info-container .sku,
+    .product__info-container [itemprop="sku"],
+    .product-information [id^="price-"],
+    .product-information .price,
+    .product-information .money,
+    .product-information .product__price,
+    .product-information .sku,
+    .product-details [id^="price-"],
+    .product-details .price,
+    .product-details .money,
+    .product-details .product__price,
+    .product-details .sku,
+    .product__info-wrapper .price,
+    .product__info-wrapper .money,
+    .product__info-wrapper .sku,
+    .shopify-section--main-product [id^="price-"],
+    .shopify-section--main-product .price:has(.price-item),
+    .shopify-section--main-product .price:has(.money),
+    .shopify-section--main-product .product__price,
+    .shopify-section--main-product .product-price,
+    .shopify-section--main-product .product__sku,
+    .shopify-section--main-product [itemprop="sku"] {
+      display: none !important;
+    }
+    {% endif %}
+  </style>
+{% endif %}

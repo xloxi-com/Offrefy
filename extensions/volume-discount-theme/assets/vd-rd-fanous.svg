@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 72" fill="none" aria-hidden="true">
+  <!-- Clean professional fanous — gold frame, emerald dome, warm glow -->
+  <defs>
+    <linearGradient id="rdFanGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0d78c"/>
+      <stop offset="55%" stop-color="#c9a227"/>
+      <stop offset="100%" stop-color="#8a6a18"/>
+    </linearGradient>
+    <linearGradient id="rdFanGlow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff3c4"/>
+      <stop offset="100%" stop-color="#e8b84a"/>
+    </linearGradient>
+    <linearGradient id="rdFanDome" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0f8a6a"/>
+      <stop offset="100%" stop-color="#064e3b"/>
+    </linearGradient>
+  </defs>
+  <!-- Hook -->
+  <path d="M24 2 C24 2 24 8 24 10" stroke="url(#rdFanGold)" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="24" cy="3.2" r="2.2" fill="none" stroke="url(#rdFanGold)" stroke-width="1.6"/>
+  <!-- Cap -->
+  <ellipse cx="24" cy="12" rx="5.5" ry="2.2" fill="url(#rdFanGold)"/>
+  <!-- Dome -->
+  <path d="M15 18 C15 13 19 11 24 11 C29 11 33 13 33 18 Z" fill="url(#rdFanDome)"/>
+  <path d="M15 18 H33" stroke="url(#rdFanGold)" stroke-width="1.4"/>
+  <!-- Body -->
+  <path d="M14 18 L12 48 Q12 56 24 58 Q36 56 36 48 L34 18 Z" fill="url(#rdFanGold)"/>
+  <path d="M17 22 L15.5 47 Q15.5 52 24 53.5 Q32.5 52 32.5 47 L31 22 Z" fill="url(#rdFanGlow)"/>
+  <!-- Lattice -->
+  <g stroke="#8a6a18" stroke-width="0.85" opacity="0.55">
+    <path d="M18 26 H30 M18 32 H30 M18 38 H30 M18 44 H30"/>
+    <path d="M20 22 V50 M24 22 V53 M28 22 V50"/>
+  </g>
+  <!-- Base -->
+  <ellipse cx="24" cy="59" rx="7" ry="2.2" fill="url(#rdFanGold)"/>
+  <path d="M20 60 L19 66 H29 L28 60" fill="url(#rdFanGold)"/>
+  <ellipse cx="24" cy="66.5" rx="5.5" ry="1.6" fill="#8a6a18"/>
+</svg>

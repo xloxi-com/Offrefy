@@ -1,20 +1,29 @@
 import { prisma } from "../db.server";
 import {
-  buildStorefrontTranslationsForLanguages,
-  type StorefrontTranslationsMap,
-} from "./storefrontTranslations";
+  autoTranslateCartBadgeStrings,
+  autoTranslateStorefrontFields,
+  autoTranslateTierCopyFields,
+  autoTranslateTierStrings,
+  hasUntranslatedCartBadgeStrings,
+  hasUntranslatedTierStrings,
+  resolveEnglishSourceForAutoTranslate,
+} from "./storefrontAutoTranslate.server";
 import {
   FALLBACK_SHOP_LANGUAGES,
   fetchShopPublishedLocales,
   type ShopLanguageOption,
 } from "./shopPublishedLocales.server";
 import {
-  autoTranslateCartBadgeStrings,
-  autoTranslateTierStrings,
-  hasUntranslatedCartBadgeStrings,
-  hasUntranslatedTierStrings,
-  resolveEnglishSourceForAutoTranslate,
-} from "./storefrontAutoTranslate.server";
+  adaptCartDiscountTemplateForLanguage,
+  buildStorefrontTranslationsForLanguages,
+  ENGLISH_STOREFRONT_TRANSLATION,
+  hasCuratedTranslationPreset,
+  STOREFRONT_TRANSLATION_FIELD_KEYS,
+  sparsifyStorefrontTranslations,
+  type StorefrontTranslationFields,
+  type StorefrontTranslationsMap,
+  type TierCopyFields,
+} from "./storefrontTranslations";
 import {
   getMemoryCachedJson,
   setMemoryCachedJson,
@@ -188,7 +197,14 @@ export async function syncStorefrontTranslationsWithShopLanguages(
     existingTranslations,
   );
 
-  const englishSource = resolveEnglishSourceForAutoTranslate(translations);
+  const primaryLang =
+    resolvedShopLanguages.find((language) => language.primary)?.value ??
+    languageKeys[0] ??
+    "en";
+  const primarySource = resolveEnglishSourceForAutoTranslate(
+    translations,
+    primaryLang,
+  );
   let tierStringsBackfilled = false;
   let cartBadgeStringsBackfilled = false;
   let needsAutoTranslate = false;
@@ -197,8 +213,12 @@ export async function syncStorefrontTranslationsWithShopLanguages(
     const fields = translations[key];
     if (!fields) continue;
 
-    const needsTier = hasUntranslatedTierStrings(key, fields);
-    const needsCartBadge = hasUntranslatedCartBadgeStrings(key, fields);
+    const needsTier = hasUntranslatedTierStrings(key, fields, primaryLang);
+    const needsCartBadge = hasUntranslatedCartBadgeStrings(
+      key,
+      fields,
+      primaryLang,
+    );
     if (needsTier || needsCartBadge) {
       needsAutoTranslate = true;
     }
@@ -209,7 +229,11 @@ export async function syncStorefrontTranslationsWithShopLanguages(
 
     if (needsTier) {
       try {
-        const tierStrings = await autoTranslateTierStrings(englishSource, key);
+        const tierStrings = await autoTranslateTierStrings(
+          primarySource,
+          key,
+          primaryLang,
+        );
         translations[key] = {
           ...fields,
           ...tierStrings,
@@ -226,12 +250,13 @@ export async function syncStorefrontTranslationsWithShopLanguages(
     const current = translations[key];
     if (
       current &&
-      hasUntranslatedCartBadgeStrings(key, current)
+      hasUntranslatedCartBadgeStrings(key, current, primaryLang)
     ) {
       try {
         const cartBadgeStrings = await autoTranslateCartBadgeStrings(
-          englishSource,
+          primarySource,
           key,
+          primaryLang,
         );
         translations[key] = {
           ...current,
@@ -279,4 +304,266 @@ export async function syncStorefrontTranslationsWithShopLanguages(
     addedLanguages,
     needsAutoTranslate,
   };
+}
+
+/** True when the cart/checkout label uses template placeholders. */
+export function isCartDiscountDisplayTemplate(displayName: string): boolean {
+  return String(displayName ?? "").trim().includes("{{");
+}
+
+/**
+ * When an offer's Cart & checkout display name changes, refresh the shop-wide
+ * cart-badge translation sheet (primary source + auto-translate other locales).
+ * Always rewrites locale cart badges from the primary template so FR/TA keep
+ * the same placeholders (`{{ amount }}` vs `{{ discount }}`).
+ */
+export async function syncCartDiscountTranslationsFromDisplayName(
+  shop: string,
+  admin: AdminGraphql,
+  displayName: string,
+  options: { autoTranslate?: boolean } = {},
+): Promise<{ updated: boolean; errors: string[] }> {
+  const trimmed = String(displayName ?? "").trim();
+  if (!isCartDiscountDisplayTemplate(trimmed)) {
+    return { updated: false, errors: [] };
+  }
+
+  const settings = await readStorefrontSettingsRow(shop);
+  const shopLanguages =
+    (await fetchShopPublishedLocales(admin)).languages;
+  const resolvedShopLanguages =
+    shopLanguages.length > 0 ? shopLanguages : FALLBACK_SHOP_LANGUAGES;
+  const languageKeys = languageKeysFromShopLanguages(resolvedShopLanguages);
+  const primaryLang =
+    resolvedShopLanguages.find((language) => language.primary)?.value ??
+    languageKeys[0] ??
+    "en";
+  const existing = parseStoredStorefrontTranslations(
+    settings.translationsString,
+  );
+  const translations = buildStorefrontTranslationsForLanguages(
+    languageKeys,
+    existing,
+  );
+
+  const primarySource = resolveEnglishSourceForAutoTranslate(
+    translations,
+    primaryLang,
+  );
+  const previousPrimary = String(
+    translations[primaryLang]?.transCartDiscount ?? "",
+  ).trim();
+  primarySource.transCartDiscount = trimmed;
+
+  const primaryFields = translations[primaryLang] ?? primarySource;
+  translations[primaryLang] = { ...primaryFields, transCartDiscount: trimmed };
+
+  const errors: string[] = [];
+  // Cart-badge locale templates must always track Display name placeholders.
+  // Plan flag only gates machine-translate for non-curated languages.
+  const allowMachineTranslate = options.autoTranslate !== false;
+
+  for (const key of languageKeys) {
+    if (key === primaryLang) continue;
+    const fields = translations[key];
+    if (!fields) continue;
+    try {
+      if (hasCuratedTranslationPreset(key)) {
+        const cartBadgeStrings = await autoTranslateCartBadgeStrings(
+          primarySource,
+          key,
+          primaryLang,
+        );
+        translations[key] = {
+          ...fields,
+          ...cartBadgeStrings,
+        };
+      } else if (allowMachineTranslate) {
+        const cartBadgeStrings = await autoTranslateCartBadgeStrings(
+          primarySource,
+          key,
+          primaryLang,
+        );
+        translations[key] = {
+          ...fields,
+          ...cartBadgeStrings,
+        };
+      } else {
+        // No machine translate: still adapt placeholders when possible.
+        translations[key] = {
+          ...fields,
+          transCartDiscount: trimmed,
+        };
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Translation failed";
+      errors.push(`${key}: ${message}`);
+      // Safe fallback — keep placeholders, avoid blanking the field.
+      translations[key] = {
+        ...fields,
+        transCartDiscount: adaptCartDiscountTemplateForLanguage(trimmed, key),
+      };
+      console.error(
+        `[storefrontTranslations] Cart badge auto-translate failed for ${key}`,
+        error,
+      );
+    }
+  }
+
+  const changed =
+    previousPrimary !== trimmed ||
+    languageKeys.some((key) => {
+      if (key === primaryLang) return previousPrimary !== trimmed;
+      const before = existing[key]?.transCartDiscount?.trim() ?? "";
+      const after = translations[key]?.transCartDiscount?.trim() ?? "";
+      return before !== after;
+    });
+
+  if (!changed) {
+    return { updated: false, errors };
+  }
+
+  await persistStorefrontTranslations(
+    shop,
+    translations,
+    settings.syncInterval,
+  );
+  invalidateMemoryCachePrefix(`widget:${shop}:`);
+  invalidateMemoryCachePrefix(`cart-rules:${shop}:`);
+  invalidateMemoryCachePrefix(`sf-translations:${shop}`);
+
+  return { updated: true, errors };
+}
+
+export type CampaignAutoTranslateActionResult =
+  | {
+      ok: true;
+      intent: "autoTranslateCampaign";
+      targetLang: string;
+      fields: StorefrontTranslationFields;
+      tierCopy: TierCopyFields[];
+      message: string;
+    }
+  | {
+      ok: false;
+      intent: "autoTranslateCampaign";
+      error: string;
+    };
+
+/**
+ * Offer-editor Auto translate: translate primary-language source → target locale fields.
+ * Does not persist; client applies overrides then merchant Saves the offer.
+ */
+export async function runCampaignAutoTranslateFromForm(
+  shop: string,
+  form: FormData,
+): Promise<CampaignAutoTranslateActionResult> {
+  const { resolveShopPlanContext } = await import("./shopPlan.server");
+  const { upgradeMessage } = await import("./pricingPlans");
+
+  const { capabilities } = await resolveShopPlanContext(shop);
+  if (!capabilities.translations) {
+    return {
+      ok: false,
+      intent: "autoTranslateCampaign",
+      error: upgradeMessage("translations"),
+    };
+  }
+
+  const targetLang = String(form.get("targetLang") ?? "")
+    .trim()
+    .toLowerCase();
+  if (!targetLang) {
+    return {
+      ok: false,
+      intent: "autoTranslateCampaign",
+      error: "Select a language to auto-translate",
+    };
+  }
+
+  const sourceLang =
+    String(form.get("sourceLang") ?? "en").trim().toLowerCase() || "en";
+  if (targetLang === sourceLang) {
+    return {
+      ok: false,
+      intent: "autoTranslateCampaign",
+      error: "Storefront primary language is the source language",
+    };
+  }
+
+  let primarySource: StorefrontTranslationFields = {
+    ...ENGLISH_STOREFRONT_TRANSLATION,
+  };
+  try {
+    const parsed = JSON.parse(String(form.get("englishSource") ?? "{}"));
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      for (const field of STOREFRONT_TRANSLATION_FIELD_KEYS) {
+        const value = (parsed as Record<string, unknown>)[field];
+        if (typeof value === "string" && value.trim()) {
+          primarySource[field] = value.trim();
+        }
+      }
+    }
+  } catch {
+    return {
+      ok: false,
+      intent: "autoTranslateCampaign",
+      error: "Invalid primary-language source for auto-translate",
+    };
+  }
+
+  let primaryTiers: Array<{
+    buyLabelText?: string;
+    optionSubtext?: string;
+    badge?: string;
+  }> = [];
+  try {
+    const parsedTiers = JSON.parse(String(form.get("englishTiers") ?? "[]"));
+    if (Array.isArray(parsedTiers)) {
+      primaryTiers = parsedTiers.map((row) => {
+        if (!row || typeof row !== "object" || Array.isArray(row)) {
+          return { buyLabelText: "", optionSubtext: "", badge: "" };
+        }
+        const o = row as Record<string, unknown>;
+        return {
+          buyLabelText:
+            typeof o.buyLabelText === "string" ? o.buyLabelText : "",
+          optionSubtext:
+            typeof o.optionSubtext === "string" ? o.optionSubtext : "",
+          badge: typeof o.badge === "string" ? o.badge : "",
+        };
+      });
+    }
+  } catch {
+    primaryTiers = [];
+  }
+
+  try {
+    const [fields, tierCopy] = await Promise.all([
+      autoTranslateStorefrontFields(primarySource, targetLang, sourceLang),
+      autoTranslateTierCopyFields(primaryTiers, targetLang, sourceLang),
+    ]);
+    const sparse = sparsifyStorefrontTranslations({ [targetLang]: fields });
+    const out: StorefrontTranslationFields = {
+      ...fields,
+      ...(sparse[targetLang] ?? {}),
+    };
+    return {
+      ok: true,
+      intent: "autoTranslateCampaign",
+      targetLang,
+      fields: out,
+      tierCopy,
+      message: `Auto-translated to ${targetLang.toUpperCase()} — Save the offer to apply`,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Auto-translate failed";
+    return {
+      ok: false,
+      intent: "autoTranslateCampaign",
+      error: message,
+    };
+  }
 }

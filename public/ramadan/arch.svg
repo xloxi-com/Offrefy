@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 90" fill="none" aria-hidden="true">
+  <!-- Soft Islamic iwan / portal arch — gold outline, transparent -->
+  <defs>
+    <linearGradient id="rdArchGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e8c547"/>
+      <stop offset="55%" stop-color="#c9a227"/>
+      <stop offset="100%" stop-color="#a67c0a"/>
+    </linearGradient>
+  </defs>
+  <!-- Outer arch -->
+  <path
+    d="M18 88 V42 C18 18 52 4 140 4 C228 4 262 18 262 42 V88"
+    stroke="url(#rdArchGold)"
+    stroke-width="2.4"
+    stroke-linecap="round"
+    opacity="0.95"
+  />
+  <!-- Inner arch -->
+  <path
+    d="M34 88 V46 C34 26 62 14 140 14 C218 14 246 26 246 46 V88"
+    stroke="url(#rdArchGold)"
+    stroke-width="1.35"
+    stroke-linecap="round"
+    opacity="0.72"
+  />
+  <!-- Keystone ornament -->
+  <circle cx="140" cy="10" r="3.2" fill="#c9a227" opacity="0.9"/>
+  <path d="M140 4 L143.2 9.5 L140 8.2 L136.8 9.5 Z" fill="#e8c547"/>
+</svg>

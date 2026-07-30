@@ -15,7 +15,14 @@ import {
   loadStorefrontTranslationsForShop,
   parseTranslationsFromWidgetPayload,
 } from "./storefrontTranslations.server";
-import type { StorefrontTranslationsMap } from "./storefrontTranslations";
+import {
+  campaignHasTranslationOverrides,
+  mergeShopAndCampaignTranslations,
+  parseSparseStorefrontTranslations,
+  parseTierCopyTranslations,
+  type StorefrontTranslationsMap,
+  type TierCopyTranslationsMap,
+} from "./storefrontTranslations";
 
 /** DB row shape for widget JSON — only fields required to build storefront payload. */
 export type VolumeDiscountCampaignStorefrontRow = Pick<
@@ -23,6 +30,7 @@ export type VolumeDiscountCampaignStorefrontRow = Pick<
   | "id"
   | "campaignName"
   | "displayName"
+  | "displayNameTranslations"
   | "productScope"
   | "quantityCondition"
   | "customerType"
@@ -47,6 +55,8 @@ import {
 } from "./volumeDiscountFunctionConfig.server";
 import { normalizeTiersFromDb } from "./volumeDiscountTier";
 import type { TierPayload } from "../types/volumeDiscount";
+import { resolveShopPlan } from "./shopPlan.server";
+import { widgetDisplayEnforcedForPlan } from "./enforcePlanWidgetDisplay.server";
 import {
   normalizeVolumeDiscountWidgetDisplay,
   type VolumeDiscountWidgetDisplay,
@@ -58,6 +68,13 @@ type AdminGraphql = {
     options?: { variables?: Record<string, unknown> },
   ) => Promise<Response>;
 };
+
+function widgetDisplayForStorefrontPlan(
+  planId: Awaited<ReturnType<typeof resolveShopPlan>>,
+  raw: unknown,
+): VolumeDiscountWidgetDisplay {
+  return widgetDisplayEnforcedForPlan(planId, raw);
+}
 
 export type StorefrontWidgetTier = FunctionTierConfig & {
   buyLabel: string;
@@ -82,6 +99,10 @@ export type StorefrontWidgetCampaign = {
   countdownStartsAt: string | null;
   /** ISO 8601 UTC — required on the storefront for a live timer (with `showCountdown`). */
   countdownEndsAt: string | null;
+  /** Merged shop + campaign overrides when this offer has translation overrides. */
+  translations?: StorefrontTranslationsMap;
+  /** Per-locale option label / subtext / badge overrides (aligned to tier order). */
+  tierCopy?: TierCopyTranslationsMap;
 };
 
 function badgeForMinQty(
@@ -149,12 +170,18 @@ export async function buildStorefrontWidgetJsonString(
   const out: StorefrontWidgetCampaign[] = [];
 
   const shop = rows[0]?.shop;
-  let translations = {};
+  let translations: StorefrontTranslationsMap = {};
+  let planId: Awaited<ReturnType<typeof resolveShopPlan>> = "free";
   if (shop) {
     try {
       translations = await loadStorefrontTranslationsForShop(shop);
     } catch (e) {
       console.error("[volume-discount] Failed querying translations", e);
+    }
+    try {
+      planId = await resolveShopPlan(shop);
+    } catch (e) {
+      console.error("[volume-discount] Failed resolving shop plan", e);
     }
   }
 
@@ -176,13 +203,24 @@ export async function buildStorefrontWidgetJsonString(
         activeByDefault: activeDefaultForMinQty(rawTiers, ft.minQty),
       };
     });
-    const wd = normalizeVolumeDiscountWidgetDisplay(row?.widgetDisplay ?? {});
+    const wd = widgetDisplayForStorefrontPlan(planId, row?.widgetDisplay);
+    const campaignOverrides = parseSparseStorefrontTranslations(
+      row?.displayNameTranslations,
+    );
+    const campaignTranslations = campaignHasTranslationOverrides(
+      campaignOverrides,
+    )
+      ? mergeShopAndCampaignTranslations(translations, campaignOverrides)
+      : undefined;
+    const tierCopy = parseTierCopyTranslations(row?.displayNameTranslations);
     out.push({
       ...c,
       tiers,
       widgetDisplay: wd,
       countdownStartsAt: row?.countdownStartsAt?.toISOString() ?? null,
       countdownEndsAt: row?.countdownEndsAt?.toISOString() ?? null,
+      ...(campaignTranslations ? { translations: campaignTranslations } : {}),
+      ...(Object.keys(tierCopy).length > 0 ? { tierCopy } : {}),
     });
   }
 
@@ -384,6 +422,7 @@ function pickStorefrontCampaignFromPayload(
   productId: string,
   variantId: string | null,
 ): StorefrontWidgetCampaign | null {
+  const now = new Date();
   try {
     const cfg = JSON.parse(payload) as {
       campaigns?: StorefrontWidgetCampaign[];
@@ -391,6 +430,12 @@ function pickStorefrontCampaignFromPayload(
     const list = Array.isArray(cfg.campaigns) ? cfg.campaigns : [];
     for (const c of list) {
       if (!c?.tiers?.length) continue;
+      const startsAt = c.countdownStartsAt
+        ? new Date(c.countdownStartsAt)
+        : null;
+      const endsAt = c.countdownEndsAt ? new Date(c.countdownEndsAt) : null;
+      if (isCampaignSchedulePendingStart(startsAt, now)) continue;
+      if (isCampaignScheduleExpired(endsAt, now)) continue;
       if (storefrontProductMatch(c, productId, variantId)) return c;
     }
   } catch {
@@ -526,6 +571,14 @@ export async function buildStorefrontWidgetForProduct(
       variantKey || null,
     );
     if (camp) {
+      const planId = await resolveShopPlan(shop).catch(() => "free" as const);
+      const clampedCamp: StorefrontWidgetCampaign = {
+        ...camp,
+        widgetDisplay: widgetDisplayForStorefrontPlan(
+          planId,
+          camp.widgetDisplay,
+        ),
+      };
       const translations = await resolveStorefrontTranslationsForWidget(
         shop,
         fullPayload,
@@ -548,7 +601,7 @@ export async function buildStorefrontWidgetForProduct(
         void 0;
       }
       return buildSingleCampaignWidgetPayload(
-        camp,
+        clampedCamp,
         translations,
         rev,
         maxDiscountProducts,
@@ -671,12 +724,20 @@ export async function buildStorefrontWidgetForProduct(
         variantKey || null,
       );
       if (camp) {
+        const planId = await resolveShopPlan(shop).catch(() => "free" as const);
+        const clampedCamp: StorefrontWidgetCampaign = {
+          ...camp,
+          widgetDisplay: widgetDisplayForStorefrontPlan(
+            planId,
+            camp.widgetDisplay,
+          ),
+        };
         const translations = await resolveStorefrontTranslationsForWidget(
           shop,
           fallbackPayload,
         );
         return buildSingleCampaignWidgetPayload(
-          camp,
+          clampedCamp,
           translations,
           null,
           readMaxDiscountProductsFromPayload(fallbackPayload),

@@ -82,6 +82,8 @@ export function QuantityBreaksSelectCard({
                   className={styles.previewImage}
                   src={QB_PREVIEW_SRC}
                   alt=""
+                  width={440}
+                  height={360}
                   decoding="async"
                   loading="eager"
                   fetchPriority="high"
@@ -120,6 +122,8 @@ export function VolumeDiscountComingSoonCard(props: OfferTypeCardFooterProps) {
                   className={styles.previewImage}
                   src={VD_PREVIEW_SRC}
                   alt=""
+                  width={440}
+                  height={360}
                   decoding="async"
                   loading="eager"
                   fetchPriority="high"

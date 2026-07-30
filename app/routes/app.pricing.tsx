@@ -44,7 +44,10 @@ import {
   pricingPlanFromBillingName,
 } from "../utils/billingPlans";
 import { resolveShopPlan, setShopPlan, ensureDefaultFreePlanOnInstall } from "../utils/shopPlan.server";
-import { scheduleVolumeDiscountShopSync } from "../services/deferredShopSync.server";
+import {
+  scheduleStorefrontWidgetRefresh,
+  scheduleVolumeDiscountShopSync,
+} from "../services/deferredShopSync.server";
 import {
   cancelActiveAppSubscriptions,
   createPlanSubscriptionConfirmationUrl,
@@ -112,6 +115,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         });
       }
     }
+    // Rebuild storefront widget so plan-gated templates/CSS match the new plan.
+    scheduleStorefrontWidgetRefresh(admin, session.shop);
     justActivated = currentPlan;
   }
 
@@ -149,6 +154,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     try {
       await cancelActiveAppSubscriptions(admin);
       const enforce = await setShopPlan(session.shop, "free");
+      // Always refresh storefront so Premium templates stop applying after downgrade.
+      scheduleStorefrontWidgetRefresh(admin, session.shop);
       if (enforce.draftedIds.length > 0) {
         scheduleVolumeDiscountShopSync(admin, session.shop, {
           changedCampaignIds: [
@@ -271,6 +278,9 @@ const FLAG_VALUE_KEY: Record<string, AdminUiMessageKey> = {
   Basic: "pricing.value.basic",
   Advanced: "pricing.value.advanced",
   Priority: "pricing.value.priority",
+  Classic: "pricing.value.classic",
+  "3 / season": "pricing.value.threePerSeason",
+  All: "pricing.value.all",
 };
 
 function CellValue({

@@ -374,10 +374,7 @@ export async function lookupDiscountRulesForProducts(
     out[key] = {
       campaignId: row.campaignId,
       status: "active",
-      label:
-        row.displayName?.trim() ||
-        row.campaignName?.trim() ||
-        "Volume discount",
+      label: row.displayName?.trim() || "",
       quantityCondition: row.quantityCondition,
       customerType: row.customerType,
       customerTags: Array.isArray(row.customerTags)

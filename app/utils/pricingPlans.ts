@@ -56,7 +56,7 @@ export const PLANS: Record<PricingPlanId, PlanDefinition> = {
       "5 active campaigns",
       "Quantity breaks (tier cards)",
       "Volume discount (pricing table)",
-      "Appearance templates",
+      "Classic appearance templates",
       "Product page widget",
       "Automatic checkout discounts",
       "Basic analytics",
@@ -73,7 +73,7 @@ export const PLANS: Record<PricingPlanId, PlanDefinition> = {
       "25 active campaigns",
       "Quantity breaks (tier cards)",
       "Volume discount (pricing table)",
-      "Appearance templates",
+      "Classic + 3 templates per season",
       "Product, collection & customer targeting",
       "Offer scheduling & countdown timers",
       "Campaign analytics",
@@ -128,6 +128,12 @@ export function getMaxActiveCampaigns(
 
 export type AnalyticsTier = "basic" | "standard" | "advanced";
 
+/** Classic only · Standard seasonal sample · Premium full library. */
+export type AppearanceTemplatesTier =
+  | "classic"
+  | "seasonal_limited"
+  | "all";
+
 export type PlanCapabilities = {
   maxActiveCampaigns: number | null;
   customerTargeting: boolean;
@@ -138,6 +144,7 @@ export type PlanCapabilities = {
   schedulingAutomation: boolean;
   importExport: boolean;
   customCss: boolean;
+  appearanceTemplates: AppearanceTemplatesTier;
 };
 
 export type PlanFeatureKey =
@@ -149,7 +156,8 @@ export type PlanFeatureKey =
   | "analytics"
   | "schedulingAutomation"
   | "importExport"
-  | "customCss";
+  | "customCss"
+  | "appearanceTemplates";
 
 export function isPricingPlanId(value: unknown): value is PricingPlanId {
   return value === "free" || value === "standard" || value === "premium";
@@ -168,6 +176,7 @@ export function planCapabilities(planId: PricingPlanId): PlanCapabilities {
         schedulingAutomation: true,
         importExport: true,
         customCss: true,
+        appearanceTemplates: "all",
       };
     case "standard":
       return {
@@ -180,6 +189,7 @@ export function planCapabilities(planId: PricingPlanId): PlanCapabilities {
         schedulingAutomation: false,
         importExport: false,
         customCss: false,
+        appearanceTemplates: "seasonal_limited",
       };
     case "free":
     default:
@@ -193,6 +203,7 @@ export function planCapabilities(planId: PricingPlanId): PlanCapabilities {
         schedulingAutomation: false,
         importExport: false,
         customCss: false,
+        appearanceTemplates: "classic",
       };
   }
 }
@@ -255,6 +266,8 @@ const UPGRADE_MESSAGES: Record<PlanFeatureKey, string> = {
     "Import & export is available on Premium. Upgrade to unlock.",
   customCss:
     "Custom CSS is available on Premium. Upgrade to unlock.",
+  appearanceTemplates:
+    "Standard unlocks 3 templates per season. Premium unlocks all appearance templates.",
 };
 
 export function upgradeMessage(featureKey: PlanFeatureKey): string {
@@ -268,6 +281,8 @@ export function minPlanForFeature(featureKey: PlanFeatureKey): PricingPlanId {
     case "schedulingAutomation":
     case "analytics":
       return featureKey === "analytics" ? "standard" : "premium";
+    case "appearanceTemplates":
+      return "premium";
     case "customerTargeting":
     case "scheduling":
     case "countdown":
@@ -341,9 +356,9 @@ export const FEATURE_COMPARE_ROWS: FeatureCompareRow[] = [
   {
     id: "appearanceTemplates",
     feature: "Appearance templates",
-    free: true,
-    standard: true,
-    premium: true,
+    free: "Classic",
+    standard: "3 / season",
+    premium: "All",
   },
   {
     id: "productPageWidget",

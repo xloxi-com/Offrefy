@@ -1,0 +1,617 @@
+/* —— New Year seasonal decorations —— */
+/* PNGs: Microsoft Fluent Emoji (MIT); SVGs: Offrefy */
+
+[data-offrefy-theme^="newyear_"] {
+  --ny-navy: #0f172a;
+  --ny-gold: #d4af37;
+  --ny-decor-sm: clamp(1.05rem, 4.2vw, 1.35rem);
+  --ny-decor-md: clamp(1.35rem, 5.5vw, 1.85rem);
+  --ny-decor-lg: clamp(1.55rem, 6.5vw, 2.15rem);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden !important;
+  padding: 1.05rem 0.85rem 2.35rem !important;
+  border-radius: 18px;
+  border: 1.5px solid rgba(15, 23, 42, 0.14);
+  background-color: #f8fafc;
+  background-image:
+    url("/newyear/fireworks.png"),
+    url("/newyear/star.png"),
+    url("/newyear/sparkles.png"),
+    url("/newyear/sparkles.png"),
+    url("/newyear/comet.png"),
+    radial-gradient(ellipse 70% 40% at 50% -5%, rgba(212, 175, 55, 0.14), transparent 55%),
+    linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+  background-repeat: no-repeat;
+  background-size:
+    var(--ny-decor-lg) auto,
+    var(--ny-decor-sm) auto,
+    var(--ny-decor-sm) auto,
+    var(--ny-decor-sm) auto,
+    var(--ny-decor-md) auto,
+    auto,
+    auto;
+  background-position:
+    left 0.35rem bottom 0.2rem,
+    right 0.3rem bottom 0.2rem,
+    left 38% bottom 0.4rem,
+    right 38% bottom 0.35rem,
+    center bottom 0.3rem,
+    center top,
+    center top;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08);
+  box-sizing: border-box;
+}
+
+[data-offrefy-theme^="newyear_"]::before,
+[data-offrefy-theme^="newyear_"]::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+  top: 0.2rem;
+  width: var(--ny-decor-lg);
+  height: var(--ny-decor-lg);
+  background-repeat: no-repeat;
+  background-size: contain;
+  opacity: 0.95;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
+}
+
+[data-offrefy-theme^="newyear_"]::before {
+  left: 0.2rem;
+  background-image: url("/newyear/champagne.svg");
+}
+
+[data-offrefy-theme^="newyear_"]::after {
+  right: 0.2rem;
+  background-image: url("/newyear/champagne.svg");
+  transform: scaleX(-1);
+}
+
+[data-offrefy-theme^="newyear_"] .offrefy-topbar,
+[data-offrefy-theme^="newyear_"] .offrefy-cards,
+[data-offrefy-theme^="newyear_"] .offrefy-cta,
+[data-offrefy-theme^="newyear_"] .offrefy-title,
+[data-offrefy-theme^="newyear_"] > * {
+  position: relative;
+  z-index: 1;
+}
+
+[data-offrefy-theme^="newyear_"] .offrefy-topbar {
+  position: relative;
+  margin-bottom: 0.9rem !important;
+  padding-bottom: 0.9rem !important;
+  border-bottom: 1.5px dashed rgba(212, 175, 55, 0.4) !important;
+}
+
+[data-offrefy-theme^="newyear_"] .offrefy-topbar::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -0.55rem;
+  width: var(--ny-decor-sm);
+  height: var(--ny-decor-sm);
+  transform: translateX(-50%);
+  background: url("/newyear/star.png") center / contain no-repeat;
+  pointer-events: none;
+  z-index: 2;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
+}
+
+[data-offrefy-theme^="newyear_"] .offrefy-title {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  color: var(--ny-navy);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  padding-inline: clamp(1.6rem, 7vw, 2.1rem);
+}
+
+[data-offrefy-theme^="newyear_"] .offrefy-title::before,
+[data-offrefy-theme^="newyear_"] .offrefy-title::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: var(--ny-decor-md);
+  height: var(--ny-decor-md);
+  transform: translateY(-50%);
+  background: url("/newyear/sparkles.png") center / contain no-repeat;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.14));
+}
+
+[data-offrefy-theme^="newyear_"] .offrefy-title::before { left: 0; }
+[data-offrefy-theme^="newyear_"] .offrefy-title::after { right: 0; }
+
+[data-offrefy-theme^="newyear_"] .offrefy-cards {
+  position: relative;
+  margin-bottom: 0.55rem;
+  margin-inline: 0.1rem;
+}
+
+[data-offrefy-theme^="newyear_"] .offrefy-card {
+  position: relative;
+  overflow: visible !important;
+}
+
+[data-offrefy-theme^="newyear_"] .offrefy-cards::before,
+[data-offrefy-theme^="newyear_"] .offrefy-cards::after {
+  content: none;
+}
+
+[data-offrefy-theme^="newyear_"] .offrefy-cta {
+  position: relative !important;
+  overflow: hidden !important;
+  z-index: 1;
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 55%, #020617 100%) !important;
+  border: 1.5px solid rgba(251, 191, 36, 0.85) !important;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.28);
+  padding-left: 2.75rem !important;
+  padding-right: 2.75rem !important;
+  color: #fbbf24 !important;
+}
+
+[data-offrefy-theme^="newyear_"] .offrefy-cta::before,
+[data-offrefy-theme^="newyear_"] .offrefy-cta::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 1.35rem;
+  height: 1.35rem;
+  transform: translateY(-50%);
+  background: url("/newyear/sparkles.png") center / contain no-repeat;
+  pointer-events: none;
+}
+
+[data-offrefy-theme^="newyear_"] .offrefy-cta::before { left: 0.65rem; }
+[data-offrefy-theme^="newyear_"] .offrefy-cta::after { right: 0.65rem; }
+
+[data-offrefy-theme^="newyear_"] .offrefy-badge-pill {
+  box-shadow: 0 0 0 1.5px rgba(251, 191, 36, 0.65), 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.vd-admin-qb-preview[data-offrefy-theme^="newyear_"] {
+  margin-bottom: 0.85rem;
+}
+
+/* —— Per-template —— */
+
+[data-offrefy-theme="newyear_midnight"] .offrefy-title { color: #0f172a; }
+[data-offrefy-theme="newyear_midnight"]::before,
+[data-offrefy-theme="newyear_midnight"]::after {
+  background-image: url("/newyear/clock.svg");
+  width: 2.4rem;
+  height: 2.4rem;
+}
+[data-offrefy-theme="newyear_midnight"] .offrefy-card.offrefy-card--selected {
+  border-color: #0f172a !important;
+  box-shadow: 0 0 0 1px #fbbf24, 0 10px 24px rgba(15, 23, 42, 0.12) !important;
+}
+[data-offrefy-theme="newyear_midnight"] .offrefy-cta {
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%) !important;
+  color: #fbbf24 !important;
+}
+
+[data-offrefy-theme="newyear_champagne"] {
+  background-color: #fffbeb;
+  border-color: rgba(180, 83, 9, 0.22);
+  background-image:
+    url("/newyear/champagne.svg"),
+    url("/newyear/champagne.svg"),
+    url("/newyear/sparkles.png"),
+    url("/newyear/star.png"),
+    url("/newyear/sparkles.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(254, 243, 199, 0.7), transparent 60%);
+  background-size: 2.2rem auto, 2.2rem auto, 1.2rem auto, 1.25rem auto, 1.1rem auto, auto;
+  background-position: left 0.35rem bottom 0.15rem, right 0.3rem bottom 0.15rem, left 38% bottom 0.45rem, right 38% bottom 0.4rem, center bottom 0.35rem, center top;
+}
+[data-offrefy-theme="newyear_champagne"]::before,
+[data-offrefy-theme="newyear_champagne"]::after {
+  background-image: url("/newyear/champagne.svg");
+}
+[data-offrefy-theme="newyear_champagne"] .offrefy-title { color: #92400e; }
+[data-offrefy-theme="newyear_champagne"] .offrefy-title::before,
+[data-offrefy-theme="newyear_champagne"] .offrefy-title::after {
+  background-image: url("/newyear/champagne.svg");
+}
+[data-offrefy-theme="newyear_champagne"] .offrefy-cards::before,
+[data-offrefy-theme="newyear_champagne"] .offrefy-cards::after {
+  background-image: url("/newyear/champagne.svg");
+}
+[data-offrefy-theme="newyear_champagne"] .offrefy-card.offrefy-card--selected {
+  border-color: #b45309 !important;
+}
+[data-offrefy-theme="newyear_champagne"] .offrefy-cta {
+  background: linear-gradient(180deg, #d97706 0%, #b45309 55%, #92400e 100%) !important;
+  color: #fffbeb !important;
+  border-color: #fde68a !important;
+}
+[data-offrefy-theme="newyear_champagne"] .offrefy-cta::before,
+[data-offrefy-theme="newyear_champagne"] .offrefy-cta::after {
+  background-image: url("/newyear/champagne.svg");
+}
+
+[data-offrefy-theme="newyear_fireworks"] {
+  background-image:
+    url("/newyear/fireworks-crimson.png"),
+    url("/newyear/fireworks-crimson.png"),
+    url("/newyear/fireworks-burst.png"),
+    url("/newyear/fireworks-gold.png"),
+    url("/newyear/sparkles.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(254, 226, 226, 0.55), transparent 60%);
+  background-size: 3.1rem auto, 3.1rem auto, 1.55rem auto, 1.45rem auto, 1.1rem auto, auto;
+  background-position: left 0.15rem bottom 0.05rem, right 0.1rem bottom 0.05rem, left 36% bottom 0.35rem, right 36% bottom 0.3rem, center bottom 0.25rem, center top;
+}
+[data-offrefy-theme="newyear_fireworks"]::before,
+[data-offrefy-theme="newyear_fireworks"]::after {
+  background-image: url("/newyear/fireworks-crimson.png");
+}
+[data-offrefy-theme="newyear_fireworks"] .offrefy-title { color: #9f1239; }
+[data-offrefy-theme="newyear_fireworks"] .offrefy-title::before,
+[data-offrefy-theme="newyear_fireworks"] .offrefy-title::after {
+  background-image: url("/newyear/fireworks-crimson.png");
+}
+[data-offrefy-theme="newyear_fireworks"] .offrefy-topbar::after {
+  background-image: url("/newyear/fireworks-burst.png");
+}
+[data-offrefy-theme="newyear_fireworks"] .offrefy-cards::before,
+[data-offrefy-theme="newyear_fireworks"] .offrefy-cards::after {
+  background-image: url("/newyear/fireworks-crimson.png");
+}
+[data-offrefy-theme="newyear_fireworks"] .offrefy-card.offrefy-card--selected {
+  border-color: #be123c !important;
+}
+[data-offrefy-theme="newyear_fireworks"] .offrefy-cta {
+  background: linear-gradient(180deg, #e11d48 0%, #be123c 55%, #9f1239 100%) !important;
+  color: #fff !important;
+}
+[data-offrefy-theme="newyear_fireworks"] .offrefy-cta::before,
+[data-offrefy-theme="newyear_fireworks"] .offrefy-cta::after {
+  background-image: url("/newyear/fireworks-crimson.png");
+}
+
+[data-offrefy-theme="newyear_skyburst"] {
+  background-color: #f5f3ff;
+  border-color: rgba(109, 40, 217, 0.22);
+  background-image:
+    url("/newyear/fireworks-violet.png"),
+    url("/newyear/fireworks-violet.png"),
+    url("/newyear/fireworks-burst.png"),
+    url("/newyear/comet.png"),
+    url("/newyear/sparkles.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(237, 233, 254, 0.85), transparent 60%),
+    linear-gradient(180deg, #f5f3ff 0%, #ede9fe 100%);
+  background-size: 3.1rem auto, 3.1rem auto, 1.45rem auto, 1.4rem auto, 1.1rem auto, auto, auto;
+  background-position: left 0.15rem bottom 0.05rem, right 0.1rem bottom 0.05rem, left 36% bottom 0.35rem, right 36% bottom 0.3rem, center bottom 0.25rem, center top, center top;
+}
+[data-offrefy-theme="newyear_skyburst"]::before,
+[data-offrefy-theme="newyear_skyburst"]::after {
+  background-image: url("/newyear/fireworks-violet.png");
+}
+[data-offrefy-theme="newyear_skyburst"] .offrefy-topbar {
+  border-bottom-color: rgba(167, 139, 250, 0.5) !important;
+}
+[data-offrefy-theme="newyear_skyburst"] .offrefy-topbar::after {
+  background-image: url("/newyear/fireworks-violet.png");
+}
+[data-offrefy-theme="newyear_skyburst"] .offrefy-title { color: #5b21b6; }
+[data-offrefy-theme="newyear_skyburst"] .offrefy-title::before,
+[data-offrefy-theme="newyear_skyburst"] .offrefy-title::after {
+  background-image: url("/newyear/fireworks-violet.png");
+}
+[data-offrefy-theme="newyear_skyburst"] .offrefy-card.offrefy-card--selected {
+  border-color: #6d28d9 !important;
+  box-shadow: 0 0 0 1px #c4b5fd, 0 10px 24px rgba(109, 40, 217, 0.12) !important;
+}
+[data-offrefy-theme="newyear_skyburst"] .offrefy-cta {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 50%, #4c1d95 100%) !important;
+  color: #f5f3ff !important;
+  border-color: #c4b5fd !important;
+}
+[data-offrefy-theme="newyear_skyburst"] .offrefy-cta::before,
+[data-offrefy-theme="newyear_skyburst"] .offrefy-cta::after {
+  background-image: url("/newyear/fireworks-violet.png");
+}
+
+[data-offrefy-theme="newyear_golden_burst"] {
+  background-color: #fffbeb;
+  border-color: rgba(202, 138, 4, 0.28);
+  background-image:
+    url("/newyear/fireworks-gold.png"),
+    url("/newyear/fireworks-gold.png"),
+    url("/newyear/fireworks-willow.png"),
+    url("/newyear/sparkles.png"),
+    url("/newyear/star.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(254, 243, 199, 0.85), transparent 60%),
+    linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
+  background-size: 3.1rem auto, 3.1rem auto, 1.55rem auto, 1.2rem auto, 1.15rem auto, auto, auto;
+  background-position: left 0.15rem bottom 0.05rem, right 0.1rem bottom 0.05rem, left 36% bottom 0.35rem, right 36% bottom 0.3rem, center bottom 0.25rem, center top, center top;
+}
+[data-offrefy-theme="newyear_golden_burst"]::before,
+[data-offrefy-theme="newyear_golden_burst"]::after {
+  background-image: url("/newyear/fireworks-gold.png");
+}
+[data-offrefy-theme="newyear_golden_burst"] .offrefy-topbar {
+  border-bottom-color: rgba(251, 191, 36, 0.55) !important;
+}
+[data-offrefy-theme="newyear_golden_burst"] .offrefy-topbar::after {
+  background-image: url("/newyear/fireworks-gold.png");
+}
+[data-offrefy-theme="newyear_golden_burst"] .offrefy-title { color: #854d0e; }
+[data-offrefy-theme="newyear_golden_burst"] .offrefy-title::before,
+[data-offrefy-theme="newyear_golden_burst"] .offrefy-title::after {
+  background-image: url("/newyear/fireworks-gold.png");
+}
+[data-offrefy-theme="newyear_golden_burst"] .offrefy-card.offrefy-card--selected {
+  border-color: #ca8a04 !important;
+  box-shadow: 0 0 0 1px #fde047, 0 10px 24px rgba(202, 138, 4, 0.14) !important;
+}
+[data-offrefy-theme="newyear_golden_burst"] .offrefy-cta {
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 55%, #020617 100%) !important;
+  color: #fbbf24 !important;
+  border-color: #fbbf24 !important;
+}
+[data-offrefy-theme="newyear_golden_burst"] .offrefy-cta::before,
+[data-offrefy-theme="newyear_golden_burst"] .offrefy-cta::after {
+  background-image: url("/newyear/fireworks-gold.png");
+}
+
+[data-offrefy-theme="newyear_sparkler"] {
+  background-color: #fff7ed;
+  border-color: rgba(234, 88, 12, 0.24);
+  background-image:
+    url("/newyear/fireworks-cluster.png"),
+    url("/newyear/fireworks-cluster.png"),
+    url("/newyear/fireworks-burst.png"),
+    url("/newyear/fireworks-gold.png"),
+    url("/newyear/sparkles.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(255, 237, 213, 0.8), transparent 60%),
+    linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%);
+  background-size: 3.2rem auto, 3.2rem auto, 1.45rem auto, 1.4rem auto, 1.1rem auto, auto, auto;
+  background-position: left 0.1rem bottom 0.02rem, right 0.05rem bottom 0.02rem, left 36% bottom 0.35rem, right 36% bottom 0.3rem, center bottom 0.25rem, center top, center top;
+}
+[data-offrefy-theme="newyear_sparkler"]::before,
+[data-offrefy-theme="newyear_sparkler"]::after {
+  background-image: url("/newyear/fireworks-cluster.png");
+}
+[data-offrefy-theme="newyear_sparkler"] .offrefy-topbar {
+  border-bottom-color: rgba(251, 146, 60, 0.5) !important;
+}
+[data-offrefy-theme="newyear_sparkler"] .offrefy-topbar::after {
+  background-image: url("/newyear/fireworks-burst.png");
+}
+[data-offrefy-theme="newyear_sparkler"] .offrefy-title { color: #9a3412; }
+[data-offrefy-theme="newyear_sparkler"] .offrefy-title::before,
+[data-offrefy-theme="newyear_sparkler"] .offrefy-title::after {
+  background-image: url("/newyear/fireworks-burst.png");
+}
+[data-offrefy-theme="newyear_sparkler"] .offrefy-card.offrefy-card--selected {
+  border-color: #ea580c !important;
+}
+[data-offrefy-theme="newyear_sparkler"] .offrefy-cta {
+  background: linear-gradient(180deg, #fb923c 0%, #ea580c 55%, #c2410c 100%) !important;
+  color: #fff7ed !important;
+  border-color: #fdba74 !important;
+}
+[data-offrefy-theme="newyear_sparkler"] .offrefy-cta::before,
+[data-offrefy-theme="newyear_sparkler"] .offrefy-cta::after {
+  background-image: url("/newyear/fireworks-burst.png");
+}
+
+[data-offrefy-theme="newyear_ball_drop"] {
+  background-color: #eff6ff;
+  border-color: rgba(30, 58, 138, 0.2);
+  background-image:
+    url("/newyear/gem.png"),
+    url("/newyear/sparkles.png"),
+    url("/newyear/star.png"),
+    url("/newyear/sparkles.png"),
+    url("/newyear/comet.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(191, 219, 254, 0.65), transparent 60%);
+  background-size: 2.4rem auto, 2.3rem auto, 1.25rem auto, 1.1rem auto, 1.4rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 38% bottom 0.45rem, right 38% bottom 0.4rem, center bottom 0.35rem, center top;
+}
+[data-offrefy-theme="newyear_ball_drop"]::before,
+[data-offrefy-theme="newyear_ball_drop"]::after {
+  background-image: url("/newyear/sparkles.png");
+}
+[data-offrefy-theme="newyear_ball_drop"] .offrefy-title { color: #1e3a8a; }
+[data-offrefy-theme="newyear_ball_drop"] .offrefy-cards::before {
+  background-image: url("/newyear/gem.png");
+}
+[data-offrefy-theme="newyear_ball_drop"] .offrefy-cards::after {
+  background-image: url("/newyear/sparkles.png");
+}
+[data-offrefy-theme="newyear_ball_drop"] .offrefy-card.offrefy-card--selected {
+  border-color: #1e3a8a !important;
+}
+[data-offrefy-theme="newyear_ball_drop"] .offrefy-cta {
+  background: linear-gradient(180deg, #2563eb 0%, #1e3a8a 100%) !important;
+  color: #e2e8f0 !important;
+  border-color: #93c5fd !important;
+}
+
+[data-offrefy-theme="newyear_confetti"] {
+  background-image:
+    url("/newyear/popper.svg"),
+    url("/newyear/popper.svg"),
+    url("/newyear/sparkles.png"),
+    url("/newyear/star.png"),
+    url("/newyear/sparkles.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(250, 232, 255, 0.75), transparent 60%);
+  background-size: 2.4rem auto, 2.4rem auto, 1.2rem auto, 1.25rem auto, 1.1rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 38% bottom 0.45rem, right 38% bottom 0.4rem, center bottom 0.35rem, center top;
+}
+[data-offrefy-theme="newyear_confetti"]::before,
+[data-offrefy-theme="newyear_confetti"]::after {
+  background-image: url("/newyear/popper.svg");
+}
+[data-offrefy-theme="newyear_confetti"] .offrefy-title { color: #a21caf; }
+[data-offrefy-theme="newyear_confetti"] .offrefy-title::before,
+[data-offrefy-theme="newyear_confetti"] .offrefy-title::after {
+  background-image: url("/newyear/popper.svg");
+}
+[data-offrefy-theme="newyear_confetti"] .offrefy-cards::before,
+[data-offrefy-theme="newyear_confetti"] .offrefy-cards::after {
+  background-image: url("/newyear/popper.svg");
+}
+[data-offrefy-theme="newyear_confetti"] .offrefy-card.offrefy-card--selected {
+  border-color: #c026d3 !important;
+}
+[data-offrefy-theme="newyear_confetti"] .offrefy-cta {
+  background: linear-gradient(180deg, #e879f9 0%, #c026d3 55%, #a21caf 100%) !important;
+  color: #fff !important;
+}
+[data-offrefy-theme="newyear_confetti"] .offrefy-cta::before,
+[data-offrefy-theme="newyear_confetti"] .offrefy-cta::after {
+  background-image: url("/newyear/popper.svg");
+}
+
+[data-offrefy-theme="newyear_sparkle"] {
+  background-color: #fffbeb;
+  border-color: rgba(202, 138, 4, 0.25);
+}
+[data-offrefy-theme="newyear_sparkle"]::before,
+[data-offrefy-theme="newyear_sparkle"]::after {
+  background-image: url("/newyear/sparkles.png");
+}
+[data-offrefy-theme="newyear_sparkle"] .offrefy-title { color: #854d0e; }
+[data-offrefy-theme="newyear_sparkle"] .offrefy-cards::before,
+[data-offrefy-theme="newyear_sparkle"] .offrefy-cards::after {
+  background-image: url("/newyear/sparkles.png");
+}
+[data-offrefy-theme="newyear_sparkle"] .offrefy-card.offrefy-card--selected {
+  border-color: #ca8a04 !important;
+}
+[data-offrefy-theme="newyear_sparkle"] .offrefy-cta {
+  background: linear-gradient(180deg, #eab308 0%, #ca8a04 55%, #a16207 100%) !important;
+  color: #1c1917 !important;
+  border-color: #fde047 !important;
+}
+
+[data-offrefy-theme="newyear_aurora"] {
+  background-image:
+    url("/newyear/comet.png"),
+    url("/newyear/comet.png"),
+    url("/newyear/sparkles.png"),
+    url("/newyear/star.png"),
+    url("/newyear/sparkles.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(204, 251, 241, 0.7), transparent 60%),
+    linear-gradient(180deg, #f0fdfa 0%, #ede9fe 100%);
+  background-size: 2.5rem auto, 2.5rem auto, 1.2rem auto, 1.25rem auto, 1.1rem auto, auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 38% bottom 0.45rem, right 38% bottom 0.4rem, center bottom 0.35rem, center top, center top;
+}
+[data-offrefy-theme="newyear_aurora"]::before,
+[data-offrefy-theme="newyear_aurora"]::after {
+  background-image: url("/newyear/comet.png");
+}
+[data-offrefy-theme="newyear_aurora"] .offrefy-title { color: #115e59; }
+[data-offrefy-theme="newyear_aurora"] .offrefy-cards::before,
+[data-offrefy-theme="newyear_aurora"] .offrefy-cards::after {
+  background-image: url("/newyear/comet.png");
+}
+[data-offrefy-theme="newyear_aurora"] .offrefy-card.offrefy-card--selected {
+  border-color: #0f766e !important;
+}
+[data-offrefy-theme="newyear_aurora"] .offrefy-cta {
+  background: linear-gradient(135deg, #0f766e 0%, #5b21b6 100%) !important;
+  color: #ecfdf5 !important;
+  border-color: #99f6e4 !important;
+}
+
+[data-offrefy-theme="newyear_rose"] {
+  background-color: #fff1f2;
+  border-color: rgba(190, 24, 93, 0.22);
+}
+[data-offrefy-theme="newyear_rose"]::before,
+[data-offrefy-theme="newyear_rose"]::after {
+  background-image: url("/newyear/crown.png");
+}
+[data-offrefy-theme="newyear_rose"] .offrefy-title { color: #9d174d; }
+[data-offrefy-theme="newyear_rose"] .offrefy-title::before,
+[data-offrefy-theme="newyear_rose"] .offrefy-title::after {
+  background-image: url("/newyear/crown.png");
+}
+[data-offrefy-theme="newyear_rose"] .offrefy-cards::before,
+[data-offrefy-theme="newyear_rose"] .offrefy-cards::after {
+  background-image: url("/newyear/crown.png");
+}
+[data-offrefy-theme="newyear_rose"] .offrefy-card.offrefy-card--selected {
+  border-color: #be185d !important;
+}
+[data-offrefy-theme="newyear_rose"] .offrefy-cta {
+  background: linear-gradient(180deg, #ec4899 0%, #be185d 55%, #9d174d 100%) !important;
+  color: #fff1f2 !important;
+}
+[data-offrefy-theme="newyear_rose"] .offrefy-cta::before,
+[data-offrefy-theme="newyear_rose"] .offrefy-cta::after {
+  background-image: url("/newyear/crown.png");
+}
+
+[data-offrefy-theme="newyear_emerald"] {
+  background-color: #ecfdf5;
+  border-color: rgba(4, 120, 87, 0.22);
+}
+[data-offrefy-theme="newyear_emerald"]::before,
+[data-offrefy-theme="newyear_emerald"]::after {
+  background-image: url("/newyear/gem.png");
+}
+[data-offrefy-theme="newyear_emerald"] .offrefy-title { color: #065f46; }
+[data-offrefy-theme="newyear_emerald"] .offrefy-cards::before,
+[data-offrefy-theme="newyear_emerald"] .offrefy-cards::after {
+  background-image: url("/newyear/gem.png");
+}
+[data-offrefy-theme="newyear_emerald"] .offrefy-card.offrefy-card--selected {
+  border-color: #047857 !important;
+}
+[data-offrefy-theme="newyear_emerald"] .offrefy-cta {
+  background: linear-gradient(180deg, #10b981 0%, #047857 55%, #065f46 100%) !important;
+  color: #ecfdf5 !important;
+  border-color: #6ee7b7 !important;
+}
+[data-offrefy-theme="newyear_emerald"] .offrefy-cta::before,
+[data-offrefy-theme="newyear_emerald"] .offrefy-cta::after {
+  background-image: url("/newyear/gem.png");
+}
+
+[data-offrefy-theme="newyear_velvet"] {
+  background-color: #fafafa;
+  border-color: rgba(24, 24, 27, 0.18);
+  background-image:
+    url("/newyear/star.png"),
+    url("/newyear/star.png"),
+    url("/newyear/sparkles.png"),
+    url("/newyear/sparkles.png"),
+    url("/newyear/gem.png"),
+    radial-gradient(ellipse 70% 40% at 50% -5%, rgba(24, 24, 27, 0.06), transparent 55%);
+  background-size: 2.3rem auto, 2.3rem auto, 1.2rem auto, 1.1rem auto, 1.4rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 38% bottom 0.45rem, right 38% bottom 0.4rem, center bottom 0.35rem, center top;
+}
+[data-offrefy-theme="newyear_velvet"]::before,
+[data-offrefy-theme="newyear_velvet"]::after {
+  background-image: url("/newyear/star.png");
+}
+[data-offrefy-theme="newyear_velvet"] .offrefy-title { color: #18181b; }
+[data-offrefy-theme="newyear_velvet"] .offrefy-title::before,
+[data-offrefy-theme="newyear_velvet"] .offrefy-title::after {
+  background-image: url("/newyear/star.png");
+}
+[data-offrefy-theme="newyear_velvet"] .offrefy-cards::before,
+[data-offrefy-theme="newyear_velvet"] .offrefy-cards::after {
+  background-image: url("/newyear/star.png");
+}
+[data-offrefy-theme="newyear_velvet"] .offrefy-card.offrefy-card--selected {
+  border-color: #18181b !important;
+  box-shadow: 0 0 0 1px #fbbf24, 0 10px 24px rgba(24, 24, 27, 0.12) !important;
+}
+[data-offrefy-theme="newyear_velvet"] .offrefy-cta {
+  background: linear-gradient(180deg, #27272a 0%, #18181b 55%, #09090b 100%) !important;
+  color: #fbbf24 !important;
+  border-color: #fbbf24 !important;
+}
+[data-offrefy-theme="newyear_velvet"] .offrefy-cta::before,
+[data-offrefy-theme="newyear_velvet"] .offrefy-cta::after {
+  background-image: url("/newyear/star.png");
+}

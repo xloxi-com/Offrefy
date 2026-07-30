@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 72" fill="none" aria-hidden="true">
+  <!-- Amber/bronze fanous — clean professional -->
+  <defs>
+    <linearGradient id="rdAmbGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f5d089"/>
+      <stop offset="55%" stop-color="#d97706"/>
+      <stop offset="100%" stop-color="#9a3412"/>
+    </linearGradient>
+    <linearGradient id="rdAmbGlow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff7ed"/>
+      <stop offset="100%" stop-color="#fb923c"/>
+    </linearGradient>
+  </defs>
+  <path d="M24 2 C24 2 24 8 24 10" stroke="url(#rdAmbGold)" stroke-width="2" stroke-linecap="round"/>
+  <path d="M22 3.5 A2.4 2.4 0 1 1 26 3.5" fill="none" stroke="url(#rdAmbGold)" stroke-width="1.6"/>
+  <!-- Crescent finial -->
+  <path d="M27 9 C24.5 7.5 21.5 8.5 21.5 11.2 C21.5 13.5 23.8 14.8 26.2 14 C24.2 13.6 23 12 23.2 10.5 C23.4 9.2 25 8.4 27 9 Z" fill="url(#rdAmbGold)"/>
+  <ellipse cx="24" cy="16" rx="6" ry="2" fill="url(#rdAmbGold)"/>
+  <path d="M14 20 L12 48 Q12 56 24 58 Q36 56 36 48 L34 20 Z" fill="url(#rdAmbGold)"/>
+  <path d="M17 24 L15.5 47 Q15.5 52 24 53.5 Q32.5 52 32.5 47 L31 24 Z" fill="url(#rdAmbGlow)"/>
+  <g stroke="#9a3412" stroke-width="0.85" opacity="0.5">
+    <path d="M18 28 H30 M18 34 H30 M18 40 H30 M18 46 H30"/>
+    <path d="M20 24 V50 M24 24 V53 M28 24 V50"/>
+  </g>
+  <ellipse cx="24" cy="59" rx="7" ry="2.2" fill="url(#rdAmbGold)"/>
+  <path d="M20 60 L19 66 H29 L28 60" fill="url(#rdAmbGold)"/>
+  <ellipse cx="24" cy="66.5" rx="5.5" ry="1.6" fill="#9a3412"/>
+</svg>

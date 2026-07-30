@@ -553,6 +553,17 @@
     return true;
   }
 
+  /** Product-rule / campaign must pass customer + schedule gates before painting. */
+  function campaignUsableOnStorefront(campaign) {
+    if (!campaign) return false;
+    // Legacy product metafields (no sv/sa) must not early-paint — Scheduled
+    // offers were incorrectly shown before /widget-config filtered them out.
+    if (campaign._fromProductRule && !campaign._scheduleAware) return false;
+    return (
+      customerAllowsCampaign(campaign) && campaignInScheduleWindow(campaign)
+    );
+  }
+
   function pickCampaign(cfg, productId, variantId, productGid, variantGid) {
     var list = (cfg && cfg.campaigns) || [];
     for (var i = 0; i < list.length; i++) {
@@ -689,6 +700,21 @@
     return t === "(qty {{ qty }})" || t.indexOf("(qty ") !== -1;
   }
 
+  function adaptCartBadgeTemplateForLocale(englishTemplate, localeTemplate, locale) {
+    var en = String(englishTemplate || "").trim();
+    var loc = String(localeTemplate || "").trim();
+    if (!en || !loc) return loc;
+    var wantsAmount = /\{\{\s*amount\s*\}\}/i.test(en);
+    var wantsDiscount = /\{\{\s*discount\s*\}\}/i.test(en);
+    if (wantsAmount && !wantsDiscount && /\{\{\s*discount\s*\}\}/i.test(loc) && !/\{\{\s*amount\s*\}\}/i.test(loc)) {
+      return loc.replace(/\{\{\s*discount\s*\}\}/gi, "{{ amount }}");
+    }
+    if (wantsDiscount && !wantsAmount && /\{\{\s*amount\s*\}\}/i.test(loc) && !/\{\{\s*discount\s*\}\}/i.test(loc)) {
+      return loc.replace(/\{\{\s*amount\s*\}\}/gi, "{{ discount }}");
+    }
+    return loc;
+  }
+
   function resolveCartBadgeTemplates() {
     var locale = resolveStorefrontLocale(null) || "en";
     var fromWindow = offrefyNs().cartBadgeTemplates;
@@ -706,6 +732,10 @@
 
     var transMap = offrefyNs().storefrontTranslations || {};
     var entry = transMap[locale] || {};
+    var enCart =
+      transMap.en &&
+      transMap.en.transCartDiscount &&
+      String(transMap.en.transCartDiscount).trim();
     var preset = CART_BADGE_JS_FALLBACKS[locale];
     var discount =
       entry.transCartDiscount && String(entry.transCartDiscount).trim()
@@ -713,6 +743,9 @@
         : preset && preset.discount
           ? preset.discount
           : "{{ discount }} OFF";
+    if (locale !== "en" && enCart) {
+      discount = adaptCartBadgeTemplateForLocale(enCart, discount, locale);
+    }
     var qty =
       entry.transCartDiscountQty && String(entry.transCartDiscountQty).trim()
         ? String(entry.transCartDiscountQty).trim()
@@ -759,12 +792,23 @@
     return templates;
   }
 
-  function formatLocalizedCartBadgeLabel(percent, qty) {
+  function formatLocalizedCartBadgeLabel(percent, qty, amountLabel) {
     var templates = resolveCartBadgeTemplates();
-    var core = String(templates.discount || "{{ discount }} OFF").replace(
-      /\{\{\s*discount\s*\}\}/gi,
-      String(percent) + "%",
-    );
+    var core = String(templates.discount || "{{ discount }} OFF");
+    var hasAmountPh = /\{\{\s*amount\s*\}\}/i.test(core);
+    var hasDiscountPh = /\{\{\s*discount\s*\}\}/i.test(core);
+    if (hasAmountPh && amountLabel) {
+      core = core.replace(/\{\{\s*amount\s*\}\}/gi, String(amountLabel));
+    }
+    if (hasDiscountPh && percent) {
+      core = core.replace(/\{\{\s*discount\s*\}\}/gi, String(percent) + "%");
+    }
+    core = core
+      .replace(/\{\{\s*amount\s*\}\}/gi, "")
+      .replace(/\{\{\s*discount\s*\}\}/gi, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+    if (!core) return "";
     var n = parseInt(String(qty), 10);
     if (!Number.isFinite(n) || n <= 0) return core;
     var suffix = String(templates.qty || "(qty {{ qty }})").replace(
@@ -776,9 +820,10 @@
 
   function looksLikeVolumeDiscountBadge(text) {
     var s = String(text || "").trim();
-    // Only rewrite legacy auto labels from the Discount Function
-    // (e.g. "25% OFF" / "25% OFF (qty 10)"). Never touch custom Display names.
+    // Only rewrite legacy English Function labels (e.g. "25% OFF").
+    // Never touch locale labels, money labels, or unfilled templates.
     if (s.length < 3 || s.length > 80) return false;
+    if (/\{\{/.test(s)) return false;
     return /^\d+(?:\.\d+)?%\s*OFF(?:\s*\(\s*qty\s+\d+\s*\))?$/i.test(s);
   }
 
@@ -810,7 +855,7 @@
       var parsed = parseVolumeDiscountBadgeText(text);
       if (!parsed) continue;
       var next = formatLocalizedCartBadgeLabel(parsed.percent, parsed.qty);
-      if (next !== text) node.textContent = next;
+      if (next && next !== text) node.textContent = next;
     }
   }
 
@@ -1393,7 +1438,7 @@
   }
 
   function checkoutUrlHref() {
-    return shopifyRoutesRoot() + "checkout";
+    return window.location.origin + "/checkout";
   }
 
   function dispatchCartRefresh(cart) {
@@ -1432,54 +1477,24 @@
     });
   }
 
-  function storefrontSectionsUrl() {
-    return window.location.pathname + (window.location.search || "");
-  }
-
-  function localeAwareSectionsUrl() {
-    var locale = resolveStorefrontLocale(null) || "en";
-    var path = window.location.pathname || "/";
-    var search = window.location.search || "";
-    if (locale !== "en" && !localeCodeFromPathPrefix(path)) {
-      var rootPath = shopifyRoutesRoot().replace(/^https?:\/\/[^/]+/i, "");
-      if (rootPath && rootPath !== "/" && path.indexOf(rootPath) === 0) {
-        path = path.slice(rootPath.length) || "/";
-      }
-      if (path.charAt(0) !== "/") path = "/" + path;
-      path = "/" + locale + (path === "/" ? "" : path);
-    }
-    return path + search;
-  }
-
+  /**
+   * After a language switch: never request Cart API `sections`.
+   * Themes (Valor/Dawn) intercept cart/update.js and inject section HTML; missing
+   * section keys become the literal text "undefined" in the cart title / icon bubble.
+   * Locale attr is already synced via syncCartLocaleAttribute — only repair counts + badges.
+   */
   function refreshCartDrawerForLocaleChange() {
-    var sectionIds = getThemeCartSectionsParam();
-    if (!sectionIds) {
-      scheduleCartDrawerDiscountLabelPatch();
-      return Promise.resolve(null);
-    }
-    var locale = resolveStorefrontLocale(null) || "en";
-    var attrs = {};
-    attrs[VD_CART_LOCALE_ATTR] = locale;
-    return fetch(shopifyRoutesRoot() + "cart/update.js", {
-      method: "POST",
+    return fetch(cartJsUrl(), {
       credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        attributes: attrs,
-        sections: sectionIds,
-        sections_url: localeAwareSectionsUrl(),
-      }),
+      headers: { Accept: "application/json" },
     })
       .then(function (res) {
         return res.ok ? res.json() : null;
       })
-      .then(function (body) {
-        /* Locale badge only — do not rewrite theme cart drawer HTML. */
+      .then(function (cart) {
+        if (cart) updateCartCountBubbles(cart);
         scheduleCartDrawerDiscountLabelPatch();
-        return body;
+        return cart;
       })
       .catch(function () {
         scheduleCartDrawerDiscountLabelPatch();
@@ -1487,70 +1502,10 @@
       });
   }
 
-  function findThemeCartDrawerEl() {
-    return (
-      document.querySelector("valor-cart-drawer") ||
-      document.querySelector("cart-drawer") ||
-      document.querySelector("cart-notification") ||
-      document.getElementById("CartDrawer") ||
-      document.getElementById("ValorCartDrawer") ||
-      document.querySelector("cart-drawer-component") ||
-      document.querySelector("[id*='CartDrawer']") ||
-      document.querySelector("[id*='cart-drawer']")
-    );
-  }
-
-  /** Same IDs Dawn/Valor ProductForm sends — must match renderContents / renderFromSections keys. */
-  function getThemeCartSectionIds() {
-    var ids = [];
-    var seen = Object.create(null);
-    function pushId(id) {
-      var s = String(id || "").trim();
-      if (!s || seen[s]) return;
-      seen[s] = true;
-      ids.push(s);
-    }
-    try {
-      var drawer = findThemeCartDrawerEl();
-      if (drawer && typeof drawer.getSectionsToRender === "function") {
-        drawer.getSectionsToRender().forEach(function (section) {
-          pushId(section.id || section.section);
-        });
-      }
-    } catch (e) {
-      void e;
-    }
-    /* Valor + Dawn defaults */
-    pushId("cart-drawer");
-    pushId("cart-icon-bubble");
-    /* Discover cart-related Shopify sections in the DOM */
-    try {
-      var nodes = document.querySelectorAll(
-        '[id^="shopify-section-"][id*="cart"], [id^="shopify-section-"][id*="Cart"], [id^="shopify-section-"][id*="header"]',
-      );
-      for (var i = 0; i < nodes.length; i++) {
-        var raw = String(nodes[i].id || "");
-        var sid = raw.replace(/^shopify-section-/, "");
-        if (
-          /cart|header|drawer/i.test(sid) &&
-          sid.indexOf("template--") !== 0
-        ) {
-          pushId(sid);
-        }
-      }
-    } catch (e2) {
-      void e2;
-    }
-    return ids.length ? ids : ["cart-drawer", "cart-icon-bubble"];
-  }
-
-  function getThemeCartSectionsParam() {
-    return getThemeCartSectionIds().join(",");
-  }
-
   function updateCartCountBubbles(cart) {
     var count =
       cart && typeof cart.item_count === "number" ? cart.item_count | 0 : 0;
+    var countLabel = count < 100 ? String(count) : "99+";
     try {
       var valor = document.querySelector("valor-cart-drawer");
       if (valor && typeof valor.updateCartCount === "function") {
@@ -1558,6 +1513,19 @@
       }
     } catch (eV) {
       void eV;
+    }
+    /* Repair "Votre panier (undefined)" / similar title count after a bad section inject. */
+    try {
+      var titleEls = document.querySelectorAll(
+        "cart-drawer .drawer__heading, cart-drawer .cart-drawer__heading, cart-drawer h2, valor-cart-drawer h2, #CartDrawer h2, [data-cart-title]",
+      );
+      for (var ti = 0; ti < titleEls.length; ti++) {
+        var titleText = String(titleEls[ti].textContent || "");
+        if (titleText.indexOf("undefined") === -1) continue;
+        titleEls[ti].textContent = titleText.replace(/\bundefined\b/g, countLabel);
+      }
+    } catch (eTitle) {
+      void eTitle;
     }
     /* Valor header badge */
     try {
@@ -1573,7 +1541,7 @@
             if (hiddenText) cartLink.insertBefore(bubble, hiddenText);
             else cartLink.appendChild(bubble);
           }
-          bubble.textContent = count < 100 ? String(count) : "";
+          bubble.textContent = countLabel;
         } else if (bubble) {
           bubble.remove();
         }
@@ -1587,13 +1555,34 @@
     } catch (eValorBadge) {
       void eValorBadge;
     }
-    /* Dawn-style bubbles */
+    /* Dawn-style bubbles + stray "undefined" near the cart icon */
     try {
       var dawnBubbles = document.querySelectorAll(
-        ".cart-count-bubble span[aria-hidden='true'], .cart-count-bubble span:not(.visually-hidden), [data-cart-count], .header__icon--cart .cart-count",
+        ".cart-count-bubble span[aria-hidden='true'], .cart-count-bubble span:not(.visually-hidden), [data-cart-count], .header__icon--cart .cart-count, .valor-cart-count",
       );
       for (var i = 0; i < dawnBubbles.length; i++) {
-        dawnBubbles[i].textContent = count > 0 ? String(count) : "";
+        if (count > 0) {
+          dawnBubbles[i].textContent = countLabel;
+        } else {
+          dawnBubbles[i].textContent = "";
+        }
+      }
+      /* Loose text nodes / spans the theme left as the word undefined */
+      var loose = document.querySelectorAll(
+        ".valor-header__cart, .header__icon--cart, #cart-icon-bubble",
+      );
+      for (var li = 0; li < loose.length; li++) {
+        var walker = document.createTreeWalker(
+          loose[li],
+          NodeFilter.SHOW_TEXT,
+          null,
+        );
+        var node;
+        while ((node = walker.nextNode())) {
+          if (String(node.textContent || "").trim() === "undefined") {
+            node.textContent = count > 0 ? countLabel : "";
+          }
+        }
       }
     } catch (eDawn) {
       void eDawn;
@@ -1766,6 +1755,829 @@
     );
   }
 
+  function isOffrefyOwnedNode(el) {
+    if (!el || !el.closest) return false;
+    return !!(
+      el.closest("[data-offrefy-root]") ||
+      el.closest(".offrefy-liquid-product-form") ||
+      el.closest("[data-offrefy-liquid-product-form]") ||
+      el.classList.contains("offrefy-cta") ||
+      el.classList.contains("offrefy-liquid-submit")
+    );
+  }
+
+  function themeCartAddForms() {
+    var forms = document.querySelectorAll('form[action*="/cart/add"]');
+    var out = [];
+    for (var i = 0; i < forms.length; i++) {
+      if (isOffrefyOwnedNode(forms[i])) continue;
+      out.push(forms[i]);
+    }
+    return out;
+  }
+
+  function markThemeHidden(el) {
+    if (!el || isOffrefyOwnedNode(el)) return;
+    if (el.getAttribute("data-offrefy-theme-hidden") === "1") return;
+    el.setAttribute("data-offrefy-theme-hidden", "1");
+    el.style.setProperty("display", "none", "important");
+  }
+
+  function clearThemeHidden(scope) {
+    var root = scope || document;
+    var nodes = root.querySelectorAll
+      ? root.querySelectorAll("[data-offrefy-theme-hidden='1']")
+      : [];
+    for (var i = 0; i < nodes.length; i++) {
+      nodes[i].style.removeProperty("display");
+      nodes[i].removeAttribute("data-offrefy-theme-hidden");
+    }
+  }
+
+  function collectThemeAtcButtons(form) {
+    var found = [];
+    function add(el) {
+      if (!el || isOffrefyOwnedNode(el)) return;
+      if (el.closest && el.closest(".shopify-payment-button")) return;
+      if (el.closest && el.closest("shopify-accelerated-checkout")) return;
+      if (el.getAttribute && el.getAttribute("name") === "checkout") return;
+      for (var s = 0; s < found.length; s++) {
+        if (found[s] === el) return;
+      }
+      found.push(el);
+    }
+    var sels = [
+      'button[type="submit"][name="add"]',
+      'button[name="add"]',
+      'input[type="submit"][name="add"]',
+      "button.product-form__submit",
+      "button.product-form__cart-submit",
+      "[data-add-to-cart]",
+      "[data-add-button]",
+      ".add-to-cart",
+      ".product-form__buttons > button[type='submit']",
+    ];
+    for (var i = 0; i < sels.length; i++) {
+      var list = form.querySelectorAll(sels[i]);
+      for (var j = 0; j < list.length; j++) add(list[j]);
+    }
+    var primary = findThemeCartAddSubmitButton(form);
+    if (primary) add(primary);
+    return found;
+  }
+
+  function themeProductScopes() {
+    var scopes = [];
+    function addScope(el) {
+      if (!el || isOffrefyOwnedNode(el)) return;
+      for (var i = 0; i < scopes.length; i++) {
+        if (scopes[i] === el) return;
+      }
+      scopes.push(el);
+    }
+    var forms = themeCartAddForms();
+    for (var f = 0; f < forms.length; f++) {
+      addScope(forms[f]);
+      addScope(
+        forms[f].closest("product-info") ||
+          forms[f].closest("[data-product-info]") ||
+          forms[f].closest(".product__info-container") ||
+          forms[f].closest(".product__info-wrapper") ||
+          forms[f].closest(".product-information") ||
+          forms[f].closest(".product-details") ||
+          forms[f].closest(".product-single") ||
+          forms[f].closest(".product") ||
+          forms[f].closest(".shopify-section") ||
+          forms[f].parentElement,
+      );
+    }
+    var extras = document.querySelectorAll(
+      "product-info, .shopify-section--main-product, [data-product-info], .product__info-container, .product-information",
+    );
+    for (var e = 0; e < extras.length; e++) addScope(extras[e]);
+    return scopes;
+  }
+
+  /**
+   * Hide every theme variant picker pattern (Dawn pills, selects, Horizon, Craft…).
+   * Scopes product-info / main product — variants are often outside the cart form.
+   */
+  function hideThemeVariantPickersInScope(scope) {
+    if (!scope || !scope.querySelectorAll) return;
+    var blockSels = [
+      "variant-selects",
+      "variant-radios",
+      "variant-picker",
+      "product-variant-picker",
+      "product-form-variant-picker",
+      "[data-variant-picker]",
+      "[data-product-options]",
+      "[data-option-selector]",
+      ".product-form__variants",
+      ".product__variants",
+      ".product-variants",
+      ".variant-wrapper",
+      ".variant-input-wrapper",
+      ".product-form__option",
+      ".product__option",
+      ".swatch-attribute",
+      ".product-block-variant-picker",
+    ];
+    for (var i = 0; i < blockSels.length; i++) {
+      try {
+        var blocks = scope.querySelectorAll(blockSels[i]);
+        for (var j = 0; j < blocks.length; j++) {
+          if (isOffrefyOwnedNode(blocks[j])) continue;
+          markThemeHidden(blocks[j]);
+        }
+      } catch (eBlock) {
+        void eBlock;
+      }
+    }
+
+    var optionNodes = scope.querySelectorAll(
+      'input[type="radio"][name^="options"],' +
+        'input[type="radio"][name^="option"],' +
+        'select[name^="options"],' +
+        'select[name^="option"],' +
+        'input[name^="options["]',
+    );
+    for (var oi = 0; oi < optionNodes.length; oi++) {
+      var node = optionNodes[oi];
+      if (isOffrefyOwnedNode(node)) continue;
+      var wrap =
+        (node.closest &&
+          (node.closest("fieldset") ||
+            node.closest("variant-radios") ||
+            node.closest("variant-selects") ||
+            node.closest("variant-picker") ||
+            node.closest(".product-form__input") ||
+            node.closest(".product-form__option") ||
+            node.closest(".product__option") ||
+            node.closest("[data-option-index]") ||
+            node.closest(".variant-input-wrapper") ||
+            node.closest(".variant-wrapper") ||
+            node.closest(".swatch") ||
+            node.closest("ul"))) ||
+        node.parentElement;
+      if (wrap && !isOffrefyOwnedNode(wrap)) markThemeHidden(wrap);
+    }
+
+    /* Label/legend-only rows some themes leave behind */
+    try {
+      var fieldsets = scope.querySelectorAll("fieldset.product-form__input, .product-form__input");
+      for (var fi = 0; fi < fieldsets.length; fi++) {
+        var fs = fieldsets[fi];
+        if (isOffrefyOwnedNode(fs)) continue;
+        if (
+          fs.querySelector(
+            'input[name^="options"], select[name^="options"], input[name^="option"], select[name^="option"]',
+          )
+        ) {
+          markThemeHidden(fs);
+        }
+      }
+    } catch (eFs) {
+      void eFs;
+    }
+  }
+
+  /**
+   * Hide theme quantity steppers + “Quantity” label / full section (Dawn, Horizon…).
+   * Often outside /cart/add form — scan product-info scopes.
+   */
+  function hideThemeQuantityInScope(scope) {
+    if (!scope || !scope.querySelectorAll) return;
+
+    function inCartChrome(el) {
+      return !!(
+        el &&
+        el.closest &&
+        (el.closest("cart-drawer") ||
+          el.closest("cart-items") ||
+          el.closest("[id*='CartDrawer']") ||
+          el.closest(".cart__items") ||
+          el.closest("cart-notification"))
+      );
+    }
+
+    function hideQtySectionFrom(el) {
+      if (!el || isOffrefyOwnedNode(el) || inCartChrome(el)) return;
+      var section = null;
+      try {
+        section =
+          (el.closest &&
+            (el.closest(".product-form__quantity") ||
+              el.closest("[data-quantity-wrapper]") ||
+              el.closest(".ProductForm__QuantitySelector") ||
+              el.closest(".product-form__input.product-form__quantity"))) ||
+          null;
+      } catch (eSec) {
+        void eSec;
+      }
+      if (!section && el.closest) {
+        try {
+          section =
+            el.closest(".product-form__input:has(quantity-input)") ||
+            el.closest(".product-form__input:has(.quantity)") ||
+            el.closest(".product-form__input:has(input[name='quantity'])") ||
+            null;
+        } catch (eHas) {
+          void eHas;
+        }
+      }
+      if (section && !isOffrefyOwnedNode(section)) {
+        markThemeHidden(section);
+        return;
+      }
+      /* Label + stepper as siblings — hide label and nearest qty control parent */
+      markThemeHidden(el);
+      if (el.tagName === "LABEL" || (el.classList && el.classList.contains("quantity__label"))) {
+        var sib =
+          el.nextElementSibling ||
+          (el.parentElement && el.parentElement.querySelector(
+            "quantity-input, quantity-selector, .quantity, .product-form__quantity",
+          ));
+        if (sib && !isOffrefyOwnedNode(sib) && !inCartChrome(sib)) {
+          var sibWrap =
+            (sib.closest &&
+              (sib.closest(".product-form__quantity") ||
+                sib.closest(".product-form__input") ||
+                sib.closest(".quantity"))) ||
+            sib;
+          markThemeHidden(sibWrap);
+        }
+        if (el.parentElement && !isOffrefyOwnedNode(el.parentElement)) {
+          var kids = el.parentElement.children;
+          var onlyQty = true;
+          for (var k = 0; k < kids.length; k++) {
+            var c = kids[k];
+            if (c === el) continue;
+            if (
+              c.matches &&
+              (c.matches("quantity-input") ||
+                c.matches("quantity-selector") ||
+                c.matches(".quantity") ||
+                c.matches(".price-per-item__container") ||
+                (c.querySelector &&
+                  c.querySelector(
+                    "quantity-input, .quantity__button, input[name='quantity']",
+                  )))
+            ) {
+              markThemeHidden(c);
+              continue;
+            }
+            onlyQty = false;
+          }
+          if (onlyQty || el.parentElement.classList.contains("product-form__input")) {
+            markThemeHidden(el.parentElement);
+          }
+        }
+      }
+    }
+
+    var blockSels = [
+      "quantity-input",
+      "quantity-selector",
+      "quantity-popover",
+      ".product-form__quantity",
+      "[data-quantity-input]",
+      "[data-quantity-selector]",
+      ".product-form__input.product-form__quantity",
+      ".price-per-item__container",
+    ];
+    for (var i = 0; i < blockSels.length; i++) {
+      try {
+        var blocks = scope.querySelectorAll(blockSels[i]);
+        for (var j = 0; j < blocks.length; j++) {
+          if (isOffrefyOwnedNode(blocks[j]) || inCartChrome(blocks[j])) continue;
+          hideQtySectionFrom(blocks[j]);
+        }
+      } catch (eQty) {
+        void eQty;
+      }
+    }
+
+    /* Explicit Quantity labels (left behind when only the stepper was hidden) */
+    var labelSels = [
+      "label.quantity__label",
+      ".quantity__label",
+      "label[for*='Quantity']",
+      "label[for*='quantity']",
+      ".product-form__quantity .form__label",
+      ".product-form__quantity label",
+    ];
+    for (var li = 0; li < labelSels.length; li++) {
+      try {
+        var labs = scope.querySelectorAll(labelSels[li]);
+        for (var lj = 0; lj < labs.length; lj++) {
+          if (isOffrefyOwnedNode(labs[lj]) || inCartChrome(labs[lj])) continue;
+          hideQtySectionFrom(labs[lj]);
+        }
+      } catch (eLab) {
+        void eLab;
+      }
+    }
+
+    /* Fallback: leftover “Quantity” label text after stepper was hidden */
+    try {
+      var formLabels = scope.querySelectorAll(
+        "label, .form__label, .quantity__label, span.form__label, p.form__label, .ProductForm__Label, [class*='quantity'] label, [class*='Quantity'] label",
+      );
+      for (var fl = 0; fl < formLabels.length; fl++) {
+        var lab = formLabels[fl];
+        if (isOffrefyOwnedNode(lab) || inCartChrome(lab)) continue;
+        var txt = String(lab.textContent || "")
+          .replace(/\s+/g, " ")
+          .trim()
+          .toLowerCase();
+        /* Keep short — avoid matching long product copy */
+        if (!txt || txt.length > 40) continue;
+        var looksQty =
+          txt === "quantity" ||
+          txt.indexOf("quantity") === 0 ||
+          txt === "quantité" ||
+          txt.indexOf("quantité") === 0 ||
+          txt === "anzahl" ||
+          txt === "menge" ||
+          txt.indexOf("cantidad") === 0 ||
+          txt.indexOf("quantità") === 0 ||
+          txt.indexOf("hoeveelheid") === 0 ||
+          txt === "qty" ||
+          txt === "qty.";
+        if (!looksQty) continue;
+        hideQtySectionFrom(lab);
+      }
+    } catch (eFormLab) {
+      void eFormLab;
+    }
+
+    /*
+     * Orphan text nodes / bare elements: theme hid the stepper via our earlier pass
+     * but left a lone “Quantity” line (common when label is a sibling, not inside
+     * quantity-input).
+     */
+    try {
+      var orphans = scope.querySelectorAll(
+        "label, span, p, div, legend, dt, strong, small",
+      );
+      for (var oi = 0; oi < orphans.length; oi++) {
+        var orphan = orphans[oi];
+        if (isOffrefyOwnedNode(orphan) || inCartChrome(orphan)) continue;
+        if (orphan.getAttribute && orphan.getAttribute("data-offrefy-theme-hidden") === "1") {
+          continue;
+        }
+        /* Only leaf-ish nodes (no nested product blocks) */
+        if (orphan.children && orphan.children.length > 2) continue;
+        if (
+          orphan.querySelector &&
+          orphan.querySelector(
+            "img, video, iframe, form, product-info, .product__title, h1, h2",
+          )
+        ) {
+          continue;
+        }
+        var oTxt = String(orphan.textContent || "")
+          .replace(/\s+/g, " ")
+          .trim()
+          .toLowerCase();
+        if (
+          oTxt !== "quantity" &&
+          oTxt !== "quantité" &&
+          oTxt !== "anzahl" &&
+          oTxt !== "menge" &&
+          oTxt !== "cantidad" &&
+          oTxt !== "quantità" &&
+          oTxt !== "hoeveelheid" &&
+          oTxt !== "qty" &&
+          oTxt !== "qty."
+        ) {
+          continue;
+        }
+        hideQtySectionFrom(orphan);
+      }
+    } catch (eOrphan) {
+      void eOrphan;
+    }
+
+    var qtyInputs = scope.querySelectorAll(
+      'input[name="quantity"]:not([type="hidden"]), input.quantity__input',
+    );
+    for (var qi = 0; qi < qtyInputs.length; qi++) {
+      var inp = qtyInputs[qi];
+      if (isOffrefyOwnedNode(inp) || inCartChrome(inp)) continue;
+      if (inp.getAttribute && inp.getAttribute("data-offrefy-qty-inject") === "1") {
+        continue;
+      }
+      if (inp.getAttribute && inp.getAttribute("data-offrefy-liquid-qty") != null) {
+        continue;
+      }
+      hideQtySectionFrom(inp);
+    }
+
+    try {
+      var steppers = scope.querySelectorAll(
+        ".quantity:has(.quantity__button), .quantity:has(.quantity__input), quantity-input.quantity",
+      );
+      for (var si = 0; si < steppers.length; si++) {
+        if (isOffrefyOwnedNode(steppers[si]) || inCartChrome(steppers[si])) continue;
+        hideQtySectionFrom(steppers[si]);
+      }
+    } catch (eStep) {
+      var steppers2 = scope.querySelectorAll("quantity-input, div.quantity, .quantity");
+      for (var s2 = 0; s2 < steppers2.length; s2++) {
+        if (isOffrefyOwnedNode(steppers2[s2]) || inCartChrome(steppers2[s2])) continue;
+        if (
+          steppers2[s2].querySelector &&
+          (steppers2[s2].querySelector(".quantity__button") ||
+            steppers2[s2].querySelector(".quantity__input") ||
+            steppers2[s2].querySelector('input[name="quantity"]') ||
+            steppers2[s2].tagName === "QUANTITY-INPUT")
+        ) {
+          hideQtySectionFrom(steppers2[s2]);
+        }
+      }
+      void eStep;
+    }
+  }
+
+  /**
+   * Hide theme product price (+ SKU when adjacent) across OS 2.0 themes.
+   * Scopes product info, walks siblings near the Offrefy widget, and matches
+   * money/SKU text when themes omit Dawn’s `.price` classes.
+   */
+  function hideThemePriceInScope(scope) {
+    if (!scope || !scope.querySelectorAll) return;
+
+    function inCartChrome(el) {
+      return !!(
+        el &&
+        el.closest &&
+        (el.closest("cart-drawer") ||
+          el.closest("cart-items") ||
+          el.closest("[id*='CartDrawer']") ||
+          el.closest(".cart__items") ||
+          el.closest("cart-notification") ||
+          el.closest(".cart-item") ||
+          el.closest("mini-cart") ||
+          el.closest("cart-drawer-items") ||
+          el.closest(".predictive-search") ||
+          el.closest("product-recommendations") ||
+          el.closest(".product-recommendations") ||
+          el.closest(".related-products") ||
+          el.closest(".complementary-products") ||
+          el.closest("[id*='product-recommendations']") ||
+          el.closest(".card-wrapper") ||
+          el.closest(".product-card") ||
+          el.closest("li.grid__item"))
+      );
+    }
+
+    function isMoneyText(raw) {
+      var t = String(raw || "")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!t || t.length > 48) return false;
+      /* $1.50 | €12,99 | 1,50 € | £9.99 | 1.50 USD | CAD $1.50 */
+      return (
+        /^[\$€£¥₹]\s?\d/.test(t) ||
+        /^\d{1,6}([.,]\d{2})?\s?[\$€£¥₹]/.test(t) ||
+        /^\d{1,6}[.,]\d{2}\s*(usd|eur|gbp|cad|aud|chf)?$/i.test(t) ||
+        /^(usd|eur|gbp|cad|aud)\s*[\$€£]?\s*\d/i.test(t)
+      );
+    }
+
+    function isSkuText(raw) {
+      var t = String(raw || "")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!t || t.length > 64) return false;
+      return /^(sku|ref|réf|reference|référence|artikel|art\.?\s*nr)\s*[:.#]?\s*\S+/i.test(
+        t,
+      );
+    }
+
+    function looksLikePriceOrSkuBlock(el) {
+      if (!el || isOffrefyOwnedNode(el) || inCartChrome(el)) return false;
+      if (el.matches) {
+        if (
+          el.matches(
+            "[id^='price-'], .price, .product__price, .product-price, .product-single__price, .product-info__price, .price-wrapper, .price__container, .money, [data-product-price], [data-price], [itemprop='price'], [itemprop='offers'], .product__sku, .product-sku, .sku, [itemprop='sku'], .product-meta__sku, .product-block--price, .product-block-price, .product-form__price, sale-price, product-price",
+          )
+        ) {
+          return true;
+        }
+      }
+      var txt = String(el.textContent || "")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!txt || txt.length > 80) return false;
+      if (isMoneyText(txt) || isSkuText(txt)) return true;
+      /* price + sku only in one wrapper */
+      if (txt.length <= 80) {
+        var lines = txt.split(/(?=\bSKU\b|\bRef\b)/i);
+        if (lines.length >= 1) {
+          var moneyish = false;
+          var skuish = false;
+          for (var li = 0; li < lines.length; li++) {
+            var part = lines[li].trim();
+            if (isMoneyText(part)) moneyish = true;
+            if (isSkuText(part)) skuish = true;
+          }
+          if (moneyish && (skuish || lines.length === 1)) return true;
+        }
+      }
+      return false;
+    }
+
+    function hidePriceNode(el) {
+      if (!el || isOffrefyOwnedNode(el) || inCartChrome(el)) return;
+      var wrap =
+        (el.closest &&
+          (el.closest("[id^='price-']") ||
+            el.closest("[itemprop='offers']") ||
+            el.closest(".product__price") ||
+            el.closest(".product-price") ||
+            el.closest(".product-single__price") ||
+            el.closest(".product-info__price") ||
+            el.closest(".ProductMeta__PriceList") ||
+            el.closest(".price-wrapper") ||
+            el.closest(".product-block--price") ||
+            el.closest(".product-block-price") ||
+            el.closest(".price__container") ||
+            el.closest(".price"))) ||
+        el;
+      if (wrap && !isOffrefyOwnedNode(wrap) && !inCartChrome(wrap)) {
+        markThemeHidden(wrap);
+        /* Hide adjacent SKU sibling under the same parent */
+        var parent = wrap.parentElement;
+        if (parent && parent.children) {
+          for (var ci = 0; ci < parent.children.length; ci++) {
+            var ch = parent.children[ci];
+            if (ch === wrap || isOffrefyOwnedNode(ch) || inCartChrome(ch)) continue;
+            if (looksLikePriceOrSkuBlock(ch)) markThemeHidden(ch);
+          }
+        }
+      }
+    }
+
+    var priceSels = [
+      "[id^='price-']",
+      "[itemprop='offers']",
+      "[itemprop='price']",
+      ".product__price",
+      ".product-price",
+      ".product-single__price",
+      ".product-info__price",
+      ".product__info-container > .price",
+      ".price--large",
+      ".price--on-sale",
+      ".price--sold-out",
+      ".price__container",
+      ".price-item--regular",
+      ".price-item--sale",
+      ".price-item",
+      ".ProductMeta__Price",
+      ".ProductMeta__PriceList",
+      ".price-wrapper",
+      "[data-product-price]",
+      "[data-price]",
+      "[data-product-price-wrapper]",
+      "sale-price",
+      "product-price",
+      ".product-block-price",
+      ".product-block--price",
+      ".product-form__price",
+      ".product__current-price",
+      ".current-price",
+      ".product-pricing",
+      ".price .money",
+      ".money",
+      ".product__sku",
+      ".product-sku",
+      ".sku",
+      "[itemprop='sku']",
+      ".product-meta__sku",
+      ".product-block--sku",
+      ".product-block-sku",
+      ".product__reference",
+    ];
+    for (var i = 0; i < priceSels.length; i++) {
+      try {
+        var nodes = scope.querySelectorAll(priceSels[i]);
+        for (var j = 0; j < nodes.length; j++) {
+          hidePriceNode(nodes[j]);
+        }
+      } catch (ePrice) {
+        void ePrice;
+      }
+    }
+
+    try {
+      var prices = scope.querySelectorAll(".price");
+      for (var pi = 0; pi < prices.length; pi++) {
+        var pEl = prices[pi];
+        if (isOffrefyOwnedNode(pEl) || inCartChrome(pEl)) continue;
+        if (
+          pEl.querySelector &&
+          (pEl.querySelector(".price-item") ||
+            pEl.querySelector(".price__container") ||
+            pEl.querySelector(".price__regular") ||
+            pEl.querySelector(".price__sale") ||
+            pEl.querySelector(".money") ||
+            isMoneyText(pEl.textContent))
+        ) {
+          hidePriceNode(pEl);
+        }
+      }
+    } catch (eDawn) {
+      void eDawn;
+    }
+
+    /* Leaf / near-leaf nodes whose entire text is a price or SKU line */
+    try {
+      var candidates = scope.querySelectorAll(
+        "div, span, p, strong, b, em, small, h1, h2, h3, h4, h5, h6, dd, dt, li",
+      );
+      for (var oi = 0; oi < candidates.length; oi++) {
+        var node = candidates[oi];
+        if (isOffrefyOwnedNode(node) || inCartChrome(node)) continue;
+        if (node.children && node.children.length > 4) continue;
+        if (
+          node.querySelector &&
+          node.querySelector(
+            "img, video, iframe, form, input, button, a[href], nav, ul, ol, table",
+          )
+        ) {
+          continue;
+        }
+        var nTxt = String(node.textContent || "")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (!nTxt || nTxt.length > 64) continue;
+        if (isMoneyText(nTxt) || isSkuText(nTxt)) {
+          hidePriceNode(node);
+        }
+      }
+    } catch (eLeaf) {
+      void eLeaf;
+    }
+  }
+
+  /** Product + widget-neighbor scopes so price blocks outside the cart form still hide. */
+  function themePriceHideScopes() {
+    var scopes = themeProductScopes();
+    function add(el) {
+      if (!el || isOffrefyOwnedNode(el)) return;
+      for (var i = 0; i < scopes.length; i++) {
+        if (scopes[i] === el) return;
+      }
+      scopes.push(el);
+    }
+    var roots = document.querySelectorAll("[data-offrefy-root]");
+    for (var r = 0; r < roots.length; r++) {
+      var root = roots[r];
+      add(
+        root.closest("product-info") ||
+          root.closest("[data-product-info]") ||
+          root.closest(".product__info-container") ||
+          root.closest(".product__info-wrapper") ||
+          root.closest(".product-information") ||
+          root.closest(".product-details") ||
+          root.closest(".product-single") ||
+          root.closest(".product") ||
+          root.closest(".shopify-section") ||
+          root.parentElement,
+      );
+      /* App block wrapper + following siblings (price/SKU often sit right under the widget) */
+      var block =
+        root.closest(".shopify-block") ||
+        root.closest("[id^='shopify-block']") ||
+        root.parentElement;
+      if (block) {
+        add(block.parentElement || block);
+        var sib = block.nextElementSibling;
+        var guard = 0;
+        while (sib && guard < 8) {
+          var st = String(sib.textContent || "")
+            .replace(/\s+/g, " ")
+            .trim();
+          var onlyPriceSku =
+            st.length > 0 &&
+            st.length <= 120 &&
+            !sib.querySelector(
+              "form, [data-offrefy-root], .product__description, .product-description, rte, .rte",
+            );
+          if (
+            onlyPriceSku &&
+            (/[\$€£¥₹]|\d[.,]\d{2}|sku\s*:|ref\s*:/i.test(st) ||
+              (sib.matches &&
+                sib.matches(
+                  ".price, .product__price, .product-price, .money, .sku, .product__sku, [id^='price-']",
+                )))
+          ) {
+            if (!isOffrefyOwnedNode(sib)) markThemeHidden(sib);
+            sib = sib.nextElementSibling;
+            guard += 1;
+            continue;
+          }
+          break;
+        }
+      }
+    }
+    add(document.querySelector("main"));
+    add(document.getElementById("MainContent"));
+    add(document.getElementById("main-content"));
+    add(document.querySelector(".main-content"));
+    return scopes;
+  }
+
+  /**
+   * Apply Theme product form hide options on real theme markup (all OS 2.0 themes).
+   * CSS data-attrs are a backup; direct display:none is the reliable path.
+   * opts.clearWhenOff: only then remove html flags (avoid wiping Liquid early flags
+   * during preview/default paint before real campaign config loads).
+   */
+  function applyThemeFormVisibility(ui, opts) {
+    opts = opts || {};
+    var clearWhenOff = opts.clearWhenOff === true;
+    var hideAtc = !!(ui && ui.hideThemeAddToCart === true);
+    var hideBin = !!(ui && ui.hideThemeBuyItNow === true);
+    var hideVar = !!(ui && ui.hideThemeVariantSelector === true);
+    var hideQty = !!(ui && ui.hideThemeQuantitySelector === true);
+    var hidePrice = !!(ui && ui.hideThemePrice === true);
+
+    try {
+      var html = document.documentElement;
+      if (hideAtc) html.setAttribute("data-offrefy-hide-theme-atc", "1");
+      else if (clearWhenOff) html.removeAttribute("data-offrefy-hide-theme-atc");
+      if (hideBin) html.setAttribute("data-offrefy-hide-theme-bin", "1");
+      else if (clearWhenOff) html.removeAttribute("data-offrefy-hide-theme-bin");
+      if (hideVar) html.setAttribute("data-offrefy-hide-theme-variant", "1");
+      else if (clearWhenOff) html.removeAttribute("data-offrefy-hide-theme-variant");
+      if (hideQty) html.setAttribute("data-offrefy-hide-theme-qty", "1");
+      else if (clearWhenOff) html.removeAttribute("data-offrefy-hide-theme-qty");
+      if (hidePrice) html.setAttribute("data-offrefy-hide-theme-price", "1");
+      else if (clearWhenOff) html.removeAttribute("data-offrefy-hide-theme-price");
+
+      /* Keep Liquid early flags active until a real campaign clears them. */
+      if (html.getAttribute("data-offrefy-hide-theme-atc") === "1") hideAtc = true;
+      if (html.getAttribute("data-offrefy-hide-theme-bin") === "1") hideBin = true;
+      if (html.getAttribute("data-offrefy-hide-theme-variant") === "1") hideVar = true;
+      if (html.getAttribute("data-offrefy-hide-theme-qty") === "1") hideQty = true;
+      if (html.getAttribute("data-offrefy-hide-theme-price") === "1") hidePrice = true;
+    } catch (eAttr) {
+      void eAttr;
+    }
+
+    clearThemeHidden(document);
+
+    if (!hideAtc && !hideBin && !hideVar && !hideQty && !hidePrice) return;
+
+    var scopes = themeProductScopes();
+    if (hideVar || hideQty) {
+      for (var si = 0; si < scopes.length; si++) {
+        if (hideVar) hideThemeVariantPickersInScope(scopes[si]);
+        if (hideQty) hideThemeQuantityInScope(scopes[si]);
+      }
+    }
+    if (hidePrice) {
+      var priceScopes = themePriceHideScopes();
+      for (var psi = 0; psi < priceScopes.length; psi++) {
+        hideThemePriceInScope(priceScopes[psi]);
+      }
+    }
+
+    var forms = themeCartAddForms();
+    for (var fi = 0; fi < forms.length; fi++) {
+      var form = forms[fi];
+      if (hideAtc) {
+        var atcBtns = collectThemeAtcButtons(form);
+        for (var ai = 0; ai < atcBtns.length; ai++) markThemeHidden(atcBtns[ai]);
+      }
+      if (hideBin) {
+        var binSels = [
+          ".shopify-payment-button",
+          "shopify-accelerated-checkout",
+          "buy-buttons",
+          "[data-shopify='payment-button']",
+          ".shopify-payment-button__button",
+        ];
+        for (var bi = 0; bi < binSels.length; bi++) {
+          var bins = form.querySelectorAll(binSels[bi]);
+          for (var bj = 0; bj < bins.length; bj++) markThemeHidden(bins[bj]);
+        }
+        var host = form.closest("product-info") || form.parentElement;
+        if (host && host.querySelectorAll) {
+          var hostBins = host.querySelectorAll(
+            ".shopify-payment-button, shopify-accelerated-checkout, buy-buttons",
+          );
+          for (var hk = 0; hk < hostBins.length; hk++) markThemeHidden(hostBins[hk]);
+        }
+      }
+    }
+  }
+
   /**
    * Ensure theme form posts the widget qty.
    * Valor (and similar) often omit name="quantity" — inject a hidden field then.
@@ -1918,10 +2730,63 @@
     return Promise.resolve();
   }
 
+  function addVariantToCartByAjax(variantId, quantity, attribution) {
+    var id = parseInt(String(variantId), 10);
+    var qty = parseInt(String(quantity), 10) || 1;
+    if (!Number.isFinite(id) || id < 1) {
+      return Promise.reject(new Error("Invalid variant"));
+    }
+    qty = Math.min(VD_MAX_LINE_QTY, Math.max(1, qty));
+    var payload = { id: id, quantity: qty };
+    var props = offrefyCartProperties(attribution);
+    if (props) payload.properties = props;
+    return fetch(shopifyRoutesRoot() + "cart/add.js", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(payload),
+    }).then(function (res) {
+      return res
+        .json()
+        .catch(function () {
+          return null;
+        })
+        .then(function (data) {
+          if (res.ok) return data || {};
+          var msg =
+            data && data.description
+              ? String(data.description)
+              : data && data.message
+                ? String(data.message)
+                : "Cart add failed";
+          throw new Error(msg);
+        });
+    });
+  }
+
+  function checkoutPermalinkHref(variantId, quantity) {
+    var id = parseInt(String(variantId), 10);
+    var qty = parseInt(String(quantity), 10) || 1;
+    if (!Number.isFinite(id) || id < 1) return checkoutUrlHref();
+    qty = Math.min(VD_MAX_LINE_QTY, Math.max(1, qty));
+    return window.location.origin + "/cart/" + String(id) + ":" + String(qty);
+  }
+
   function addVariantToCart(variantId, quantity, action, attribution) {
     var qty = parseInt(String(quantity), 10) || 1;
     qty = Math.min(VD_MAX_LINE_QTY, Math.max(1, qty));
-    void action;
+    var act = String(action || "add_to_cart");
+    if (act === "go_to_checkout") {
+      return Promise.resolve({
+        redirectHref: checkoutPermalinkHref(variantId, qty),
+      });
+    }
+    if (act === "go_to_page") {
+      return addVariantToCartByAjax(variantId, qty, attribution);
+    }
     return addVariantToCartByThemeSubmit(variantId, qty, attribution);
   }
 
@@ -1955,10 +2820,13 @@
     );
   }
 
-  function completeAfterCartAdd(ui) {
-    var act = String(ui.ctaButtonAction || "add_to_cart_open_drawer");
+  function completeAfterCartAdd(ui, addResult) {
+    var act = String(ui.ctaButtonAction || "add_to_cart");
     if (act === "go_to_checkout") {
-      window.location.href = checkoutUrlHref();
+      window.location.href =
+        addResult && addResult.redirectHref
+          ? String(addResult.redirectHref)
+          : checkoutUrlHref();
       return Promise.resolve();
     }
     if (act === "go_to_page") {
@@ -2269,12 +3137,13 @@
     countdownTimeAmount: 1,
     countdownTimeUnit: "days",
     ctaLabel: "Grab this deal",
-    ctaButtonAction: "add_to_cart_open_drawer",
+    ctaButtonAction: "add_to_cart",
     ctaButtonPageUrl: "",
     hideThemeAddToCart: false,
     hideThemeBuyItNow: false,
     hideThemeVariantSelector: false,
     hideThemeQuantitySelector: false,
+    hideThemePrice: false,
     hideWidgetVariantSelector: false,
     hideOutOfStockVariants: false,
     hideWidgetQuantitySelector: false,
@@ -2294,9 +3163,12 @@
     volumeTablePriceColPaddingStartPx: 10,
     volumeTablePriceColPaddingEndPx: 12,
     badgePosition: "after_label",
+    badgeDesign: "pill",
     badgeBackgroundColor: "#6b1d1e",
     badgeTextColor: "#ffffff",
     badgeSizeScalePercent: 100,
+    appearanceTemplateId: "classic_burgundy",
+    appearanceDecorThemeId: "classic_burgundy",
     footnote: "Pick a tier to set quantity, then add to cart.",
     transQty: "Qty",
     transDiscount: "Discount",
@@ -2570,6 +3442,24 @@
     var cdAmt = Math.floor(Number(d.countdownTimeAmount));
     d.countdownTimeAmount =
       !Number.isFinite(cdAmt) || cdAmt < 1 ? 1 : Math.min(9999, cdAmt);
+    /* Normalize legacy Christmas template ids */
+    var themeRaw = String(d.appearanceTemplateId || "").trim();
+    var themeLegacy = {
+      christmas_holly: "christmas_holly_bow",
+      christmas_snow: "christmas_snowflake",
+      christmas_gold: "christmas_santa_sleigh",
+      christmas_candy: "christmas_candy_cane",
+      christmas_evergreen: "christmas_gift_wrap",
+      christmas_crimson: "christmas_santa_sleigh",
+    };
+    if (themeLegacy[themeRaw]) themeRaw = themeLegacy[themeRaw];
+    d.appearanceTemplateId = themeRaw || "classic_burgundy";
+    var decorRaw = String(d.appearanceDecorThemeId || "").trim();
+    if (themeLegacy[decorRaw]) decorRaw = themeLegacy[decorRaw];
+    if (!decorRaw && d.appearanceTemplateId && d.appearanceTemplateId !== "custom") {
+      decorRaw = d.appearanceTemplateId;
+    }
+    d.appearanceDecorThemeId = decorRaw;
     return d;
   }
 
@@ -2596,6 +3486,16 @@
     root.removeAttribute("data-offrefy-font-scale");
     if (d.fontScale === "compact") root.setAttribute("data-offrefy-font-scale", "compact");
     else if (d.fontScale === "comfortable") root.setAttribute("data-offrefy-font-scale", "comfortable");
+
+    /* Seasonal / appearance template decorations (Christmas candy cane, etc.) */
+    root.removeAttribute("data-offrefy-theme");
+    var themeId = String(d.appearanceTemplateId || "").trim();
+    if (!themeId || themeId === "custom") {
+      themeId = String(d.appearanceDecorThemeId || "").trim();
+    }
+    if (themeId && themeId !== "custom") {
+      root.setAttribute("data-offrefy-theme", themeId);
+    }
 
     applyWidgetHeaderDisplayToRoot(root, d);
 
@@ -2745,23 +3645,28 @@
     applyVolumeDiscountCustomCss(root, d.customCss);
 
     var h = String(d.widgetHeading || "").trim();
-    var ctaAct = String(d.ctaButtonAction || "add_to_cart_open_drawer");
+    var ctaAct = String(d.ctaButtonAction || "add_to_cart");
     if (
       ctaAct !== "add_to_cart" &&
       ctaAct !== "add_to_cart_open_drawer" &&
       ctaAct !== "go_to_checkout" &&
       ctaAct !== "go_to_page"
     ) {
-      ctaAct = "add_to_cart_open_drawer";
+      ctaAct = "add_to_cart";
     }
     var pres = String(d.widgetPresentation || "").trim();
     return {
       title: h,
       widgetPresentation: pres === "volume_table" ? "volume_table" : "tier_cards",
-      showCountdown: d.showCountdown === true,
+      showCountdown: d.showCountdown === true || d.showCountdown === 1 || d.showCountdown === "true",
       countdownLabel: String(d.countdownLabel || WD_DEFAULT.countdownLabel).trim() ||
         WD_DEFAULT.countdownLabel,
       countdownTimeUnit: pickCountdownTimeUnit(d.countdownTimeUnit),
+      countdownTimeAmount: (function () {
+        var amt = Math.floor(Number(d.countdownTimeAmount));
+        if (!isFinite(amt) || amt < 1) return 1;
+        return Math.min(9999, amt);
+      })(),
       ctaLabel: String(d.ctaLabel || "Grab this deal").trim() || "Grab this deal",
       footnote: String(d.footnote || WD_DEFAULT.footnote).trim() || WD_DEFAULT.footnote,
       transQty: String(d.transQty || "").trim() || "Quantity",
@@ -2772,10 +3677,11 @@
       transAdd: String(d.transAdd || "").trim() || "Add",
       ctaButtonAction: ctaAct,
       ctaButtonPageUrl: String(d.ctaButtonPageUrl || "").trim(),
-      hideThemeAddToCart: d.hideThemeAddToCart === true,
-      hideThemeBuyItNow: d.hideThemeBuyItNow === true,
-      hideThemeVariantSelector: d.hideThemeVariantSelector === true,
-      hideThemeQuantitySelector: d.hideThemeQuantitySelector === true,
+      hideThemeAddToCart: d.hideThemeAddToCart === true || d.hideThemeAddToCart === 1 || d.hideThemeAddToCart === "true",
+      hideThemeBuyItNow: d.hideThemeBuyItNow === true || d.hideThemeBuyItNow === 1 || d.hideThemeBuyItNow === "true",
+      hideThemeVariantSelector: d.hideThemeVariantSelector === true || d.hideThemeVariantSelector === 1 || d.hideThemeVariantSelector === "true",
+      hideThemeQuantitySelector: d.hideThemeQuantitySelector === true || d.hideThemeQuantitySelector === 1 || d.hideThemeQuantitySelector === "true",
+      hideThemePrice: d.hideThemePrice === true || d.hideThemePrice === 1 || d.hideThemePrice === "true",
       hideWidgetVariantSelector: d.hideWidgetVariantSelector === true,
       hideWidgetQuantitySelector: d.hideWidgetQuantitySelector === true,
       hideWidgetLineTotal: d.hideWidgetLineTotal === true,
@@ -2801,6 +3707,32 @@
           return "after_subtext";
         }
         return "after_label";
+      })(),
+      badgeDesign: (function () {
+        var bd = String(d.badgeDesign || "pill");
+        var allowed = {
+          pill: 1,
+          rounded: 1,
+          square: 1,
+          soft: 1,
+          outline: 1,
+          outline_bold: 1,
+          ghost: 1,
+          ribbon: 1,
+          flag: 1,
+          tag: 1,
+          capsule: 1,
+          chip: 1,
+          underline: 1,
+          shadow: 1,
+          gradient: 1,
+          glow: 1,
+          stamp: 1,
+          ticket: 1,
+          arrow: 1,
+          banner: 1,
+        };
+        return allowed[bd] ? bd : "pill";
       })(),
     };
   }
@@ -2840,7 +3772,15 @@
     ) {
       widgetDisplay.widgetHeading = langTrans.transHeading;
     }
-    if (langTrans.transCta != null && langTrans.transCta !== "") widgetDisplay.ctaLabel = langTrans.transCta;
+    // Offer "Text button" wins when set — same as heading (preview ↔ storefront).
+    var offerCta = String(widgetDisplay.ctaLabel || "").trim();
+    if (
+      !offerCta &&
+      langTrans.transCta != null &&
+      String(langTrans.transCta).trim() !== ""
+    ) {
+      widgetDisplay.ctaLabel = langTrans.transCta;
+    }
     if (langTrans.transFootnote != null && langTrans.transFootnote !== "") widgetDisplay.footnote = langTrans.transFootnote;
     if (langTrans.transCountdown != null && langTrans.transCountdown !== "") widgetDisplay.countdownLabel = langTrans.transCountdown;
     if (langTrans.transQty != null && langTrans.transQty !== "") widgetDisplay.transQty = langTrans.transQty;
@@ -2853,26 +3793,37 @@
     var ui = applyWidgetDisplayToRoot(root, widgetDisplay, heading);
     var isVolumeTable = ui.widgetPresentation === "volume_table";
 
-    /*
-     * App-block isolation: never hide or mutate theme purchase UI
-     * (ATC / Buy it now / variant / qty), regardless of legacy widget settings.
-     */
-    try {
-      document.documentElement.removeAttribute("data-offrefy-hide-theme-atc");
-      document.documentElement.removeAttribute("data-offrefy-hide-theme-bin");
-      document.documentElement.removeAttribute("data-offrefy-hide-theme-variant");
-      document.documentElement.removeAttribute("data-offrefy-hide-theme-qty");
-    } catch (eHideClear) {
-      void eHideClear;
-    }
-    ui.hideThemeAddToCart = false;
-    ui.hideThemeBuyItNow = false;
-    ui.hideThemeVariantSelector = false;
-    ui.hideThemeQuantitySelector = false;
+    /* Theme product form hide options — apply for all Online Store 2.0 themes. */
+    applyThemeFormVisibility(ui, { clearWhenOff: true });
 
     var tiers = campaign.tiers.slice().sort(function (a, b) {
       return (a.minQty | 0) - (b.minQty | 0);
     });
+    var localeKey = String(locale || "en")
+      .toLowerCase()
+      .split("-")[0];
+    var tierCopyMap =
+      campaign.tierCopy && typeof campaign.tierCopy === "object"
+        ? campaign.tierCopy
+        : null;
+    var localeTierCopy =
+      (tierCopyMap &&
+        (tierCopyMap[locale] ||
+          tierCopyMap[localeKey] ||
+          null)) ||
+      null;
+    if (localeTierCopy && localeTierCopy.length) {
+      for (var tci = 0; tci < tiers.length; tci++) {
+        var copyRow = localeTierCopy[tci];
+        if (!copyRow || typeof copyRow !== "object") continue;
+        var copyBuy = String(copyRow.buyLabelText || "").trim();
+        var copySub = String(copyRow.optionSubtext || "").trim();
+        var copyBadge = String(copyRow.badge || "").trim();
+        if (copyBuy) tiers[tci].buyLabel = copyBuy;
+        if (copySub) tiers[tci].optionSubtext = copySub;
+        if (copyBadge) tiers[tci].badge = copyBadge;
+      }
+    }
     var defaultIdx = 0;
     for (var gi = 0; gi < tiers.length; gi++) {
       if (tiers[gi].activeByDefault) {
@@ -2928,11 +3879,13 @@
 
     function resolveActiveVariantIdForCart() {
       if (vdShowVariant) {
-        var selAdd = mountEl.querySelector(".offrefy-card--selected .offrefy-variant-select");
+        var selAdd = mountEl.querySelector(
+          ".offrefy-card--selected [data-offrefy-vd-vsel-input]",
+        );
         if (!selAdd) {
-          selAdd = mountEl.querySelector(".offrefy-variant-select");
+          selAdd = mountEl.querySelector("[data-offrefy-vd-vsel-input]");
         }
-        if (selAdd) return String(selAdd.value);
+        if (selAdd) return String(selAdd.value || "");
       }
       return String(root.getAttribute("data-variant-id") || "");
     }
@@ -2979,33 +3932,57 @@
 
     function variantOptionsHtml(selId) {
       var o = [];
+      var label = "";
       for (var vi = 0; vi < variants.length; vi++) {
         var v = variants[vi];
         var id = String(v.id);
         var pr = parseInt(String(v.price), 10) || 0;
-        var sel = id === String(selId) ? " selected" : "";
-        var dis = v.available === false ? " disabled" : "";
+        var title = String(v.title || "Variant");
+        var isSel = id === String(selId);
+        if (isSel) label = title;
+        var dis = v.available === false;
         o.push(
-          '<option value="' +
+          '<button type="button" class="offrefy-vd-vsel__opt' +
+            (isSel ? " is-selected" : "") +
+            (dis ? " is-disabled" : "") +
+            '" role="option" data-offrefy-vd-vid="' +
             id +
-            '" data-price="' +
+            '" data-offrefy-vd-price="' +
             pr +
+            '" aria-selected="' +
+            (isSel ? "true" : "false") +
             '"' +
-            sel +
-            dis +
+            (dis ? " disabled aria-disabled=\"true\"" : "") +
             ">" +
-            esc(String(v.title || "Variant")) +
-            "</option>",
+            esc(title) +
+            "</button>",
         );
       }
-      return o.join("");
+      if (!label && variants[0]) label = String(variants[0].title || "Variant");
+      return {
+        options: o.join(""),
+        label: label,
+        value: String(selId || (variants[0] && variants[0].id) || ""),
+      };
     }
 
     function expandHtml(c, selId) {
-      var selectBlock = vdShowVariant
-        ? '<div class="offrefy-select-wrap"><select class="offrefy-variant-select" aria-label="Variant">' +
-          variantOptionsHtml(selId) +
-          "</select></div>"
+      var picker = vdShowVariant ? variantOptionsHtml(selId) : null;
+      var selectBlock = picker
+        ? '<div class="offrefy-vd-vsel" data-offrefy-vd-vsel>' +
+          '<button type="button" class="offrefy-vd-vsel__trigger" data-offrefy-vd-vsel-trigger aria-haspopup="listbox" aria-expanded="false">' +
+          '<span class="offrefy-vd-vsel__label" data-offrefy-vd-vsel-label>' +
+          esc(picker.label) +
+          "</span>" +
+          '<span class="offrefy-vd-vsel__chev" aria-hidden="true"></span>' +
+          "</button>" +
+          '<div class="offrefy-vd-vsel__panel" data-offrefy-vd-vsel-panel role="listbox" hidden>' +
+          picker.options +
+          "</div>" +
+          '<input type="hidden" class="offrefy-vd-vsel__input" data-offrefy-vd-vsel-input value="' +
+          esc(picker.value) +
+          '" />' +
+          "</div>"
         : "";
       var qtyBlock = ui.hideWidgetQuantitySelector
         ? ""
@@ -3044,18 +4021,23 @@
       if (!vdShowVariant) expandClasses += " offrefy-expand-compact--no-variant";
       if (ui.hideWidgetQuantitySelector) expandClasses += " offrefy-expand-compact--no-qty";
       if (ui.hideWidgetLineTotal) expandClasses += " offrefy-expand-compact--no-line-total";
+      /* Keep # · amount · qty · Add on one row; variant select sits above when shown. */
+      var rowHtml =
+        '<div class="offrefy-expand-row">' +
+        '<span class="offrefy-tier-idx">#' +
+        (c + 1) +
+        "</span>" +
+        lineTotalBlock +
+        trailingHtml +
+        "</div>";
       return (
         '<div class="offrefy-card__expand">' +
         '<div class="offrefy-card__divider" aria-hidden="true"></div>' +
         '<div class="' +
         expandClasses +
         '">' +
-        '<span class="offrefy-tier-idx">#' +
-        (c + 1) +
-        "</span>" +
         selectBlock +
-        lineTotalBlock +
-        trailingHtml +
+        rowHtml +
         "</div>" +
         "</div>"
       );
@@ -3225,7 +4207,8 @@
         if (n.tagName === "INPUT") {
           n.setAttribute("maxlength", String(String(VD_MAX_LINE_QTY).length));
           n.setAttribute("inputmode", "numeric");
-          if (document.activeElement !== n) n.value = str;
+          /* Always sync value — skipping focused inputs left stale "1" after tier switches. */
+          n.value = str;
         } else {
           n.textContent = str;
         }
@@ -3266,16 +4249,50 @@
 
     function syncAllVariantSelects(vid) {
       if (!vdShowVariant) return;
-      var sels = mountEl.querySelectorAll(".offrefy-variant-select");
-      for (var si = 0; si < sels.length; si++) {
-        sels[si].value = String(vid);
+      var id = String(vid);
+      var title = "";
+      for (var ti = 0; ti < variants.length; ti++) {
+        if (String(variants[ti].id) === id) {
+          title = String(variants[ti].title || "Variant");
+          break;
+        }
       }
+      var pickers = mountEl.querySelectorAll("[data-offrefy-vd-vsel]");
+      for (var si = 0; si < pickers.length; si++) {
+        var box = pickers[si];
+        var inp = box.querySelector("[data-offrefy-vd-vsel-input]");
+        var lab = box.querySelector("[data-offrefy-vd-vsel-label]");
+        if (inp) inp.value = id;
+        if (lab && title) lab.textContent = title;
+        var opts = box.querySelectorAll("[data-offrefy-vd-vid]");
+        for (var oi = 0; oi < opts.length; oi++) {
+          var isSel = String(opts[oi].getAttribute("data-offrefy-vd-vid")) === id;
+          opts[oi].classList.toggle("is-selected", isSel);
+          opts[oi].setAttribute("aria-selected", isSel ? "true" : "false");
+        }
+      }
+    }
+
+    function closeAllVdVariantPickers() {
+      var pickers = mountEl.querySelectorAll("[data-offrefy-vd-vsel]");
+      for (var i = 0; i < pickers.length; i++) {
+        var panel = pickers[i].querySelector("[data-offrefy-vd-vsel-panel]");
+        var trig = pickers[i].querySelector("[data-offrefy-vd-vsel-trigger]");
+        if (panel) panel.setAttribute("hidden", "");
+        if (trig) trig.setAttribute("aria-expanded", "false");
+        pickers[i].classList.remove("is-open");
+      }
+      var cardsWrap = mountEl.querySelector(".offrefy-cards");
+      if (cardsWrap) cardsWrap.classList.remove("offrefy-cards--vsel-open");
+      if (root) root.classList.remove("offrefy-theme--vsel-open");
     }
 
     function scrollToAtc() {
       clampQty();
       syncQtyToForm(false);
-      var sel = mountEl.querySelector(".offrefy-card--selected .offrefy-variant-select");
+      var sel = mountEl.querySelector(
+        ".offrefy-card--selected [data-offrefy-vd-vsel-input]",
+      );
       if (sel) {
         syncFormVariant(sel.value);
         root.setAttribute("data-variant-id", String(sel.value));
@@ -3300,8 +4317,66 @@
       for (var i = 0; i < labels.length; i++) {
         var lab = labels[i];
         var inp = lab.querySelector("input[type=radio]");
-        lab.classList.toggle("offrefy-card--selected", !!(inp && inp.checked));
+        var isSelected = !!(inp && inp.checked);
+        lab.classList.toggle("offrefy-card--selected", isSelected);
+        lab.setAttribute("aria-checked", isSelected ? "true" : "false");
+        var expand = lab.querySelector(".offrefy-card__expand");
+        if (expand) {
+          if (isSelected) {
+            expand.removeAttribute("hidden");
+          } else {
+            expand.setAttribute("hidden", "");
+          }
+        }
       }
+    }
+
+    /** Always select the clicked tier card (label nesting was flaky on tier 2/3). */
+    function selectCard(card, snapQty) {
+      if (!card || !mountEl.contains(card)) return false;
+      var radio = card.querySelector('input[name="' + rn + '"]');
+      if (!radio) return false;
+      var changed = !radio.checked;
+      if (changed) {
+        var radios = mountEl.querySelectorAll('input[name="' + rn + '"]');
+        for (var ri = 0; ri < radios.length; ri++) {
+          radios[ri].checked = false;
+        }
+        radio.checked = true;
+      }
+      syncSelectedCard();
+      /*
+       * Only snap qty when the selected *tier* changes.
+       * Re-clicking the already-selected card (or blur after typing) must keep
+       * the manually entered quantity — previously snapQty=true reset to tier min.
+       */
+      if (changed) {
+        try {
+          if (
+            document.activeElement &&
+            document.activeElement.getAttribute &&
+            document.activeElement.getAttribute("data-offrefy-qty-display") != null
+          ) {
+            document.activeElement.blur();
+          }
+        } catch (eBlur) {
+          void eBlur;
+        }
+        stateQty = getTierMinQty();
+        updateQtyDisplay();
+      } else {
+        var minNow = getTierMinQty();
+        if (stateQty < minNow) {
+          stateQty = minNow;
+          updateQtyDisplay();
+        }
+      }
+      return changed;
+    }
+
+    function ensureCardSelectedFromNode(node) {
+      if (!node || !node.closest) return false;
+      return selectCard(node.closest(".offrefy-card"), true);
     }
 
     function tierVolumeTableDiscountLabel(tier) {
@@ -3403,6 +4478,18 @@
       campaign.countdownEndsAt != null
         ? Date.parse(String(campaign.countdownEndsAt))
         : NaN;
+    // showCountdown without a saved Schedule end: fall back to amount × unit from now
+    // so the pill still renders (admin preview used to show a demo timer in this case).
+    if (ui.showCountdown === true && isNaN(cdEndsMs)) {
+      var cdAmt = Math.max(1, Math.floor(Number(ui.countdownTimeAmount)) || 1);
+      var cdMult =
+        ui.countdownTimeUnit === "hours"
+          ? 3600
+          : ui.countdownTimeUnit === "minutes"
+            ? 60
+            : 86400;
+      cdEndsMs = Date.now() + cdAmt * cdMult * 1000;
+    }
     var cdLive = ui.showCountdown === true && !isNaN(cdEndsMs);
 
     var h = [];
@@ -3490,8 +4577,10 @@
       }
       var tierBadgeHtml = function (badgeText, rowClass) {
         if (!badgeText) return "";
+        var design = String(ui.badgeDesign || "pill");
         return (
-          '<span class="offrefy-badge-pill' +
+          '<span class="offrefy-badge-pill offrefy-badge-pill--d-' +
+          design +
           (rowClass ? " " + rowClass : "") +
           '">' +
           esc(badgeText) +
@@ -3510,9 +4599,13 @@
           : minQ > 1 && P > 0;
 
         h.push(
-          '<label class="offrefy-card' +
+          '<div class="offrefy-card' +
             (c2 === defaultIdx ? " offrefy-card--selected" : "") +
             (badge && isBadgeTopFloat(badgePos) ? " offrefy-card--badge-top-float" : "") +
+            '" tabindex="0" aria-checked="' +
+            (c2 === defaultIdx ? "true" : "false") +
+            '" data-tier-index="' +
+            c2 +
             '">',
         );
         h.push(
@@ -3520,7 +4613,7 @@
             rn +
             '" value="' +
             d.minQty +
-            '"' +
+            '" tabindex="-1"' +
             (c2 === defaultIdx ? " checked" : "") +
             "/>",
         );
@@ -3589,7 +4682,14 @@
         );
         h.push("</div></div>");
         h.push(expandHtml(c2, selVariantId));
-        h.push("</span></label>");
+        /* Mark non-selected expands hidden at paint time (avoids flash / stale CSS :has mismatch). */
+        if (c2 !== defaultIdx) {
+          h[h.length - 1] = String(h[h.length - 1] || "").replace(
+            'class="offrefy-card__expand"',
+            'class="offrefy-card__expand" hidden',
+          );
+        }
+        h.push("</span></div>");
       }
       h.push("</div>");
     }
@@ -3644,6 +4744,8 @@
     updateQtyDisplay();
     syncSelectedCard();
     updatePurchaseControlsAvailability();
+    /* Force one expand only — class + radio can desync after back/checkout. */
+    syncSelectedCard();
 
     mountEl.addEventListener("input", function (ev) {
       var t = ev.target;
@@ -3670,15 +4772,20 @@
         t.getAttribute("data-offrefy-qty-display") != null &&
         t.tagName === "INPUT"
       ) {
+        /* Commit typed qty; selectCard only snaps when the tier actually changes. */
+        ensureCardSelectedFromNode(t);
         applyQtyFromInput(t);
         return;
       }
       if (
         vdShowVariant &&
         t &&
-        t.classList &&
-        t.classList.contains("offrefy-variant-select")
+        t.getAttribute &&
+        t.getAttribute("data-offrefy-vd-vsel-input") != null
       ) {
+        if (ensureCardSelectedFromNode(t)) {
+          stateQty = getTierMinQty();
+        }
         var v = t.value;
         currentUnitCents = readPriceForVariant(v);
         syncAllVariantSelects(v);
@@ -3727,7 +4834,105 @@
       }
     });
 
+    function isExpandControlTarget(t) {
+      return !!(
+        t &&
+        t.closest &&
+        t.closest(
+          "[data-offrefy-vd-vsel], .offrefy-vd-vsel, [data-offrefy-qty-dec], [data-offrefy-qty-inc], [data-offrefy-tier-add], [data-offrefy-qty-display], .offrefy-qty-group, .offrefy-qty-btn, .offrefy-add-outline",
+        )
+      );
+    }
+
+    function applyVdVariantChoice(vid, fromNode) {
+      var v = String(vid || "");
+      if (!v) return;
+      if (fromNode && ensureCardSelectedFromNode(fromNode)) {
+        stateQty = getTierMinQty();
+      }
+      currentUnitCents = readPriceForVariant(v);
+      syncAllVariantSelects(v);
+      closeAllVdVariantPickers();
+      updateAllPrices();
+      updateQtyDisplay();
+      syncFormVariant(v);
+      root.setAttribute("data-variant-id", v);
+      updatePurchaseControlsAvailability();
+    }
+
+    mountEl.addEventListener(
+      "pointerdown",
+      function (ev) {
+        if (isVolumeTable) return;
+        /* Never intercept variant picker / qty — card selectCard blocks controls. */
+        if (isExpandControlTarget(ev.target)) return;
+        var card =
+          ev.target && ev.target.closest
+            ? ev.target.closest(".offrefy-card")
+            : null;
+        if (!card || !mountEl.contains(card)) return;
+        closeAllVdVariantPickers();
+        /* Select immediately on press so text-drag / theme handlers cannot steal tier 2/3 clicks. */
+        selectCard(card, true);
+      },
+      true,
+    );
+
+    mountEl.addEventListener("keydown", function (ev) {
+      if (isVolumeTable) return;
+      if (isExpandControlTarget(ev.target)) return;
+      var card =
+        ev.target && ev.target.closest
+          ? ev.target.closest(".offrefy-card")
+          : null;
+      if (!card || ev.target !== card) return;
+      if (ev.key !== "Enter" && ev.key !== " ") return;
+      ev.preventDefault();
+      selectCard(card, true);
+    });
+
     mountEl.addEventListener("click", function (ev) {
+      var t = ev.target;
+      if (vdShowVariant && t && t.closest) {
+        var trigger = t.closest("[data-offrefy-vd-vsel-trigger]");
+        if (trigger && mountEl.contains(trigger)) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          var box = trigger.closest("[data-offrefy-vd-vsel]");
+          if (!box) return;
+          var panel = box.querySelector("[data-offrefy-vd-vsel-panel]");
+          var open = box.classList.contains("is-open");
+          closeAllVdVariantPickers();
+          if (!open && panel) {
+            panel.removeAttribute("hidden");
+            trigger.setAttribute("aria-expanded", "true");
+            box.classList.add("is-open");
+            var cardsWrap = mountEl.querySelector(".offrefy-cards");
+            if (cardsWrap) cardsWrap.classList.add("offrefy-cards--vsel-open");
+            if (root) root.classList.add("offrefy-theme--vsel-open");
+          }
+          ensureCardSelectedFromNode(trigger);
+          return;
+        }
+        var opt = t.closest("[data-offrefy-vd-vid]");
+        if (opt && mountEl.contains(opt) && !opt.disabled) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          applyVdVariantChoice(opt.getAttribute("data-offrefy-vd-vid"), opt);
+          return;
+        }
+      }
+
+      if (!isVolumeTable && !isExpandControlTarget(ev.target)) {
+        var clickCard =
+          ev.target && ev.target.closest
+            ? ev.target.closest(".offrefy-card")
+            : null;
+        if (clickCard) {
+          closeAllVdVariantPickers();
+          selectCard(clickCard, false);
+        }
+      }
       var btn = ev.target && ev.target.closest ? ev.target.closest("[data-offrefy-qty-dec],[data-offrefy-qty-inc],[data-offrefy-tier-add]") : null;
       if (!btn) return;
       if (btn.hasAttribute("data-offrefy-qty-dec")) {
@@ -3763,10 +4968,10 @@
         btn.disabled = true;
         widgetAtcInFlight = true;
         addVariantToCart(vidAdd, qtyAdd, ui.ctaButtonAction, offrefyAttribution)
-          .then(function () {
+          .then(function (addResult) {
             recordAddToCartAnalytics(qtyAdd, vidAdd);
             clearVdCartQtyAlert();
-            return completeAfterCartAdd(ui);
+            return completeAfterCartAdd(ui, addResult);
           })
           .catch(function (err) {
             var em = err && err.message ? String(err.message) : "";
@@ -3782,6 +4987,38 @@
           });
       }
     });
+
+    if (!offrefyNs()._offrefyVdVselOutsideClose) {
+      offrefyNs()._offrefyVdVselOutsideClose = true;
+      document.addEventListener(
+        "pointerdown",
+        function (ev) {
+          var open = document.querySelector(
+            "[data-offrefy-root] [data-offrefy-vd-vsel].is-open",
+          );
+          if (!open) return;
+          if (
+            ev.target &&
+            ev.target.closest &&
+            ev.target.closest("[data-offrefy-vd-vsel]")
+          ) {
+            return;
+          }
+          var roots = document.querySelectorAll("[data-offrefy-root] [data-offrefy-mount]");
+          for (var ri = 0; ri < roots.length; ri++) {
+            var boxes = roots[ri].querySelectorAll("[data-offrefy-vd-vsel].is-open");
+            for (var bi = 0; bi < boxes.length; bi++) {
+              var panel = boxes[bi].querySelector("[data-offrefy-vd-vsel-panel]");
+              var trig = boxes[bi].querySelector("[data-offrefy-vd-vsel-trigger]");
+              if (panel) panel.setAttribute("hidden", "");
+              if (trig) trig.setAttribute("aria-expanded", "false");
+              boxes[bi].classList.remove("is-open");
+            }
+          }
+        },
+        true,
+      );
+    }
 
     var cta = mountEl.querySelector("[data-offrefy-cta]");
     if (cta) {
@@ -3804,10 +5041,10 @@
         cta.disabled = true;
         widgetAtcInFlight = true;
         addVariantToCart(vidC, stateQty, ui.ctaButtonAction, offrefyAttribution)
-          .then(function () {
+          .then(function (addResult) {
             recordAddToCartAnalytics(stateQty, vidC);
             clearVdCartQtyAlert();
-            return completeAfterCartAdd(ui);
+            return completeAfterCartAdd(ui, addResult);
           })
           .catch(function (err) {
             var em = err && err.message ? String(err.message) : "";
@@ -3859,9 +5096,20 @@
     root.setAttribute("data-offrefy-ready", "1");
     mountEl.hidden = false;
     root.setAttribute("data-offrefy-inited", "1");
+    /* Re-apply after paint — themes often hydrate variant pills late. */
+    applyThemeFormVisibility(ui, { clearWhenOff: true });
+    setTimeout(function () {
+      applyThemeFormVisibility(ui, { clearWhenOff: true });
+    }, 400);
+    setTimeout(function () {
+      applyThemeFormVisibility(ui, { clearWhenOff: true });
+    }, 1200);
+    setTimeout(function () {
+      applyThemeFormVisibility(ui, { clearWhenOff: true });
+    }, 2500);
     trackImpression(campaign, root.getAttribute("data-product-id"));
     offrefyNs().embed = offrefyNs().embed || {};
-    offrefyNs().embed.version = "1.30.6";
+    offrefyNs().embed.version = "1.31.12";
 
   }
   /**
@@ -3898,6 +5146,18 @@
       tiers.push(tier);
     }
     if (!tiers.length) return null;
+    var ctCode = String(rule.ct || "e");
+    var customerType =
+      ctCode === "l"
+        ? "logged-in"
+        : ctCode === "t"
+          ? "logged-in-tag-any"
+          : "everyone";
+    var customerTags = Array.isArray(rule.tg)
+      ? rule.tg.filter(function (x) {
+          return typeof x === "string" && x.trim();
+        })
+      : [];
     return {
       id: String(rule.c || "_product_rule"),
       campaignName: String(rule.m || "Volume discount"),
@@ -3911,11 +5171,37 @@
             : rule.q === "p"
               ? "per-product"
               : "per-variant",
-      customerType: "everyone",
-      customerTags: [],
+      customerType: customerType,
+      customerTags: customerTags,
       productIds: [],
       tiers: tiers,
-      widgetDisplay: {},
+      widgetDisplay: {
+        showCountdown: rule.sc === 1 || rule.sc === true,
+        countdownLabel:
+          typeof rule.cl === "string" && rule.cl.trim()
+            ? String(rule.cl).trim()
+            : WD_DEFAULT.countdownLabel,
+        countdownTimeAmount: (function () {
+          var amt = Math.floor(Number(rule.ca));
+          if (!isFinite(amt) || amt < 1) return 1;
+          return Math.min(9999, amt);
+        })(),
+        countdownTimeUnit:
+          rule.cu === "h" ? "hours" : rule.cu === "m" ? "minutes" : "days",
+      },
+      _fromProductRule: true,
+      _scheduleAware:
+        rule.sv === 1 ||
+        Object.prototype.hasOwnProperty.call(rule, "sa") ||
+        Object.prototype.hasOwnProperty.call(rule, "ea"),
+      countdownStartsAt:
+        rule.sa != null && Number(rule.sa) > 0
+          ? new Date(Number(rule.sa) * 1000).toISOString()
+          : null,
+      countdownEndsAt:
+        rule.ea != null && Number(rule.ea) > 0
+          ? new Date(Number(rule.ea) * 1000).toISOString()
+          : null,
     };
   }
 
@@ -3995,7 +5281,11 @@
 
     function applyConfig(cfg) {
       var camp = pickCampaign(cfg, productId, variantId, productGid, variantGid);
-      if (!camp || !camp.tiers || !camp.tiers.length) {
+      if (
+        (!camp || !camp.tiers || !camp.tiers.length) &&
+        productRuleCampaign &&
+        campaignUsableOnStorefront(productRuleCampaign)
+      ) {
         camp = productRuleCampaign;
       }
       if ((!camp || !camp.tiers || !camp.tiers.length) && designMode) {
@@ -4066,13 +5356,33 @@
       };
     }
 
-    if ((!matched || !matched.tiers || !matched.tiers.length) && productRuleCampaign) {
+    if (
+      (!matched || !matched.tiers || !matched.tiers.length) &&
+      productRuleCampaign &&
+      campaignUsableOnStorefront(productRuleCampaign)
+    ) {
       matched = productRuleCampaign;
     }
 
     if (matched && matched.tiers && matched.tiers.length) {
       if (inline && inline.translations) {
         matched.translations = inline.translations;
+      }
+      // Product-rule early paint lacks full widgetDisplay — still fetch /widget-config
+      // so countdown + appearance from the offer are applied.
+      if (!matched._fromProductRule) {
+        mountBundle(
+          root,
+          mount,
+          matched,
+          String(configId || "vd"),
+          unitCents,
+          currency,
+          heading,
+          sectionHeading,
+          variants,
+        );
+        return;
       }
       mountBundle(
         root,
@@ -4085,12 +5395,20 @@
         sectionHeading,
         variants,
       );
-      return;
     }
 
     function finishFetch(remote) {
       if (!root.isConnected) return;
-      if (root.getAttribute("data-offrefy-inited") === "1") return;
+      var hadProductRulePaint =
+        root.getAttribute("data-offrefy-inited") === "1" &&
+        productRuleCampaign;
+      if (root.getAttribute("data-offrefy-inited") === "1" && !hadProductRulePaint) {
+        return;
+      }
+      if (hadProductRulePaint) {
+        clearCountdown(root);
+        root.removeAttribute("data-offrefy-inited");
+      }
       var cfg = sanitizeWidgetConfig(
         remote || { version: 1, campaigns: [] },
         designMode,
@@ -4231,6 +5549,17 @@
   }
   /* Section remounts only need widget roots — avoid cart/update storm on every variant section swap. */
   document.addEventListener("shopify:section:load", function () {
+    scan({ syncCart: false });
+  });
+  /* Browser Back/Forward (checkout -> product) can restore stale card DOM via bfcache.
+     Clear inited flags so widgets remount with a single selected expand. */
+  window.addEventListener("pageshow", function (ev) {
+    if (ev && ev.persisted) {
+      document.querySelectorAll(".offrefy-root[data-offrefy-inited]").forEach(function (el) {
+        el.removeAttribute("data-offrefy-inited");
+        el.removeAttribute("data-offrefy-ready");
+      });
+    }
     scan({ syncCart: false });
   });
 })();

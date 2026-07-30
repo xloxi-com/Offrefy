@@ -56,7 +56,7 @@
           "productDiscountsAdd": {
             "candidates": [
               {
-                "message": "10% OFF",
+                "message": "10%",
                 "targets": [
                   {
                     "cartLine": {

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 56" fill="none" aria-hidden="true">
+  <!-- Clean mosque icon — gold domes, cream body -->
+  <defs>
+    <linearGradient id="rdMosGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0d78c"/>
+      <stop offset="100%" stop-color="#c9a227"/>
+    </linearGradient>
+    <linearGradient id="rdMosBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#faf6ee"/>
+      <stop offset="100%" stop-color="#e8dcc8"/>
+    </linearGradient>
+  </defs>
+  <!-- Left minaret -->
+  <rect x="6" y="22" width="6" height="30" rx="1.2" fill="url(#rdMosBody)" stroke="#c9a227" stroke-width="1"/>
+  <rect x="4.5" y="19" width="9" height="4" rx="1" fill="url(#rdMosGold)"/>
+  <path d="M9 8 L12.5 19 H5.5 Z" fill="url(#rdMosGold)"/>
+  <!-- Right minaret -->
+  <rect x="52" y="22" width="6" height="30" rx="1.2" fill="url(#rdMosBody)" stroke="#c9a227" stroke-width="1"/>
+  <rect x="50.5" y="19" width="9" height="4" rx="1" fill="url(#rdMosGold)"/>
+  <path d="M55 8 L58.5 19 H51.5 Z" fill="url(#rdMosGold)"/>
+  <!-- Main body -->
+  <rect x="14" y="28" width="36" height="24" rx="2" fill="url(#rdMosBody)" stroke="#c9a227" stroke-width="1.2"/>
+  <!-- Domes -->
+  <path d="M18 28 C18 20 24 16 32 16 C40 16 46 20 46 28 Z" fill="url(#rdMosGold)"/>
+  <rect x="30" y="10" width="4" height="7" rx="1" fill="url(#rdMosGold)"/>
+  <path d="M32 6 L34.2 10.5 H29.8 Z" fill="#e8c547"/>
+  <!-- Side domes -->
+  <path d="M16 30 C16 26 19 24 22 24 C25 24 28 26 28 30" fill="url(#rdMosGold)"/>
+  <path d="M36 30 C36 26 39 24 42 24 C45 24 48 26 48 30" fill="url(#rdMosGold)"/>
+  <!-- Arches -->
+  <path d="M22 52 V42 Q22 36 32 36 Q42 36 42 42 V52" fill="#6b1d1e" opacity="0.75"/>
+  <path d="M17 52 V46 Q17 42 20 42 Q23 42 23 46 V52" fill="#6b1d1e" opacity="0.45"/>
+  <path d="M41 52 V46 Q41 42 44 42 Q47 42 47 46 V52" fill="#6b1d1e" opacity="0.45"/>
+</svg>

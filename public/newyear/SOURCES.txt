@@ -1,0 +1,23 @@
+New Year assets:
+
+PNGs (Fluent Emoji MIT, copied from christmas):
+- sparkles.png, star.png, comet.png, crown.png, gem.png
+
+PNGs (Fluent Emoji MIT, downloaded):
+- sparkler.png — optional sparkler emoji
+
+Transparent fireworks PNGs (Offrefy-generated, no background):
+- fireworks.png / fireworks-burst.png — rainbow burst
+- fireworks-gold.png — golden starburst
+- fireworks-violet.png — violet / pink burst
+- fireworks-crimson.png — red / gold burst
+- fireworks-willow.png — cascading gold willow
+- fireworks-cluster.png — multi-burst cluster
+Regenerate: python scripts/gen-fireworks-png.py
+
+SVGs:
+- champagne.svg — flute swatch / decor
+- popper.svg — confetti party
+- clock.svg — midnight countdown
+
+Theme copies: extensions/.../assets/vd-ny-*

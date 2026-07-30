@@ -1,9 +1,21 @@
 {% comment %}
-  App embed (body) — Theme settings → App embeds.
-  Enable flag on product pages only. No CSS/JS here (avoids collection/home
-  inject). Storefront assets load from the Quantity breaks app block.
+  App embed (head) — Theme settings → App embeds → Offrefy (global).
+  Runs in <head> on product pages so Theme product form hide CSS applies
+  before price / variants / ATC paint (no flash on refresh).
 {% endcomment %}
-{% if request.page_type == 'product' or template.name == 'product' %}
+{% liquid
+  assign vd_is_product_page = false
+  if request.page_type == 'product' or template.name == 'product'
+    assign vd_is_product_page = true
+  endif
+
+  if product != blank
+    assign vd_product = product
+  elsif closest.product != blank
+    assign vd_product = closest.product
+  endif
+%}
+{% if vd_is_product_page %}
   <script>
     (function () {
       var o = window.Offrefy;
@@ -23,12 +35,13 @@
       o.appEmbedActive = true;
     })();
   </script>
+  {% render 'vd-hide-theme-atc', vd_product: vd_product %}
 {% endif %}
 
 {% schema %}
 {
   "name": "t:volume_discount.blocks.embed.name",
-  "target": "body",
+  "target": "head",
   "settings": [
     {
       "type": "paragraph",

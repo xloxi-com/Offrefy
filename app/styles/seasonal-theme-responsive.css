@@ -1,0 +1,119 @@
+/* Shared seasonal template sizing — keeps decorations inside the widget on all widths */
+
+.vd-admin-qb-preview[data-offrefy-theme^="christmas_"],
+.vd-admin-qb-preview[data-offrefy-theme^="newyear_"],
+.vd-admin-qb-preview[data-offrefy-theme^="halloween_"],
+.vd-admin-qb-preview[data-offrefy-theme^="ramadan_"],
+.vd-admin-qb-preview[data-offrefy-theme^="diwali_"],
+.vd-admin-qb-preview[data-offrefy-theme^="pongal_"],
+.vd-admin-qb-preview[data-offrefy-theme^="valentine_"],
+.vd-admin-qb-preview[data-offrefy-theme^="easter_"],
+[data-offrefy-theme^="christmas_"],
+[data-offrefy-theme^="newyear_"],
+[data-offrefy-theme^="halloween_"],
+[data-offrefy-theme^="ramadan_"],
+[data-offrefy-theme^="diwali_"],
+[data-offrefy-theme^="pongal_"],
+[data-offrefy-theme^="valentine_"],
+[data-offrefy-theme^="easter_"] {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.vd-admin-qb-preview[data-preview-device="mobile"][data-offrefy-theme^="christmas_"],
+.vd-admin-qb-preview[data-preview-device="mobile"][data-offrefy-theme^="newyear_"],
+.vd-admin-qb-preview[data-preview-device="mobile"][data-offrefy-theme^="halloween_"],
+.vd-admin-qb-preview[data-preview-device="mobile"][data-offrefy-theme^="ramadan_"],
+.vd-admin-qb-preview[data-preview-device="mobile"][data-offrefy-theme^="diwali_"],
+.vd-admin-qb-preview[data-preview-device="mobile"][data-offrefy-theme^="pongal_"],
+.vd-admin-qb-preview[data-preview-device="mobile"][data-offrefy-theme^="valentine_"],
+.vd-admin-qb-preview[data-preview-device="mobile"][data-offrefy-theme^="easter_"] {
+  --xmas-decor-sm: 1rem;
+  --xmas-decor-md: 1.2rem;
+  --xmas-decor-lg: 1.45rem;
+  --ny-decor-sm: 1rem;
+  --ny-decor-md: 1.2rem;
+  --ny-decor-lg: 1.45rem;
+  --hw-decor-sm: 1rem;
+  --hw-decor-md: 1.2rem;
+  --hw-decor-lg: 1.45rem;
+  --vl-decor-sm: 1rem;
+  --vl-decor-md: 1.2rem;
+  --vl-decor-lg: 1.45rem;
+  --ea-decor-sm: 1rem;
+  --ea-decor-md: 1.2rem;
+  --ea-decor-lg: 1.45rem;
+  padding: 0.85rem 0.7rem 1.85rem !important;
+}
+
+.vd-admin-qb-preview[data-preview-device="mobile"][data-offrefy-theme^="christmas_"] .offrefy-cta,
+.vd-admin-qb-preview[data-preview-device="mobile"][data-offrefy-theme^="newyear_"] .offrefy-cta,
+.vd-admin-qb-preview[data-preview-device="mobile"][data-offrefy-theme^="halloween_"] .offrefy-cta,
+.vd-admin-qb-preview[data-preview-device="mobile"][data-offrefy-theme^="ramadan_"] .offrefy-cta,
+.vd-admin-qb-preview[data-preview-device="mobile"][data-offrefy-theme^="diwali_"] .offrefy-cta,
+.vd-admin-qb-preview[data-preview-device="mobile"][data-offrefy-theme^="pongal_"] .offrefy-cta,
+.vd-admin-qb-preview[data-preview-device="mobile"][data-offrefy-theme^="valentine_"] .offrefy-cta,
+.vd-admin-qb-preview[data-preview-device="mobile"][data-offrefy-theme^="easter_"] .offrefy-cta {
+  padding-left: 2.15rem !important;
+  padding-right: 2.15rem !important;
+}
+
+@media (max-width: 420px) {
+  [data-offrefy-theme^="christmas_"],
+  [data-offrefy-theme^="newyear_"],
+  [data-offrefy-theme^="halloween_"],
+  [data-offrefy-theme^="ramadan_"],
+  [data-offrefy-theme^="diwali_"],
+  [data-offrefy-theme^="pongal_"],
+  [data-offrefy-theme^="valentine_"],
+  [data-offrefy-theme^="easter_"] {
+    --xmas-decor-sm: 1rem;
+    --xmas-decor-md: 1.15rem;
+    --xmas-decor-lg: 1.4rem;
+    --ny-decor-sm: 1rem;
+    --ny-decor-md: 1.15rem;
+    --ny-decor-lg: 1.4rem;
+    --hw-decor-sm: 1rem;
+    --hw-decor-md: 1.15rem;
+    --hw-decor-lg: 1.4rem;
+    --vl-decor-sm: 1rem;
+    --vl-decor-md: 1.15rem;
+    --vl-decor-lg: 1.4rem;
+    --ea-decor-sm: 1rem;
+    --ea-decor-md: 1.15rem;
+    --ea-decor-lg: 1.4rem;
+    padding: 0.85rem 0.7rem 1.85rem !important;
+  }
+
+  [data-offrefy-theme^="christmas_"] .offrefy-cta,
+  [data-offrefy-theme^="newyear_"] .offrefy-cta,
+  [data-offrefy-theme^="halloween_"] .offrefy-cta,
+  [data-offrefy-theme^="ramadan_"] .offrefy-cta,
+  [data-offrefy-theme^="diwali_"] .offrefy-cta,
+  [data-offrefy-theme^="pongal_"] .offrefy-cta,
+  [data-offrefy-theme^="valentine_"] .offrefy-cta,
+  [data-offrefy-theme^="easter_"] .offrefy-cta {
+    padding-left: 2.15rem !important;
+    padding-right: 2.15rem !important;
+  }
+
+  [data-offrefy-theme^="christmas_"] .offrefy-cta::before,
+  [data-offrefy-theme^="christmas_"] .offrefy-cta::after,
+  [data-offrefy-theme^="newyear_"] .offrefy-cta::before,
+  [data-offrefy-theme^="newyear_"] .offrefy-cta::after,
+  [data-offrefy-theme^="halloween_"] .offrefy-cta::before,
+  [data-offrefy-theme^="halloween_"] .offrefy-cta::after,
+  [data-offrefy-theme^="ramadan_"] .offrefy-cta::before,
+  [data-offrefy-theme^="ramadan_"] .offrefy-cta::after,
+  [data-offrefy-theme^="diwali_"] .offrefy-cta::before,
+  [data-offrefy-theme^="diwali_"] .offrefy-cta::after,
+  [data-offrefy-theme^="pongal_"] .offrefy-cta::before,
+  [data-offrefy-theme^="pongal_"] .offrefy-cta::after,
+  [data-offrefy-theme^="valentine_"] .offrefy-cta::before,
+  [data-offrefy-theme^="valentine_"] .offrefy-cta::after,
+  [data-offrefy-theme^="easter_"] .offrefy-cta::before,
+  [data-offrefy-theme^="easter_"] .offrefy-cta::after {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+}

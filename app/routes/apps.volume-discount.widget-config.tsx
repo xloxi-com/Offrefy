@@ -17,6 +17,7 @@ import {
 import { cachedJsonResponse } from "../utils/httpCache.server";
 import { volumeDiscountCampaignSyncSelect } from "../utils/volumeDiscountCampaignSelect.server";
 import { storefrontLiveCampaignWhere } from "../utils/campaignScheduleStatus";
+import { applyShopCampaignScheduleTransitionsIfNeeded } from "../services/scheduledVolumeDiscountSync.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 async function persistDbOnlyStorefrontPayload(
@@ -100,6 +101,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (!shop) {
     return emptyJson(request);
   }
+
+  // Schedule start due → flip Scheduled→Active and force Shopify AD startsAt refresh
+  // so cart discounts apply as soon as the widget appears (not after cron lag).
+  applyShopCampaignScheduleTransitionsIfNeeded(shop);
 
   const productId = url.searchParams.get("product_id")?.trim() ?? "";
   const variantId = url.searchParams.get("variant_id")?.trim() ?? "";

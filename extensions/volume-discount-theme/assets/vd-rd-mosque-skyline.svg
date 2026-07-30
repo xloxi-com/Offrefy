@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 80" fill="none" aria-hidden="true">
+  <!-- Soft mosque skyline — gold silhouette, transparent -->
+  <defs>
+    <linearGradient id="rdSkyG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d4af37" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#8a6a18" stop-opacity="0.32"/>
+    </linearGradient>
+  </defs>
+  <g fill="url(#rdSkyG)">
+    <!-- Far left minaret -->
+    <rect x="12" y="28" width="6" height="48" rx="1.2"/>
+    <rect x="9.5" y="24" width="11" height="4.5" rx="1"/>
+    <path d="M15 10 L18.5 24 H11.5 Z"/>
+    <!-- Left dome building -->
+    <path d="M28 76 V44 Q28 32 44 32 Q60 32 60 44 V76 Z"/>
+    <circle cx="44" cy="28" r="10"/>
+    <!-- Center grand mosque -->
+    <path d="M68 76 V36 Q68 18 110 18 Q152 18 152 36 V76 Z"/>
+    <circle cx="110" cy="12" r="18"/>
+    <rect x="106.5" y="0" width="7" height="8" rx="1"/>
+    <path d="M110 -3 L113.5 5 H106.5 Z"/>
+    <!-- Mid right building -->
+    <path d="M160 76 V42 Q160 30 178 30 Q196 30 196 42 V76 Z"/>
+    <circle cx="178" cy="26" r="10"/>
+    <!-- Right minaret -->
+    <rect x="208" y="22" width="6" height="54" rx="1.2"/>
+    <rect x="205.5" y="18" width="11" height="4.5" rx="1"/>
+    <path d="M211 6 L214.5 18 H207.5 Z"/>
+    <!-- Far right small -->
+    <path d="M228 76 V48 Q228 38 242 38 Q256 38 256 48 V76 Z"/>
+    <circle cx="242" cy="34" r="8"/>
+    <rect x="268" y="30" width="5.5" height="46" rx="1"/>
+    <path d="M270.75 16 L274 30 H267.5 Z"/>
+    <path d="M286 76 V50 Q286 42 298 42 Q310 42 310 50 V76 Z"/>
+    <circle cx="298" cy="38" r="7"/>
+    <!-- Soft ground -->
+    <rect x="8" y="74" width="310" height="4" rx="2" opacity="0.4"/>
+  </g>
+</svg>

@@ -1,0 +1,189 @@
+{
+  "name": "function.wasm",
+  "size": 27,
+  "memory_usage": 1344,
+  "instructions": 848524,
+  "logs": "",
+  "input": {
+    "payload": {
+      "export": "cart-lines-discounts-generate-run",
+      "input": {
+        "cart": {
+          "buyerIdentity": {
+            "customer": null,
+            "isAuthenticated": false
+          },
+          "lines": [
+            {
+              "cost": {
+                "subtotalAmount": {
+                  "amount": "100.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "id": "gid://shopify/CartLine/pct",
+              "merchandise": {
+                "__typename": "ProductVariant",
+                "id": "gid://shopify/ProductVariant/1",
+                "product": {
+                  "id": "gid://shopify/Product/2001",
+                  "tiersMetafield": {
+                    "jsonValue": {
+                      "c": "camp-pct",
+                      "ct": "e",
+                      "m": "{{ discount }} OFF",
+                      "q": "v",
+                      "t": [
+                        {
+                          "m": 3,
+                          "p": 10
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              "quantity": 5
+            },
+            {
+              "cost": {
+                "subtotalAmount": {
+                  "amount": "50.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "id": "gid://shopify/CartLine/amount-each",
+              "merchandise": {
+                "__typename": "ProductVariant",
+                "id": "gid://shopify/ProductVariant/2",
+                "product": {
+                  "id": "gid://shopify/Product/2002",
+                  "tiersMetafield": {
+                    "jsonValue": {
+                      "c": "camp-ae",
+                      "ct": "e",
+                      "m": "{{ discount }} OFF",
+                      "q": "v",
+                      "t": [
+                        {
+                          "e": 1,
+                          "f": 2,
+                          "m": 3
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              "quantity": 5
+            },
+            {
+              "cost": {
+                "subtotalAmount": {
+                  "amount": "40.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "id": "gid://shopify/CartLine/fixed-price",
+              "merchandise": {
+                "__typename": "ProductVariant",
+                "id": "gid://shopify/ProductVariant/3",
+                "product": {
+                  "id": "gid://shopify/Product/2003",
+                  "tiersMetafield": {
+                    "jsonValue": {
+                      "c": "camp-fp",
+                      "ct": "e",
+                      "m": "{{ amount }} OFF",
+                      "q": "v",
+                      "t": [
+                        {
+                          "fp": 7,
+                          "m": 2
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              "quantity": 4
+            }
+          ]
+        },
+        "discount": {
+          "discountClasses": [
+            "PRODUCT"
+          ],
+          "ruleSource": {
+            "jsonValue": {
+              "mode": "metafield"
+            }
+          }
+        }
+      },
+      "output": {
+        "operations": [
+          {
+            "productDiscountsAdd": {
+              "candidates": [
+                {
+                  "message": "10% OFF",
+                  "targets": [
+                    {
+                      "cartLine": {
+                        "id": "gid://shopify/CartLine/pct"
+                      }
+                    }
+                  ],
+                  "value": {
+                    "percentage": {
+                      "value": "10"
+                    }
+                  }
+                },
+                {
+                  "message": "$10.00",
+                  "targets": [
+                    {
+                      "cartLine": {
+                        "id": "gid://shopify/CartLine/amount-each"
+                      }
+                    }
+                  ],
+                  "value": {
+                    "fixedAmount": {
+                      "amount": "2",
+                      "appliesToEachItem": true
+                    }
+                  }
+                },
+                {
+                  "message": "$12.00",
+                  "targets": [
+                    {
+                      "cartLine": {
+                        "id": "gid://shopify/CartLine/fixed-price"
+                      }
+                    }
+                  ],
+                  "value": {
+                    "fixedAmount": {
+                      "amount": "12",
+                      "appliesToEachItem": false
+                    }
+                  }
+                }
+              ],
+              "selectionStrategy": "ALL"
+            }
+          }
+        ]
+      },
+      "target": "cart.lines.discounts.generate.run"
+    }
+  },
+  "output": {
+    "operations": []
+  },
+  "success": true
+}

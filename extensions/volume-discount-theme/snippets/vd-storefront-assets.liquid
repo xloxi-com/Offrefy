@@ -31,11 +31,17 @@
     elsif locale_trans.transQty != blank
       assign vd_cart_discount_qty = '(' | append: locale_trans.transQty | append: ' {{ qty }})'
     endif
+    if vd_widget.translations.en and vd_widget.translations.en.transCartDiscount != blank
+      assign vd_en_cart = vd_widget.translations.en.transCartDiscount
+      if vd_en_cart contains 'amount' and vd_cart_discount contains 'discount'
+        assign vd_cart_discount = vd_cart_discount | replace: '{{ discount }}', '{{ amount }}' | replace: '{{discount}}', '{{ amount }}'
+      endif
+    endif
   endif
 %}
 <script>
 (function () {
-  var VD_ASSET_VERSION = "1.30.6";
+  var VD_ASSET_VERSION = "1.31.12";
   /* App host for rare hosted-asset fallback — not the merchant shop origin. */
   var APP_ORIGIN = "https://offrey.xloxi.com";
 
@@ -192,7 +198,8 @@
 
   o.storefrontAssetsLoaded = true;
   var head = document.head || document.getElementsByTagName("head")[0];
-  /* CSS is also declared via block schema "stylesheet" — skip duplicate <link> when present. */
+  /* Load CSS here (not schema "stylesheet") — storefront CSS exceeds Shopify's 100KB
+     AssetSizeAppBlockCSS suggested limit for schema-referenced stylesheets. */
   if (!document.querySelector('link[href*="volume-discount-storefront.css"]')) {
     var cssHref = {{ 'volume-discount-storefront.css' | asset_url | json }};
     cssHref +=

@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Link, useFetcher, useLocation, useRevalidator } from "react-router";
+import { Link, useFetcher, useLocation } from "react-router";
 import {
   Badge,
   BlockStack,
@@ -43,7 +43,6 @@ import {
   DiscountIcon,
   DuplicateIcon,
   EditIcon,
-  RefreshIcon,
 } from "@shopify/polaris-icons";
 
 import styles from "../styles/offers-dashboard.module.css";
@@ -75,6 +74,8 @@ export type OfferCampaignRow = {
   status: string;
   createdAt: string;
   updatedAt: string;
+  countdownStartsAt?: string | null;
+  countdownEndsAt?: string | null;
   widgetPresentation: VolumeDiscountWidgetPresentation;
 };
 
@@ -651,38 +652,72 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
 
   const upgradeLabel = t("common.upgradePlan");
 
-  const offersTableBulkActions = useMemo(
+  const runBulkActivate = useCallback(() => {
+    if (selectedResources.length === 0) return;
+    if (atCampaignCap) {
+      showOfferLimitReached();
+      return;
+    }
+    const fd = new FormData();
+    fd.set("_action", "bulkActivate");
+    for (const id of selectedResources) {
+      fd.append("campaignIds", id);
+    }
+    listFetcher.submit(fd, { method: "post", action: listIndexAction });
+  }, [
+    atCampaignCap,
+    listFetcher,
+    listIndexAction,
+    selectedResources,
+    showOfferLimitReached,
+  ]);
+
+  const runBulkDraft = useCallback(() => {
+    if (selectedResources.length === 0) return;
+    const fd = new FormData();
+    fd.set("_action", "bulkDeactivate");
+    for (const id of selectedResources) {
+      fd.append("campaignIds", id);
+    }
+    listFetcher.submit(fd, { method: "post", action: listIndexAction });
+  }, [listFetcher, listIndexAction, selectedResources]);
+
+  const runBulkDelete = useCallback(() => {
+    if (selectedResources.length === 0) return;
+    setPendingDeleteIds([...selectedResources]);
+  }, [selectedResources]);
+
+  const offerBulkActions = useMemo(
     () => [
       {
-        content: t("offers.bulk.active"),
+        content: planLockedActionContent(
+          t("offers.bulk.active"),
+          atCampaignCap,
+          upgradeLabel,
+        ),
+        onAction: runBulkActivate,
         disabled: listMutationPending || atCampaignCap,
-        suffix: atCampaignCap ? <PlanUpgradeBadge /> : undefined,
-        onAction: () => {
-          if (atCampaignCap) {
-            showOfferLimitReached();
-            return;
-          }
-          submitBulkStatus("bulkActivate");
-        },
       },
       {
         content: t("offers.bulk.draft"),
-        onAction: () => submitBulkStatus("bulkDeactivate"),
+        onAction: runBulkDraft,
         disabled: listMutationPending,
       },
       {
         content: t("offers.bulk.delete"),
-        onAction: () => setPendingDeleteIds([...selectedResources]),
-        destructive: true,
+        onAction: runBulkDelete,
         disabled: listMutationPending,
+        destructive: true,
       },
     ],
     [
       atCampaignCap,
       listMutationPending,
-      selectedResources,
-      showOfferLimitReached,
+      runBulkActivate,
+      runBulkDelete,
+      runBulkDraft,
       t,
+      upgradeLabel,
     ],
   );
 
@@ -823,20 +858,8 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     ],
   );
 
-  const revalidator = useRevalidator();
-  const isReloading = revalidator.state === "loading";
-
   const pageSecondaryActions = useMemo(
     () => [
-      {
-        // Icon-only reload, same pattern as Analytics.
-        content: "",
-        icon: RefreshIcon,
-        loading: isReloading,
-        disabled: isReloading,
-        onAction: () => revalidator.revalidate(),
-        accessibilityLabel: t("common.reload"),
-      },
       {
         content: planLockedActionContent(
           t("common.export"),
@@ -867,9 +890,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
       canExportOffers,
       canImportExport,
       csvExportPending,
-      isReloading,
       notify,
-      revalidator,
       submitExportCsv,
       t,
       upgradeLabel,
@@ -955,9 +976,10 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
               itemCount={filteredCampaigns.length}
               hasMoreItems={false}
               selectedItemsCount={selectedItemsCountForTable}
-              bulkActions={offersTableBulkActions}
               onSelectionChange={handleOffersSelectionChange}
               selectable
+              promotedBulkActions={offerBulkActions}
+              bulkActions={offerBulkActions}
               headings={[
                 {
                   id: "campaign-name",

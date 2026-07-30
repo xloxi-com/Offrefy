@@ -1,0 +1,780 @@
+/* —— Christmas seasonal decorations (Fluent UI 3D emoji images) —— */
+/* Assets: Microsoft Fluent Emoji (MIT) https://github.com/microsoft/fluentui-emoji */
+
+[data-offrefy-theme^="christmas_"] {
+  --xmas-navy: #14532d;
+  --xmas-decor-sm: clamp(1.05rem, 4.2vw, 1.35rem);
+  --xmas-decor-md: clamp(1.35rem, 5.5vw, 1.85rem);
+  --xmas-decor-lg: clamp(1.55rem, 6.5vw, 2.15rem);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden !important;
+  padding: 1.05rem 0.85rem 2.35rem !important;
+  border-radius: 18px;
+  border: 1.5px solid rgba(20, 83, 45, 0.14);
+  background-color: #ffffff;
+  background-image:
+    url("/christmas/gift.png"),
+    url("/christmas/tree.png"),
+    url("/christmas/candy.png"),
+    url("/christmas/star.png"),
+    url("/christmas/sparkles.png"),
+    radial-gradient(ellipse 70% 40% at 50% -5%, rgba(220, 38, 38, 0.06), transparent 55%);
+  background-repeat: no-repeat;
+  background-size:
+    var(--xmas-decor-lg) auto,
+    var(--xmas-decor-lg) auto,
+    var(--xmas-decor-sm) auto,
+    var(--xmas-decor-sm) auto,
+    var(--xmas-decor-sm) auto,
+    auto;
+  background-position:
+    left 0.35rem bottom 0.2rem,
+    right 0.3rem bottom 0.15rem,
+    left 36% bottom 0.45rem,
+    right 36% bottom 0.4rem,
+    center bottom 0.35rem,
+    center top;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.07);
+  box-sizing: border-box;
+}
+
+[data-offrefy-theme^="christmas_"]::before,
+[data-offrefy-theme^="christmas_"]::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+  top: 0.2rem;
+  width: var(--xmas-decor-lg);
+  height: var(--xmas-decor-lg);
+  background-repeat: no-repeat;
+  background-size: contain;
+  opacity: 0.95;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
+}
+
+[data-offrefy-theme^="christmas_"]::before {
+  left: 0.2rem;
+  background-image: url("/christmas/tree.png");
+}
+
+[data-offrefy-theme^="christmas_"]::after {
+  right: 0.2rem;
+  background-image: url("/christmas/tree.png");
+  transform: scaleX(-1);
+}
+
+[data-offrefy-theme^="christmas_"] .offrefy-topbar,
+[data-offrefy-theme^="christmas_"] .offrefy-cards,
+[data-offrefy-theme^="christmas_"] .offrefy-cta,
+[data-offrefy-theme^="christmas_"] .offrefy-title,
+[data-offrefy-theme^="christmas_"] > * {
+  position: relative;
+  z-index: 1;
+}
+
+[data-offrefy-theme^="christmas_"] .offrefy-topbar {
+  position: relative;
+  margin-bottom: 0.9rem !important;
+  padding-bottom: 0.9rem !important;
+  border-bottom: 1.5px dashed rgba(185, 28, 28, 0.28) !important;
+}
+
+[data-offrefy-theme^="christmas_"] .offrefy-topbar::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -0.55rem;
+  width: var(--xmas-decor-sm);
+  height: var(--xmas-decor-sm);
+  transform: translateX(-50%);
+  background: url("/christmas/bell.png") center / contain no-repeat;
+  pointer-events: none;
+  z-index: 2;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
+}
+
+[data-offrefy-theme^="christmas_"] .offrefy-title {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  color: var(--xmas-navy);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  padding-inline: clamp(1.6rem, 7vw, 2.1rem);
+}
+
+[data-offrefy-theme^="christmas_"] .offrefy-title::before,
+[data-offrefy-theme^="christmas_"] .offrefy-title::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: var(--xmas-decor-md);
+  height: var(--xmas-decor-md);
+  transform: translateY(-50%);
+  background: url("/christmas/star.png") center / contain no-repeat;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.14));
+}
+
+[data-offrefy-theme^="christmas_"] .offrefy-title::before { left: 0; }
+[data-offrefy-theme^="christmas_"] .offrefy-title::after { right: 0; }
+
+[data-offrefy-theme^="christmas_"] .offrefy-cards {
+  position: relative;
+  margin-bottom: 0.55rem;
+  margin-inline: 0.1rem;
+}
+
+[data-offrefy-theme^="christmas_"] .offrefy-card {
+  position: relative;
+  overflow: visible !important;
+}
+
+/* Keep side ornaments inside the frame (no hanging overflow). */
+[data-offrefy-theme^="christmas_"] .offrefy-cards::before,
+[data-offrefy-theme^="christmas_"] .offrefy-cards::after {
+  content: none;
+}
+
+[data-offrefy-theme^="christmas_"] .offrefy-cta {
+  position: relative !important;
+  overflow: hidden !important;
+  z-index: 1;
+  background: linear-gradient(180deg, #dc2626 0%, #b91c1c 55%, #991b1b 100%) !important;
+  border: 1.5px solid rgba(251, 191, 36, 0.85) !important;
+  box-shadow: 0 8px 20px rgba(153, 27, 27, 0.22);
+  padding-left: 2.75rem !important;
+  padding-right: 2.75rem !important;
+}
+
+[data-offrefy-theme^="christmas_"] .offrefy-cta::before {
+  content: "";
+  position: absolute;
+  left: 0.65rem;
+  top: 50%;
+  width: 1.35rem;
+  height: 1.35rem;
+  transform: translateY(-50%);
+  background: url("/christmas/tree.png") center / contain no-repeat;
+  pointer-events: none;
+}
+
+[data-offrefy-theme^="christmas_"] .offrefy-cta::after {
+  content: "";
+  position: absolute;
+  right: 0.65rem;
+  top: 50%;
+  width: 1.35rem;
+  height: 1.35rem;
+  transform: translateY(-50%);
+  background: url("/christmas/gift.png") center / contain no-repeat;
+  pointer-events: none;
+}
+
+[data-offrefy-theme^="christmas_"] .offrefy-badge-pill {
+  box-shadow: 0 0 0 1.5px rgba(251, 191, 36, 0.65), 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* —— Per-template —— */
+
+[data-offrefy-theme="christmas_candy_cane"] {
+  background-color: #fffbfb;
+  border-color: rgba(190, 18, 60, 0.22);
+  background-image:
+    url("/christmas/candy.png"),
+    url("/christmas/lollipop.png"),
+    url("/christmas/candy.png"),
+    url("/christmas/star.png"),
+    url("/christmas/sparkles.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(254, 226, 226, 0.55), transparent 60%);
+  background-repeat: no-repeat;
+  background-size: 2.5rem auto, 2.5rem auto, 1.4rem auto, 1.25rem auto, 1.1rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.1rem, left 36% bottom 0.5rem, right 36% bottom 0.45rem, center bottom 0.4rem, center top;
+}
+[data-offrefy-theme="christmas_candy_cane"]::before,
+[data-offrefy-theme="christmas_candy_cane"]::after {
+  background-image: url("/christmas/candy.png");
+}
+[data-offrefy-theme="christmas_candy_cane"] .offrefy-title { color: #9f1239; }
+[data-offrefy-theme="christmas_candy_cane"] .offrefy-title::before,
+[data-offrefy-theme="christmas_candy_cane"] .offrefy-title::after {
+  background-image: url("/christmas/candy.png");
+}
+[data-offrefy-theme="christmas_candy_cane"] .offrefy-cards::before {
+  background-image: url("/christmas/candy.png");
+}
+[data-offrefy-theme="christmas_candy_cane"] .offrefy-cards::after {
+  background-image: url("/christmas/lollipop.png");
+}
+[data-offrefy-theme="christmas_candy_cane"] .offrefy-card.offrefy-card--selected {
+  border: 2.5px solid transparent !important;
+  background:
+    linear-gradient(165deg, #ffffff 0%, #fff7f7 100%) padding-box,
+    repeating-linear-gradient(-45deg, #be123c 0 5px, #ffffff 5px 10px, #be123c 10px 15px, #f59e0b 15px 17px) border-box !important;
+  background-clip: padding-box, border-box !important;
+  box-shadow: 0 10px 26px rgba(190, 18, 60, 0.14) !important;
+}
+[data-offrefy-theme="christmas_candy_cane"] .offrefy-card.offrefy-card--selected::before {
+  content: "";
+  position: absolute;
+  top: -0.5rem;
+  left: 0.35rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  background: url("/christmas/candy.png") center / contain no-repeat;
+  z-index: 5;
+  pointer-events: none;
+}
+[data-offrefy-theme="christmas_candy_cane"] .offrefy-card.offrefy-card--selected::after { content: none; }
+[data-offrefy-theme="christmas_candy_cane"] .offrefy-cta {
+  background: linear-gradient(180deg, #e11d48 0%, #be123c 55%, #9f1239 100%) !important;
+}
+[data-offrefy-theme="christmas_candy_cane"] .offrefy-cta::before {
+  background-image: url("/christmas/candy.png");
+}
+[data-offrefy-theme="christmas_candy_cane"] .offrefy-cta::after {
+  background-image: url("/christmas/lollipop.png");
+}
+
+[data-offrefy-theme="christmas_holly_bow"] {
+  background-color: #f7fef9;
+  border-color: rgba(22, 101, 52, 0.22);
+  background-image:
+    url("/christmas/herb.png"),
+    url("/christmas/ribbon.png"),
+    url("/christmas/heart.png"),
+    url("/christmas/star.png"),
+    url("/christmas/sparkles.png"),
+    radial-gradient(ellipse 70% 40% at 50% -5%, rgba(22, 101, 52, 0.1), transparent 55%);
+  background-repeat: no-repeat;
+  background-size: 2.5rem auto, 2.5rem auto, 1.4rem auto, 1.25rem auto, 1.1rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.1rem, left 36% bottom 0.5rem, right 36% bottom 0.45rem, center bottom 0.4rem, center top;
+}
+[data-offrefy-theme="christmas_holly_bow"]::before,
+[data-offrefy-theme="christmas_holly_bow"]::after {
+  background-image: url("/christmas/herb.png");
+}
+[data-offrefy-theme="christmas_holly_bow"] .offrefy-title { color: #14532d; }
+[data-offrefy-theme="christmas_holly_bow"] .offrefy-title::before,
+[data-offrefy-theme="christmas_holly_bow"] .offrefy-title::after {
+  background-image: url("/christmas/ribbon.png");
+}
+[data-offrefy-theme="christmas_holly_bow"] .offrefy-cards::before {
+  background-image: url("/christmas/herb.png");
+}
+[data-offrefy-theme="christmas_holly_bow"] .offrefy-cards::after {
+  background-image: url("/christmas/heart.png");
+}
+[data-offrefy-theme="christmas_holly_bow"] .offrefy-card.offrefy-card--selected {
+  border: 2px solid #166534 !important;
+  background: linear-gradient(165deg, #ffffff 0%, #ecfdf5 100%) !important;
+  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.3), 0 10px 26px rgba(22, 101, 52, 0.12) !important;
+}
+[data-offrefy-theme="christmas_holly_bow"] .offrefy-card.offrefy-card--selected::before {
+  content: "";
+  position: absolute;
+  top: -0.5rem;
+  left: 0.35rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  background: url("/christmas/ribbon.png") center / contain no-repeat;
+  z-index: 5;
+  pointer-events: none;
+}
+[data-offrefy-theme="christmas_holly_bow"] .offrefy-card.offrefy-card--selected::after { content: none; }
+[data-offrefy-theme="christmas_holly_bow"] .offrefy-cta {
+  background: linear-gradient(180deg, #16a34a 0%, #166534 100%) !important;
+  border-color: #dc2626 !important;
+}
+[data-offrefy-theme="christmas_holly_bow"] .offrefy-cta::before {
+  background-image: url("/christmas/herb.png");
+}
+[data-offrefy-theme="christmas_holly_bow"] .offrefy-cta::after {
+  background-image: url("/christmas/ribbon.png");
+}
+
+[data-offrefy-theme="christmas_snowflake"] {
+  background-color: #f8fafc;
+  border-color: rgba(14, 116, 144, 0.22);
+  background-image:
+    url("/christmas/snowflake.png"),
+    url("/christmas/snowman.png"),
+    url("/christmas/snowcloud.png"),
+    url("/christmas/star.png"),
+    url("/christmas/sparkles.png"),
+    radial-gradient(ellipse 70% 40% at 50% -5%, rgba(14, 116, 144, 0.1), transparent 55%);
+  background-repeat: no-repeat;
+  background-size: 2.5rem auto, 2.5rem auto, 1.45rem auto, 1.25rem auto, 1.1rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.1rem, left 36% bottom 0.5rem, right 36% bottom 0.45rem, center bottom 0.4rem, center top;
+}
+[data-offrefy-theme="christmas_snowflake"]::before,
+[data-offrefy-theme="christmas_snowflake"]::after {
+  background-image: url("/christmas/snowflake.png");
+}
+[data-offrefy-theme="christmas_snowflake"] .offrefy-title { color: #0e7490; }
+[data-offrefy-theme="christmas_snowflake"] .offrefy-title::before,
+[data-offrefy-theme="christmas_snowflake"] .offrefy-title::after {
+  background-image: url("/christmas/snowflake.png");
+}
+[data-offrefy-theme="christmas_snowflake"] .offrefy-cards::before {
+  background-image: url("/christmas/snowflake.png");
+}
+[data-offrefy-theme="christmas_snowflake"] .offrefy-cards::after {
+  background-image: url("/christmas/snowman.png");
+}
+[data-offrefy-theme="christmas_snowflake"] .offrefy-card.offrefy-card--selected {
+  border: 2px solid #0e7490 !important;
+  background: linear-gradient(165deg, #ffffff 0%, #ecfeff 100%) !important;
+  box-shadow: 0 10px 28px rgba(14, 116, 144, 0.14) !important;
+}
+[data-offrefy-theme="christmas_snowflake"] .offrefy-card.offrefy-card--selected::before {
+  content: "";
+  position: absolute;
+  top: -0.5rem;
+  left: 0.35rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  background: url("/christmas/snowflake.png") center / contain no-repeat;
+  z-index: 5;
+  pointer-events: none;
+}
+[data-offrefy-theme="christmas_snowflake"] .offrefy-card.offrefy-card--selected::after { content: none; }
+[data-offrefy-theme="christmas_snowflake"] .offrefy-cta {
+  background: linear-gradient(180deg, #06b6d4 0%, #0e7490 100%) !important;
+  border-color: #e0f2fe !important;
+}
+[data-offrefy-theme="christmas_snowflake"] .offrefy-cta::before,
+[data-offrefy-theme="christmas_snowflake"] .offrefy-cta::after {
+  background-image: url("/christmas/snowflake.png");
+}
+
+[data-offrefy-theme="christmas_gift_wrap"] {
+  background-color: #fffbeb;
+  border-color: rgba(180, 83, 9, 0.24);
+  background-image:
+    url("/christmas/gift.png"),
+    url("/christmas/socks.png"),
+    url("/christmas/ribbon.png"),
+    url("/christmas/star.png"),
+    url("/christmas/sparkles.png"),
+    radial-gradient(ellipse 70% 40% at 50% -5%, rgba(245, 158, 11, 0.12), transparent 55%);
+  background-repeat: no-repeat;
+  background-size: 2.6rem auto, 2.5rem auto, 1.4rem auto, 1.25rem auto, 1.1rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.1rem, left 36% bottom 0.5rem, right 36% bottom 0.45rem, center bottom 0.4rem, center top;
+}
+[data-offrefy-theme="christmas_gift_wrap"]::before {
+  background-image: url("/christmas/gift.png");
+}
+[data-offrefy-theme="christmas_gift_wrap"]::after {
+  background-image: url("/christmas/socks.png");
+  transform: none;
+}
+[data-offrefy-theme="christmas_gift_wrap"] .offrefy-title { color: #92400e; }
+[data-offrefy-theme="christmas_gift_wrap"] .offrefy-title::before,
+[data-offrefy-theme="christmas_gift_wrap"] .offrefy-title::after {
+  background-image: url("/christmas/gift.png");
+}
+[data-offrefy-theme="christmas_gift_wrap"] .offrefy-cards::before {
+  background-image: url("/christmas/gift.png");
+}
+[data-offrefy-theme="christmas_gift_wrap"] .offrefy-cards::after {
+  background-image: url("/christmas/ribbon.png");
+}
+[data-offrefy-theme="christmas_gift_wrap"] .offrefy-card.offrefy-card--selected {
+  border: 2px solid #b45309 !important;
+  background: linear-gradient(165deg, #ffffff 0%, #fffbeb 100%) !important;
+  box-shadow: 0 10px 26px rgba(180, 83, 9, 0.14) !important;
+}
+[data-offrefy-theme="christmas_gift_wrap"] .offrefy-card.offrefy-card--selected::before {
+  content: "";
+  position: absolute;
+  top: -0.5rem;
+  left: 0.35rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  background: url("/christmas/gift.png") center / contain no-repeat;
+  z-index: 5;
+  pointer-events: none;
+}
+[data-offrefy-theme="christmas_gift_wrap"] .offrefy-card.offrefy-card--selected::after { content: none; }
+[data-offrefy-theme="christmas_gift_wrap"] .offrefy-cta {
+  background: linear-gradient(180deg, #f59e0b 0%, #b45309 100%) !important;
+  color: #1c1917 !important;
+  border-color: #fff !important;
+}
+[data-offrefy-theme="christmas_gift_wrap"] .offrefy-cta::before {
+  background-image: url("/christmas/gift.png");
+}
+[data-offrefy-theme="christmas_gift_wrap"] .offrefy-cta::after {
+  background-image: url("/christmas/socks.png");
+}
+
+[data-offrefy-theme="christmas_santa_sleigh"] {
+  background-color: #fff8f8;
+  border-color: rgba(159, 18, 57, 0.24);
+  background-image:
+    url("/christmas/santa.png"),
+    url("/christmas/deer.png"),
+    url("/christmas/gift.png"),
+    url("/christmas/bell.png"),
+    url("/christmas/sparkles.png"),
+    radial-gradient(ellipse 70% 40% at 50% -5%, rgba(220, 38, 38, 0.1), transparent 55%);
+  background-repeat: no-repeat;
+  background-size: 2.7rem auto, 2.7rem auto, 1.4rem auto, 1.3rem auto, 1.1rem auto, auto;
+  background-position: left 0.25rem bottom 0.1rem, right 0.2rem bottom 0.1rem, left 36% bottom 0.5rem, right 36% bottom 0.45rem, center bottom 0.4rem, center top;
+}
+[data-offrefy-theme="christmas_santa_sleigh"]::before {
+  background-image: url("/christmas/santa.png");
+}
+[data-offrefy-theme="christmas_santa_sleigh"]::after {
+  background-image: url("/christmas/deer.png");
+  transform: none;
+}
+[data-offrefy-theme="christmas_santa_sleigh"] .offrefy-title { color: #9f1239; }
+[data-offrefy-theme="christmas_santa_sleigh"] .offrefy-title::before {
+  background-image: url("/christmas/santa.png");
+}
+[data-offrefy-theme="christmas_santa_sleigh"] .offrefy-title::after {
+  background-image: url("/christmas/deer.png");
+}
+[data-offrefy-theme="christmas_santa_sleigh"] .offrefy-cards::before {
+  background-image: url("/christmas/santa.png");
+}
+[data-offrefy-theme="christmas_santa_sleigh"] .offrefy-cards::after {
+  background-image: url("/christmas/deer.png");
+}
+[data-offrefy-theme="christmas_santa_sleigh"] .offrefy-card.offrefy-card--selected {
+  border: 2px solid #9f1239 !important;
+  background: linear-gradient(165deg, #ffffff 0%, #fff1f2 100%) !important;
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.45), 0 10px 26px rgba(159, 18, 57, 0.14) !important;
+}
+[data-offrefy-theme="christmas_santa_sleigh"] .offrefy-card.offrefy-card--selected::before {
+  content: "";
+  position: absolute;
+  top: -0.55rem;
+  left: 0.3rem;
+  width: 1.55rem;
+  height: 1.55rem;
+  background: url("/christmas/santa.png") center / contain no-repeat;
+  z-index: 5;
+  pointer-events: none;
+}
+[data-offrefy-theme="christmas_santa_sleigh"] .offrefy-card.offrefy-card--selected::after { content: none; }
+[data-offrefy-theme="christmas_santa_sleigh"] .offrefy-cta {
+  background: linear-gradient(180deg, #e11d48 0%, #9f1239 100%) !important;
+}
+[data-offrefy-theme="christmas_santa_sleigh"] .offrefy-cta::before {
+  background-image: url("/christmas/santa.png");
+}
+[data-offrefy-theme="christmas_santa_sleigh"] .offrefy-cta::after {
+  background-image: url("/christmas/deer.png");
+}
+
+[data-offrefy-theme="christmas_velvet"] {
+  background-color: #fff7f8;
+  border-color: rgba(76, 5, 25, 0.22);
+  background-image:
+    url("/christmas/crown.png"),
+    url("/christmas/gem.png"),
+    url("/christmas/heart.png"),
+    url("/christmas/candle.png"),
+    url("/christmas/sparkles.png"),
+    radial-gradient(ellipse 70% 40% at 50% -5%, rgba(136, 19, 55, 0.1), transparent 55%);
+  background-repeat: no-repeat;
+  background-size: 2.5rem auto, 2.4rem auto, 1.4rem auto, 1.35rem auto, 1.1rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 36% bottom 0.5rem, right 36% bottom 0.45rem, center bottom 0.4rem, center top;
+}
+[data-offrefy-theme="christmas_velvet"]::before {
+  background-image: url("/christmas/crown.png");
+}
+[data-offrefy-theme="christmas_velvet"]::after {
+  background-image: url("/christmas/gem.png");
+  transform: none;
+}
+[data-offrefy-theme="christmas_velvet"] .offrefy-title { color: #4c0519; }
+[data-offrefy-theme="christmas_velvet"] .offrefy-title::before,
+[data-offrefy-theme="christmas_velvet"] .offrefy-title::after {
+  background-image: url("/christmas/crown.png");
+}
+[data-offrefy-theme="christmas_velvet"] .offrefy-cards::before {
+  background-image: url("/christmas/crown.png");
+}
+[data-offrefy-theme="christmas_velvet"] .offrefy-cards::after {
+  background-image: url("/christmas/gem.png");
+}
+[data-offrefy-theme="christmas_velvet"] .offrefy-card.offrefy-card--selected {
+  border: 2px solid #4c0519 !important;
+  background: linear-gradient(165deg, #ffffff 0%, #fff1f2 100%) !important;
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.4), 0 10px 26px rgba(76, 5, 25, 0.14) !important;
+}
+[data-offrefy-theme="christmas_velvet"] .offrefy-card.offrefy-card--selected::before {
+  content: "";
+  position: absolute;
+  top: -0.45rem;
+  left: 0.35rem;
+  width: 1.4rem;
+  height: 1.4rem;
+  background: url("/christmas/crown.png") center / contain no-repeat;
+  z-index: 5;
+  pointer-events: none;
+}
+[data-offrefy-theme="christmas_velvet"] .offrefy-card.offrefy-card--selected::after { content: none; }
+[data-offrefy-theme="christmas_velvet"] .offrefy-cta {
+  background: linear-gradient(180deg, #9f1239 0%, #4c0519 100%) !important;
+  border-color: #fbbf24 !important;
+}
+[data-offrefy-theme="christmas_velvet"] .offrefy-cta::before {
+  background-image: url("/christmas/crown.png");
+}
+[data-offrefy-theme="christmas_velvet"] .offrefy-cta::after {
+  background-image: url("/christmas/gem.png");
+}
+
+[data-offrefy-theme="christmas_pearl"] {
+  background-color: #fafafa;
+  border-color: rgba(168, 162, 158, 0.35);
+  background-image:
+    url("/christmas/gem.png"),
+    url("/christmas/sparkles.png"),
+    url("/christmas/star.png"),
+    url("/christmas/snowflake.png"),
+    url("/christmas/bell.png"),
+    radial-gradient(ellipse 70% 40% at 50% -5%, rgba(214, 211, 209, 0.35), transparent 55%);
+  background-repeat: no-repeat;
+  background-size: 2.4rem auto, 2.3rem auto, 1.35rem auto, 1.35rem auto, 1.25rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 36% bottom 0.5rem, right 36% bottom 0.45rem, center bottom 0.4rem, center top;
+}
+[data-offrefy-theme="christmas_pearl"]::before,
+[data-offrefy-theme="christmas_pearl"]::after {
+  background-image: url("/christmas/gem.png");
+}
+[data-offrefy-theme="christmas_pearl"] .offrefy-title { color: #57534e; }
+[data-offrefy-theme="christmas_pearl"] .offrefy-title::before,
+[data-offrefy-theme="christmas_pearl"] .offrefy-title::after {
+  background-image: url("/christmas/sparkles.png");
+}
+[data-offrefy-theme="christmas_pearl"] .offrefy-cards::before {
+  background-image: url("/christmas/gem.png");
+}
+[data-offrefy-theme="christmas_pearl"] .offrefy-cards::after {
+  background-image: url("/christmas/sparkles.png");
+}
+[data-offrefy-theme="christmas_pearl"] .offrefy-card.offrefy-card--selected {
+  border: 2px solid #a8a29e !important;
+  background: linear-gradient(165deg, #ffffff 0%, #fafaf9 100%) !important;
+  box-shadow: 0 10px 26px rgba(120, 113, 108, 0.12) !important;
+}
+[data-offrefy-theme="christmas_pearl"] .offrefy-card.offrefy-card--selected::before {
+  content: "";
+  position: absolute;
+  top: -0.45rem;
+  left: 0.35rem;
+  width: 1.35rem;
+  height: 1.35rem;
+  background: url("/christmas/gem.png") center / contain no-repeat;
+  z-index: 5;
+  pointer-events: none;
+}
+[data-offrefy-theme="christmas_pearl"] .offrefy-card.offrefy-card--selected::after { content: none; }
+[data-offrefy-theme="christmas_pearl"] .offrefy-cta {
+  background: linear-gradient(180deg, #a8a29e 0%, #57534e 100%) !important;
+  border-color: #e7e5e4 !important;
+}
+[data-offrefy-theme="christmas_pearl"] .offrefy-cta::before {
+  background-image: url("/christmas/gem.png");
+}
+[data-offrefy-theme="christmas_pearl"] .offrefy-cta::after {
+  background-image: url("/christmas/sparkles.png");
+}
+
+[data-offrefy-theme="christmas_nordic"] {
+  background-color: #f7fee7;
+  border-color: rgba(63, 98, 18, 0.24);
+  background-image:
+    url("/christmas/evergreen.png"),
+    url("/christmas/deer.png"),
+    url("/christmas/snowflake.png"),
+    url("/christmas/star.png"),
+    url("/christmas/sparkles.png"),
+    radial-gradient(ellipse 70% 40% at 50% -5%, rgba(63, 98, 18, 0.1), transparent 55%);
+  background-repeat: no-repeat;
+  background-size: 2.6rem auto, 2.6rem auto, 1.4rem auto, 1.25rem auto, 1.1rem auto, auto;
+  background-position: left 0.3rem bottom 0.1rem, right 0.2rem bottom 0.1rem, left 36% bottom 0.5rem, right 36% bottom 0.45rem, center bottom 0.4rem, center top;
+}
+[data-offrefy-theme="christmas_nordic"]::before {
+  background-image: url("/christmas/evergreen.png");
+}
+[data-offrefy-theme="christmas_nordic"]::after {
+  background-image: url("/christmas/deer.png");
+  transform: none;
+}
+[data-offrefy-theme="christmas_nordic"] .offrefy-title { color: #3f6212; }
+[data-offrefy-theme="christmas_nordic"] .offrefy-title::before {
+  background-image: url("/christmas/evergreen.png");
+}
+[data-offrefy-theme="christmas_nordic"] .offrefy-title::after {
+  background-image: url("/christmas/snowflake.png");
+}
+[data-offrefy-theme="christmas_nordic"] .offrefy-cards::before {
+  background-image: url("/christmas/evergreen.png");
+}
+[data-offrefy-theme="christmas_nordic"] .offrefy-cards::after {
+  background-image: url("/christmas/deer.png");
+}
+[data-offrefy-theme="christmas_nordic"] .offrefy-card.offrefy-card--selected {
+  border: 2px solid #3f6212 !important;
+  background: linear-gradient(165deg, #ffffff 0%, #f7fee7 100%) !important;
+  box-shadow: 0 10px 26px rgba(63, 98, 18, 0.14) !important;
+}
+[data-offrefy-theme="christmas_nordic"] .offrefy-card.offrefy-card--selected::before {
+  content: "";
+  position: absolute;
+  top: -0.5rem;
+  left: 0.35rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  background: url("/christmas/evergreen.png") center / contain no-repeat;
+  z-index: 5;
+  pointer-events: none;
+}
+[data-offrefy-theme="christmas_nordic"] .offrefy-card.offrefy-card--selected::after { content: none; }
+[data-offrefy-theme="christmas_nordic"] .offrefy-cta {
+  background: linear-gradient(180deg, #65a30d 0%, #3f6212 100%) !important;
+  border-color: #1c1917 !important;
+}
+[data-offrefy-theme="christmas_nordic"] .offrefy-cta::before {
+  background-image: url("/christmas/evergreen.png");
+}
+[data-offrefy-theme="christmas_nordic"] .offrefy-cta::after {
+  background-image: url("/christmas/deer.png");
+}
+
+[data-offrefy-theme="christmas_cocoa"] {
+  background-color: #fffaf5;
+  border-color: rgba(120, 53, 15, 0.24);
+  background-image:
+    url("/christmas/cocoa.png"),
+    url("/christmas/cookie.png"),
+    url("/christmas/chocolate.png"),
+    url("/christmas/star.png"),
+    url("/christmas/sparkles.png"),
+    radial-gradient(ellipse 70% 40% at 50% -5%, rgba(180, 83, 9, 0.12), transparent 55%);
+  background-repeat: no-repeat;
+  background-size: 2.6rem auto, 2.5rem auto, 1.4rem auto, 1.25rem auto, 1.1rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.1rem, left 36% bottom 0.5rem, right 36% bottom 0.45rem, center bottom 0.4rem, center top;
+}
+[data-offrefy-theme="christmas_cocoa"]::before {
+  background-image: url("/christmas/cocoa.png");
+}
+[data-offrefy-theme="christmas_cocoa"]::after {
+  background-image: url("/christmas/cookie.png");
+  transform: none;
+}
+[data-offrefy-theme="christmas_cocoa"] .offrefy-title { color: #78350f; }
+[data-offrefy-theme="christmas_cocoa"] .offrefy-title::before {
+  background-image: url("/christmas/cocoa.png");
+}
+[data-offrefy-theme="christmas_cocoa"] .offrefy-title::after {
+  background-image: url("/christmas/cookie.png");
+}
+[data-offrefy-theme="christmas_cocoa"] .offrefy-cards::before {
+  background-image: url("/christmas/cocoa.png");
+}
+[data-offrefy-theme="christmas_cocoa"] .offrefy-cards::after {
+  background-image: url("/christmas/chocolate.png");
+}
+[data-offrefy-theme="christmas_cocoa"] .offrefy-card.offrefy-card--selected {
+  border: 2px solid #78350f !important;
+  background: linear-gradient(165deg, #ffffff 0%, #fff7ed 100%) !important;
+  box-shadow: 0 10px 26px rgba(120, 53, 15, 0.14) !important;
+}
+[data-offrefy-theme="christmas_cocoa"] .offrefy-card.offrefy-card--selected::before {
+  content: "";
+  position: absolute;
+  top: -0.5rem;
+  left: 0.35rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  background: url("/christmas/cocoa.png") center / contain no-repeat;
+  z-index: 5;
+  pointer-events: none;
+}
+[data-offrefy-theme="christmas_cocoa"] .offrefy-card.offrefy-card--selected::after { content: none; }
+[data-offrefy-theme="christmas_cocoa"] .offrefy-cta {
+  background: linear-gradient(180deg, #a16207 0%, #78350f 100%) !important;
+  border-color: #fde68a !important;
+}
+[data-offrefy-theme="christmas_cocoa"] .offrefy-cta::before {
+  background-image: url("/christmas/cocoa.png");
+}
+[data-offrefy-theme="christmas_cocoa"] .offrefy-cta::after {
+  background-image: url("/christmas/cookie.png");
+}
+
+[data-offrefy-theme="christmas_aurora"] {
+  background-color: #f5f3ff;
+  border-color: rgba(49, 46, 129, 0.24);
+  background-image:
+    url("/christmas/aurora.png"),
+    url("/christmas/comet.png"),
+    url("/christmas/fireworks.png"),
+    url("/christmas/star.png"),
+    url("/christmas/sparkles.png"),
+    radial-gradient(ellipse 70% 40% at 50% -5%, rgba(99, 102, 241, 0.12), transparent 55%);
+  background-repeat: no-repeat;
+  background-size: 2.7rem auto, 2.5rem auto, 1.45rem auto, 1.3rem auto, 1.1rem auto, auto;
+  background-position: left 0.25rem bottom 0.1rem, right 0.2rem bottom 0.15rem, left 36% bottom 0.45rem, right 36% bottom 0.45rem, center bottom 0.4rem, center top;
+}
+[data-offrefy-theme="christmas_aurora"]::before {
+  background-image: url("/christmas/aurora.png");
+}
+[data-offrefy-theme="christmas_aurora"]::after {
+  background-image: url("/christmas/comet.png");
+  transform: none;
+}
+[data-offrefy-theme="christmas_aurora"] .offrefy-title { color: #312e81; }
+[data-offrefy-theme="christmas_aurora"] .offrefy-title::before {
+  background-image: url("/christmas/aurora.png");
+}
+[data-offrefy-theme="christmas_aurora"] .offrefy-title::after {
+  background-image: url("/christmas/star.png");
+}
+[data-offrefy-theme="christmas_aurora"] .offrefy-cards::before {
+  background-image: url("/christmas/comet.png");
+}
+[data-offrefy-theme="christmas_aurora"] .offrefy-cards::after {
+  background-image: url("/christmas/fireworks.png");
+}
+[data-offrefy-theme="christmas_aurora"] .offrefy-card.offrefy-card--selected {
+  border: 2px solid #312e81 !important;
+  background: linear-gradient(165deg, #ffffff 0%, #eef2ff 100%) !important;
+  box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.45), 0 10px 26px rgba(49, 46, 129, 0.14) !important;
+}
+[data-offrefy-theme="christmas_aurora"] .offrefy-card.offrefy-card--selected::before {
+  content: "";
+  position: absolute;
+  top: -0.5rem;
+  left: 0.35rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  background: url("/christmas/star.png") center / contain no-repeat;
+  z-index: 5;
+  pointer-events: none;
+}
+[data-offrefy-theme="christmas_aurora"] .offrefy-card.offrefy-card--selected::after { content: none; }
+[data-offrefy-theme="christmas_aurora"] .offrefy-cta {
+  background: linear-gradient(180deg, #6366f1 0%, #312e81 100%) !important;
+  border-color: #c4b5fd !important;
+}
+[data-offrefy-theme="christmas_aurora"] .offrefy-cta::before {
+  background-image: url("/christmas/aurora.png");
+}
+[data-offrefy-theme="christmas_aurora"] .offrefy-cta::after {
+  background-image: url("/christmas/comet.png");
+}
+
+.vd-admin-qb-preview[data-offrefy-theme^="christmas_"] {
+  margin-bottom: 1rem;
+}

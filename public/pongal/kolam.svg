@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+  <!-- Clean Tamil floral kolam — crisp vector decor -->
+  <g transform="translate(128 128)">
+    <!-- soft gold wash -->
+    <circle r="108" fill="#fbbf24" opacity="0.12"/>
+    <!-- outer ring -->
+    <circle r="102" stroke="#c2410c" stroke-width="2.2" opacity="0.85"/>
+    <circle r="94" stroke="#ca8a04" stroke-width="1.4" opacity="0.7"/>
+
+    <!-- 8 petals -->
+    <g stroke="#9a3412" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M0 -88 C22 -72 28 -48 0 -28 C-28 -48 -22 -72 0 -88Z" fill="#fef3c7"/>
+      <path d="M0 88 C22 72 28 48 0 28 C-28 48 -22 72 0 88Z" fill="#fef3c7"/>
+      <path d="M88 0 C72 22 48 28 28 0 C48 -28 72 -22 88 0Z" fill="#fef3c7"/>
+      <path d="M-88 0 C-72 22 -48 28 -28 0 C-48 -28 -72 -22 -88 0Z" fill="#fef3c7"/>
+      <path d="M62 -62 C66 -36 48 -22 22 -22 C36 -48 36 -66 62 -62Z" fill="#ffedd5"/>
+      <path d="M62 62 C66 36 48 22 22 22 C36 48 36 66 62 62Z" fill="#ffedd5"/>
+      <path d="M-62 62 C-66 36 -48 22 -22 22 C-36 48 -36 66 -62 62Z" fill="#ffedd5"/>
+      <path d="M-62 -62 C-66 -36 -48 -22 -22 -22 C-36 -48 -36 -66 -62 -62Z" fill="#ffedd5"/>
+    </g>
+
+    <!-- inner diamond + loops -->
+    <path d="M0 -46 L46 0 L0 46 L-46 0 Z" fill="#fff7ed" stroke="#b45309" stroke-width="2"/>
+    <path d="M0 -30 L30 0 L0 30 L-30 0 Z" fill="none" stroke="#ca8a04" stroke-width="1.5"/>
+    <circle r="14" fill="#f59e0b" stroke="#9a3412" stroke-width="1.8"/>
+    <circle r="6" fill="#fffbeb"/>
+
+    <!-- pulli accents -->
+    <g fill="#9a3412">
+      <circle cx="0" cy="-102" r="3.2"/>
+      <circle cx="0" cy="102" r="3.2"/>
+      <circle cx="102" cy="0" r="3.2"/>
+      <circle cx="-102" cy="0" r="3.2"/>
+      <circle cx="72" cy="-72" r="2.6"/>
+      <circle cx="72" cy="72" r="2.6"/>
+      <circle cx="-72" cy="72" r="2.6"/>
+      <circle cx="-72" cy="-72" r="2.6"/>
+    </g>
+
+    <!-- tiny marigold dots -->
+    <g fill="#ea580c" opacity="0.9">
+      <circle cx="0" cy="-58" r="2"/>
+      <circle cx="0" cy="58" r="2"/>
+      <circle cx="58" cy="0" r="2"/>
+      <circle cx="-58" cy="0" r="2"/>
+    </g>
+  </g>
+</svg>

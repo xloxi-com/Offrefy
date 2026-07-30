@@ -12,6 +12,7 @@ import {
 } from "./orderAnalyticsReconcile.server";
 import { syncVolumeDiscountShop } from "./volumeDiscountFunctionSync.server";
 import { touchShopLastSyncedAt } from "../utils/shopSyncState.server";
+import { discountSyncCampaignWhere } from "../utils/campaignScheduleStatus";
 
 export {
   applyDueCampaignScheduleTransitions,
@@ -24,6 +25,8 @@ type ShopSyncRow = {
 };
 
 const shopSyncInFlight = new Map<string, Promise<void>>();
+/** If a sync is requested while one is running, run again after (schedule flips). */
+const shopSyncNeedsFollowUp = new Map<string, { force?: boolean }>();
 let localTickerStarted = false;
 
 async function listShopsWithScheduledSync(): Promise<ShopSyncRow[]> {
@@ -41,17 +44,37 @@ async function listShopsWithScheduledSync(): Promise<ShopSyncRow[]> {
 export function applyShopCampaignScheduleTransitionsIfNeeded(
   shop: string,
 ): void {
-  void applyDueCampaignScheduleTransitions(shop)
-    .then((result) => {
-      if (!result.shopsNeedingShopifySync.length) return;
-      enqueueScheduledSyncForShop(shop);
-    })
-    .catch((e) => {
-      console.error("[volume-discount] schedule transitions", shop, e);
-    });
+  void (async () => {
+    const result = await applyDueCampaignScheduleTransitions(shop);
+    if (result.shopsNeedingShopifySync.length) {
+      enqueueScheduledSyncForShop(shop, { force: true });
+      return;
+    }
+    /*
+     * Recover stale Shopify AD: Offrefy already Draft/empty but Automatic Discount
+     * still Active (previous sync dropped while in-flight).
+     */
+    const [liveCount, state] = await Promise.all([
+      prisma.volumeDiscountCampaign.count({
+        where: discountSyncCampaignWhere(shop),
+      }),
+      prisma.volumeDiscountShopState.findUnique({
+        where: { shop },
+        select: { functionDiscountId: true },
+      }),
+    ]);
+    if (liveCount === 0 && state?.functionDiscountId) {
+      enqueueScheduledSyncForShop(shop, { force: true });
+    }
+  })().catch((e) => {
+    console.error("[volume-discount] schedule transitions", shop, e);
+  });
 }
 
-export async function runScheduledSyncForShop(shop: string): Promise<string[]> {
+export async function runScheduledSyncForShop(
+  shop: string,
+  opts?: { force?: boolean },
+): Promise<string[]> {
   const errors: string[] = [];
   try {
     /* Flip Scheduled→Active / Active→Draft before building Shopify payload. */
@@ -61,6 +84,7 @@ export async function runScheduledSyncForShop(shop: string): Promise<string[]> {
     const syncResult = await syncVolumeDiscountShop(admin, shop, {
       purgeLegacy: true,
       skipScheduleTransitions: true,
+      force: opts?.force === true,
     });
     if (syncResult.errors.length) {
       errors.push(...syncResult.errors);
@@ -83,10 +107,20 @@ export async function runScheduledSyncForShop(shop: string): Promise<string[]> {
   return errors;
 }
 
-function enqueueScheduledSyncForShop(shop: string): void {
-  if (shopSyncInFlight.has(shop)) return;
+function enqueueScheduledSyncForShop(
+  shop: string,
+  opts?: { force?: boolean },
+): void {
+  if (shopSyncInFlight.has(shop)) {
+    // Do not drop schedule start/end syncs — chain a follow-up after the current run.
+    const prev = shopSyncNeedsFollowUp.get(shop);
+    shopSyncNeedsFollowUp.set(shop, {
+      force: Boolean(prev?.force || opts?.force),
+    });
+    return;
+  }
 
-  const work = runScheduledSyncForShop(shop)
+  const work = runScheduledSyncForShop(shop, opts)
     .then((errors) => {
       if (errors.length) {
         console.error(
@@ -100,6 +134,11 @@ function enqueueScheduledSyncForShop(shop: string): void {
     })
     .finally(() => {
       shopSyncInFlight.delete(shop);
+      const followUp = shopSyncNeedsFollowUp.get(shop);
+      if (followUp) {
+        shopSyncNeedsFollowUp.delete(shop);
+        enqueueScheduledSyncForShop(shop, followUp);
+      }
     });
 
   shopSyncInFlight.set(shop, work);
@@ -115,7 +154,7 @@ export async function runDueScheduledSyncs(): Promise<{
   const transition = await applyDueCampaignScheduleTransitions();
   const scheduleTransitionShops = transition.shopsNeedingShopifySync;
   for (const shop of scheduleTransitionShops) {
-    enqueueScheduledSyncForShop(shop);
+    enqueueScheduledSyncForShop(shop, { force: true });
   }
 
   const rows = await listShopsWithScheduledSync();
@@ -162,6 +201,6 @@ export function ensureLocalScheduledSyncTicker(): void {
   };
 
   setTimeout(tick, 5_000);
-  /* Poll often enough for short schedule windows (start/end) in local/dev. */
-  setInterval(tick, 30_000);
+  /* Poll often — short schedule windows (start/end) must flip Shopify AD quickly. */
+  setInterval(tick, 10_000);
 }

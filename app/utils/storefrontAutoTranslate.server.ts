@@ -1,6 +1,7 @@
 import {
   ENGLISH_STOREFRONT_TRANSLATION,
   STOREFRONT_TRANSLATION_FIELD_KEYS,
+  adaptCartDiscountTemplateForLanguage,
   hasCuratedTranslationPreset,
   translationPresetForLanguage,
   type StorefrontTranslationFields,
@@ -20,9 +21,11 @@ const ENGLISH_CART_BADGE_STRINGS = {
 export function hasUntranslatedCartBadgeStrings(
   languageKey: string,
   fields: StorefrontTranslationFields,
+  primaryLang = "en",
 ): boolean {
   const key = languageKey.trim().toLowerCase();
-  if (!key || key === "en") return false;
+  const primary = primaryLang.trim().toLowerCase() || "en";
+  if (!key || key === primary) return false;
   return (
     fields.transCartDiscount.trim() === ENGLISH_CART_BADGE_STRINGS.transCartDiscount ||
     fields.transCartDiscountQty.trim() === ENGLISH_CART_BADGE_STRINGS.transCartDiscountQty
@@ -32,9 +35,11 @@ export function hasUntranslatedCartBadgeStrings(
 export function hasUntranslatedTierStrings(
   languageKey: string,
   fields: StorefrontTranslationFields,
+  primaryLang = "en",
 ): boolean {
   const key = languageKey.trim().toLowerCase();
-  if (!key || key === "en") return false;
+  const primary = primaryLang.trim().toLowerCase() || "en";
+  if (!key || key === primary) return false;
   return (
     fields.transBuy.trim() === ENGLISH_TIER_STRINGS.transBuy ||
     fields.transYouSave.trim() === ENGLISH_TIER_STRINGS.transYouSave ||
@@ -91,25 +96,51 @@ export async function autoTranslateCartBadgeStrings(
     };
   }
 
-  if (hasCuratedTranslationPreset(to)) {
-    const preset = translationPresetForLanguage(to);
-    return {
-      transCartDiscount: preset.transCartDiscount,
-      transCartDiscountQty: preset.transCartDiscountQty,
-    };
-  }
+  const usePresetDiscount =
+    hasCuratedTranslationPreset(to) &&
+    source.transCartDiscount.trim() ===
+      ENGLISH_CART_BADGE_STRINGS.transCartDiscount;
+  const usePresetQty =
+    hasCuratedTranslationPreset(to) &&
+    source.transCartDiscountQty.trim() ===
+      ENGLISH_CART_BADGE_STRINGS.transCartDiscountQty;
+  const preset = hasCuratedTranslationPreset(to)
+    ? translationPresetForLanguage(to)
+    : null;
 
-  return {
-    transCartDiscount: await translateTemplateWithPlaceholders(
+  let transCartDiscount: string;
+  if (usePresetDiscount) {
+    transCartDiscount = preset!.transCartDiscount;
+  } else if (hasCuratedTranslationPreset(to)) {
+    const adapted = adaptCartDiscountTemplateForLanguage(
+      source.transCartDiscount,
+      to,
+    );
+    transCartDiscount =
+      adapted !== source.transCartDiscount.trim()
+        ? adapted
+        : await translateTemplateWithPlaceholders(
+            source.transCartDiscount,
+            from,
+            to,
+          );
+  } else {
+    transCartDiscount = await translateTemplateWithPlaceholders(
       source.transCartDiscount,
       from,
       to,
-    ),
-    transCartDiscountQty: await translateTemplateWithPlaceholders(
-      source.transCartDiscountQty,
-      from,
-      to,
-    ),
+    );
+  }
+
+  return {
+    transCartDiscount,
+    transCartDiscountQty: usePresetQty
+      ? preset!.transCartDiscountQty
+      : await translateTemplateWithPlaceholders(
+          source.transCartDiscountQty,
+          from,
+          to,
+        ),
   };
 }
 
@@ -200,8 +231,9 @@ async function translateTextWithMyMemory(
 }
 
 /**
- * Auto-translate storefront widget copy from English into the target language.
- * Uses curated presets when available; otherwise calls MyMemory machine translation.
+ * Auto-translate storefront widget copy from the shop primary language into the target.
+ * - Unchanged primary/default starter copy → curated preset (when available).
+ * - Merchant-edited primary fields (e.g. custom Widget Heading) → translate that text.
  */
 export async function autoTranslateStorefrontFields(
   source: StorefrontTranslationFields,
@@ -218,24 +250,73 @@ export async function autoTranslateStorefrontFields(
     return { ...source };
   }
 
-  if (hasCuratedTranslationPreset(to)) {
-    return { ...translationPresetForLanguage(to) };
-  }
-
+  const sourceDefaults =
+    from === "en" || !hasCuratedTranslationPreset(from)
+      ? ENGLISH_STOREFRONT_TRANSLATION
+      : translationPresetForLanguage(from);
+  const preset = hasCuratedTranslationPreset(to)
+    ? translationPresetForLanguage(to)
+    : null;
   const result = { ...source };
   const failures: string[] = [];
 
   for (const field of STOREFRONT_TRANSLATION_FIELD_KEYS) {
+    const value = String(source[field] ?? "").trim();
+    const isDefaultSource =
+      value === sourceDefaults[field] ||
+      value === ENGLISH_STOREFRONT_TRANSLATION[field] ||
+      value === "";
+
     try {
-      const value = source[field];
-      result[field] = /\{\{\s*\w+\s*\}\}/.test(value)
-        ? await translateTemplateWithPlaceholders(value, from, to)
-        : await translateTextWithMyMemory(value, from, to);
+      if (field === "transCartDiscount") {
+        if (isDefaultSource && preset) {
+          result[field] = preset.transCartDiscount;
+        } else if (preset && /\{\{\s*(discount|amount)\s*\}\}/i.test(value)) {
+          const adapted = adaptCartDiscountTemplateForLanguage(value, to);
+          result[field] =
+            adapted !== value
+              ? adapted
+              : await translateTemplateWithPlaceholders(value, from, to);
+        } else {
+          result[field] = await translateTemplateWithPlaceholders(
+            value || sourceDefaults.transCartDiscount,
+            from,
+            to,
+          );
+        }
+        continue;
+      }
+
+      if (field === "transCartDiscountQty") {
+        if (isDefaultSource && preset) {
+          result[field] = preset.transCartDiscountQty;
+        } else {
+          result[field] = await translateTemplateWithPlaceholders(
+            value || sourceDefaults.transCartDiscountQty,
+            from,
+            to,
+          );
+        }
+        continue;
+      }
+
+      // Default starter copy → curated preset when we have one.
+      if (isDefaultSource && preset) {
+        result[field] = preset[field];
+        continue;
+      }
+
+      // Merchant customized primary-language text → translate that exact string.
+      const toTranslate = value || sourceDefaults[field];
+      result[field] = /\{\{\s*\w+\s*\}\}/.test(toTranslate)
+        ? await translateTemplateWithPlaceholders(toTranslate, from, to)
+        : await translateTextWithMyMemory(toTranslate, from, to);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Translation request failed";
       failures.push(`${field}: ${message}`);
-      result[field] = source[field];
+      result[field] =
+        preset?.[field] ?? source[field] ?? sourceDefaults[field];
     }
   }
 
@@ -246,20 +327,78 @@ export async function autoTranslateStorefrontFields(
   return result;
 }
 
+/** Resolve the shop primary-language sheet used as Auto translate source. */
 export function resolveEnglishSourceForAutoTranslate(
   translations: Partial<Record<string, Partial<StorefrontTranslationFields>>>,
+  primaryLang = "en",
 ): StorefrontTranslationFields {
-  const english = translations.en;
+  const primary = primaryLang.trim().toLowerCase() || "en";
+  const basePreset =
+    primary === "en" || !hasCuratedTranslationPreset(primary)
+      ? ENGLISH_STOREFRONT_TRANSLATION
+      : translationPresetForLanguage(primary);
+  const sourceSheet = translations[primary];
   const merged: StorefrontTranslationFields = {
-    ...ENGLISH_STOREFRONT_TRANSLATION,
-    ...(english ?? {}),
+    ...basePreset,
+    ...(sourceSheet ?? {}),
   };
 
   for (const field of STOREFRONT_TRANSLATION_FIELD_KEYS) {
     if (!merged[field] || String(merged[field]).trim() === "") {
-      merged[field] = ENGLISH_STOREFRONT_TRANSLATION[field];
+      merged[field] = basePreset[field];
     }
   }
 
   return merged;
+}
+
+export type TierCopyTranslateInput = {
+  buyLabelText?: string;
+  optionSubtext?: string;
+  badge?: string;
+};
+
+/**
+ * Translate Rules-tab tier option label / subtext / badge into the target language.
+ * Empty primary-language fields stay empty (storefront keeps auto “Buy …” via transBuy).
+ */
+export async function autoTranslateTierCopyFields(
+  sourceTiers: TierCopyTranslateInput[],
+  targetLang: string,
+  sourceLang = "en",
+): Promise<
+  Array<{ buyLabelText: string; optionSubtext: string; badge: string }>
+> {
+  const from = normalizeLanguageCode(sourceLang);
+  const to = normalizeLanguageCode(targetLang);
+  if (!to || to === from) {
+    return sourceTiers.map((row) => ({
+      buyLabelText: String(row?.buyLabelText ?? "").trim(),
+      optionSubtext: String(row?.optionSubtext ?? "").trim(),
+      badge: String(row?.badge ?? "").trim(),
+    }));
+  }
+
+  const out: Array<{
+    buyLabelText: string;
+    optionSubtext: string;
+    badge: string;
+  }> = [];
+
+  for (const row of sourceTiers) {
+    const buyLabelText = String(row?.buyLabelText ?? "").trim();
+    const optionSubtext = String(row?.optionSubtext ?? "").trim();
+    const badge = String(row?.badge ?? "").trim();
+    out.push({
+      buyLabelText: buyLabelText
+        ? await translateTextWithMyMemory(buyLabelText, from, to)
+        : "",
+      optionSubtext: optionSubtext
+        ? await translateTextWithMyMemory(optionSubtext, from, to)
+        : "",
+      badge: badge ? await translateTextWithMyMemory(badge, from, to) : "",
+    });
+  }
+
+  return out;
 }

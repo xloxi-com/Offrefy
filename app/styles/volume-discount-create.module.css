@@ -22,6 +22,19 @@
   min-width: 0;
 }
 
+/* Polaris Tabs with short labels — tighter padding so all 4 stay visible. */
+.offerSettingsTabs {
+  width: 100%;
+}
+
+.offerSettingsTabs :global(.Polaris-Tabs__Wrapper) {
+  padding-inline: 0;
+}
+
+.offerSettingsTabs :global(.Polaris-Tabs__Tab) {
+  padding-inline: var(--p-space-200, 0.5rem);
+}
+
 .previewColumn {
   position: sticky;
   top: var(--p-space-300, 0.75rem);
@@ -143,6 +156,21 @@
 }
 
 /* Appearance template picker (10 presets + Custom) */
+.appearanceTemplateCategoryBar {
+  width: 100%;
+  max-width: 100%;
+  overflow: visible;
+}
+
+.appearanceTemplateCategoryBar :global(.Polaris-ButtonGroup) {
+  flex-wrap: nowrap;
+}
+
+.appearanceTemplateCategoryBar :global(.Polaris-Button) {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .appearanceTemplateGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
@@ -183,12 +211,55 @@
   box-shadow: 0 0 0 1px var(--p-color-border-emphasis);
 }
 
+.appearanceTemplateCardLocked {
+  opacity: 0.72;
+  position: relative;
+}
+
+.appearanceTemplateCardLocked:hover {
+  border-color: var(--p-color-border-hover);
+}
+
+.appearanceTemplateLockBadge {
+  display: flex;
+  justify-content: center;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  text-decoration: none;
+  color: inherit;
+  font: inherit;
+}
+
+.appearanceTemplateLockBadge:hover {
+  text-decoration: none;
+}
+
+.appearanceTemplateLockBadge:focus-visible {
+  outline: var(--p-border-width-050, 2px) solid var(--p-color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--p-border-radius-100, 0.25rem);
+}
+
+.appearanceTemplateLockBadge :global(.Polaris-Badge) {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
 .appearanceTemplateSwatch {
   width: 2rem;
   height: 2rem;
   border-radius: var(--p-border-radius-full, 9999px);
   border: var(--p-border-width-025, 1px) solid var(--p-color-border-secondary);
   flex-shrink: 0;
+  background-repeat: no-repeat;
 }
 
 .appearanceTemplateSwatchCustom {
@@ -212,6 +283,199 @@
   word-break: break-word;
 }
 
+/* Badge design picker (Layout) — 20 shapes; colors from Appearance */
+.badgeDesignGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+  gap: var(--p-space-200, 0.5rem);
+  width: 100%;
+}
+
+.badgeDesignCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--p-space-150, 0.375rem);
+  padding: var(--p-space-200, 0.5rem) var(--p-space-100, 0.25rem);
+  margin: 0;
+  border: var(--p-border-width-025, 1px) solid var(--p-color-border-secondary);
+  border-radius: var(--p-border-radius-200, 0.5rem);
+  background: var(--p-color-bg-surface);
+  cursor: pointer;
+  text-align: center;
+  font: inherit;
+  color: inherit;
+  box-sizing: border-box;
+  min-width: 0;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.badgeDesignCard:hover {
+  border-color: var(--p-color-border-hover);
+}
+
+.badgeDesignCard:focus-visible {
+  outline: 2px solid var(--p-color-border-focus);
+  outline-offset: 1px;
+}
+
+.badgeDesignCardSelected {
+  border-color: var(--p-color-border-emphasis);
+  box-shadow: 0 0 0 1px var(--p-color-border-emphasis);
+}
+
+.badgeDesignLabel {
+  font-size: var(--p-font-size-275, 0.75rem);
+  line-height: 1.2;
+  color: var(--p-color-text-secondary);
+}
+
+.badgePill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  padding: 2px 12px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background: var(--vd-badge-bg, #6b1d1e);
+  color: var(--vd-badge-text, #fff);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  box-sizing: border-box;
+  box-shadow: 0 1px 2px rgba(107, 29, 30, 0.2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badgePill[data-badge-design="rounded"] {
+  border-radius: 8px;
+}
+.badgePill[data-badge-design="square"] {
+  border-radius: 2px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+.badgePill[data-badge-design="soft"] {
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--vd-badge-bg, #6b1d1e) 35%, transparent);
+  padding-inline: 14px;
+}
+.badgePill[data-badge-design="outline"] {
+  background: transparent;
+  color: var(--vd-badge-bg, #6b1d1e);
+  border-color: var(--vd-badge-bg, #6b1d1e);
+  box-shadow: none;
+}
+.badgePill[data-badge-design="outline_bold"] {
+  background: color-mix(in srgb, var(--vd-badge-bg, #6b1d1e) 8%, #fff);
+  color: var(--vd-badge-bg, #6b1d1e);
+  border: 2px solid var(--vd-badge-bg, #6b1d1e);
+  box-shadow: none;
+}
+.badgePill[data-badge-design="ghost"] {
+  background: color-mix(in srgb, var(--vd-badge-bg, #6b1d1e) 14%, #fff);
+  color: var(--vd-badge-bg, #6b1d1e);
+  border-color: color-mix(in srgb, var(--vd-badge-bg, #6b1d1e) 22%, transparent);
+  box-shadow: none;
+}
+.badgePill[data-badge-design="ribbon"] {
+  border-radius: 4px;
+  transform: skewX(-12deg);
+}
+.badgePill[data-badge-design="flag"] {
+  border-radius: 4px 0 0 4px;
+  clip-path: polygon(0 0, calc(100% - 0.45em) 0, 100% 50%, calc(100% - 0.45em) 100%, 0 100%);
+  padding-inline: 8px 14px;
+  box-shadow: none;
+}
+.badgePill[data-badge-design="tag"] {
+  border-radius: 3px 9999px 9999px 3px;
+  box-shadow: none;
+}
+.badgePill[data-badge-design="capsule"] {
+  padding-block: 4px;
+  padding-inline: 14px;
+}
+.badgePill[data-badge-design="chip"] {
+  border-radius: 6px;
+  padding: 1px 8px;
+  font-size: 10px;
+  box-shadow: none;
+}
+.badgePill[data-badge-design="underline"] {
+  background: transparent;
+  color: var(--vd-badge-bg, #6b1d1e);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  border-bottom: 2px solid var(--vd-badge-bg, #6b1d1e);
+  padding: 0 2px 2px;
+}
+.badgePill[data-badge-design="shadow"] {
+  box-shadow: 0 5px 12px color-mix(in srgb, var(--vd-badge-bg, #6b1d1e) 40%, transparent);
+}
+.badgePill[data-badge-design="gradient"] {
+  border: none;
+  background: linear-gradient(
+    135deg,
+    var(--vd-badge-bg, #6b1d1e) 0%,
+    color-mix(in srgb, var(--vd-badge-bg, #6b1d1e) 55%, #111) 100%
+  );
+}
+.badgePill[data-badge-design="glow"] {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--vd-badge-text, #fff) 35%, transparent),
+    0 0 10px color-mix(in srgb, var(--vd-badge-bg, #6b1d1e) 65%, transparent);
+}
+.badgePill[data-badge-design="stamp"] {
+  background: color-mix(in srgb, var(--vd-badge-bg, #6b1d1e) 10%, #fff);
+  color: var(--vd-badge-bg, #6b1d1e);
+  border: 2px dashed var(--vd-badge-bg, #6b1d1e);
+  border-radius: 6px;
+  box-shadow: none;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+}
+.badgePill[data-badge-design="ticket"] {
+  border-radius: 4px;
+  clip-path: polygon(
+    0.35em 0,
+    calc(100% - 0.35em) 0,
+    100% 0.35em,
+    100% calc(100% - 0.35em),
+    calc(100% - 0.35em) 100%,
+    0.35em 100%,
+    0 calc(100% - 0.35em),
+    0 0.35em
+  );
+  box-shadow: none;
+}
+.badgePill[data-badge-design="arrow"] {
+  border-radius: 4px 0 0 4px;
+  clip-path: polygon(0 0, calc(100% - 0.55em) 0, 100% 50%, calc(100% - 0.55em) 100%, 0 100%);
+  padding-inline: 8px 14px;
+  box-shadow: none;
+}
+.badgePill[data-badge-design="banner"] {
+  border-radius: 0;
+  clip-path: polygon(0.4em 0, 100% 0, calc(100% - 0.4em) 100%, 0 100%);
+  box-shadow: 0 2px 0 color-mix(in srgb, #000 18%, transparent);
+}
+
+/* Preview widget badges reuse .badgePill + data-badge-design */
+.badgePillPreview {
+  font-size: calc(var(--vd-fs-badge, 12px) * var(--vd-badge-size-scale, 1));
+  padding: 2px 20px;
+  font-weight: var(--vd-fw-accent, 600);
+  max-width: 100%;
+  vertical-align: middle;
+}
+
 /* Match storefront `.xloxi-qb` font resolution (Dawn + Horizon + inherit). */
 :global(.vd-admin-qb-preview) {
   --vd-theme-font-body: var(
@@ -223,4 +487,23 @@
     var(--font-heading--family, var(--vd-theme-font-body))
   );
   font-family: var(--vd-theme-font-body);
+}
+
+/* Campaign status → Schedule jump link (underline so it reads as a link). */
+.scheduleJumpLink {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-size: var(--p-font-size-325, 0.8125rem);
+  line-height: var(--p-font-line-height-500, 1.25rem);
+  color: var(--p-color-text-critical);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.scheduleJumpLink:hover {
+  color: var(--p-color-text-critical-hover, var(--p-color-text-critical));
 }

@@ -1,0 +1,404 @@
+/* —— Tamil Thai Pongal — reference mockup (transparent PNG elements) —— */
+/* paanai, karumbu, suryan, offerings, kolam, lotus, diya, mattu */
+
+[data-offrefy-theme^="pongal_"] {
+  --pg-maroon: #6b1520;
+  --pg-ink: #5c1620;
+  --pg-gold: #c9a227;
+  --pg-cream: #fff8ee;
+  --pg-saffron: #ea580c;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden !important;
+  padding: 1.6rem 1rem 1.75rem !important;
+  border-radius: 18px;
+  border: 1.5px solid rgba(107, 21, 32, 0.14);
+  background-color: var(--pg-cream);
+  background-image:
+    url("/pongal/karumbu.png"),
+    url("/pongal/karumbu.png"),
+    url("/pongal/lotus.png"),
+    url("/pongal/lotus.png"),
+    url("/pongal/kolam.svg"),
+    url("/pongal/kolam-pattern.svg"),
+    radial-gradient(ellipse 90% 42% at 50% -8%, rgba(201, 162, 39, 0.12), transparent 58%);
+  background-repeat:
+    no-repeat,
+    no-repeat,
+    no-repeat,
+    no-repeat,
+    no-repeat,
+    repeat,
+    no-repeat;
+  background-size:
+    2.4rem auto,
+    2.4rem auto,
+    3.2rem auto,
+    3.2rem auto,
+    3.4rem auto,
+    10rem 10rem,
+    auto;
+  background-position:
+    left 0.05rem top 38%,
+    right 0.05rem top 38%,
+    left -0.35rem bottom -0.25rem,
+    right -0.35rem bottom -0.25rem,
+    center bottom -0.55rem,
+    center top,
+    center top;
+  box-shadow: 0 12px 28px rgba(74, 14, 22, 0.08);
+  box-sizing: border-box;
+}
+
+/* Top corners: paanai + offerings/sun */
+[data-offrefy-theme^="pongal_"]::before,
+[data-offrefy-theme^="pongal_"]::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  z-index: 2;
+  top: 0.15rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  background-repeat: no-repeat;
+  background-size: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
+}
+[data-offrefy-theme^="pongal_"]::before {
+  left: 0.1rem;
+  background-image: url("/pongal/paanai.png");
+}
+[data-offrefy-theme^="pongal_"]::after {
+  right: 0.1rem;
+  width: 2.55rem;
+  height: 2.55rem;
+  background-image: url("/pongal/suryan.png");
+}
+
+[data-offrefy-theme^="pongal_"] .offrefy-topbar,
+[data-offrefy-theme^="pongal_"] .offrefy-cards,
+[data-offrefy-theme^="pongal_"] .offrefy-cta,
+[data-offrefy-theme^="pongal_"] .offrefy-title,
+[data-offrefy-theme^="pongal_"] > * {
+  position: relative;
+  z-index: 1;
+}
+
+[data-offrefy-theme^="pongal_"] .offrefy-topbar {
+  position: relative;
+  margin-bottom: 0.85rem !important;
+  padding-top: 0.15rem !important;
+  padding-bottom: 0.85rem !important;
+  border-bottom: none !important;
+}
+[data-offrefy-theme^="pongal_"] .offrefy-topbar::after {
+  content: "";
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  bottom: 0;
+  height: 1.5px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(201, 162, 39, 0.35) 15%,
+    rgba(107, 21, 32, 0.55) 50%,
+    rgba(201, 162, 39, 0.35) 85%,
+    transparent
+  );
+  pointer-events: none;
+}
+[data-offrefy-theme^="pongal_"] .offrefy-topbar::before {
+  content: "";
+  position: absolute;
+  right: 2.6rem;
+  top: -0.15rem;
+  width: 2.1rem;
+  height: 2.1rem;
+  background: url("/pongal/offerings.png") center / contain no-repeat;
+  pointer-events: none;
+  z-index: 3;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+[data-offrefy-theme^="pongal_"] .offrefy-title {
+  color: var(--pg-ink);
+  font-family: Georgia, "Times New Roman", Times, serif;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  padding-inline: 2.1rem;
+}
+[data-offrefy-theme^="pongal_"] .offrefy-title::before,
+[data-offrefy-theme^="pongal_"] .offrefy-title::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 1.35rem;
+  height: 1.35rem;
+  transform: translateY(-50%);
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+[data-offrefy-theme^="pongal_"] .offrefy-title::before {
+  left: 0;
+  background: url("/pongal/diya.png") center / contain no-repeat;
+}
+[data-offrefy-theme^="pongal_"] .offrefy-title::after {
+  right: 0;
+  background: url("/pongal/diya.png") center / contain no-repeat;
+}
+
+[data-offrefy-theme^="pongal_"] .offrefy-cards {
+  margin-inline: 0.2rem;
+  margin-bottom: 0.35rem;
+}
+[data-offrefy-theme^="pongal_"] .offrefy-cards::before,
+[data-offrefy-theme^="pongal_"] .offrefy-cards::after {
+  content: none;
+}
+
+[data-offrefy-theme^="pongal_"] .offrefy-card {
+  position: relative;
+  overflow: visible !important;
+  background: rgba(255, 255, 255, 0.97) !important;
+  border: 1.5px solid rgba(107, 21, 32, 0.16) !important;
+  box-shadow: 0 4px 14px rgba(74, 14, 22, 0.05);
+}
+[data-offrefy-theme^="pongal_"] .offrefy-card.offrefy-card--selected {
+  border: 2.25px solid var(--pg-maroon) !important;
+  background: linear-gradient(165deg, #ffffff 0%, #fff5ea 100%) !important;
+  box-shadow:
+    0 0 0 1px rgba(201, 162, 39, 0.22),
+    0 8px 18px rgba(107, 21, 32, 0.1) !important;
+}
+[data-offrefy-theme^="pongal_"] .offrefy-card.offrefy-card--selected::before {
+  content: "";
+  position: absolute;
+  right: 0.35rem;
+  bottom: 0.3rem;
+  width: 1.15rem;
+  height: 1.15rem;
+  background: url("/pongal/diya.png") center / contain no-repeat;
+  pointer-events: none;
+  z-index: 4;
+}
+[data-offrefy-theme^="pongal_"] .offrefy-card.offrefy-card--selected::after {
+  content: none;
+}
+
+[data-offrefy-theme^="pongal_"] .offrefy-cta {
+  position: relative !important;
+  overflow: hidden !important;
+  z-index: 1;
+  background: linear-gradient(180deg, #8b1e2d 0%, #6b1520 55%, #4a0e16 100%) !important;
+  border: 2px solid var(--pg-gold) !important;
+  box-shadow:
+    0 0 0 1px rgba(245, 230, 184, 0.35),
+    0 8px 18px rgba(74, 14, 22, 0.22) !important;
+  color: #f5e6b8 !important;
+  font-family: Georgia, "Times New Roman", Times, serif !important;
+  font-weight: 700 !important;
+  padding-left: 2.6rem !important;
+  padding-right: 2.6rem !important;
+  border-radius: 999px !important;
+}
+[data-offrefy-theme^="pongal_"] .offrefy-cta::before,
+[data-offrefy-theme^="pongal_"] .offrefy-cta::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 1.35rem;
+  height: 1.35rem;
+  transform: translateY(-50%);
+  pointer-events: none;
+  filter: drop-shadow(0 0 3px rgba(255, 183, 71, 0.45));
+}
+[data-offrefy-theme^="pongal_"] .offrefy-cta::before {
+  left: 0.7rem;
+  background: url("/pongal/diya.png") center / contain no-repeat;
+}
+[data-offrefy-theme^="pongal_"] .offrefy-cta::after {
+  right: 0.7rem;
+  background: url("/pongal/diya.png") center / contain no-repeat;
+}
+
+[data-offrefy-theme^="pongal_"] .offrefy-badge-pill {
+  background: var(--pg-maroon) !important;
+  color: #fff8e7 !important;
+  box-shadow: 0 0 0 1.5px rgba(201, 162, 39, 0.75);
+}
+
+/* —— Variants —— */
+[data-offrefy-theme="pongal_pot"] .offrefy-title { color: #5c1620; }
+[data-offrefy-theme="pongal_pot"] .offrefy-card.offrefy-card--selected { border-color: #6b1520 !important; }
+
+[data-offrefy-theme="pongal_sun"] {
+  background-color: #fffbeb;
+}
+[data-offrefy-theme="pongal_sun"]::before { background-image: url("/pongal/suryan.png"); }
+[data-offrefy-theme="pongal_sun"]::after { background-image: url("/pongal/offerings.png"); }
+[data-offrefy-theme="pongal_sun"] .offrefy-title { color: #854d0e; }
+[data-offrefy-theme="pongal_sun"] .offrefy-title::before,
+[data-offrefy-theme="pongal_sun"] .offrefy-title::after {
+  background-image: url("/pongal/suryan.png");
+}
+[data-offrefy-theme="pongal_sun"] .offrefy-card.offrefy-card--selected { border-color: #ca8a04 !important; }
+[data-offrefy-theme="pongal_sun"] .offrefy-cta {
+  background: linear-gradient(180deg, #f59e0b 0%, #b45309 55%, #7c2d12 100%) !important;
+  color: #fffbeb !important;
+}
+[data-offrefy-theme="pongal_sun"] .offrefy-cta::before,
+[data-offrefy-theme="pongal_sun"] .offrefy-cta::after {
+  background-image: url("/pongal/suryan.png");
+}
+
+[data-offrefy-theme="pongal_sugarcane"] {
+  background-color: #f4faf6;
+}
+[data-offrefy-theme="pongal_sugarcane"]::before,
+[data-offrefy-theme="pongal_sugarcane"]::after {
+  background-image: url("/pongal/karumbu.png");
+}
+[data-offrefy-theme="pongal_sugarcane"] .offrefy-title { color: #166534; }
+[data-offrefy-theme="pongal_sugarcane"] .offrefy-title::before,
+[data-offrefy-theme="pongal_sugarcane"] .offrefy-title::after {
+  background-image: url("/pongal/karumbu.png");
+}
+[data-offrefy-theme="pongal_sugarcane"] .offrefy-card.offrefy-card--selected { border-color: #16a34a !important; }
+[data-offrefy-theme="pongal_sugarcane"] .offrefy-cta {
+  background: linear-gradient(180deg, #22c55e 0%, #15803d 100%) !important;
+  border-color: #86efac !important;
+  color: #fff !important;
+  border-radius: 14px !important;
+}
+[data-offrefy-theme="pongal_sugarcane"] .offrefy-cta::before,
+[data-offrefy-theme="pongal_sugarcane"] .offrefy-cta::after {
+  background-image: url("/pongal/karumbu.png");
+}
+
+[data-offrefy-theme="pongal_cow"]::before { background-image: url("/pongal/mattu.png"); }
+[data-offrefy-theme="pongal_cow"]::after { background-image: url("/pongal/paanai.png"); }
+[data-offrefy-theme="pongal_cow"] .offrefy-title { color: #78350f; }
+[data-offrefy-theme="pongal_cow"] .offrefy-title::before,
+[data-offrefy-theme="pongal_cow"] .offrefy-title::after {
+  background-image: url("/pongal/mattu.png");
+}
+[data-offrefy-theme="pongal_cow"] .offrefy-card.offrefy-card--selected { border-color: #92400e !important; }
+[data-offrefy-theme="pongal_cow"] .offrefy-cta {
+  background: linear-gradient(180deg, #b45309 0%, #78350f 100%) !important;
+  border-radius: 14px !important;
+}
+[data-offrefy-theme="pongal_cow"] .offrefy-cta::before,
+[data-offrefy-theme="pongal_cow"] .offrefy-cta::after {
+  background-image: url("/pongal/mattu.png");
+}
+
+[data-offrefy-theme="pongal_rice"]::before { background-image: url("/pongal/rice.png"); }
+[data-offrefy-theme="pongal_rice"]::after { background-image: url("/pongal/karumbu.png"); }
+[data-offrefy-theme="pongal_rice"] .offrefy-title { color: #854d0e; }
+[data-offrefy-theme="pongal_rice"] .offrefy-title::before { background-image: url("/pongal/rice.png"); }
+[data-offrefy-theme="pongal_rice"] .offrefy-card.offrefy-card--selected { border-color: #a16207 !important; }
+[data-offrefy-theme="pongal_rice"] .offrefy-cta {
+  background: linear-gradient(180deg, #eab308 0%, #854d0e 100%) !important;
+  color: #1c1917 !important;
+  border-radius: 14px !important;
+}
+[data-offrefy-theme="pongal_rice"] .offrefy-cta::before { background-image: url("/pongal/rice.png"); }
+[data-offrefy-theme="pongal_rice"] .offrefy-cta::after { background-image: url("/pongal/paanai.png"); }
+
+[data-offrefy-theme="pongal_coconut"]::before { background-image: url("/pongal/offerings.png"); }
+[data-offrefy-theme="pongal_coconut"]::after { background-image: url("/pongal/karumbu.png"); }
+[data-offrefy-theme="pongal_coconut"] .offrefy-title { color: #14532d; }
+[data-offrefy-theme="pongal_coconut"] .offrefy-title::before { background-image: url("/pongal/offerings.png"); }
+[data-offrefy-theme="pongal_coconut"] .offrefy-card.offrefy-card--selected { border-color: #15803d !important; }
+[data-offrefy-theme="pongal_coconut"] .offrefy-cta {
+  background: linear-gradient(180deg, #16a34a 0%, #14532d 100%) !important;
+  border-radius: 14px !important;
+}
+[data-offrefy-theme="pongal_coconut"] .offrefy-cta::before { background-image: url("/pongal/offerings.png"); }
+[data-offrefy-theme="pongal_coconut"] .offrefy-cta::after { background-image: url("/pongal/lotus.png"); }
+
+[data-offrefy-theme="pongal_kolam"] {
+  background-image:
+    url("/pongal/kolam.svg"),
+    url("/pongal/kolam.svg"),
+    url("/pongal/lotus.png"),
+    url("/pongal/lotus.png"),
+    url("/pongal/kolam.svg"),
+    url("/pongal/kolam-pattern.svg"),
+    radial-gradient(ellipse 90% 42% at 50% -8%, rgba(201, 162, 39, 0.14), transparent 58%);
+  background-repeat:
+    no-repeat,
+    no-repeat,
+    no-repeat,
+    no-repeat,
+    no-repeat,
+    repeat,
+    no-repeat;
+  background-size: 3.2rem auto, 3.2rem auto, 2.8rem auto, 2.8rem auto, 3.6rem auto, 10rem 10rem, auto;
+  background-position:
+    left -0.2rem top 0.2rem,
+    right -0.2rem top 0.2rem,
+    left -0.3rem bottom -0.2rem,
+    right -0.3rem bottom -0.2rem,
+    center bottom -0.35rem,
+    center top,
+    center top;
+}
+[data-offrefy-theme="pongal_kolam"]::before,
+[data-offrefy-theme="pongal_kolam"]::after {
+  background-image: url("/pongal/kolam.svg");
+}
+[data-offrefy-theme="pongal_kolam"] .offrefy-title { color: #9a3412; }
+[data-offrefy-theme="pongal_kolam"] .offrefy-title::before,
+[data-offrefy-theme="pongal_kolam"] .offrefy-title::after {
+  background-image: url("/pongal/kolam.svg");
+}
+[data-offrefy-theme="pongal_kolam"] .offrefy-cta {
+  background: linear-gradient(180deg, #f59e0b 0%, #b45309 100%) !important;
+  border-radius: 14px !important;
+}
+[data-offrefy-theme="pongal_kolam"] .offrefy-cta::before,
+[data-offrefy-theme="pongal_kolam"] .offrefy-cta::after {
+  background-image: url("/pongal/kolam.svg");
+}
+
+[data-offrefy-theme="pongal_banana"]::before { background-image: url("/pongal/offerings.png"); }
+[data-offrefy-theme="pongal_banana"]::after { background-image: url("/pongal/lotus.png"); }
+[data-offrefy-theme="pongal_banana"] .offrefy-title { color: #3f6212; }
+[data-offrefy-theme="pongal_banana"] .offrefy-title::before { background-image: url("/pongal/offerings.png"); }
+[data-offrefy-theme="pongal_banana"] .offrefy-card.offrefy-card--selected { border-color: #65a30d !important; }
+[data-offrefy-theme="pongal_banana"] .offrefy-cta {
+  background: linear-gradient(180deg, #84cc16 0%, #3f6212 100%) !important;
+  border-radius: 14px !important;
+}
+[data-offrefy-theme="pongal_banana"] .offrefy-cta::before { background-image: url("/pongal/offerings.png"); }
+[data-offrefy-theme="pongal_banana"] .offrefy-cta::after { background-image: url("/pongal/paanai.png"); }
+
+[data-offrefy-theme="pongal_harvest"]::before { background-image: url("/pongal/lotus.png"); }
+[data-offrefy-theme="pongal_harvest"]::after { background-image: url("/pongal/offerings.png"); }
+[data-offrefy-theme="pongal_harvest"] .offrefy-title { color: #92400e; }
+[data-offrefy-theme="pongal_harvest"] .offrefy-title::before { background-image: url("/pongal/lotus.png"); }
+[data-offrefy-theme="pongal_harvest"] .offrefy-cta {
+  background: linear-gradient(180deg, #f59e0b 0%, #92400e 100%) !important;
+  border-radius: 14px !important;
+}
+[data-offrefy-theme="pongal_harvest"] .offrefy-cta::before { background-image: url("/pongal/lotus.png"); }
+[data-offrefy-theme="pongal_harvest"] .offrefy-cta::after { background-image: url("/pongal/offerings.png"); }
+
+[data-offrefy-theme="pongal_steam"]::before { background-image: url("/pongal/sakkarai.png"); }
+[data-offrefy-theme="pongal_steam"]::after { background-image: url("/pongal/diya.png"); }
+[data-offrefy-theme="pongal_steam"] .offrefy-title { color: #9a3412; }
+[data-offrefy-theme="pongal_steam"] .offrefy-title::before { background-image: url("/pongal/sakkarai.png"); }
+[data-offrefy-theme="pongal_steam"] .offrefy-title::after { background-image: url("/pongal/diya.png"); }
+[data-offrefy-theme="pongal_steam"] .offrefy-card.offrefy-card--selected { border-color: #ea580c !important; }
+[data-offrefy-theme="pongal_steam"] .offrefy-cta {
+  background: linear-gradient(180deg, #f97316 0%, #c2410c 100%) !important;
+  border-radius: 14px !important;
+}
+[data-offrefy-theme="pongal_steam"] .offrefy-cta::before { background-image: url("/pongal/sakkarai.png"); }
+[data-offrefy-theme="pongal_steam"] .offrefy-cta::after { background-image: url("/pongal/diya.png"); }
+
+.vd-admin-qb-preview[data-offrefy-theme^="pongal_"] {
+  margin-bottom: 0.85rem;
+}

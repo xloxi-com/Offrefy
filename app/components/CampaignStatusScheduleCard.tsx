@@ -2,11 +2,15 @@ import {
   BlockStack,
   Card,
   Checkbox,
+  InlineStack,
   Text,
+  TextField,
 } from "@shopify/polaris";
 
+import { useAdminI18n } from "./AdminI18nProvider";
+import { PlanUpgradeBadge } from "./PlanUpgradeBadge";
+import { PlanUpgradeBanner } from "./PlanUpgradeBanner";
 import { PolarisDateTimeField } from "./PolarisDateTimeField";
-import { formatDatetimeLocalDisplay } from "../utils/countdownTimes";
 
 export type CampaignStatusScheduleCardProps = {
   scheduleStartEnabled: boolean;
@@ -21,11 +25,19 @@ export type CampaignStatusScheduleCardProps = {
   shopTimezone?: string;
   /** Display label from Shopify store timezone, e.g. America/New_York (EDT). */
   shopTimezoneLabel?: string;
+  /** Storefront countdown pill (shown when end date is enabled). */
+  showCountdown?: boolean;
+  onShowCountdownChange?: (next: boolean) => void;
+  countdownLabel?: string;
+  onCountdownLabelChange?: (next: string) => void;
+  /** When true, show upgrade banner instead of editable countdown controls. */
+  countdownLocked?: boolean;
 };
 
 /**
  * Optional start/end schedule (Polaris Card).
  * Start/end map to `countdownStartsAt` / `countdownEndsAt` in shop timezone.
+ * Countdown timer controls appear only when end date is enabled.
  */
 export function CampaignStatusScheduleCard({
   scheduleStartEnabled,
@@ -38,9 +50,13 @@ export function CampaignStatusScheduleCard({
   onScheduleEndLocalChange,
   shopTimezone,
   shopTimezoneLabel,
+  showCountdown = true,
+  onShowCountdownChange,
+  countdownLabel = "",
+  onCountdownLabelChange,
+  countdownLocked = false,
 }: CampaignStatusScheduleCardProps) {
-  const startShown = formatDatetimeLocalDisplay(scheduleStartLocal);
-  const endShown = formatDatetimeLocalDisplay(scheduleEndLocal);
+  const { t } = useAdminI18n();
   const tzLabel =
     shopTimezoneLabel?.trim() || shopTimezone?.trim() || "";
 
@@ -48,57 +64,72 @@ export function CampaignStatusScheduleCard({
     <Card padding="400">
       <BlockStack gap="300">
         <Text as="h2" variant="headingSm">
-          Schedule
+          {t("offerEditor.schedule")}
         </Text>
         <Text as="p" variant="bodySm" tone="subdued">
           {tzLabel
-            ? `Times use your Shopify store timezone: ${tzLabel}. Future start sets status to Scheduled until that time. End turns the offer to Draft automatically and drives the countdown timer.`
-            : "Times use your Shopify store timezone. Future start sets status to Scheduled until that time. End turns the offer to Draft automatically and drives the countdown timer."}
+            ? t("offerEditor.schedule.timezone", { tz: tzLabel })
+            : t("offerEditor.schedule.timezoneFallback")}
         </Text>
 
         <Checkbox
-          label="Set start date"
+          label={t("offerEditor.schedule.setStartDate")}
           checked={scheduleStartEnabled}
           onChange={(checked) => onScheduleStartEnabledChange(checked)}
         />
         {scheduleStartEnabled ? (
-          <BlockStack gap="100">
-            <PolarisDateTimeField
-              label="Start"
-              value={scheduleStartLocal}
-              onChange={onScheduleStartLocalChange}
-              shopTimezone={shopTimezone}
-              helpText="Offer stays Scheduled until this time, then goes Active."
-            />
-            {startShown ? (
-              <Text as="p" variant="bodySm" tone="subdued">
-                Selected: {startShown}
-                {tzLabel ? ` · ${tzLabel}` : ""}
-              </Text>
-            ) : null}
-          </BlockStack>
+          <PolarisDateTimeField
+            label={t("offerEditor.schedule.start")}
+            value={scheduleStartLocal}
+            onChange={onScheduleStartLocalChange}
+            shopTimezone={shopTimezone}
+            helpText={t("offerEditor.schedule.startHelp")}
+          />
         ) : null}
 
         <Checkbox
-          label="Set end date"
+          label={t("offerEditor.schedule.setEndDate")}
           checked={scheduleEndEnabled}
           onChange={(checked) => onScheduleEndEnabledChange(checked)}
         />
         {scheduleEndEnabled ? (
-          <BlockStack gap="100">
-            <PolarisDateTimeField
-              label="End"
-              value={scheduleEndLocal}
-              onChange={onScheduleEndLocalChange}
-              shopTimezone={shopTimezone}
-              helpText="Offer turns Draft at this time (also used by the countdown)."
-            />
-            {endShown ? (
-              <Text as="p" variant="bodySm" tone="subdued">
-                Selected: {endShown}
-                {tzLabel ? ` · ${tzLabel}` : ""}
+          <PolarisDateTimeField
+            label={t("offerEditor.schedule.end")}
+            value={scheduleEndLocal}
+            onChange={onScheduleEndLocalChange}
+            shopTimezone={shopTimezone}
+            helpText={t("offerEditor.schedule.endHelp")}
+          />
+        ) : null}
+
+        {scheduleEndEnabled ? (
+          <BlockStack gap="300">
+            <InlineStack gap="200" blockAlign="center" wrap>
+              <Text as="h2" variant="headingSm">
+                {t("offerEditor.countdownTimer")}
               </Text>
-            ) : null}
+              {countdownLocked ? <PlanUpgradeBadge /> : null}
+            </InlineStack>
+
+            {countdownLocked ? (
+              <PlanUpgradeBanner feature="countdown" />
+            ) : (
+              <>
+                <Checkbox
+                  label={t("offerEditor.showCountdown")}
+                  checked={showCountdown}
+                  onChange={(checked) => onShowCountdownChange?.(checked)}
+                />
+                <TextField
+                  label={t("offerEditor.timerLabel")}
+                  name="countdownLabel"
+                  value={countdownLabel}
+                  onChange={(v) => onCountdownLabelChange?.(v)}
+                  autoComplete="off"
+                  placeholder={t("offerEditor.timerLabelPlaceholder")}
+                />
+              </>
+            )}
           </BlockStack>
         ) : null}
       </BlockStack>

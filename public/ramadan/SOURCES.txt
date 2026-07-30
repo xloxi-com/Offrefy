@@ -1,0 +1,10 @@
+Ramadan assets in use (transparent, no white backgrounds):
+
+SVGs:
+- arch.svg — Islamic portal arch (header)
+- mosque-skyline.svg — soft bottom skyline
+- crescent-gold.svg / star-gold.svg — celestial accents
+- fanous.svg / fanous-amber.svg — hanging lanterns + CTA icons
+- mosque.svg, kaaba.svg, dates.svg, teapot.svg — variant accents
+
+Theme copies: extensions/.../assets/vd-rd-*

@@ -5,6 +5,7 @@ export const volumeDiscountCampaignSyncSelect = {
   id: true,
   campaignName: true,
   displayName: true,
+  displayNameTranslations: true,
   productScope: true,
   quantityCondition: true,
   customerType: true,

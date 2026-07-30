@@ -1,0 +1,24 @@
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+Error: unknown import: `shopify_functions_javy_v4::cabi_realloc` has not been defined
+ΓöÇΓöÇ external error ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+Error coming from `D:/Code Project/shopify apps/Offrefy/Offrefys/volume-discount
+/node_modules/@shopify/cli/bin/function-runner-v9.0.0.exe -f D:/Code
+Project/shopify apps/Offrefy/Offrefys/volume-discount/extensions/volume-discount
+-fn/dist/function.wasm --input ./tmp-50.json --export
+cart-lines-discounts-generate-run --json --schema-path D:/Code Project/shopify
+apps/Offrefy/Offrefys/volume-discount/extensions/volume-discount-fn/schema.graph
+ql --query-path D:/Code Project/shopify apps/Offrefy/Offrefys/volume-discount/ex
+tensions/volume-discount-fn/src/input.graphql`
+
+Command failed with exit code 1: D:/Code Project/shopify apps/Offrefy/Offrefys/v
+olume-discount/node_modules/@shopify/cli/bin/function-runner-v9.0.0.exe -f
+D:/Code Project/shopify apps/Offrefy/Offrefys/volume-discount/extensions/volume-
+discount-fn/dist/function.wasm --input ./tmp-50.json --export
+cart-lines-discounts-generate-run --json --schema-path D:/Code Project/shopify
+apps/Offrefy/Offrefys/volume-discount/extensions/volume-discount-fn/schema.graph
+ql --query-path D:/Code Project/shopify apps/Offrefy/Offrefys/volume-discount/ex
+tensions/volume-discount-fn/src/input.graphql
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+

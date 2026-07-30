@@ -1,0 +1,335 @@
+/* —— Diwali — professional downloaded SVG elements —— */
+/* Sources: UXWing, SVG Repo (CC0), Fluent/Noto via Iconify — see public/diwali/SOURCES.txt */
+
+[data-offrefy-theme^="diwali_"] {
+  --dw-maroon: #6b1520;
+  --dw-maroon-deep: #4a0e16;
+  --dw-gold: #d4af37;
+  --dw-cream: #fdf6ea;
+  --dw-ink: #5c1620;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden !important;
+  padding: 1.5rem 0.9rem 1.35rem !important;
+  border-radius: 16px;
+  border: 1.5px solid rgba(107, 21, 32, 0.12);
+  background-color: var(--dw-cream);
+  background-image:
+    url("/diwali/marigold.svg"),
+    url("/diwali/marigold.svg"),
+    url("/diwali/marigold.svg"),
+    url("/diwali/marigold.svg"),
+    url("/diwali/sparkles.svg"),
+    url("/diwali/sparkles.svg"),
+    radial-gradient(ellipse 88% 42% at 50% -8%, rgba(212, 175, 55, 0.14), transparent 58%);
+  background-repeat: no-repeat;
+  background-size:
+    2.65rem auto,
+    2.65rem auto,
+    2.85rem auto,
+    2.85rem auto,
+    0.95rem auto,
+    0.95rem auto,
+    auto;
+  background-position:
+    left 0.15rem top 0.15rem,
+    right 0.15rem top 0.15rem,
+    left 0.2rem bottom 0.15rem,
+    right 0.2rem bottom 0.15rem,
+    left 30% top 42%,
+    right 28% top 58%,
+    center top;
+  box-shadow: 0 10px 26px rgba(74, 14, 22, 0.07);
+  box-sizing: border-box;
+}
+
+/* Side hanging lanterns (Noto / SVG Repo) */
+[data-offrefy-theme^="diwali_"]::before,
+[data-offrefy-theme^="diwali_"]::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  z-index: 2;
+  top: 1.75rem;
+  width: 1.7rem;
+  height: 2.4rem;
+  background: url("/diwali/hanging-lantern.svg") center top / contain no-repeat;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.1));
+}
+[data-offrefy-theme^="diwali_"]::before { left: 0.05rem; }
+[data-offrefy-theme^="diwali_"]::after { right: 0.05rem; }
+
+[data-offrefy-theme^="diwali_"] .offrefy-topbar,
+[data-offrefy-theme^="diwali_"] .offrefy-cards,
+[data-offrefy-theme^="diwali_"] .offrefy-cta,
+[data-offrefy-theme^="diwali_"] .offrefy-title,
+[data-offrefy-theme^="diwali_"] > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Top toran = SVG Repo diya-string garland */
+[data-offrefy-theme^="diwali_"] .offrefy-topbar {
+  position: relative;
+  margin-bottom: 0.75rem !important;
+  padding-top: 0.2rem !important;
+  padding-bottom: 0.7rem !important;
+  border-bottom: none !important;
+}
+[data-offrefy-theme^="diwali_"] .offrefy-topbar::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -1.55rem;
+  width: min(100%, 17rem);
+  height: 1.7rem;
+  transform: translateX(-50%);
+  background: url("/diwali/toran.svg") center / contain no-repeat;
+  pointer-events: none;
+  z-index: 4;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.08));
+}
+[data-offrefy-theme^="diwali_"] .offrefy-topbar::after {
+  content: "";
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  bottom: 0;
+  height: 1.5px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(212, 175, 55, 0.35) 15%,
+    rgba(212, 175, 55, 0.95) 50%,
+    rgba(212, 175, 55, 0.35) 85%,
+    transparent
+  );
+  pointer-events: none;
+}
+
+[data-offrefy-theme^="diwali_"] .offrefy-title {
+  color: var(--dw-ink);
+  font-family: Georgia, "Times New Roman", Times, serif;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  padding-inline: 1.75rem;
+}
+/* Title flank diyas — UXWing professional diya */
+[data-offrefy-theme^="diwali_"] .offrefy-title::before,
+[data-offrefy-theme^="diwali_"] .offrefy-title::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 1.35rem;
+  height: 1.35rem;
+  transform: translateY(-50%);
+  background: url("/diwali/diya.svg") center / contain no-repeat;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+[data-offrefy-theme^="diwali_"] .offrefy-title::before { left: 0.05rem; }
+[data-offrefy-theme^="diwali_"] .offrefy-title::after { right: 0.05rem; }
+
+[data-offrefy-theme^="diwali_"] .offrefy-cards {
+  margin-inline: 0.1rem;
+  margin-bottom: 0.3rem;
+}
+[data-offrefy-theme^="diwali_"] .offrefy-cards::before,
+[data-offrefy-theme^="diwali_"] .offrefy-cards::after {
+  content: none;
+}
+
+[data-offrefy-theme^="diwali_"] .offrefy-card {
+  position: relative;
+  overflow: visible !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  border: 1.5px solid rgba(212, 175, 55, 0.42) !important;
+  box-shadow: 0 3px 12px rgba(74, 14, 22, 0.05);
+}
+[data-offrefy-theme^="diwali_"] .offrefy-card.offrefy-card--selected {
+  border: 2.25px solid var(--dw-maroon) !important;
+  background: linear-gradient(165deg, #ffffff 0%, #fff5e8 100%) !important;
+  box-shadow:
+    0 0 0 1px rgba(212, 175, 55, 0.22),
+    0 8px 18px rgba(107, 21, 32, 0.1) !important;
+}
+[data-offrefy-theme^="diwali_"] .offrefy-card.offrefy-card--selected::before {
+  content: "";
+  position: absolute;
+  right: 0.4rem;
+  bottom: 0.35rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  background: url("/diwali/diya.svg") center / contain no-repeat;
+  pointer-events: none;
+  z-index: 4;
+  opacity: 0.92;
+}
+[data-offrefy-theme^="diwali_"] .offrefy-card.offrefy-card--selected::after {
+  content: none;
+}
+
+[data-offrefy-theme^="diwali_"] .offrefy-cta {
+  position: relative !important;
+  overflow: hidden !important;
+  z-index: 1;
+  background: linear-gradient(180deg, #9a2a3a 0%, #6b1520 52%, #4a0e16 100%) !important;
+  border: 2px solid var(--dw-gold) !important;
+  box-shadow:
+    0 0 0 1px rgba(245, 230, 184, 0.35),
+    0 0 14px rgba(212, 175, 55, 0.25),
+    0 8px 16px rgba(74, 14, 22, 0.22) !important;
+  color: #fff8e7 !important;
+  font-family: Georgia, "Times New Roman", Times, serif !important;
+  font-weight: 700 !important;
+  padding-left: 2.5rem !important;
+  padding-right: 2.5rem !important;
+  border-radius: 14px !important;
+}
+[data-offrefy-theme^="diwali_"] .offrefy-cta::before,
+[data-offrefy-theme^="diwali_"] .offrefy-cta::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 1.3rem;
+  height: 1.3rem;
+  transform: translateY(-50%);
+  background: url("/diwali/diya.svg") center / contain no-repeat;
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px rgba(255, 183, 71, 0.5));
+}
+[data-offrefy-theme^="diwali_"] .offrefy-cta::before { left: 0.7rem; }
+[data-offrefy-theme^="diwali_"] .offrefy-cta::after { right: 0.7rem; }
+
+[data-offrefy-theme^="diwali_"] .offrefy-badge-pill {
+  background: var(--dw-maroon) !important;
+  color: #fff8e7 !important;
+  box-shadow: 0 0 0 1.5px rgba(212, 175, 55, 0.75), 0 2px 5px rgba(0, 0, 0, 0.08);
+}
+
+/* —— Variants —— */
+[data-offrefy-theme="diwali_diya"] .offrefy-title { color: #5c1620; }
+
+[data-offrefy-theme="diwali_marigold"] .offrefy-title { color: #7c2d12; }
+[data-offrefy-theme="diwali_marigold"]::before,
+[data-offrefy-theme="diwali_marigold"]::after {
+  background-image: url("/diwali/marigold.svg");
+  width: 1.55rem;
+  height: 1.55rem;
+}
+
+[data-offrefy-theme="diwali_rangoli"] .offrefy-title { color: #6b1520; }
+[data-offrefy-theme="diwali_rangoli"] {
+  background-image:
+    url("/diwali/rangoli.svg"),
+    url("/diwali/rangoli.svg"),
+    url("/diwali/marigold.svg"),
+    url("/diwali/marigold.svg"),
+    url("/diwali/sparkles.svg"),
+    url("/diwali/sparkles.svg"),
+    radial-gradient(ellipse 88% 42% at 50% -8%, rgba(212, 175, 55, 0.14), transparent 58%);
+  background-size:
+    4.2rem auto,
+    4.2rem auto,
+    2.4rem auto,
+    2.4rem auto,
+    0.95rem auto,
+    0.95rem auto,
+    auto;
+  background-position:
+    left -0.6rem bottom -0.4rem,
+    right -0.6rem bottom -0.4rem,
+    left 0.2rem top 0.2rem,
+    right 0.2rem top 0.2rem,
+    left 30% top 42%,
+    right 28% top 58%,
+    center top;
+}
+
+[data-offrefy-theme="diwali_fireworks"] .offrefy-title { color: #3c141e; }
+[data-offrefy-theme="diwali_fireworks"] {
+  background-image:
+    url("/diwali/fireworks.svg"),
+    url("/diwali/fireworks.svg"),
+    url("/diwali/marigold.svg"),
+    url("/diwali/marigold.svg"),
+    url("/diwali/sparkles.svg"),
+    url("/diwali/sparkles.svg"),
+    radial-gradient(ellipse 88% 42% at 50% -8%, rgba(212, 175, 55, 0.14), transparent 58%);
+  background-size:
+    2.2rem auto,
+    2.2rem auto,
+    2.4rem auto,
+    2.4rem auto,
+    0.95rem auto,
+    0.95rem auto,
+    auto;
+  background-position:
+    left 0.35rem top 2.8rem,
+    right 0.35rem top 3.2rem,
+    left 0.15rem top 0.15rem,
+    right 0.15rem top 0.15rem,
+    left 30% top 42%,
+    right 28% top 58%,
+    center top;
+}
+[data-offrefy-theme="diwali_fireworks"] .offrefy-cta {
+  background: linear-gradient(180deg, #6b1520 0%, #3c141e 100%) !important;
+}
+
+[data-offrefy-theme="diwali_temple"] .offrefy-title { color: #4a0e16; }
+[data-offrefy-theme="diwali_temple"] .offrefy-card.offrefy-card--selected {
+  border-color: #4a0e16 !important;
+}
+[data-offrefy-theme="diwali_temple"] .offrefy-cta {
+  background: linear-gradient(180deg, #7a1f2b 0%, #4a0e16 100%) !important;
+}
+[data-offrefy-theme="diwali_temple"]::before,
+[data-offrefy-theme="diwali_temple"]::after {
+  background-image: url("/diwali/lantern.svg");
+}
+
+[data-offrefy-theme="diwali_mithai"] .offrefy-title { color: #854d0e; }
+[data-offrefy-theme="diwali_mithai"] .offrefy-card.offrefy-card--selected {
+  border-color: #b8860b !important;
+}
+[data-offrefy-theme="diwali_mithai"] .offrefy-cta {
+  background: linear-gradient(180deg, #d4a017 0%, #8a6410 100%) !important;
+  color: #1c1917 !important;
+  border-color: #f5e6b8 !important;
+}
+
+[data-offrefy-theme="diwali_lotus"] .offrefy-title { color: #6b1520; }
+[data-offrefy-theme="diwali_lotus"] .offrefy-cta {
+  background: linear-gradient(180deg, #a33a48 0%, #6b1520 100%) !important;
+}
+[data-offrefy-theme="diwali_lotus"]::before,
+[data-offrefy-theme="diwali_lotus"]::after {
+  background-image: url("/diwali/flourish.svg");
+}
+
+[data-offrefy-theme="diwali_sparkle"] .offrefy-card.offrefy-card--selected {
+  border-color: #d4af37 !important;
+}
+[data-offrefy-theme="diwali_sparkle"] .offrefy-cta {
+  background: linear-gradient(180deg, #d4af37 0%, #6b1520 100%) !important;
+}
+
+[data-offrefy-theme="diwali_royal"] .offrefy-title { color: #4a0e16; }
+[data-offrefy-theme="diwali_royal"] .offrefy-card.offrefy-card--selected {
+  border-color: #4a0e16 !important;
+}
+[data-offrefy-theme="diwali_royal"] .offrefy-cta {
+  background: linear-gradient(180deg, #7a1f2b 0%, #4a0e16 100%) !important;
+}
+
+[data-offrefy-theme="diwali_peacock"] .offrefy-card.offrefy-card--selected {
+  border-color: #b8860b !important;
+}
+[data-offrefy-theme="diwali_peacock"] .offrefy-cta {
+  background: linear-gradient(180deg, #c9a227 0%, #6b1520 100%) !important;
+}
+
+.vd-admin-qb-preview[data-offrefy-theme^="diwali_"] {
+  margin-bottom: 0.75rem;
+}

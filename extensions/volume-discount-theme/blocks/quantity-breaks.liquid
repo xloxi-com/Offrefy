@@ -39,6 +39,7 @@
     </script>
   {% endif %}
   {% render 'vd-storefront-assets', vd_product: vd_product %}
+  {% render 'vd-hide-theme-atc', vd_product: vd_product %}
   {% render 'vd-quantity-breaks', block: block, vd_product: vd_product %}
 {% endif %}
 
@@ -46,7 +47,6 @@
 {
   "name": "t:volume_discount.blocks.quantity_breaks.name",
   "target": "section",
-  "stylesheet": "volume-discount-storefront.css",
   "enabled_on": {
     "templates": ["product"]
   },

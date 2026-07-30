@@ -26,6 +26,7 @@ export type CampaignSyncSnapshot = {
   collectionIds: unknown;
   tiers: unknown;
   widgetDisplay: unknown;
+  displayNameTranslations?: unknown;
   countdownStartsAt: Date | null;
   countdownEndsAt: Date | null;
 };
@@ -42,6 +43,7 @@ export type ParsedCampaignForm = {
   collectionIds: string[];
   tiers: unknown;
   widgetDisplay: JsonValue;
+  displayNameTranslations?: unknown;
   countdownStartsAt: Date | null;
   countdownEndsAt: Date | null;
 };
@@ -64,6 +66,14 @@ export function discountFunctionFieldsChanged(
   if (!jsonArraysEqual(before.productIds, after.productIds)) return true;
   if (!jsonArraysEqual(before.collectionIds, after.collectionIds)) return true;
   if (!jsonArraysEqual(before.tiers, after.tiers)) return true;
+  if (
+    !jsonArraysEqual(
+      before.displayNameTranslations ?? {},
+      after.displayNameTranslations ?? {},
+    )
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -72,7 +82,11 @@ export function storefrontPresentationChanged(
   before: CampaignSyncSnapshot,
   after: ParsedCampaignForm,
 ): boolean {
-  return !jsonArraysEqual(before.widgetDisplay, after.widgetDisplay);
+  if (!jsonArraysEqual(before.widgetDisplay, after.widgetDisplay)) return true;
+  return !jsonArraysEqual(
+    before.displayNameTranslations ?? {},
+    after.displayNameTranslations ?? {},
+  );
 }
 
 /** Schedule start/end — embedded in Discount Function compact rules (sa/ea). */

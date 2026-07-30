@@ -32,9 +32,11 @@ import {
 import {
   buildCompactRuleForProduct,
   buildProductRuleIndex,
+  compactRuleMessageField,
   splitProductRuleIndexIntoMetafieldChunks,
   type ProductRuleCampaignInput,
 } from "../utils/productRuleIndex.server";
+import { normalizeVolumeDiscountWidgetDisplay } from "../utils/widgetDisplay";
 import {
   isLikelyVariantId,
   resolveVariantToProductIds,
@@ -51,7 +53,11 @@ import {
   readDiscountVolumeMetafieldNodes,
 } from "../utils/discountMetafieldRead.server";
 import { rowSyncFingerprint } from "../utils/syncRowFingerprint.server";
-import { compactTranslationsForDiscountFunction } from "../utils/storefrontTranslations";
+import {
+  compactCartTrFromCampaignOverrides,
+  compactTranslationsForDiscountFunction,
+  parseSparseStorefrontTranslations,
+} from "../utils/storefrontTranslations";
 import { loadStorefrontTranslationsForShop } from "../utils/storefrontTranslations.server";
 
 export type SyncShopOptions = {
@@ -273,6 +279,10 @@ const SHARED_DISCOUNT_TITLE = "Offrefy — Quantity breaks";
 /**
  * Shopify Automatic Discount startsAt/endsAt (Functions cannot use Date.now —
  * it returns epoch and incorrectly blocked schedule windows).
+ *
+ * One AD covers all offers. If any campaign is already live, pin startsAt slightly
+ * in the past so cart discounts apply immediately (Shopify's scheduled activation
+ * can lag). Only when every campaign is still pending do we use the earliest start.
  */
 function automaticDiscountScheduleBounds(
   rows: ReadonlyArray<{
@@ -281,16 +291,18 @@ function automaticDiscountScheduleBounds(
   }>,
   now: Date = new Date(),
 ): { startsAt: string; endsAt?: string } {
-  let earliestStart: Date | null = null;
   let latestEnd: Date | null = null;
   let allHaveEnd = rows.length > 0;
+  let anyLive = false;
+  let earliestPendingStart: Date | null = null;
+  const nowMs = now.getTime();
 
   for (const r of rows) {
-    if (r.countdownStartsAt) {
-      if (!earliestStart || r.countdownStartsAt.getTime() < earliestStart.getTime()) {
-        earliestStart = r.countdownStartsAt;
-      }
-    }
+    const ended =
+      r.countdownEndsAt != null && r.countdownEndsAt.getTime() <= nowMs;
+    // Expired rows are dropped from sync selection already; skip if present.
+    if (ended) continue;
+
     if (r.countdownEndsAt) {
       if (!latestEnd || r.countdownEndsAt.getTime() > latestEnd.getTime()) {
         latestEnd = r.countdownEndsAt;
@@ -298,16 +310,30 @@ function automaticDiscountScheduleBounds(
     } else {
       allHaveEnd = false;
     }
+
+    const pending =
+      r.countdownStartsAt != null && r.countdownStartsAt.getTime() > nowMs;
+    if (pending) {
+      if (
+        !earliestPendingStart ||
+        r.countdownStartsAt!.getTime() < earliestPendingStart.getTime()
+      ) {
+        earliestPendingStart = r.countdownStartsAt;
+      }
+    } else {
+      anyLive = true;
+    }
   }
 
-  const startsAt =
-    earliestStart && earliestStart.getTime() > now.getTime()
-      ? earliestStart
-      : now;
+  const startsAt = anyLive
+    ? new Date(nowMs - 5_000)
+    : earliestPendingStart && earliestPendingStart.getTime() > nowMs
+      ? earliestPendingStart
+      : new Date(nowMs - 5_000);
 
   return {
     startsAt: startsAt.toISOString(),
-    ...(allHaveEnd && latestEnd && latestEnd.getTime() > now.getTime()
+    ...(allHaveEnd && latestEnd && latestEnd.getTime() > nowMs
       ? { endsAt: latestEnd.toISOString() }
       : {}),
   };
@@ -544,37 +570,113 @@ async function syncVolumeDiscountShopImpl(
   const maxDiscountProducts = shopPlanCap.maxTargets;
 
   if (activeRows.length === 0) {
+    /*
+     * No live/scheduled offers — tear down Automatic Discount + product tiers
+     * so cart discounts stop immediately (Shopify AD endsAt can lag).
+     */
+    const shopGidPromise = resolveStorefrontWidgetShopGid(admin, shop);
+    let clearProductErrors: string[] = [];
+    try {
+      const { previousProductIds } = await rebuildDiscountRulesForShop(shop, []);
+      const clearMf: Array<{
+        ownerId: string;
+        namespace: string;
+        key: string;
+        type: string;
+        value: string;
+      }> = [];
+      for (const oldId of previousProductIds) {
+        clearMf.push({
+          ownerId: `gid://shopify/Product/${oldId}`,
+          namespace: "volume_discount",
+          key: "tiers",
+          type: "json",
+          value: JSON.stringify({ t: [] }),
+        });
+      }
+      const BATCH_SIZE = 25;
+      for (let i = 0; i < clearMf.length; i += BATCH_SIZE) {
+        const chunk = clearMf.slice(i, i + BATCH_SIZE);
+        try {
+          const res = await admin.graphql(METAFIELDS_SET_MUTATION, {
+            variables: { metafields: chunk },
+          });
+          const parsed = (await res.json()) as {
+            data?: {
+              metafieldsSet?: { userErrors?: { message?: string }[] };
+            };
+          };
+          const ue = parsed.data?.metafieldsSet?.userErrors ?? [];
+          for (const e of ue) {
+            if (e.message) clearProductErrors.push(e.message);
+          }
+        } catch (err) {
+          clearProductErrors.push(
+            err instanceof Error ? err.message : String(err),
+          );
+        }
+      }
+    } catch (e) {
+      clearProductErrors.push(e instanceof Error ? e.message : String(e));
+      console.warn("[volume-discount] clear product tiers on empty sync", shop, e);
+    }
+
+    const gid = await shopGidPromise.catch(() => null);
+    const errors: string[] = [...clearProductErrors];
+
     if (state?.functionDiscountId) {
-      const shopGidPromise = resolveStorefrontWidgetShopGid(admin, shop);
-      const [{ errors: delErr }, gid] = await Promise.all([
-        deleteAutomaticDiscounts(admin, [state.functionDiscountId]),
-        shopGidPromise,
+      const { errors: delErr } = await deleteAutomaticDiscounts(admin, [
+        state.functionDiscountId,
       ]);
-      if (delErr.length) {
-        return { discountIds: [], errors: delErr };
+      // Ignore "not found" — discount may already be gone; still clear local state.
+      for (const msg of delErr) {
+        if (!/not found|does not exist/i.test(msg)) errors.push(msg);
       }
       await prisma.volumeDiscountShopState.deleteMany({ where: { shop } });
       await prisma.volumeDiscountCampaign.updateMany({
         where: { shop },
         data: { shopifyDiscountIds: [] },
       });
-      await syncShopStorefrontWidgetMetafield(
-        admin,
-        [],
+    }
+
+    await syncShopStorefrontWidgetMetafield(
+      admin,
+      [],
+      shop,
+      undefined,
+      gid ?? undefined,
+    );
+    try {
+      await prisma.volumeDiscountStorefrontPayload.upsert({
+        where: { shop },
+        create: {
+          shop,
+          payload: JSON.stringify({ version: 1, campaigns: [] }),
+          syncRowFingerprint: "empty",
+        },
+        update: {
+          payload: JSON.stringify({ version: 1, campaigns: [] }),
+          syncRowFingerprint: "empty",
+        },
+      });
+    } catch {
+      /* column may be missing until migration */
+    }
+
+    if (errors.length) {
+      console.warn(
+        "[volume-discount] empty-shop cleanup warnings",
         shop,
-        undefined,
-        gid ?? undefined,
+        errors.join("; "),
       );
-    } else {
-      await syncShopStorefrontWidgetMetafield(admin, [], shop);
     }
     return { discountIds: [], errors: [] };
   }
 
   const rowFp = rowSyncFingerprint(activeRows, {
     maxDiscountProducts,
-    // v4: schedule via Automatic Discount startsAt/endsAt (Functions Date.now is epoch)
-    ruleSourceVersion: 4,
+    // v8: slim rule_source (w only) + omit empty display m — less Function parse fuel
+    ruleSourceVersion: 8,
   });
 
   if (!force && !incrementalIds?.length && recursionDepth === 0) {
@@ -703,6 +805,9 @@ async function syncVolumeDiscountShopImpl(
   let needsRemoteLookup = false;
   let widgetJsonFull: string;
   let wildcardCompact: Record<string, unknown> | undefined;
+  let discountFunctionTranslations: ReturnType<
+    typeof compactTranslationsForDiscountFunction
+  > = {};
   try {
     const campaignsForRules = (config.campaigns as {
       id: string;
@@ -730,6 +835,35 @@ async function syncVolumeDiscountShopImpl(
         ? await resolveVariantToProductIds(admin, variantRawIds)
         : new Map<string, string>();
 
+    const cartTrByCampaignId = new Map(
+      activeRows.map((row) => {
+        const overrides = parseSparseStorefrontTranslations(
+          row.displayNameTranslations,
+        );
+        return [
+          row.id,
+          compactCartTrFromCampaignOverrides(overrides, row.displayName),
+        ] as const;
+      }),
+    );
+
+    const scheduleByCampaignId = new Map(
+      activeRows.map((row) => {
+        const wd = normalizeVolumeDiscountWidgetDisplay(row.widgetDisplay ?? {});
+        return [
+          row.id,
+          {
+            countdownStartsAt: row.countdownStartsAt,
+            countdownEndsAt: row.countdownEndsAt,
+            showCountdown: wd.showCountdown === true,
+            countdownLabel: wd.countdownLabel,
+            countdownTimeAmount: wd.countdownTimeAmount,
+            countdownTimeUnit: wd.countdownTimeUnit,
+          },
+        ] as const;
+      }),
+    );
+
     const rulesInput: ProductRuleCampaignInput[] = campaignsForRules.map(
       (c) => {
         const collectionIdsByProduct: Record<string, string[]> = {};
@@ -749,6 +883,19 @@ async function syncVolumeDiscountShopImpl(
             }
           }
         }
+
+        const cartTr = cartTrByCampaignId.get(c.id);
+        const cartTrField =
+          cartTr && Object.keys(cartTr).length > 0 ? { cartTr } : {};
+        const schedule = scheduleByCampaignId.get(c.id);
+        const scheduleField = {
+          countdownStartsAt: schedule?.countdownStartsAt ?? null,
+          countdownEndsAt: schedule?.countdownEndsAt ?? null,
+          showCountdown: schedule?.showCountdown === true,
+          countdownLabel: schedule?.countdownLabel ?? null,
+          countdownTimeAmount: schedule?.countdownTimeAmount ?? null,
+          countdownTimeUnit: schedule?.countdownTimeUnit ?? null,
+        };
 
         if (c.productScope === "variants") {
           const productIds: string[] = [];
@@ -778,6 +925,8 @@ async function syncVolumeDiscountShopImpl(
             productIds: [...new Set(productIds)],
             variantIds: [...new Set(variantIds)],
             tiers: c.tiers,
+            ...cartTrField,
+            ...scheduleField,
           };
         }
 
@@ -794,12 +943,48 @@ async function syncVolumeDiscountShopImpl(
             ? { collectionIdsByProduct }
             : {}),
           tiers: c.tiers,
+          ...cartTrField,
+          ...scheduleField,
         };
       },
     );
 
-    const discountFunctionTranslations = compactTranslationsForDiscountFunction(
-      await loadStorefrontTranslationsForShop(shop),
+    const storedTranslations = await loadStorefrontTranslationsForShop(shop);
+    const campaignDisplay =
+      rulesInput.find(
+        (c) =>
+          typeof c.displayName === "string" &&
+          c.displayName.includes("{{"),
+      )?.displayName?.trim() || "";
+    if (
+      campaignDisplay &&
+      storedTranslations.en &&
+      storedTranslations.en.transCartDiscount.trim() !== campaignDisplay
+    ) {
+      storedTranslations.en = {
+        ...storedTranslations.en,
+        transCartDiscount: campaignDisplay,
+      };
+    }
+    discountFunctionTranslations = compactTranslationsForDiscountFunction(
+      Object.keys(storedTranslations).length > 0
+        ? storedTranslations
+        : {
+            en: {
+              transHeading: "",
+              transQty: "Qty",
+              transDiscount: "Discount",
+              transPrice: "",
+              transCountdown: "",
+              transCta: "",
+              transFootnote: "",
+              transBuy: "Buy",
+              transYouSave: "",
+              transAdd: "Add",
+              transCartDiscount: campaignDisplay || "{{ discount }} OFF",
+              transCartDiscountQty: "(qty {{ qty }})",
+            },
+          },
     );
 
     const [{ errors: purgeErrors }, built, widgetJsonBuilt] = await Promise.all([
@@ -872,11 +1057,7 @@ async function syncVolumeDiscountShopImpl(
 
             compactRule = {
               c: row.campaignId,
-              m: (
-                row.displayName ||
-                row.campaignName ||
-                "Volume discount"
-              ).slice(0, 80),
+              ...compactRuleMessageField(row.displayName),
               q:
                 row.quantityCondition === "total-all"
                   ? "a"
@@ -891,9 +1072,35 @@ async function syncVolumeDiscountShopImpl(
                   : row.customerType === "logged-in"
                     ? "l"
                     : "e",
-              tg: Array.isArray(row.customerTags) ? row.customerTags : [],
+              sv: 1,
+              ...(Array.isArray(row.customerTags) && row.customerTags.length
+                ? { tg: row.customerTags }
+                : {}),
               t: compactTiers,
             };
+            const sched = scheduleByCampaignId.get(row.campaignId);
+            if (sched?.countdownStartsAt) {
+              compactRule.sa = Math.floor(
+                sched.countdownStartsAt.getTime() / 1000,
+              );
+            }
+            if (sched?.countdownEndsAt) {
+              compactRule.ea = Math.floor(
+                sched.countdownEndsAt.getTime() / 1000,
+              );
+            }
+            if (sched?.showCountdown) {
+              compactRule.sc = 1;
+              if (sched.countdownLabel) {
+                compactRule.cl = String(sched.countdownLabel).slice(0, 80);
+              }
+              const ca = Math.floor(Number(sched.countdownTimeAmount));
+              compactRule.ca =
+                Number.isFinite(ca) && ca >= 1 ? Math.min(9999, ca) : 1;
+              const unit = String(sched.countdownTimeUnit || "days");
+              compactRule.cu =
+                unit === "hours" ? "h" : unit === "minutes" ? "m" : "d";
+            }
           }
 
           metafieldsToSet.push({
@@ -1022,13 +1229,8 @@ async function syncVolumeDiscountShopImpl(
     customerSegmentTags: collectCustomerSegmentTags(activeRows),
   });
   const ruleSourcePayload = {
-    mode: needsRemoteLookup ? ("api" as const) : ("metafield" as const),
-    // Always include shopDomain so Function fetch can gap-fill empty product metafields.
-    apiPath: "/apps/volume-discount/cart-rules",
-    shopDomain: shop,
-    shopifyPlus: shopPlanCap.shopifyPlus,
-    maxTargets: maxDiscountProducts,
-    // All-products offers: Function applies rule_source.w when product tiers MF is absent.
+    // Function only reads `w`. Extra keys (tr/ctr/apiPath/…) were parsed every
+    // cart eval and burned instruction fuel without being used after fetch disable.
     ...(wildcardCompact ? { w: wildcardCompact } : {}),
   };
   const metafields = [

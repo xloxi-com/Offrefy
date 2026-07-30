@@ -8,6 +8,8 @@ import {
   Card,
   Checkbox,
   ChoiceList,
+  Divider,
+  FormLayout,
   Icon,
   InlineStack,
   RangeSlider,
@@ -20,7 +22,9 @@ import {
 import {
   DesktopIcon,
   MobileIcon,
+  AutomationIcon,
   RedoIcon,
+  ResetIcon,
   SearchIcon,
   UndoIcon,
 } from "@shopify/polaris-icons";
@@ -34,20 +38,57 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
 } from "react";
 import { useFetcher } from "react-router";
 
 import { useAdminI18n } from "./AdminI18nProvider";
+import type { AdminUiMessageKey } from "../utils/adminUiMessages";
+import { AdminLanguageDropdown } from "./AdminLanguageDropdown";
 import { CampaignStatusScheduleCard } from "./CampaignStatusScheduleCard";
-import { CountdownTimerSettingsCard } from "./CountdownTimerSettingsCard";
 import { WidgetHeaderAlignFields } from "./WidgetHeaderAlignFields";
 import { PlanUpgradeBanner, PlanUpgradeHint } from "./PlanUpgradeBanner";
 import { PlanUpgradeBadge } from "./PlanUpgradeBadge";
 import { WidgetDisplayColorField } from "./WidgetDisplayColorField";
+import { AppearanceTemplateCategoryTabs } from "./AppearanceTemplateCategoryTabs";
+import { AppearanceTemplateGrid } from "./AppearanceTemplateGrid";
+import {
+  isWidgetDisplayAppearanceAbovePlan,
+  isAppearancePresetAllowedForTier,
+  isSeasonalAppearanceCategory,
+} from "../utils/appearanceTemplateAccess";
 import {
   planCapabilities as defaultPlanCapabilities,
   type PlanCapabilities,
 } from "../utils/pricingPlans";
+import {
+  emptyTierCopyFields,
+  packCampaignTranslationBlob,
+  resolveCampaignEnglishSourceForAutoTranslate,
+  sparsifyStorefrontTranslations,
+  translationPresetForLanguage,
+  type SparseStorefrontTranslationsMap,
+  type StorefrontTranslationFields,
+  type StorefrontTranslationsMap,
+  type TierCopyFields,
+  type TierCopyTranslationsMap,
+} from "../utils/storefrontTranslations";
+
+type OfferEditorShopLanguage = {
+  label: string;
+  value: string;
+  locale?: string;
+  primary?: boolean;
+};
+
+const FALLBACK_OFFER_SHOP_LANGUAGES: OfferEditorShopLanguage[] = [
+  {
+    label: "English (EN) — Primary",
+    value: "en",
+    locale: "en",
+    primary: true,
+  },
+];
 import createStyles from "../styles/volume-discount-create.module.css";
 import { buyLabelsForQuantityTiers } from "../utils/buyLabelsForQuantityTiers";
 import {
@@ -65,10 +106,14 @@ import {
 } from "../utils/campaignScheduleStatus";
 import { statusBadgeTone, statusLabel } from "../utils/offers-display";
 import {
+  BADGE_DESIGN_OPTIONS,
   BADGE_POSITION_OPTIONS,
   BADGE_SIZE_SCALE_PERCENT_MAX,
   BADGE_SIZE_SCALE_PERCENT_MIN,
+  appearanceCategoryForPresetId,
+  appearancePresetsForCategory,
   clampBadgeSizeScalePercent,
+  isVolumeDiscountBadgeDesign,
   isVolumeDiscountBadgePosition,
   isVolumeDiscountWidgetHeaderTextAlign,
   WIDGET_HEADER_TEXT_ALIGN_OPTIONS,
@@ -80,14 +125,11 @@ import {
   clampWidgetFontPx,
   clampWidgetFontWeight,
   CTA_BUTTON_ACTION_OPTIONS,
-  applyVolumeDiscountAppearancePreset,
   applyVolumeTableAppearancePreset,
   DEFAULT_WIDGET_DISPLAY,
   FONT_SIZE_SCALE_PERCENT_MAX,
   FONT_SIZE_SCALE_PERCENT_MIN,
   normalizeVolumeDiscountWidgetDisplay,
-  VOLUME_DISCOUNT_APPEARANCE_PRESETS,
-  VOLUME_TABLE_APPEARANCE_PRESETS,
   widgetDisplayFontSizesFromScale,
   WIDGET_APPEARANCE_CUSTOM_TRIGGER_KEYS,
   WIDGET_BORDER_RADIUS_PX_MAX,
@@ -102,6 +144,9 @@ import {
   WIDGET_FONT_PX_MAX,
   WIDGET_FONT_PX_MIN,
   WIDGET_FONT_WEIGHT_SELECT_OPTIONS,
+  type AppearanceTemplateCategory,
+  type VolumeDiscountBadgeDesign,
+  type VolumeDiscountBadgePosition,
   type VolumeDiscountFontScale,
   type VolumeDiscountWidgetDisplay,
 } from "../utils/widgetDisplay";
@@ -136,8 +181,8 @@ function PreviewPanelFallback() {
   );
 }
 
-/** Cart & checkout label default for new offers (`{{ discount }}` = tier %). */
-const DEFAULT_VOLUME_DISCOUNT_DISPLAY_NAME = "{{ discount }} OFF";
+/** Cart & checkout label — empty uses Function default badge (e.g. `13% OFF`). */
+const DEFAULT_VOLUME_DISCOUNT_DISPLAY_NAME = "";
 
 /** Default “Discounted products” scope for new offers (Specific products). */
 const DEFAULT_PRODUCT_SCOPE: VolumeDiscountProductScope = "specific-products";
@@ -332,14 +377,87 @@ const WIDGET_FONT_SIZE_FIELDS: { key: WidgetFontSizeFieldKey; label: string }[] 
     { key: "fontSizeFootnote", label: "Footnote" },
   ];
 
+const CAMPAIGN_STATUS_LABEL_KEYS: Record<string, AdminUiMessageKey> = {
+  active: "offers.status.active",
+  draft: "offers.status.draft",
+  scheduled: "offers.status.scheduled",
+  archived: "offers.status.archived",
+};
+
+const ALIGN_OPTION_LABEL_KEYS: Record<"start" | "center" | "end", AdminUiMessageKey> = {
+  start: "offerEditor.align.left",
+  center: "offerEditor.align.center",
+  end: "offerEditor.align.right",
+};
+
+const BADGE_POSITION_LABEL_KEYS: Record<VolumeDiscountBadgePosition, AdminUiMessageKey> = {
+  after_label: "offerEditor.badge.position.afterLabel",
+  below_label: "offerEditor.badge.position.belowLabel",
+  after_subtext: "offerEditor.badge.position.afterSubtext",
+  top_left: "offerEditor.badge.position.topLeft",
+  top_center: "offerEditor.badge.position.topCenter",
+  top_right: "offerEditor.badge.position.topRight",
+  price_column: "offerEditor.badge.position.priceColumn",
+};
+
+const BADGE_DESIGN_LABEL_KEYS: Partial<
+  Record<VolumeDiscountBadgeDesign, AdminUiMessageKey>
+> = {
+  pill: "offerEditor.badge.design.pill",
+  rounded: "offerEditor.badge.design.rounded",
+  square: "offerEditor.badge.design.square",
+  soft: "offerEditor.badge.design.soft",
+  outline: "offerEditor.badge.design.outline",
+  outline_bold: "offerEditor.badge.design.outlineBold",
+  ghost: "offerEditor.badge.design.ghost",
+  ribbon: "offerEditor.badge.design.ribbon",
+  flag: "offerEditor.badge.design.flag",
+  tag: "offerEditor.badge.design.tag",
+  capsule: "offerEditor.badge.design.capsule",
+  chip: "offerEditor.badge.design.chip",
+};
+
+const FONT_ROLE_LABEL_KEYS: Record<WidgetFontSizeFieldKey, AdminUiMessageKey> = {
+  fontSizeTitle: "offerEditor.font.role.title",
+  fontSizeBuyLabel: "offerEditor.font.role.buyLabel",
+  fontSizeOptionSubtext: "offerEditor.font.role.optionSubtext",
+  fontSizeBadge: "offerEditor.font.role.badge",
+  fontSizePrice: "offerEditor.font.role.price",
+  fontSizeComparePrice: "offerEditor.font.role.comparePrice",
+  fontSizeSavings: "offerEditor.font.role.savingsLine",
+  fontSizeButton: "offerEditor.font.role.ctaText",
+  fontSizeCountdownLabel: "offerEditor.font.role.countdownLabel",
+  fontSizeCountdownValue: "offerEditor.font.role.countdownPill",
+  fontSizeFootnote: "offerEditor.font.role.footnote",
+};
+
 type SaveResponse =
   | { ok: true; campaignId: string }
   | { ok: false; error: string };
+
+type CampaignTranslateResponse =
+  | {
+      ok: true;
+      intent: "autoTranslateCampaign";
+      targetLang: string;
+      fields: StorefrontTranslationFields;
+      tierCopy: TierCopyFields[];
+      message: string;
+    }
+  | {
+      ok: false;
+      intent?: "autoTranslateCampaign";
+      error: string;
+    };
 
 export type VolumeDiscountInitialCampaign = {
   id: string;
   campaignName: string;
   displayName: string | null;
+  /** Sparse per-locale storefront overrides for this offer. */
+  displayNameTranslations?: SparseStorefrontTranslationsMap;
+  /** Per-locale option label / subtext / badge overrides (by tier index). */
+  tierCopyTranslations?: TierCopyTranslationsMap;
   /** `draft` | `active` (and other DB values treated as not active in the toggle). */
   status: string;
   productScope: VolumeDiscountProductScope;
@@ -380,6 +498,8 @@ function volumeDiscountFormSnapshot(input: {
   customerTags: string[];
   tiers: TierForm[];
   widgetDisplay: VolumeDiscountWidgetDisplay;
+  displayNameTranslations: SparseStorefrontTranslationsMap;
+  tierCopyTranslations: TierCopyTranslationsMap;
   countdownStartsAt: string | null;
   countdownEndsAt: string | null;
 }) {
@@ -395,6 +515,8 @@ function volumeDiscountFormSnapshot(input: {
     customerTags: [...input.customerTags].slice().sort(),
     tiers: input.tiers,
     widgetDisplay: input.widgetDisplay,
+    displayNameTranslations: input.displayNameTranslations,
+    tierCopyTranslations: input.tierCopyTranslations,
     countdownStartsAt: input.countdownStartsAt,
     countdownEndsAt: input.countdownEndsAt,
   });
@@ -415,6 +537,10 @@ type VolumeDiscountCreateViewProps = {
   planCapabilities?: PlanCapabilities;
   /** Shopify shop IANA timezone for schedule pickers (e.g. Asia/Kolkata). */
   shopTimezone?: string;
+  /** Published shop languages for the Translations tab. */
+  shopLanguages?: OfferEditorShopLanguage[];
+  /** Shop-wide Settings translations (placeholders / inherit defaults). */
+  shopTranslations?: StorefrontTranslationsMap;
 };
 
 export function VolumeDiscountCreateView({
@@ -425,6 +551,8 @@ export function VolumeDiscountCreateView({
   newOfferPreset,
   planCapabilities: planCapsProp,
   shopTimezone: shopTimezoneProp,
+  shopLanguages: shopLanguagesProp,
+  shopTranslations: shopTranslationsProp,
 }: VolumeDiscountCreateViewProps) {
   const { t } = useAdminI18n();
   const planCaps = planCapsProp ?? defaultPlanCapabilities("free");
@@ -432,6 +560,7 @@ export function VolumeDiscountCreateView({
   const shopTimezoneLabel = formatShopTimezoneDisplay(shopTimezone);
   const shopify = useAppBridge();
   const fetcher = useFetcher<SaveResponse>();
+  const translateFetcher = useFetcher<CampaignTranslateResponse>();
   const [campaignName, setCampaignName] = useState(
     () =>
       initialCampaign?.campaignName ??
@@ -455,7 +584,7 @@ export function VolumeDiscountCreateView({
   const [collectionQuery, setCollectionQuery] = useState("");
   const [quantityCondition, setQuantityCondition] =
     useState<VolumeDiscountQuantityCondition>(
-      () => initialCampaign?.quantityCondition ?? "total-all",
+      () => initialCampaign?.quantityCondition ?? "per-product",
     );
   const [customerType, setCustomerType] = useState<VolumeDiscountCustomerType>(
     () =>
@@ -483,6 +612,28 @@ export function VolumeDiscountCreateView({
         ? normalizeVolumeDiscountWidgetDisplay(initialCampaign.widgetDisplay)
         : initialWidgetDisplayForNewCampaign(newOfferPreset),
   );
+  const [campaignTranslations, setCampaignTranslations] =
+    useState<SparseStorefrontTranslationsMap>(
+      () => initialCampaign?.displayNameTranslations ?? {},
+    );
+  const [campaignTierCopy, setCampaignTierCopy] =
+    useState<TierCopyTranslationsMap>(
+      () => initialCampaign?.tierCopyTranslations ?? {},
+    );
+  const shopLanguages = useMemo(
+    () =>
+      shopLanguagesProp && shopLanguagesProp.length > 0
+        ? shopLanguagesProp
+        : FALLBACK_OFFER_SHOP_LANGUAGES,
+    [shopLanguagesProp],
+  );
+  const shopTranslations = shopTranslationsProp ?? {};
+  const primaryLang = useMemo(() => {
+    const primary = shopLanguages.find((l) => l.primary);
+    return primary?.value ?? shopLanguages[0]?.value ?? "en";
+  }, [shopLanguages]);
+  const [selectedTransLang, setSelectedTransLang] = useState(primaryLang);
+  const canEditTranslations = planCaps.translations;
   const [countdownEndsAtLocal, setCountdownEndsAtLocal] = useState(() =>
     initialCountdownEndsAtLocalForEditor(initialCampaign, newOfferPreset, shopTimezone),
   );
@@ -494,11 +645,21 @@ export function VolumeDiscountCreateView({
       isoToDatetimeLocalValue(initialCampaign?.countdownStartsAt ?? null, shopTimezone).trim(),
     ),
   );
-  const [scheduleEndEnabled, setScheduleEndEnabled] = useState(() =>
-    Boolean(
-      isoToDatetimeLocalValue(initialCampaign?.countdownEndsAt ?? null, shopTimezone).trim(),
-    ),
-  );
+  const [scheduleEndEnabled, setScheduleEndEnabled] = useState(() => {
+    const hasStoredEnd = Boolean(
+      isoToDatetimeLocalValue(
+        initialCampaign?.countdownEndsAt ?? null,
+        shopTimezone,
+      ).trim(),
+    );
+    if (hasStoredEnd) return true;
+    // showCountdown without a saved end still seeds a local end for the pill —
+    // keep Schedule end enabled so Save persists countdownEndsAt (storefront needs it).
+    const wd = initialCampaign
+      ? normalizeVolumeDiscountWidgetDisplay(initialCampaign.widgetDisplay ?? {})
+      : initialWidgetDisplayForNewCampaign(newOfferPreset);
+    return Boolean(wd.showCountdown);
+  });
   /** Bumps preview countdown when schedule end is re-seeded. */
   const [countdownPreviewNonce, setCountdownPreviewNonce] = useState(0);
   const lastShowCountdownRef = useRef<boolean | null>(null);
@@ -519,9 +680,47 @@ export function VolumeDiscountCreateView({
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">(
     "desktop",
   );
+  const [appearanceTemplateCategory, setAppearanceTemplateCategory] =
+    useState<AppearanceTemplateCategory>(() => {
+      const tid = widgetDisplay.appearanceTemplateId;
+      if (tid === "custom" && widgetDisplay.appearanceDecorThemeId) {
+        return appearanceCategoryForPresetId(
+          widgetDisplay.appearanceDecorThemeId,
+        );
+      }
+      return appearanceCategoryForPresetId(tid);
+    });
 
   const isVolumeTableOffer =
     widgetDisplay.widgetPresentation === "volume_table";
+
+  useEffect(() => {
+    // Keep the current tab when Custom is selected so Custom stays visible
+    // under Classic / Christmas / Halloween / Ramadan / Diwali / Pongal.
+    if (widgetDisplay.appearanceTemplateId === "custom") return;
+    setAppearanceTemplateCategory(
+      appearanceCategoryForPresetId(widgetDisplay.appearanceTemplateId),
+    );
+  }, [widgetDisplay.appearanceTemplateId]);
+
+  const appearanceTemplatesInCategory = useMemo(
+    () =>
+      appearancePresetsForCategory(
+        appearanceTemplateCategory,
+        isVolumeTableOffer,
+      ),
+    [appearanceTemplateCategory, isVolumeTableOffer],
+  );
+
+  const selectedAppearanceTemplateLocked = !isAppearancePresetAllowedForTier(
+    planCaps.appearanceTemplates,
+    widgetDisplay.appearanceTemplateId,
+  );
+
+  const showAppearanceTemplateUpgrade =
+    planCaps.appearanceTemplates === "classic" &&
+    isSeasonalAppearanceCategory(appearanceTemplateCategory);
+
   /** Matches Select offer type cards: “Quantity breaks” vs “Volume discount”. */
   const offerTypePageTitle = useMemo((): string => {
     const isVolume =
@@ -553,14 +752,21 @@ export function VolumeDiscountCreateView({
           f.key !== "fontSizeCountdownValue",
       );
     }
-    return rows.map((f) =>
-      f.key === "fontSizeBuyLabel"
-        ? { ...f, label: "Quantity column" }
-        : f.key === "fontSizePrice"
-          ? { ...f, label: "Price column" }
-          : f,
-    );
+    return rows;
   }, [isVolumeTableOffer, widgetDisplay.showCountdown]);
+
+  const fontRoleLabel = useCallback(
+    (key: WidgetFontSizeFieldKey) => {
+      if (isVolumeTableOffer && key === "fontSizeBuyLabel") {
+        return t("offerEditor.font.role.quantityColumn");
+      }
+      if (isVolumeTableOffer && key === "fontSizePrice") {
+        return t("offerEditor.font.role.priceColumn");
+      }
+      return t(FONT_ROLE_LABEL_KEYS[key]);
+    },
+    [isVolumeTableOffer, t],
+  );
 
   const tier = tiers[activeTier] ?? defaultTier();
 
@@ -577,6 +783,9 @@ export function VolumeDiscountCreateView({
         ) {
           for (const k of Object.keys(patch) as (keyof VolumeDiscountWidgetDisplay)[]) {
             if (WIDGET_APPEARANCE_CUSTOM_TRIGGER_KEYS.has(k)) {
+              if (prev.appearanceTemplateId !== "custom") {
+                next.appearanceDecorThemeId = prev.appearanceTemplateId;
+              }
               next.appearanceTemplateId = "custom";
               break;
             }
@@ -811,6 +1020,28 @@ export function VolumeDiscountCreateView({
 
     setWidgetDisplay(normalizeVolumeDiscountWidgetDisplay(o.widgetDisplay));
 
+    if (
+      o.displayNameTranslations &&
+      typeof o.displayNameTranslations === "object" &&
+      !Array.isArray(o.displayNameTranslations)
+    ) {
+      setCampaignTranslations(
+        o.displayNameTranslations as SparseStorefrontTranslationsMap,
+      );
+    } else {
+      setCampaignTranslations({});
+    }
+
+    if (
+      o.tierCopyTranslations &&
+      typeof o.tierCopyTranslations === "object" &&
+      !Array.isArray(o.tierCopyTranslations)
+    ) {
+      setCampaignTierCopy(o.tierCopyTranslations as TierCopyTranslationsMap);
+    } else {
+      setCampaignTierCopy({});
+    }
+
     const ends = o.countdownEndsAt;
     setCountdownEndsAtLocal(
       typeof ends === "string" && ends.trim()
@@ -838,6 +1069,21 @@ export function VolumeDiscountCreateView({
 
   const handleSave = useCallback(() => {
     setSaveErrorDismissed(false);
+    if (
+      isWidgetDisplayAppearanceAbovePlan(
+        planCaps.appearanceTemplates,
+        widgetDisplay,
+      )
+    ) {
+      shopify.toast.show(
+        t(
+          planCaps.appearanceTemplates === "classic"
+            ? "offerEditor.appearance.templateSaveBlockedFree"
+            : "offerEditor.appearance.templateSaveBlockedPremium",
+        ),
+      );
+      return;
+    }
     const fd = new FormData();
     fd.set("campaignName", campaignName.trim());
     fd.set("displayName", displayName.trim());
@@ -866,12 +1112,19 @@ export function VolumeDiscountCreateView({
         ? datetimeLocalToIsoUtc(countdownStartsAtLocal, shopTimezone) ?? ""
         : "",
     );
+    // Persist end only when Schedule → Set end date is on (not merely showCountdown).
+    let endLocalForSave = countdownEndsAtLocal.trim();
+    if (scheduleEndEnabled && !endLocalForSave) {
+      endLocalForSave = countdownDatetimeLocalFromNow(
+        widgetDisplay.countdownTimeAmount,
+        widgetDisplay.countdownTimeUnit,
+        shopTimezone,
+      );
+    }
     fd.set(
       "countdownEndsAt",
-      planCaps.scheduling &&
-        scheduleEndEnabled &&
-        countdownEndsAtLocal.trim()
-        ? datetimeLocalToIsoUtc(countdownEndsAtLocal, shopTimezone) ?? ""
+      planCaps.scheduling && scheduleEndEnabled && endLocalForSave
+        ? datetimeLocalToIsoUtc(endLocalForSave, shopTimezone) ?? ""
         : "",
     );
     const startIsoForStatus =
@@ -890,12 +1143,20 @@ export function VolumeDiscountCreateView({
     };
     fd.set("widgetDisplay", JSON.stringify(widgetForSave));
     fd.set(
+      "displayNameTranslations",
+      JSON.stringify(
+        packCampaignTranslationBlob(campaignTranslations, campaignTierCopy),
+      ),
+    );
+    fd.set(
       "campaignStatus",
       previewCampaignOn || pendingStart ? "active" : "draft",
     );
     fetcher.submit(fd, { method: "post" });
   }, [
     campaignName,
+    campaignTierCopy,
+    campaignTranslations,
     collectionIds,
     countdownEndsAtLocal,
     countdownStartsAtLocal,
@@ -910,7 +1171,9 @@ export function VolumeDiscountCreateView({
     quantityCondition,
     scheduleEndEnabled,
     scheduleStartEnabled,
+    shopify,
     shopTimezone,
+    t,
     tiers,
     widgetDisplay,
   ]);
@@ -953,11 +1216,18 @@ export function VolumeDiscountCreateView({
       );
       setCountdownStartsAtLocal(startLocal);
       setScheduleStartEnabled(startLocal.trim() !== "");
+      const discardedWd = initialCampaign.widgetDisplay
+        ? normalizeVolumeDiscountWidgetDisplay(initialCampaign.widgetDisplay)
+        : { ...DEFAULT_WIDGET_DISPLAY };
       setScheduleEndEnabled(
-        isoToDatetimeLocalValue(initialCampaign.countdownEndsAt ?? null, shopTimezone).trim() !==
-          "",
+        isoToDatetimeLocalValue(
+          initialCampaign.countdownEndsAt ?? null,
+          shopTimezone,
+        ).trim() !== "" || Boolean(discardedWd.showCountdown),
       );
       setPreviewCampaignOn(initialCampaign.status === "active");
+      setCampaignTranslations(initialCampaign.displayNameTranslations ?? {});
+      setCampaignTierCopy(initialCampaign.tierCopyTranslations ?? {});
     } else {
       setCampaignName(defaultCampaignName ?? "Offer 1");
       setDisplayName(DEFAULT_VOLUME_DISCOUNT_DISPLAY_NAME);
@@ -979,6 +1249,8 @@ export function VolumeDiscountCreateView({
       setProductQuery("");
       setCollectionQuery("");
       setPreviewCampaignOn(true);
+      setCampaignTranslations({});
+      setCampaignTierCopy({});
     }
     setActiveTier(0);
   }, [defaultCampaignName, initialCampaign, newOfferPreset, shopTimezone]);
@@ -1079,6 +1351,7 @@ export function VolumeDiscountCreateView({
     scheduleStartEnabled && countdownStartsAtLocal.trim() !== ""
       ? datetimeLocalToIsoUtc(countdownStartsAtLocal, shopTimezone)
       : null;
+  // Schedule end only — countdown display must not block Turn on when Schedule is off.
   const countdownEndsSnapshot =
     scheduleEndEnabled && countdownEndsAtLocal.trim() !== ""
       ? datetimeLocalToIsoUtc(countdownEndsAtLocal, shopTimezone)
@@ -1143,9 +1416,10 @@ export function VolumeDiscountCreateView({
   /** Why “Turn on” cannot activate the offer right now (shown under Campaign status). */
   const turnOnBlockedReason = useMemo(() => {
     if (editorCampaignStatus === "active") return null;
-    if (scheduleExpired) return "expired" as const;
+    // Only when Schedule → Set end date is on and that end is already past.
+    if (scheduleEndEnabled && scheduleExpired) return "expired" as const;
     return null;
-  }, [editorCampaignStatus, scheduleExpired]);
+  }, [editorCampaignStatus, scheduleEndEnabled, scheduleExpired]);
 
   const goToScheduleSettings = useCallback(() => {
     handleSettingsTabChange(0);
@@ -1157,6 +1431,243 @@ export function VolumeDiscountCreateView({
       }
     }, 80);
   }, [handleSettingsTabChange, scheduleEndEnabled]);
+
+  useEffect(() => {
+    if (!shopLanguages.some((l) => l.value === selectedTransLang)) {
+      setSelectedTransLang(primaryLang);
+    }
+  }, [primaryLang, selectedTransLang, shopLanguages]);
+
+  const handleCampaignTranslationFieldChange = useCallback(
+    (field: keyof StorefrontTranslationFields, value: string) => {
+      if (!canEditTranslations) return;
+      // Primary language copy lives in Display settings (and Discount rules for tiers).
+      if (selectedTransLang === primaryLang) {
+        if (field === "transHeading") {
+          patchWidgetDisplay({ widgetHeading: value });
+          return;
+        }
+        if (field === "transCta") {
+          patchWidgetDisplay({ ctaLabel: value });
+          return;
+        }
+        if (field === "transFootnote") {
+          patchWidgetDisplay({ footnote: value });
+          return;
+        }
+        if (field === "transCountdown") {
+          patchWidgetDisplay({ countdownLabel: value });
+          return;
+        }
+        if (field === "transCartDiscount") {
+          setDisplayName(value);
+          return;
+        }
+      }
+      setCampaignTranslations((prev) => {
+        const next: SparseStorefrontTranslationsMap = { ...prev };
+        const langFields: Partial<StorefrontTranslationFields> = {
+          ...(next[selectedTransLang] ?? {}),
+        };
+        const trimmed = value.trim();
+        if (!trimmed) {
+          delete langFields[field];
+        } else {
+          langFields[field] = value;
+        }
+        if (Object.keys(langFields).length === 0) {
+          delete next[selectedTransLang];
+        } else {
+          next[selectedTransLang] = langFields;
+        }
+        return next;
+      });
+    },
+    [
+      canEditTranslations,
+      patchWidgetDisplay,
+      primaryLang,
+      selectedTransLang,
+    ],
+  );
+
+  const handleResetCampaignLanguage = useCallback(() => {
+    if (!canEditTranslations) return;
+    setCampaignTranslations((prev) => {
+      const next = { ...prev };
+      delete next[selectedTransLang];
+      return next;
+    });
+    setCampaignTierCopy((prev) => {
+      const next = { ...prev };
+      delete next[selectedTransLang];
+      return next;
+    });
+    shopify.toast.show(t("offerEditor.translations.toast.reset"));
+  }, [canEditTranslations, selectedTransLang, shopify, t]);
+
+  const handleAutoTranslateCampaignLanguage = useCallback(() => {
+    if (!canEditTranslations) {
+      shopify.toast.show(t("settings.toast.upgradeTranslations"));
+      return;
+    }
+    if (selectedTransLang === primaryLang) {
+      shopify.toast.show(t("settings.toast.englishSource"));
+      return;
+    }
+    const englishSource = resolveCampaignEnglishSourceForAutoTranslate({
+      primaryLang,
+      shopTranslations,
+      campaignOverrides: campaignTranslations,
+      widgetHeading: widgetDisplay.widgetHeading,
+      ctaLabel: widgetDisplay.ctaLabel,
+      footnote: widgetDisplay.footnote,
+      countdownLabel: widgetDisplay.countdownLabel,
+      displayName,
+    });
+    const englishTiers = tiers.map((tier) => ({
+      buyLabelText: tier.buyLabelText,
+      optionSubtext: tier.optionSubtext,
+      badge: tier.badge,
+    }));
+    const fd = new FormData();
+    fd.set("intent", "autoTranslateCampaign");
+    fd.set("targetLang", selectedTransLang);
+    fd.set("sourceLang", primaryLang);
+    fd.set("englishSource", JSON.stringify(englishSource));
+    fd.set("englishTiers", JSON.stringify(englishTiers));
+    translateFetcher.submit(fd, { method: "post" });
+  }, [
+    canEditTranslations,
+    campaignTranslations,
+    displayName,
+    primaryLang,
+    selectedTransLang,
+    shopTranslations,
+    shopify,
+    t,
+    tiers,
+    translateFetcher,
+    widgetDisplay.countdownLabel,
+    widgetDisplay.ctaLabel,
+    widgetDisplay.footnote,
+    widgetDisplay.widgetHeading,
+  ]);
+
+  useEffect(() => {
+    if (translateFetcher.state !== "idle" || !translateFetcher.data) return;
+    const result = translateFetcher.data;
+    if (result.ok && result.intent === "autoTranslateCampaign") {
+      const sparse = sparsifyStorefrontTranslations({
+        [result.targetLang]: result.fields,
+      });
+      setCampaignTranslations((prev) => ({
+        ...prev,
+        ...sparse,
+      }));
+      if (Array.isArray(result.tierCopy) && result.tierCopy.length > 0) {
+        setCampaignTierCopy((prev) => ({
+          ...prev,
+          [result.targetLang]: result.tierCopy.map((row) => ({
+            buyLabelText: String(row?.buyLabelText ?? "").trim(),
+            optionSubtext: String(row?.optionSubtext ?? "").trim(),
+            badge: String(row?.badge ?? "").trim(),
+          })),
+        }));
+      }
+      shopify.toast.show(
+        result.message || t("settings.toast.autoTranslateComplete"),
+      );
+      return;
+    }
+    if (!result.ok && "error" in result && result.error) {
+      shopify.toast.show(`Auto-translate error: ${result.error}`);
+    }
+  }, [translateFetcher.data, translateFetcher.state, shopify, t]);
+
+  const isAutoTranslating = translateFetcher.state !== "idle";
+
+  const activeCampaignTranslation = campaignTranslations[selectedTransLang] ?? {};
+  const shopTranslationDefaults =
+    shopTranslations[selectedTransLang] ||
+    translationPresetForLanguage(selectedTransLang);
+  const isPrimaryTransLang = selectedTransLang === primaryLang;
+
+  const translationFieldValue = (field: keyof StorefrontTranslationFields) => {
+    if (isPrimaryTransLang) {
+      if (field === "transHeading") return widgetDisplay.widgetHeading;
+      if (field === "transCta") return widgetDisplay.ctaLabel;
+      if (field === "transFootnote") return widgetDisplay.footnote;
+      if (field === "transCountdown") return widgetDisplay.countdownLabel;
+      if (field === "transCartDiscount" && displayName.includes("{{")) {
+        return displayName;
+      }
+    }
+    return activeCampaignTranslation[field] ?? "";
+  };
+  const translationFieldPlaceholder = (
+    field: keyof StorefrontTranslationFields,
+  ) => {
+    if (isPrimaryTransLang) {
+      if (field === "transHeading") return widgetDisplay.widgetHeading || shopTranslationDefaults[field] || "";
+      if (field === "transCta") return widgetDisplay.ctaLabel || shopTranslationDefaults[field] || "";
+      if (field === "transFootnote") return widgetDisplay.footnote || shopTranslationDefaults[field] || "";
+      if (field === "transCountdown") return widgetDisplay.countdownLabel || shopTranslationDefaults[field] || "";
+    }
+    return shopTranslationDefaults[field] || "";
+  };
+
+  const activeTierCopyRows = isPrimaryTransLang
+    ? tiers.map((tier) => ({
+        buyLabelText: tier.buyLabelText,
+        optionSubtext: tier.optionSubtext,
+        badge: tier.badge,
+      }))
+    : (campaignTierCopy[selectedTransLang] ?? []);
+  const handleCampaignTierCopyFieldChange = useCallback(
+    (
+      tierIndex: number,
+      field: keyof TierCopyFields,
+      value: string,
+    ) => {
+      if (!canEditTranslations) return;
+      // Primary language tier copy is edited on Discount rules (and mirrored here).
+      if (selectedTransLang === primaryLang) {
+        setTiers((prev) =>
+          prev.map((tier, index) =>
+            index === tierIndex ? { ...tier, [field]: value } : tier,
+          ),
+        );
+        return;
+      }
+      setCampaignTierCopy((prev) => {
+        const rows = [...(prev[selectedTransLang] ?? [])];
+        while (rows.length <= tierIndex) {
+          rows.push(emptyTierCopyFields());
+        }
+        const nextRow = {
+          ...emptyTierCopyFields(),
+          ...rows[tierIndex],
+          [field]: value,
+        };
+        rows[tierIndex] = nextRow;
+        const next = { ...prev };
+        const any = rows.some(
+          (r) =>
+            r.buyLabelText.trim() ||
+            r.optionSubtext.trim() ||
+            r.badge.trim(),
+        );
+        if (!any) {
+          delete next[selectedTransLang];
+        } else {
+          next[selectedTransLang] = rows;
+        }
+        return next;
+      });
+    },
+    [canEditTranslations, primaryLang, selectedTransLang],
+  );
 
   const currentFormSnapshot = useMemo(
     () =>
@@ -1172,11 +1683,15 @@ export function VolumeDiscountCreateView({
         customerTags: [...customerTags].sort(),
         tiers,
         widgetDisplay,
+        displayNameTranslations: campaignTranslations,
+        tierCopyTranslations: campaignTierCopy,
         countdownStartsAt: countdownStartsSnapshot,
         countdownEndsAt: countdownEndsSnapshot,
       }),
     [
       campaignName,
+      campaignTierCopy,
+      campaignTranslations,
       collectionIds,
       countdownEndsSnapshot,
       countdownStartsSnapshot,
@@ -1380,6 +1895,7 @@ export function VolumeDiscountCreateView({
             <div className={createStyles.formWithPreview}>
               <div className={createStyles.formColumn}>
                 <Box paddingBlockEnd="300">
+                  <div className={createStyles.offerSettingsTabs}>
                   <Tabs
                     fitted
                     tabs={[
@@ -1397,6 +1913,11 @@ export function VolumeDiscountCreateView({
                         id: "appearance",
                         content: t("offerEditor.tab.appearance"),
                         panelID: "vd-appearance-panel",
+                      },
+                      {
+                        id: "translations",
+                        content: t("offerEditor.tab.translations"),
+                        panelID: "vd-translations-panel",
                       },
                     ]}
                     selected={settingsTab}
@@ -1522,29 +2043,22 @@ export function VolumeDiscountCreateView({
 
                       {(tier.valueUnit === "amount-each" ||
                         tier.valueUnit === "amount") && (
-                        <s-select
+                        <AdminLanguageDropdown
                           label="Discount mode"
-                          name="discountMode"
-                          icon="select"
                           value={
                             tier.discountMode === "per-line"
                               ? "per-line"
                               : "per-item"
                           }
-                          onChange={(e) =>
-                            updateTier({
-                              discountMode: e.currentTarget.value,
-                            })
+                          options={[
+                            { value: "per-item", label: "Per item" },
+                            { value: "per-line", label: "Per line" },
+                          ]}
+                          onChange={(value) =>
+                            updateTier({ discountMode: value })
                           }
-                          onInput={(e) =>
-                            updateTier({
-                              discountMode: e.currentTarget.value,
-                            })
-                          }
-                        >
-                          <s-option value="per-item">Per item</s-option>
-                          <s-option value="per-line">Per line</s-option>
-                        </s-select>
+                          helpText="Per item: off each unit. Per line: off once for the whole line."
+                        />
                       )}
 
                       <s-checkbox
@@ -1559,7 +2073,7 @@ export function VolumeDiscountCreateView({
                       />
 
                       <s-text-field
-                        label="Option label (widget)"
+                        label={t("offerEditor.tier.optionLabel")}
                         name="tierBuyLabelText"
                         value={tier.buyLabelText}
                         onChange={(e) =>
@@ -1572,18 +2086,17 @@ export function VolumeDiscountCreateView({
                             buyLabelText: sTextFieldValue(e.currentTarget),
                           })
                         }
-                        placeholder="e.g. Buy 10–14 (auto if empty)"
+                        placeholder={t("offerEditor.tier.optionLabelPlaceholder")}
                         autocomplete="off"
                       />
                       <s-paragraph color="subdued">
-                        Overrides the automatic “Buy 1”, “Buy 10–14” text from
-                        quantities. Leave empty to use the default range labels.
+                        {t("offerEditor.tier.optionLabelHelp")}
                       </s-paragraph>
 
                       {!isVolumeTableOffer ? (
                         <>
                           <s-text-field
-                            label="Subtext under option (widget)"
+                            label={t("offerEditor.tier.optionSubtext")}
                             name="tierOptionSubtext"
                             value={tier.optionSubtext}
                             onChange={(e) =>
@@ -1596,16 +2109,17 @@ export function VolumeDiscountCreateView({
                                 optionSubtext: sTextFieldValue(e.currentTarget),
                               })
                             }
-                            placeholder="e.g. Standard price"
+                            placeholder={t(
+                              "offerEditor.tier.optionSubtextPlaceholder",
+                            )}
                             autocomplete="off"
                           />
                           <s-paragraph color="subdued">
-                            Shown under the option name (color and size:
-                            Appearance). Use for extra copy on any tier.
+                            {t("offerEditor.tier.optionSubtextHelp")}
                           </s-paragraph>
 
                           <s-text-field
-                            label="Badge"
+                            label={t("offerEditor.tier.badge")}
                             name="tierBadge"
                             value={tier.badge}
                             onChange={(e) =>
@@ -1618,13 +2132,11 @@ export function VolumeDiscountCreateView({
                                 badge: sTextFieldValue(e.currentTarget),
                               })
                             }
-                            placeholder="e.g. Most Popular ⚡"
+                            placeholder={t("offerEditor.tier.badgePlaceholder")}
                             autocomplete="off"
                           />
                           <s-paragraph color="subdued">
-                            Leave empty to hide the pill. New offers pre-fill
-                            “Most Popular ⚡” on the first tier only; other tiers
-                            stay blank unless you add a badge.
+                            {t("offerEditor.tier.badgeHelp")}
                           </s-paragraph>
                         </>
                       ) : null}
@@ -1887,6 +2399,9 @@ export function VolumeDiscountCreateView({
                       scheduleEndEnabled={scheduleEndEnabled}
                       onScheduleEndEnabledChange={(next) => {
                         setScheduleEndEnabled(next);
+                        if (!next) {
+                          patchWidgetDisplay({ showCountdown: false });
+                        }
                         if (next && !countdownEndsAtLocal.trim()) {
                           setCountdownEndsAtLocal(
                             countdownDatetimeLocalFromNow(
@@ -1927,6 +2442,15 @@ export function VolumeDiscountCreateView({
                       }}
                       shopTimezone={shopTimezone}
                       shopTimezoneLabel={shopTimezoneLabel}
+                      showCountdown={widgetDisplay.showCountdown}
+                      onShowCountdownChange={(checked) =>
+                        patchWidgetDisplay({ showCountdown: checked })
+                      }
+                      countdownLabel={widgetDisplay.countdownLabel}
+                      onCountdownLabelChange={(v) =>
+                        patchWidgetDisplay({ countdownLabel: v })
+                      }
+                      countdownLocked={!planCaps.countdown}
                     />
                     </div>
                   ) : (
@@ -1956,9 +2480,8 @@ export function VolumeDiscountCreateView({
                       {!planCaps.customerTargeting ? (
                         <PlanUpgradeHint feature="customerTargeting" />
                       ) : null}
-                      <Select
+                      <AdminLanguageDropdown
                         label={t("offerEditor.customerType")}
-                        name="customerType"
                         disabled={!planCaps.customerTargeting}
                         options={[
                           { label: "Everyone", value: "everyone" },
@@ -2037,7 +2560,7 @@ export function VolumeDiscountCreateView({
                               onChange={setDisplayName}
                               multiline={2}
                               autoComplete="off"
-                              helpText="Cart & checkout. {{ discount }} = tier % (e.g. 10%). {{ amount }} = line discount in store currency."
+                              helpText={t("offerEditor.displayNameHelp")}
                             />
                           </BlockStack>
                         </Card>
@@ -2061,10 +2584,15 @@ export function VolumeDiscountCreateView({
                               label={t("offerEditor.buttonAction")}
                               helpText={
                                 isVolumeTableOffer
-                                  ? "Applies to the main button below the pricing table. Page URL must be on this shop."
-                                  : "Applies to main CTA and tier + Add. Page URL must be on this shop."
+                                  ? t("offerEditor.buttonAction.helpVolume")
+                                  : t("offerEditor.buttonAction.help")
                               }
-                              options={[...CTA_BUTTON_ACTION_OPTIONS]}
+                              options={CTA_BUTTON_ACTION_OPTIONS.map((o) => ({
+                                value: o.value,
+                                label: t(
+                                  `offerEditor.ctaAction.${o.value}` as AdminUiMessageKey,
+                                ),
+                              }))}
                               value={widgetDisplay.ctaButtonAction}
                               onChange={(v) => {
                                 if (
@@ -2089,7 +2617,7 @@ export function VolumeDiscountCreateView({
                                   })
                                 }
                                 autoComplete="off"
-                                helpText="e.g. /pages/shipping or a full URL on this shop."
+                                helpText={t("offerEditor.pageUrlHelp")}
                               />
                             ) : null}
                           </BlockStack>
@@ -2098,150 +2626,217 @@ export function VolumeDiscountCreateView({
                         <Card padding="400">
                           <BlockStack gap="300">
                             <Text as="h2" variant="headingSm">
-                              {t("offerEditor.advancedSettings")}
+                              {t("offerEditor.advanced.themeSection")}
+                            </Text>
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              {t("offerEditor.advanced.themeIntro")}
+                            </Text>
+                            <BlockStack gap="200">
+                              <Checkbox
+                                label={t("offerEditor.advanced.hideThemeAddToCart")}
+                                helpText={t(
+                                  "offerEditor.advanced.hideThemeAddToCartHelp",
+                                )}
+                                checked={widgetDisplay.hideThemeAddToCart}
+                                onChange={(checked) =>
+                                  patchWidgetDisplay({
+                                    hideThemeAddToCart: checked,
+                                  })
+                                }
+                              />
+                              <Checkbox
+                                label={t("offerEditor.advanced.hideThemeBuyItNow")}
+                                helpText={t(
+                                  "offerEditor.advanced.hideThemeBuyItNowHelp",
+                                )}
+                                checked={widgetDisplay.hideThemeBuyItNow}
+                                onChange={(checked) =>
+                                  patchWidgetDisplay({
+                                    hideThemeBuyItNow: checked,
+                                  })
+                                }
+                              />
+                              <Checkbox
+                                label={t(
+                                  "offerEditor.advanced.hideThemeVariantPicker",
+                                )}
+                                helpText={t(
+                                  "offerEditor.advanced.hideThemeVariantPickerHelp",
+                                )}
+                                checked={widgetDisplay.hideThemeVariantSelector}
+                                onChange={(checked) =>
+                                  patchWidgetDisplay({
+                                    hideThemeVariantSelector: checked,
+                                  })
+                                }
+                              />
+                              <Checkbox
+                                label={t("offerEditor.advanced.hideThemeQuantity")}
+                                helpText={t(
+                                  "offerEditor.advanced.hideThemeQuantityHelp",
+                                )}
+                                checked={widgetDisplay.hideThemeQuantitySelector}
+                                onChange={(checked) =>
+                                  patchWidgetDisplay({
+                                    hideThemeQuantitySelector: checked,
+                                  })
+                                }
+                              />
+                              <Checkbox
+                                label={t("offerEditor.advanced.hideThemePrice")}
+                                helpText={t(
+                                  "offerEditor.advanced.hideThemePriceHelp",
+                                )}
+                                checked={widgetDisplay.hideThemePrice}
+                                onChange={(checked) =>
+                                  patchWidgetDisplay({
+                                    hideThemePrice: checked,
+                                  })
+                                }
+                              />
+                            </BlockStack>
+                          </BlockStack>
+                        </Card>
+
+                        <Card padding="400">
+                          <BlockStack gap="300">
+                            <Text as="h2" variant="headingSm">
+                              {t("offerEditor.advanced.widgetSection")}
                             </Text>
                             <Text as="p" variant="bodySm" tone="subdued">
                               {isVolumeTableOffer
-                                ? "Theme product form visibility. Tier row options below apply only to Quantity breaks (radio cards), not the volume discount table."
-                                : "Theme product form visibility, widget chrome, and tier card price display. Most shops can leave these off unless you are replacing theme controls with the widget."}
+                                ? t("offerEditor.advanced.introVolume")
+                                : t("offerEditor.advanced.widgetIntro")}
                             </Text>
                             <BlockStack gap="200">
+                              {isVolumeTableOffer ? (
                                 <Checkbox
-                                  label="Hide theme Add to cart"
-                                  helpText="Theme form only. Use the widget button to add."
-                                  checked={widgetDisplay.hideThemeAddToCart}
+                                  label={t(
+                                    "offerEditor.advanced.hideWidgetMainCta",
+                                  )}
+                                  helpText={t(
+                                    "offerEditor.advanced.hideWidgetMainCtaHelp",
+                                  )}
+                                  checked={widgetDisplay.hideWidgetMainCta}
                                   onChange={(checked) =>
                                     patchWidgetDisplay({
-                                      hideThemeAddToCart: checked,
+                                      hideWidgetMainCta: checked,
                                     })
                                   }
                                 />
-                                <Checkbox
-                                  label="Hide theme Buy it now"
-                                  helpText="Hides Shop Pay / dynamic checkout on the form."
-                                  checked={widgetDisplay.hideThemeBuyItNow}
-                                  onChange={(checked) =>
-                                    patchWidgetDisplay({
-                                      hideThemeBuyItNow: checked,
-                                    })
-                                  }
-                                />
-                                <Checkbox
-                                  label="Hide theme variant picker"
-                                  helpText="Pick variant in the widget (keep widget variant on)."
-                                  checked={widgetDisplay.hideThemeVariantSelector}
-                                  onChange={(checked) =>
-                                    patchWidgetDisplay({
-                                      hideThemeVariantSelector: checked,
-                                    })
-                                  }
-                                />
-                                <Checkbox
-                                  label="Hide theme quantity"
-                                  helpText="Removes qty on the product form only."
-                                  checked={widgetDisplay.hideThemeQuantitySelector}
-                                  onChange={(checked) =>
-                                    patchWidgetDisplay({
-                                      hideThemeQuantitySelector: checked,
-                                    })
-                                  }
-                                />
-                                {isVolumeTableOffer ? (
+                              ) : null}
+                              {!isVolumeTableOffer ? (
+                                <>
                                   <Checkbox
-                                    label="Hide widget Add to cart button"
-                                    helpText="Removes only this offer’s main button under the pricing table. Use Hide theme Add to cart above to hide the theme’s button."
-                                    checked={widgetDisplay.hideWidgetMainCta}
+                                    label={t(
+                                      "offerEditor.advanced.hideWidgetVariantDropdown",
+                                    )}
+                                    helpText={t(
+                                      "offerEditor.advanced.hideWidgetVariantDropdownHelp",
+                                    )}
+                                    checked={
+                                      widgetDisplay.hideWidgetVariantSelector
+                                    }
                                     onChange={(checked) =>
                                       patchWidgetDisplay({
-                                        hideWidgetMainCta: checked,
+                                        hideWidgetVariantSelector: checked,
                                       })
                                     }
                                   />
-                                ) : null}
-                                {!isVolumeTableOffer ? (
-                                  <>
-                                    <Checkbox
-                                      label="Hide widget variant dropdown"
-                                      helpText="Use the theme’s variant UI instead."
-                                      checked={
-                                        widgetDisplay.hideWidgetVariantSelector
-                                      }
-                                      onChange={(checked) =>
-                                        patchWidgetDisplay({
-                                          hideWidgetVariantSelector: checked,
-                                        })
-                                      }
-                                    />
-                                    <Checkbox
-                                      label="Hide out-of-stock variants in widget"
-                                      helpText="Unavailable variants are omitted from the widget variant dropdown only."
-                                      checked={
-                                        widgetDisplay.hideOutOfStockVariants
-                                      }
-                                      onChange={(checked) =>
-                                        patchWidgetDisplay({
-                                          hideOutOfStockVariants: checked,
-                                        })
-                                      }
-                                    />
-                                    <Checkbox
-                                      label="Hide widget quantity"
-                                      helpText="Tier minimum only; no +/- in the widget."
-                                      checked={
-                                        widgetDisplay.hideWidgetQuantitySelector
-                                      }
-                                      onChange={(checked) =>
-                                        patchWidgetDisplay({
-                                          hideWidgetQuantitySelector: checked,
-                                        })
-                                      }
-                                    />
-                                    <Checkbox
-                                      label="Hide line total in widget"
-                                      helpText="Hides qty × price in the expanded row."
-                                      checked={widgetDisplay.hideWidgetLineTotal}
-                                      onChange={(checked) =>
-                                        patchWidgetDisplay({
-                                          hideWidgetLineTotal: checked,
-                                        })
-                                      }
-                                    />
-                                    <Checkbox
-                                      label="Hide tier + Add buttons"
-                                      helpText="Main CTA only."
-                                      checked={
-                                        widgetDisplay.hideWidgetTierAddButton
-                                      }
-                                      onChange={(checked) =>
-                                        patchWidgetDisplay({
-                                          hideWidgetTierAddButton: checked,
-                                        })
-                                      }
-                                    />
-                                    <Checkbox
-                                      label="Show per-item price in tier cards"
-                                      helpText="Off: tier total. On: each price. “You save” is unchanged."
-                                      checked={widgetDisplay.cardPriceShowsUnit}
-                                      onChange={(checked) =>
-                                        patchWidgetDisplay({
-                                          cardPriceShowsUnit: checked,
-                                        })
-                                      }
-                                    />
-                                    <Checkbox
-                                      label="Hide compare-at price in tier cards"
-                                      helpText="Removes strikethrough; sale price and savings can still show."
-                                      checked={
-                                        widgetDisplay.hideWidgetComparePrice
-                                      }
-                                      onChange={(checked) =>
-                                        patchWidgetDisplay({
-                                          hideWidgetComparePrice: checked,
-                                        })
-                                      }
-                                    />
-                                  </>
-                                ) : null}
+                                  <Checkbox
+                                    label={t(
+                                      "offerEditor.advanced.hideOutOfStockVariants",
+                                    )}
+                                    helpText={t(
+                                      "offerEditor.advanced.hideOutOfStockVariantsHelp",
+                                    )}
+                                    checked={
+                                      widgetDisplay.hideOutOfStockVariants
+                                    }
+                                    onChange={(checked) =>
+                                      patchWidgetDisplay({
+                                        hideOutOfStockVariants: checked,
+                                      })
+                                    }
+                                  />
+                                  <Checkbox
+                                    label={t(
+                                      "offerEditor.advanced.hideWidgetQuantity",
+                                    )}
+                                    helpText={t(
+                                      "offerEditor.advanced.hideWidgetQuantityHelp",
+                                    )}
+                                    checked={
+                                      widgetDisplay.hideWidgetQuantitySelector
+                                    }
+                                    onChange={(checked) =>
+                                      patchWidgetDisplay({
+                                        hideWidgetQuantitySelector: checked,
+                                      })
+                                    }
+                                  />
+                                  <Checkbox
+                                    label={t(
+                                      "offerEditor.advanced.hideWidgetLineTotal",
+                                    )}
+                                    helpText={t(
+                                      "offerEditor.advanced.hideWidgetLineTotalHelp",
+                                    )}
+                                    checked={widgetDisplay.hideWidgetLineTotal}
+                                    onChange={(checked) =>
+                                      patchWidgetDisplay({
+                                        hideWidgetLineTotal: checked,
+                                      })
+                                    }
+                                  />
+                                  <Checkbox
+                                    label={t(
+                                      "offerEditor.advanced.hideTierAddButtons",
+                                    )}
+                                    helpText={t(
+                                      "offerEditor.advanced.hideTierAddButtonsHelp",
+                                    )}
+                                    checked={
+                                      widgetDisplay.hideWidgetTierAddButton
+                                    }
+                                    onChange={(checked) =>
+                                      patchWidgetDisplay({
+                                        hideWidgetTierAddButton: checked,
+                                      })
+                                    }
+                                  />
+                                  <Checkbox
+                                    label={t(
+                                      "offerEditor.advanced.showPerItemPrice",
+                                    )}
+                                    helpText={t(
+                                      "offerEditor.advanced.showPerItemPriceHelp",
+                                    )}
+                                    checked={widgetDisplay.cardPriceShowsUnit}
+                                    onChange={(checked) =>
+                                      patchWidgetDisplay({
+                                        cardPriceShowsUnit: checked,
+                                      })
+                                    }
+                                  />
+                                  <Checkbox
+                                    label={t(
+                                      "offerEditor.advanced.hideCompareAtPrice",
+                                    )}
+                                    helpText={t(
+                                      "offerEditor.advanced.hideCompareAtPriceHelp",
+                                    )}
+                                    checked={
+                                      widgetDisplay.hideWidgetComparePrice
+                                    }
+                                    onChange={(checked) =>
+                                      patchWidgetDisplay({
+                                        hideWidgetComparePrice: checked,
+                                      })
+                                    }
+                                  />
+                                </>
+                              ) : null}
                             </BlockStack>
                           </BlockStack>
                         </Card>
@@ -2255,7 +2850,7 @@ export function VolumeDiscountCreateView({
                               {t("offerEditor.widgetTextHelp")}
                             </Text>
                             <TextField
-                              label="Widget heading (optional)"
+                              label={t("offerEditor.widget.headingLabel")}
                               name="widgetHeading"
                               value={widgetDisplay.widgetHeading}
                               onChange={(v) =>
@@ -2263,7 +2858,9 @@ export function VolumeDiscountCreateView({
                               }
                               autoComplete="off"
                               multiline={2}
-                              placeholder="Empty = hide heading"
+                              placeholder={t(
+                                "offerEditor.widget.headingPlaceholder",
+                              )}
                             />
                             {!isVolumeTableOffer ? (
                               <WidgetHeaderAlignFields
@@ -2285,19 +2882,11 @@ export function VolumeDiscountCreateView({
                               />
                             ) : (
                               <Text as="p" variant="bodySm" tone="subdued">
-                                Title alignment is in{" "}
-                                <Text as="span" fontWeight="semibold">
-                                  Appearance
-                                </Text>{" "}
-                                →{" "}
-                                <Text as="span" fontWeight="semibold">
-                                  Title &amp; countdown
-                                </Text>
-                                .
+                                {t("offerEditor.widget.titleAlignmentNote")}
                               </Text>
                             )}
                             <TextField
-                              label="Footnote under button"
+                              label={t("offerEditor.widget.footnoteLabel")}
                               name="footnote"
                               value={widgetDisplay.footnote}
                               onChange={(v) =>
@@ -2308,56 +2897,8 @@ export function VolumeDiscountCreateView({
                             />
                           </BlockStack>
                         </Card>
-
-                        <CountdownTimerSettingsCard
-                          widgetDisplay={widgetDisplay}
-                          patchWidgetDisplay={patchWidgetDisplay}
-                          scheduleStartEnabled={scheduleStartEnabled}
-                          scheduleStartLocal={countdownStartsAtLocal}
-                          scheduleEndEnabled={scheduleEndEnabled}
-                          scheduleEndLocal={countdownEndsAtLocal}
-                          locked={!planCaps.countdown}
-                        />
-
-                        <Card padding="400">
-                          <BlockStack gap="200">
-                            <Text as="h2" variant="headingSm">
-                              {t("offerEditor.themeSetup")}
-                            </Text>
-                            <Text as="p" variant="bodySm" tone="subdued">
-                              Add the{" "}
-                              <Text as="span" fontWeight="semibold">
-                                {isVolumeTableOffer
-                                  ? t("offerEditor.volumeDiscount")
-                                  : t("offerEditor.quantityBreaks")}
-                              </Text>{" "}
-                              app block on the product template (Online Store →
-                              Themes → Customize). Leave widget heading empty to
-                              hide the title on the storefront.
-                            </Text>
-                            {!isVolumeTableOffer ? (
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                <Text as="span" fontWeight="semibold">
-                                  Badge
-                                </Text>{" "}
-                                (Rule settings): tier field shows a pill; clear the
-                                field to hide. New offers default to “Most Popular
-                                ⚡” on tier 1.
-                              </Text>
-                            ) : (
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                Volume discount uses a pricing table (quantity,
-                                discount, price per item). Tier labels come from
-                                Rule settings.
-                              </Text>
-                            )}
-                            <Text as="p" variant="bodySm" tone="subdued">
-                              Widget in editor but not live? Enable <Text as="span" fontWeight="semibold">Offrefy (global)</Text> under Theme settings → App embeds, then save.
-                            </Text>
-                          </BlockStack>
-                        </Card>
                       </BlockStack>
-                    ) : (
+                    ) : settingsTab === 2 ? (
                       <BlockStack gap="400">
                         <Card padding="400">
                           <BlockStack gap="300">
@@ -2382,49 +2923,13 @@ export function VolumeDiscountCreateView({
                                   )
                                 }
                               >
-                                Reset styles
+                                {t("offerEditor.appearance.resetStyles")}
                               </Button>
                             </InlineStack>
                             <Text as="p" variant="bodySm" tone="subdued">
-                              {isVolumeTableOffer ? (
-                                <>
-                                  Volume discount pricing table on the product page
-                                  (stored as{" "}
-                                  <Text as="span" fontWeight="semibold">
-                                    widgetDisplay
-                                  </Text>
-                                  ). Customer-facing copy:{" "}
-                                  <Text as="span" fontWeight="semibold">
-                                    Display settings
-                                  </Text>
-                                  ; timer length:{" "}
-                                  <Text as="span" fontWeight="semibold">
-                                    Countdown timer
-                                  </Text>
-                                  ; header layout:{" "}
-                                  <Text as="span" fontWeight="semibold">
-                                    Title &amp; countdown
-                                  </Text>
-                                  .
-                                </>
-                              ) : (
-                                <>
-                                  Storefront widget look for this offer (one{" "}
-                                  <Text as="span" fontWeight="semibold">
-                                    widgetDisplay
-                                  </Text>{" "}
-                                  JSON). Widget copy:{" "}
-                                  <Text as="span" fontWeight="semibold">
-                                    Display settings
-                                  </Text>{" "}
-                                  → Widget text; countdown notice, timer length
-                                  &amp; layout:{" "}
-                                  <Text as="span" fontWeight="semibold">
-                                    Countdown timer
-                                  </Text>
-                                  .
-                                </>
-                              )}
+                              {isVolumeTableOffer
+                                ? t("offerEditor.appearance.introVolume")
+                                : t("offerEditor.appearance.intro")}
                             </Text>
                           </BlockStack>
                         </Card>
@@ -2434,22 +2939,19 @@ export function VolumeDiscountCreateView({
                             <BlockStack gap="400">
                               <BlockStack gap="200">
                                 <Text as="h2" variant="headingSm">
-                                  Title &amp; countdown
+                                  {t("offerEditor.widget.titleCountdown")}
                                 </Text>
                                 <Text as="p" variant="bodySm" tone="subdued">
-                                  Arranges the widget title and the countdown in
-                                  the header. Layout = structure; alignment =
-                                  left/center/right for each part.
+                                  {t("offerEditor.widget.titleCountdownHelp")}
                                 </Text>
                               </BlockStack>
 
                               <BlockStack gap="300">
                                 <Text as="h3" variant="headingSm">
-                                  Title &amp; countdown
+                                  {t("offerEditor.widget.titleCountdown")}
                                 </Text>
                                 <Text as="p" variant="bodySm" tone="subdued">
-                                  Layout, order, and horizontal alignment of the
-                                  title and countdown.
+                                  {t("offerEditor.widget.titleCountdownSubHelp")}
                                 </Text>
                                 <WidgetHeaderAlignFields
                                   idPrefix="vd-volume"
@@ -2468,9 +2970,13 @@ export function VolumeDiscountCreateView({
                                     widgetDisplay.widgetHeaderSwapOrder
                                   }
                                   patchWidgetDisplay={patchWidgetDisplay}
-                                  layoutHelpText="Wide screens: how the title and countdown share the row or stack vertically."
-                                  headingHelpText="Title in the header."
-                                  timerHelpText="Countdown label and pill together."
+                                  layoutHelpText={t("offerEditor.widget.layoutHelp")}
+                                  headingHelpText={t(
+                                    "offerEditor.widget.headingAlignHelp",
+                                  )}
+                                  timerHelpText={t(
+                                    "offerEditor.widget.timerAlignHelp",
+                                  )}
                                 />
                               </BlockStack>
                             </BlockStack>
@@ -2480,260 +2986,161 @@ export function VolumeDiscountCreateView({
                         {isVolumeTableOffer ? (
                           <Card padding="400">
                             <BlockStack gap="300">
-                              <Text as="h3" variant="headingSm">
-                                Appearance templates
-                              </Text>
+                              <BlockStack gap="200">
+                                <Text as="h3" variant="headingSm">
+                                  {t("offerEditor.appearance.templates")}
+                                </Text>
+                                <AppearanceTemplateCategoryTabs
+                                  value={appearanceTemplateCategory}
+                                  onChange={setAppearanceTemplateCategory}
+                                />
+                              </BlockStack>
                               <Text as="p" variant="bodySm" tone="subdued">
-                                Choose one of 10 table styles. Fine-tune colors and
-                                type below; manual changes set the template to{" "}
-                                <Text as="span" fontWeight="semibold">
-                                  Custom
-                                </Text>{" "}
-                                in saved data.
+                                {t("offerEditor.appearance.templatesHelpVolume")}
                               </Text>
-                              <div
-                                className={createStyles.appearanceTemplateGrid}
-                                aria-label="Volume discount appearance templates"
-                              >
-                                {VOLUME_TABLE_APPEARANCE_PRESETS.map((preset) => {
-                                  const selected =
-                                    widgetDisplay.appearanceTemplateId ===
-                                    preset.id;
-                                  return (
-                                    <button
-                                      key={preset.id}
-                                      type="button"
-                                      className={
-                                        selected
-                                          ? `${createStyles.appearanceTemplateCard} ${createStyles.appearanceTemplateCardSelected}`
-                                          : createStyles.appearanceTemplateCard
-                                      }
-                                      onClick={() => {
-                                        setWidgetDisplay(
-                                          applyVolumeTableAppearancePreset(
-                                            widgetDisplay,
-                                            preset.id,
-                                          ),
-                                        );
-                                      }}
-                                    >
-                                      <span
-                                        className={
-                                          createStyles.appearanceTemplateSwatch
-                                        }
-                                        style={{
-                                          backgroundColor: preset.swatch,
-                                        }}
-                                        aria-hidden
-                                      />
-                                      <span
-                                        className={
-                                          createStyles.appearanceTemplateLabel
-                                        }
-                                      >
-                                        {preset.label}
-                                      </span>
-                                    </button>
-                                  );
-                                })}
-                              </div>
+                              {showAppearanceTemplateUpgrade ||
+                              selectedAppearanceTemplateLocked ? (
+                                <PlanUpgradeBanner feature="appearanceTemplates" />
+                              ) : null}
+                              <AppearanceTemplateGrid
+                                presets={appearanceTemplatesInCategory}
+                                widgetDisplay={widgetDisplay}
+                                setWidgetDisplay={setWidgetDisplay}
+                                patchWidgetDisplay={patchWidgetDisplay}
+                                appearanceTemplates={planCaps.appearanceTemplates}
+                                forVolumeTable
+                                ariaLabel={t(
+                                  "offerEditor.appearance.templatesAriaVolume",
+                                )}
+                              />
                             </BlockStack>
                           </Card>
                         ) : (
                           <Card padding="400">
                             <BlockStack gap="300">
-                              <Text as="h3" variant="headingSm">
-                                Appearance templates
-                              </Text>
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                Pick a look; you can still fine-tune colors and
-                                layout below. Manual tweaks set the picker to{" "}
-                                <Text as="span" fontWeight="semibold">
-                                  Custom
+                              <BlockStack gap="200">
+                                <Text as="h3" variant="headingSm">
+                                  {t("offerEditor.appearance.templates")}
                                 </Text>
-                                .
+                                <AppearanceTemplateCategoryTabs
+                                  value={appearanceTemplateCategory}
+                                  onChange={setAppearanceTemplateCategory}
+                                />
+                              </BlockStack>
+                              <Text as="p" variant="bodySm" tone="subdued">
+                                {t("offerEditor.appearance.templatesHelp")}
                               </Text>
-                              <div
-                                className={createStyles.appearanceTemplateGrid}
-                                aria-label="Widget appearance templates"
-                              >
-                                {VOLUME_DISCOUNT_APPEARANCE_PRESETS.map(
-                                  (preset) => {
-                                    const selected =
-                                      widgetDisplay.appearanceTemplateId ===
-                                      preset.id;
-                                    return (
-                                      <button
-                                        key={preset.id}
-                                        type="button"
-                                        className={
-                                          selected
-                                            ? `${createStyles.appearanceTemplateCard} ${createStyles.appearanceTemplateCardSelected}`
-                                            : createStyles.appearanceTemplateCard
-                                        }
-                                        onClick={() => {
-                                          setWidgetDisplay(
-                                            applyVolumeDiscountAppearancePreset(
-                                              widgetDisplay,
-                                              preset.id,
-                                            ),
-                                          );
-                                        }}
-                                      >
-                                        <span
-                                          className={
-                                            createStyles.appearanceTemplateSwatch
-                                          }
-                                          style={{
-                                            backgroundColor: preset.swatch,
-                                          }}
-                                          aria-hidden
-                                        />
-                                        <span
-                                          className={
-                                            createStyles.appearanceTemplateLabel
-                                          }
-                                        >
-                                          {preset.label}
-                                        </span>
-                                      </button>
-                                    );
-                                  },
+                              {showAppearanceTemplateUpgrade ||
+                              selectedAppearanceTemplateLocked ? (
+                                <PlanUpgradeBanner feature="appearanceTemplates" />
+                              ) : null}
+                              <AppearanceTemplateGrid
+                                presets={appearanceTemplatesInCategory}
+                                widgetDisplay={widgetDisplay}
+                                setWidgetDisplay={setWidgetDisplay}
+                                patchWidgetDisplay={patchWidgetDisplay}
+                                appearanceTemplates={planCaps.appearanceTemplates}
+                                forVolumeTable={false}
+                                ariaLabel={t(
+                                  "offerEditor.appearance.templatesAria",
                                 )}
-                                <button
-                                  type="button"
-                                  className={
-                                    widgetDisplay.appearanceTemplateId ===
-                                    "custom"
-                                      ? `${createStyles.appearanceTemplateCard} ${createStyles.appearanceTemplateCardSelected}`
-                                      : createStyles.appearanceTemplateCard
-                                  }
-                                  onClick={() =>
-                                    patchWidgetDisplay({
-                                      appearanceTemplateId: "custom",
-                                    })
-                                  }
-                                >
-                                  <span
-                                    className={
-                                      createStyles.appearanceTemplateSwatchCustom
-                                    }
-                                    aria-hidden
-                                  />
-                                  <span
-                                    className={
-                                      createStyles.appearanceTemplateLabel
-                                    }
-                                  >
-                                    Custom
-                                  </span>
-                                </button>
-                              </div>
+                              />
                             </BlockStack>
                           </Card>
                         )}
 
                         <Card padding="400">
-                          <BlockStack gap="400">
+                          <BlockStack gap="300">
                               <Text as="h3" variant="headingSm">
-                                Type
+                                {t("offerEditor.font.type")}
                               </Text>
                               <Text as="p" variant="bodySm" tone="subdued">
-                                {isVolumeTableOffer ? (
-                                  <>
-                                    Font family follows your live theme (body / heading
-                                    CSS variables). Font sizes below apply to the volume
-                                    table, title row, button, countdown, and footnote —
-                                    not tier cards. To change families, use Theme
-                                    settings → Typography or{" "}
-                                    <Text as="span" fontWeight="semibold">
-                                      Custom CSS
-                                    </Text>{" "}
-                                    on this offer.
-                                  </>
-                                ) : (
-                                  <>
-                                    Font family follows your live theme: body text uses the
-                                    theme body font (CSS variables such as{" "}
-                                    <Text as="span" fontWeight="semibold">
-                                      --font-body-family
-                                    </Text>{" "}
-                                    or{" "}
-                                    <Text as="span" fontWeight="semibold">
-                                      --font-body--family
-                                    </Text>
-                                    ); widget titles use the heading font when the theme
-                                    exposes it. To change fonts, use Theme settings →
-                                    Typography (or Custom CSS on this offer). Commonly used
-                                    web fonts include Inter, Roboto, Open Sans, Lato,
-                                    Montserrat, Poppins, Work Sans, Source Sans 3, Nunito,
-                                    and DM Sans.
-                                  </>
-                                )}
+                                {t("offerEditor.font.typeHelp")}
                               </Text>
-                              <Select
-                                id="vd-widget-font-scale"
-                                label="Size preset"
-                                options={WIDGET_FONT_SCALE_OPTIONS}
-                                value={widgetDisplay.fontScale}
-                                onChange={(v) => {
-                                  if (
-                                    v === "compact" ||
-                                    v === "default" ||
-                                    v === "comfortable"
-                                  ) {
-                                    patchWidgetDisplay({
-                                      fontScale: v,
-                                      ...widgetDisplayFontSizesFromScale(v),
-                                    });
-                                  }
-                                }}
-                              />
-                              <InlineStack gap="200" blockAlign="center">
-                                <Button
-                                  size="slim"
-                                  onClick={() =>
-                                    patchWidgetDisplay(
-                                      widgetDisplayFontSizesFromScale(
-                                        widgetDisplay.fontScale,
-                                      ),
-                                    )
-                                  }
-                                >
-                                  Reset sizes to preset
-                                </Button>
-                              </InlineStack>
-                              <RangeSlider
-                                id="vd-widget-font-scale-percent"
-                                label="Overall text scale"
-                                helpText="Applies to all sizes below."
-                                min={FONT_SIZE_SCALE_PERCENT_MIN}
-                                max={FONT_SIZE_SCALE_PERCENT_MAX}
-                                step={1}
-                                value={widgetDisplay.fontSizeScalePercent}
-                                output
-                                suffix="%"
-                                onChange={(value) => {
-                                  if (typeof value === "number") {
-                                    patchWidgetDisplay({
-                                      fontSizeScalePercent:
-                                        clampFontSizeScalePercent(value),
-                                    });
-                                  }
-                                }}
-                              />
+                              <FormLayout>
+                                <FormLayout.Group>
+                                  <BlockStack gap="200">
+                                    <Select
+                                      id="vd-widget-font-scale"
+                                      label={t("offerEditor.font.sizePreset")}
+                                      options={WIDGET_FONT_SCALE_OPTIONS.map(
+                                        (o) => ({
+                                          value: o.value,
+                                          label: t(
+                                            `offerEditor.font.scalePreset.${o.value}` as AdminUiMessageKey,
+                                          ),
+                                        }),
+                                      )}
+                                      value={widgetDisplay.fontScale}
+                                      onChange={(v) => {
+                                        if (
+                                          v === "compact" ||
+                                          v === "default" ||
+                                          v === "comfortable"
+                                        ) {
+                                          patchWidgetDisplay({
+                                            fontScale: v,
+                                            ...widgetDisplayFontSizesFromScale(v),
+                                          });
+                                        }
+                                      }}
+                                    />
+                                    <InlineStack gap="200">
+                                      <Button
+                                        size="slim"
+                                        onClick={() =>
+                                          patchWidgetDisplay(
+                                            widgetDisplayFontSizesFromScale(
+                                              widgetDisplay.fontScale,
+                                            ),
+                                          )
+                                        }
+                                      >
+                                        {t("offerEditor.font.resetToPreset")}
+                                      </Button>
+                                    </InlineStack>
+                                  </BlockStack>
+                                  <RangeSlider
+                                    id="vd-widget-font-scale-percent"
+                                    label={t("offerEditor.font.overallScale")}
+                                    helpText={t(
+                                      "offerEditor.font.overallScaleHelp",
+                                    )}
+                                    min={FONT_SIZE_SCALE_PERCENT_MIN}
+                                    max={FONT_SIZE_SCALE_PERCENT_MAX}
+                                    step={1}
+                                    value={widgetDisplay.fontSizeScalePercent}
+                                    output
+                                    suffix="%"
+                                    onChange={(value) => {
+                                      if (typeof value === "number") {
+                                        patchWidgetDisplay({
+                                          fontSizeScalePercent:
+                                            clampFontSizeScalePercent(value),
+                                        });
+                                      }
+                                    }}
+                                  />
+                                </FormLayout.Group>
+                              </FormLayout>
                           </BlockStack>
                         </Card>
 
                         <Card padding="400">
                           <BlockStack gap="300">
                               <Text as="h3" variant="headingSm">
-                                Font size (px)
+                                {t("offerEditor.font.sizePx")}
                               </Text>
                               <Text as="p" variant="bodySm" tone="subdued">
                                 {isVolumeTableOffer
-                                  ? `${WIDGET_FONT_PX_MIN}–${WIDGET_FONT_PX_MAX} px. Only roles used by the volume table widget are listed. Countdown sizes appear when Show countdown is on (Display settings).`
-                                  : `${WIDGET_FONT_PX_MIN}–${WIDGET_FONT_PX_MAX} px per role.`}
+                                  ? t("offerEditor.font.sizePxHelpVolume", {
+                                      min: WIDGET_FONT_PX_MIN,
+                                      max: WIDGET_FONT_PX_MAX,
+                                    })
+                                  : t("offerEditor.font.sizePxHelp", {
+                                      min: WIDGET_FONT_PX_MIN,
+                                      max: WIDGET_FONT_PX_MAX,
+                                    })}
                               </Text>
                             <div className={createStyles.widgetFontSizeGrid}>
                               {appearanceFontSizeFields.map((row) => (
@@ -2742,7 +3149,7 @@ export function VolumeDiscountCreateView({
                                   className={createStyles.widgetFontSizeRow}
                                 >
                                   <Text as="p" variant="bodySm">
-                                    {row.label}
+                                    {fontRoleLabel(row.key)}
                                   </Text>
                                   <div
                                     className={createStyles.widgetFontSizeControlRow}
@@ -2752,7 +3159,7 @@ export function VolumeDiscountCreateView({
                                     >
                                       <RangeSlider
                                         id={`vd-widget-font-${row.key}`}
-                                        label={row.label}
+                                        label={fontRoleLabel(row.key)}
                                         labelHidden
                                         min={WIDGET_FONT_PX_MIN}
                                         max={WIDGET_FONT_PX_MAX}
@@ -2782,7 +3189,7 @@ export function VolumeDiscountCreateView({
                                     >
                                       <TextField
                                         id={`vd-widget-font-field-${row.key}`}
-                                        label={row.label}
+                                        label={fontRoleLabel(row.key)}
                                         labelHidden
                                         type="number"
                                         autoComplete="off"
@@ -2811,17 +3218,17 @@ export function VolumeDiscountCreateView({
                         <Card padding="400">
                           <BlockStack gap="300">
                               <Text as="h3" variant="headingSm">
-                                Font weights
+                                {t("offerEditor.font.weights")}
                               </Text>
                               <Text as="p" variant="bodySm" tone="subdued">
                                 {isVolumeTableOffer
-                                  ? "CSS numeric weights (100–900). Strong: widget title, table header, quantity label, price column, main button. Accent: countdown pill. Normal: footnote and muted helper text."
-                                  : "CSS numeric weights (100–900). Strong = title, tier label, price, CTA; accent = badge, countdown pill, qty buttons; body = subtext and “You save”; normal = footnote, compare-at, muted lines."}
+                                  ? t("offerEditor.font.weightsHelpVolume")
+                                  : t("offerEditor.font.weightsHelp")}
                               </Text>
                               <div className={createStyles.widgetFontWeightGrid}>
                                 <Select
                                   id="vd-widget-fw-strong"
-                                  label="Strong"
+                                  label={t("offerEditor.font.weightStrong")}
                                   options={WIDGET_FONT_WEIGHT_SELECT_OPTIONS}
                                   value={String(widgetDisplay.fontWeightStrong)}
                                   onChange={(v) => {
@@ -2835,7 +3242,7 @@ export function VolumeDiscountCreateView({
                                 />
                                 <Select
                                   id="vd-widget-fw-accent"
-                                  label="Accent"
+                                  label={t("offerEditor.font.weightAccent")}
                                   options={WIDGET_FONT_WEIGHT_SELECT_OPTIONS}
                                   value={String(widgetDisplay.fontWeightAccent)}
                                   onChange={(v) => {
@@ -2850,7 +3257,7 @@ export function VolumeDiscountCreateView({
                                 {!isVolumeTableOffer ? (
                                   <Select
                                     id="vd-widget-fw-body"
-                                    label="Body"
+                                    label={t("offerEditor.font.weightBody")}
                                     options={WIDGET_FONT_WEIGHT_SELECT_OPTIONS}
                                     value={String(widgetDisplay.fontWeightBody)}
                                     onChange={(v) => {
@@ -2865,7 +3272,7 @@ export function VolumeDiscountCreateView({
                                 ) : null}
                                 <Select
                                   id="vd-widget-fw-normal"
-                                  label="Normal"
+                                  label={t("offerEditor.font.weightNormal")}
                                   options={WIDGET_FONT_WEIGHT_SELECT_OPTIONS}
                                   value={String(widgetDisplay.fontWeightNormal)}
                                   onChange={(v) => {
@@ -2884,14 +3291,16 @@ export function VolumeDiscountCreateView({
                         <Card padding="400">
                           <BlockStack gap="400">
                               <Text as="h3" variant="headingSm">
-                                Layout
+                                {t("offerEditor.layout.heading")}
                               </Text>
                               {isVolumeTableOffer ? (
                                 <>
                                   <RangeSlider
                                     id="vd-widget-card-border-radius"
-                                    label="Table corner radius"
-                                    helpText="Corners of the pricing table container."
+                                    label={t("offerEditor.layout.tableCornerRadius")}
+                                    helpText={t(
+                                      "offerEditor.layout.tableCornerRadiusHelp",
+                                    )}
                                     min={WIDGET_BORDER_RADIUS_PX_MIN}
                                     max={WIDGET_BORDER_RADIUS_PX_MAX}
                                     step={1}
@@ -2909,8 +3318,10 @@ export function VolumeDiscountCreateView({
                                   />
                                   <RangeSlider
                                     id="vd-widget-volume-table-cell-pad"
-                                    label="Table row height"
-                                    helpText="Vertical padding inside each table cell (header and rows)."
+                                    label={t("offerEditor.layout.tableRowHeight")}
+                                    helpText={t(
+                                      "offerEditor.layout.tableRowHeightHelp",
+                                    )}
                                     min={WIDGET_VOLUME_TABLE_CELL_PADDING_PX_MIN}
                                     max={WIDGET_VOLUME_TABLE_CELL_PADDING_PX_MAX}
                                     step={1}
@@ -2927,20 +3338,24 @@ export function VolumeDiscountCreateView({
                                     }}
                                   />
                                   <Text as="p" variant="bodyMd" fontWeight="semibold">
-                                    Table columns
+                                    {t("offerEditor.layout.tableColumns")}
                                   </Text>
                                   <Text as="p" variant="bodySm" tone="subdued">
-                                    Text alignment and left/right padding inside each
-                                    column (applies to header and body cells).
+                                    {t("offerEditor.layout.tableColumnsHelp")}
                                   </Text>
                                   <BlockStack gap="300">
                                     <Text as="p" variant="bodySm" fontWeight="semibold">
-                                      Quantity
+                                      {t("offerEditor.layout.columnQuantity")}
                                     </Text>
                                     <Select
                                       id="vd-vt-col-qty-align"
-                                      label="Text align"
-                                      options={[...WIDGET_HEADER_TEXT_ALIGN_OPTIONS]}
+                                      label={t("offerEditor.layout.textAlign")}
+                                      options={WIDGET_HEADER_TEXT_ALIGN_OPTIONS.map(
+                                        (o) => ({
+                                          value: o.value,
+                                          label: t(ALIGN_OPTION_LABEL_KEYS[o.value]),
+                                        }),
+                                      )}
                                       value={widgetDisplay.volumeTableQuantityColumnAlign}
                                       onChange={(v) => {
                                         if (isVolumeDiscountWidgetHeaderTextAlign(v)) {
@@ -2952,7 +3367,7 @@ export function VolumeDiscountCreateView({
                                     />
                                     <RangeSlider
                                       id="vd-vt-col-qty-pad-start"
-                                      label="Left padding"
+                                      label={t("offerEditor.layout.leftPadding")}
                                       min={WIDGET_VOLUME_TABLE_COL_INLINE_PADDING_PX_MIN}
                                       max={WIDGET_VOLUME_TABLE_COL_INLINE_PADDING_PX_MAX}
                                       step={1}
@@ -2972,7 +3387,7 @@ export function VolumeDiscountCreateView({
                                     />
                                     <RangeSlider
                                       id="vd-vt-col-qty-pad-end"
-                                      label="Right padding"
+                                      label={t("offerEditor.layout.rightPadding")}
                                       min={WIDGET_VOLUME_TABLE_COL_INLINE_PADDING_PX_MIN}
                                       max={WIDGET_VOLUME_TABLE_COL_INLINE_PADDING_PX_MAX}
                                       step={1}
@@ -2993,12 +3408,17 @@ export function VolumeDiscountCreateView({
                                   </BlockStack>
                                   <BlockStack gap="300">
                                     <Text as="p" variant="bodySm" fontWeight="semibold">
-                                      Discount
+                                      {t("offerEditor.layout.columnDiscount")}
                                     </Text>
                                     <Select
                                       id="vd-vt-col-discount-align"
-                                      label="Text align"
-                                      options={[...WIDGET_HEADER_TEXT_ALIGN_OPTIONS]}
+                                      label={t("offerEditor.layout.textAlign")}
+                                      options={WIDGET_HEADER_TEXT_ALIGN_OPTIONS.map(
+                                        (o) => ({
+                                          value: o.value,
+                                          label: t(ALIGN_OPTION_LABEL_KEYS[o.value]),
+                                        }),
+                                      )}
                                       value={widgetDisplay.volumeTableDiscountColumnAlign}
                                       onChange={(v) => {
                                         if (isVolumeDiscountWidgetHeaderTextAlign(v)) {
@@ -3010,7 +3430,7 @@ export function VolumeDiscountCreateView({
                                     />
                                     <RangeSlider
                                       id="vd-vt-col-discount-pad-start"
-                                      label="Left padding"
+                                      label={t("offerEditor.layout.leftPadding")}
                                       min={WIDGET_VOLUME_TABLE_COL_INLINE_PADDING_PX_MIN}
                                       max={WIDGET_VOLUME_TABLE_COL_INLINE_PADDING_PX_MAX}
                                       step={1}
@@ -3030,7 +3450,7 @@ export function VolumeDiscountCreateView({
                                     />
                                     <RangeSlider
                                       id="vd-vt-col-discount-pad-end"
-                                      label="Right padding"
+                                      label={t("offerEditor.layout.rightPadding")}
                                       min={WIDGET_VOLUME_TABLE_COL_INLINE_PADDING_PX_MIN}
                                       max={WIDGET_VOLUME_TABLE_COL_INLINE_PADDING_PX_MAX}
                                       step={1}
@@ -3051,12 +3471,17 @@ export function VolumeDiscountCreateView({
                                   </BlockStack>
                                   <BlockStack gap="300">
                                     <Text as="p" variant="bodySm" fontWeight="semibold">
-                                      Price per item
+                                      {t("offerEditor.layout.columnPricePerItem")}
                                     </Text>
                                     <Select
                                       id="vd-vt-col-price-align"
-                                      label="Text align"
-                                      options={[...WIDGET_HEADER_TEXT_ALIGN_OPTIONS]}
+                                      label={t("offerEditor.layout.textAlign")}
+                                      options={WIDGET_HEADER_TEXT_ALIGN_OPTIONS.map(
+                                        (o) => ({
+                                          value: o.value,
+                                          label: t(ALIGN_OPTION_LABEL_KEYS[o.value]),
+                                        }),
+                                      )}
                                       value={widgetDisplay.volumeTablePriceColumnAlign}
                                       onChange={(v) => {
                                         if (isVolumeDiscountWidgetHeaderTextAlign(v)) {
@@ -3068,7 +3493,7 @@ export function VolumeDiscountCreateView({
                                     />
                                     <RangeSlider
                                       id="vd-vt-col-price-pad-start"
-                                      label="Left padding"
+                                      label={t("offerEditor.layout.leftPadding")}
                                       min={WIDGET_VOLUME_TABLE_COL_INLINE_PADDING_PX_MIN}
                                       max={WIDGET_VOLUME_TABLE_COL_INLINE_PADDING_PX_MAX}
                                       step={1}
@@ -3086,7 +3511,7 @@ export function VolumeDiscountCreateView({
                                     />
                                     <RangeSlider
                                       id="vd-vt-col-price-pad-end"
-                                      label="Right padding"
+                                      label={t("offerEditor.layout.rightPadding")}
                                       min={WIDGET_VOLUME_TABLE_COL_INLINE_PADDING_PX_MIN}
                                       max={WIDGET_VOLUME_TABLE_COL_INLINE_PADDING_PX_MAX}
                                       step={1}
@@ -3105,8 +3530,10 @@ export function VolumeDiscountCreateView({
                                   </BlockStack>
                                   <RangeSlider
                                     id="vd-widget-cta-border-radius"
-                                    label="Main button radius"
-                                    helpText="Primary button under the table (e.g. Add to cart)."
+                                    label={t("offerEditor.layout.mainButtonRadius")}
+                                    helpText={t(
+                                      "offerEditor.layout.mainButtonRadiusHelp",
+                                    )}
                                     min={WIDGET_BORDER_RADIUS_PX_MIN}
                                     max={WIDGET_BORDER_RADIUS_PX_MAX}
                                     step={1}
@@ -3124,115 +3551,201 @@ export function VolumeDiscountCreateView({
                                   />
                                 </>
                               ) : (
-                                <>
-                                  <Select
-                                    id="vd-badge-position"
-                                    label="Badge position"
-                                    helpText="Badge text: Rule settings → Discount rules."
-                                    options={[...BADGE_POSITION_OPTIONS]}
-                                    value={widgetDisplay.badgePosition}
-                                    onChange={(v) => {
-                                      if (isVolumeDiscountBadgePosition(v)) {
-                                        patchWidgetDisplay({ badgePosition: v });
+                                <FormLayout>
+                                  <FormLayout.Group>
+                                    <Select
+                                      id="vd-badge-position"
+                                      label={t("offerEditor.badge.position")}
+                                      helpText={t("offerEditor.badge.positionHelp")}
+                                      options={BADGE_POSITION_OPTIONS.map((o) => ({
+                                        value: o.value,
+                                        label: t(BADGE_POSITION_LABEL_KEYS[o.value]),
+                                      }))}
+                                      value={widgetDisplay.badgePosition}
+                                      onChange={(v) => {
+                                        if (isVolumeDiscountBadgePosition(v)) {
+                                          patchWidgetDisplay({ badgePosition: v });
+                                        }
+                                      }}
+                                    />
+                                    <RangeSlider
+                                      id="vd-badge-size-scale"
+                                      label={t("offerEditor.badge.size")}
+                                      helpText={t("offerEditor.badge.sizeHelp")}
+                                      min={BADGE_SIZE_SCALE_PERCENT_MIN}
+                                      max={BADGE_SIZE_SCALE_PERCENT_MAX}
+                                      step={1}
+                                      value={widgetDisplay.badgeSizeScalePercent}
+                                      output
+                                      suffix="%"
+                                      onChange={(value) => {
+                                        if (typeof value === "number") {
+                                          patchWidgetDisplay({
+                                            badgeSizeScalePercent:
+                                              clampBadgeSizeScalePercent(value),
+                                          });
+                                        }
+                                      }}
+                                    />
+                                  </FormLayout.Group>
+                                  <BlockStack gap="200">
+                                    <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                      {t("offerEditor.badge.design")}
+                                    </Text>
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                      {t("offerEditor.badge.designHelp")}
+                                    </Text>
+                                    <div
+                                      className={createStyles.badgeDesignGrid}
+                                      style={
+                                        {
+                                          ["--vd-badge-bg" as string]:
+                                            widgetDisplay.badgeBackgroundColor,
+                                          ["--vd-badge-text" as string]:
+                                            widgetDisplay.badgeTextColor,
+                                        } as CSSProperties
                                       }
-                                    }}
-                                  />
-                                  <RangeSlider
-                                    id="vd-badge-size-scale"
-                                    label="Badge size"
-                                    helpText="Scales tier badge text and padding. 100% matches the “Badge” font size (Appearance) × global text scale."
-                                    min={BADGE_SIZE_SCALE_PERCENT_MIN}
-                                    max={BADGE_SIZE_SCALE_PERCENT_MAX}
-                                    step={1}
-                                    value={widgetDisplay.badgeSizeScalePercent}
-                                    output
-                                    suffix="%"
-                                    onChange={(value) => {
-                                      if (typeof value === "number") {
-                                        patchWidgetDisplay({
-                                          badgeSizeScalePercent:
-                                            clampBadgeSizeScalePercent(value),
-                                        });
-                                      }
-                                    }}
-                                  />
-                                  <RangeSlider
-                                    id="vd-widget-card-border-radius"
-                                    label="Tier card radius"
-                                    helpText="Corner radius for each tier row."
-                                    min={WIDGET_BORDER_RADIUS_PX_MIN}
-                                    max={WIDGET_BORDER_RADIUS_PX_MAX}
-                                    step={1}
-                                    value={widgetDisplay.cardBorderRadiusPx}
-                                    output
-                                    suffix="px"
-                                    onChange={(value) => {
-                                      if (typeof value === "number") {
-                                        patchWidgetDisplay({
-                                          cardBorderRadiusPx:
-                                            clampWidgetBorderRadiusPx(value),
-                                        });
-                                      }
-                                    }}
-                                  />
-                                  <RangeSlider
-                                    id="vd-widget-cta-border-radius"
-                                    label="Main CTA radius"
-                                    helpText="Primary button only (“Grab this deal”)."
-                                    min={WIDGET_BORDER_RADIUS_PX_MIN}
-                                    max={WIDGET_BORDER_RADIUS_PX_MAX}
-                                    step={1}
-                                    value={widgetDisplay.buttonBorderRadiusPx}
-                                    output
-                                    suffix="px"
-                                    onChange={(value) => {
-                                      if (typeof value === "number") {
-                                        patchWidgetDisplay({
-                                          buttonBorderRadiusPx:
-                                            clampWidgetBorderRadiusPx(value),
-                                        });
-                                      }
-                                    }}
-                                  />
-                                  <RangeSlider
-                                    id="vd-widget-control-border-radius"
-                                    label="Qty & + Add radius"
-                                    helpText="Expanded tier row: variant menu, quantity stepper, and “+ Add” button."
-                                    min={WIDGET_BORDER_RADIUS_PX_MIN}
-                                    max={WIDGET_BORDER_RADIUS_PX_MAX}
-                                    step={1}
-                                    value={widgetDisplay.controlBorderRadiusPx}
-                                    output
-                                    suffix="px"
-                                    onChange={(value) => {
-                                      if (typeof value === "number") {
-                                        patchWidgetDisplay({
-                                          controlBorderRadiusPx:
-                                            clampWidgetBorderRadiusPx(value),
-                                        });
-                                      }
-                                    }}
-                                  />
-                                  <RangeSlider
-                                    id="vd-widget-radio-size"
-                                    label="Tier radio size"
-                                    helpText="Diameter of the circle next to each tier option."
-                                    min={WIDGET_RADIO_BUTTON_SIZE_PX_MIN}
-                                    max={WIDGET_RADIO_BUTTON_SIZE_PX_MAX}
-                                    step={1}
-                                    value={widgetDisplay.radioButtonSizePx}
-                                    output
-                                    suffix="px"
-                                    onChange={(value) => {
-                                      if (typeof value === "number") {
-                                        patchWidgetDisplay({
-                                          radioButtonSizePx:
-                                            clampRadioButtonSizePx(value),
-                                        });
-                                      }
-                                    }}
-                                  />
-                                </>
+                                      role="listbox"
+                                      aria-label={t("offerEditor.badge.design")}
+                                    >
+                                      {BADGE_DESIGN_OPTIONS.map((opt) => {
+                                        const selected =
+                                          widgetDisplay.badgeDesign === opt.value;
+                                        return (
+                                          <button
+                                            key={opt.value}
+                                            type="button"
+                                            role="option"
+                                            aria-selected={selected}
+                                            className={[
+                                              createStyles.badgeDesignCard,
+                                              selected
+                                                ? createStyles.badgeDesignCardSelected
+                                                : "",
+                                            ]
+                                              .filter(Boolean)
+                                              .join(" ")}
+                                            onClick={() => {
+                                              if (
+                                                isVolumeDiscountBadgeDesign(opt.value)
+                                              ) {
+                                                patchWidgetDisplay({
+                                                  badgeDesign: opt.value,
+                                                });
+                                              }
+                                            }}
+                                          >
+                                            <span
+                                              className={createStyles.badgePill}
+                                              data-badge-design={opt.value}
+                                            >
+                                              {t("offerEditor.badge.previewSale")}
+                                            </span>
+                                            <span
+                                              className={createStyles.badgeDesignLabel}
+                                            >
+                                              {BADGE_DESIGN_LABEL_KEYS[opt.value]
+                                                ? t(
+                                                    BADGE_DESIGN_LABEL_KEYS[
+                                                      opt.value
+                                                    ] as AdminUiMessageKey,
+                                                  )
+                                                : opt.label}
+                                            </span>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </BlockStack>
+                                  <FormLayout.Group>
+                                    <RangeSlider
+                                      id="vd-widget-card-border-radius"
+                                      label={t("offerEditor.layout.tierCardRadius")}
+                                      helpText={t(
+                                        "offerEditor.layout.tierCardRadiusHelp",
+                                      )}
+                                      min={WIDGET_BORDER_RADIUS_PX_MIN}
+                                      max={WIDGET_BORDER_RADIUS_PX_MAX}
+                                      step={1}
+                                      value={widgetDisplay.cardBorderRadiusPx}
+                                      output
+                                      suffix="px"
+                                      onChange={(value) => {
+                                        if (typeof value === "number") {
+                                          patchWidgetDisplay({
+                                            cardBorderRadiusPx:
+                                              clampWidgetBorderRadiusPx(value),
+                                          });
+                                        }
+                                      }}
+                                    />
+                                    <RangeSlider
+                                      id="vd-widget-cta-border-radius"
+                                      label={t("offerEditor.layout.mainCtaRadius")}
+                                      helpText={t(
+                                        "offerEditor.layout.mainCtaRadiusHelp",
+                                      )}
+                                      min={WIDGET_BORDER_RADIUS_PX_MIN}
+                                      max={WIDGET_BORDER_RADIUS_PX_MAX}
+                                      step={1}
+                                      value={widgetDisplay.buttonBorderRadiusPx}
+                                      output
+                                      suffix="px"
+                                      onChange={(value) => {
+                                        if (typeof value === "number") {
+                                          patchWidgetDisplay({
+                                            buttonBorderRadiusPx:
+                                              clampWidgetBorderRadiusPx(value),
+                                          });
+                                        }
+                                      }}
+                                    />
+                                  </FormLayout.Group>
+                                  <FormLayout.Group>
+                                    <RangeSlider
+                                      id="vd-widget-control-border-radius"
+                                      label={t("offerEditor.layout.qtyAddRadius")}
+                                      helpText={t(
+                                        "offerEditor.layout.qtyAddRadiusHelp",
+                                      )}
+                                      min={WIDGET_BORDER_RADIUS_PX_MIN}
+                                      max={WIDGET_BORDER_RADIUS_PX_MAX}
+                                      step={1}
+                                      value={widgetDisplay.controlBorderRadiusPx}
+                                      output
+                                      suffix="px"
+                                      onChange={(value) => {
+                                        if (typeof value === "number") {
+                                          patchWidgetDisplay({
+                                            controlBorderRadiusPx:
+                                              clampWidgetBorderRadiusPx(value),
+                                          });
+                                        }
+                                      }}
+                                    />
+                                    <RangeSlider
+                                      id="vd-widget-radio-size"
+                                      label={t("offerEditor.layout.tierRadioSize")}
+                                      helpText={t(
+                                        "offerEditor.layout.tierRadioSizeHelp",
+                                      )}
+                                      min={WIDGET_RADIO_BUTTON_SIZE_PX_MIN}
+                                      max={WIDGET_RADIO_BUTTON_SIZE_PX_MAX}
+                                      step={1}
+                                      value={widgetDisplay.radioButtonSizePx}
+                                      output
+                                      suffix="px"
+                                      onChange={(value) => {
+                                        if (typeof value === "number") {
+                                          patchWidgetDisplay({
+                                            radioButtonSizePx:
+                                              clampRadioButtonSizePx(value),
+                                          });
+                                        }
+                                      }}
+                                    />
+                                  </FormLayout.Group>
+                                </FormLayout>
                               )}
                           </BlockStack>
                         </Card>
@@ -3240,15 +3753,15 @@ export function VolumeDiscountCreateView({
                         <Card padding="400">
                           <BlockStack gap="400">
                               <Text as="h3" variant="headingSm">
-                                Colors
+                                {t("offerEditor.colors.title")}
                               </Text>
                               <Text as="p" variant="bodySm" tone="subdued">
-                                Hex or rgba; swatch opens the picker.
+                                {t("offerEditor.colors.help")}
                               </Text>
                             <InlineStack gap="300" wrap>
                               <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                                 <WidgetDisplayColorField
-                                  label="Primary"
+                                  label={t("offerEditor.colors.primary")}
                                   value={widgetDisplay.primaryColor}
                                   onChange={(hex) =>
                                     patchWidgetDisplay({ primaryColor: hex })
@@ -3257,7 +3770,7 @@ export function VolumeDiscountCreateView({
                               </div>
                               <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                                 <WidgetDisplayColorField
-                                  label="Primary hover"
+                                  label={t("offerEditor.colors.primaryHover")}
                                   value={widgetDisplay.primaryHoverColor}
                                   onChange={(hex) =>
                                     patchWidgetDisplay({
@@ -3271,7 +3784,7 @@ export function VolumeDiscountCreateView({
                               <InlineStack gap="300" wrap>
                                 <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                                   <WidgetDisplayColorField
-                                    label="Badge background"
+                                    label={t("offerEditor.colors.badgeBackground")}
                                     value={widgetDisplay.badgeBackgroundColor}
                                     onChange={(hex) =>
                                       patchWidgetDisplay({
@@ -3282,7 +3795,7 @@ export function VolumeDiscountCreateView({
                                 </div>
                                 <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                                   <WidgetDisplayColorField
-                                    label="Badge text"
+                                    label={t("offerEditor.colors.badgeText")}
                                     value={widgetDisplay.badgeTextColor}
                                     onChange={(hex) =>
                                       patchWidgetDisplay({
@@ -3298,8 +3811,8 @@ export function VolumeDiscountCreateView({
                                 <WidgetDisplayColorField
                                   label={
                                     isVolumeTableOffer
-                                      ? "Selected row background"
-                                      : "Selected tier background"
+                                      ? t("offerEditor.colors.selectedRowBackground")
+                                      : t("offerEditor.colors.selectedTierBackground")
                                   }
                                   value={widgetDisplay.selectedBgColor}
                                   onChange={(hex) =>
@@ -3313,8 +3826,8 @@ export function VolumeDiscountCreateView({
                                 <WidgetDisplayColorField
                                   label={
                                     isVolumeTableOffer
-                                      ? "Table border"
-                                      : "Card border (unselected)"
+                                      ? t("offerEditor.colors.tableBorder")
+                                      : t("offerEditor.colors.cardBorder")
                                   }
                                   value={widgetDisplay.cardBorderColor}
                                   onChange={(hex) =>
@@ -3329,7 +3842,7 @@ export function VolumeDiscountCreateView({
                               <InlineStack gap="300" wrap>
                                 <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                                   <WidgetDisplayColorField
-                                    label="Radio border (unselected)"
+                                    label={t("offerEditor.colors.radioBorder")}
                                     value={widgetDisplay.radioButtonBorderColor}
                                     onChange={(hex) =>
                                       patchWidgetDisplay({
@@ -3340,7 +3853,7 @@ export function VolumeDiscountCreateView({
                                 </div>
                                 <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                                   <WidgetDisplayColorField
-                                    label="Radio accent (selected)"
+                                    label={t("offerEditor.colors.radioAccent")}
                                     value={widgetDisplay.radioButtonAccentColor}
                                     onChange={(hex) =>
                                       patchWidgetDisplay({
@@ -3354,7 +3867,7 @@ export function VolumeDiscountCreateView({
                             <InlineStack gap="300" wrap>
                               <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                                 <WidgetDisplayColorField
-                                  label="Countdown pill background"
+                                  label={t("offerEditor.colors.countdownBackground")}
                                   value={widgetDisplay.countdownBgColor}
                                   onChange={(hex) =>
                                     patchWidgetDisplay({
@@ -3365,7 +3878,7 @@ export function VolumeDiscountCreateView({
                               </div>
                               <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                                 <WidgetDisplayColorField
-                                  label="Countdown pill text"
+                                  label={t("offerEditor.colors.countdownText")}
                                   value={widgetDisplay.countdownTextColor}
                                   onChange={(hex) =>
                                     patchWidgetDisplay({
@@ -3379,7 +3892,7 @@ export function VolumeDiscountCreateView({
                               <InlineStack gap="300" wrap>
                                 <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                                   <WidgetDisplayColorField
-                                    label="Discount column (header & %)"
+                                    label={t("offerEditor.colors.discountColumn")}
                                     value={widgetDisplay.volumeTableDiscountColor}
                                     onChange={(hex) =>
                                       patchWidgetDisplay({
@@ -3394,7 +3907,7 @@ export function VolumeDiscountCreateView({
                               <InlineStack gap="300" wrap>
                                 <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                                   <WidgetDisplayColorField
-                                    label={'"You save" line color'}
+                                    label={t("offerEditor.colors.savingsLine")}
                                     value={widgetDisplay.savingsColor}
                                     onChange={(hex) =>
                                       patchWidgetDisplay({ savingsColor: hex })
@@ -3403,7 +3916,7 @@ export function VolumeDiscountCreateView({
                                 </div>
                                 <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                                   <WidgetDisplayColorField
-                                    label="Option subtext color"
+                                    label={t("offerEditor.colors.optionSubtext")}
                                     value={widgetDisplay.optionSubtextColor}
                                     onChange={(hex) =>
                                       patchWidgetDisplay({
@@ -3417,7 +3930,7 @@ export function VolumeDiscountCreateView({
                             <InlineStack gap="300" wrap>
                               <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                                 <WidgetDisplayColorField
-                                  label="Muted text"
+                                  label={t("offerEditor.colors.mutedText")}
                                   value={widgetDisplay.mutedColor}
                                   onChange={(hex) =>
                                     patchWidgetDisplay({ mutedColor: hex })
@@ -3432,7 +3945,7 @@ export function VolumeDiscountCreateView({
                           <BlockStack gap="300">
                             <InlineStack gap="200" blockAlign="center" wrap>
                               <Text as="h3" variant="headingSm">
-                                Custom CSS
+                                {t("offerEditor.customCss.title")}
                               </Text>
                               {!planCaps.customCss ? <PlanUpgradeBadge /> : null}
                             </InlineStack>
@@ -3441,25 +3954,12 @@ export function VolumeDiscountCreateView({
                             ) : (
                               <>
                             <Text as="p" variant="bodySm" tone="subdued">
-                              Extra rules injected on the storefront root (
-                              <Text as="span" fontWeight="semibold">
-                                .xloxi-qb
-                              </Text>
-                              ). Admin preview:{" "}
-                              <Text as="span" fontWeight="semibold">
-                                .vd-admin-qb-preview
-                              </Text>{" "}
                               {isVolumeTableOffer
-                                ? "(volume table preview)."
-                                : "(tier card preview)."}{" "}
-                              Field:{" "}
-                              <Text as="span" fontWeight="semibold">
-                                customCss
-                              </Text>
-                              .
+                                ? t("offerEditor.customCss.helpVolumeTable")
+                                : t("offerEditor.customCss.helpTierCard")}
                             </Text>
                             <TextField
-                              label="CSS"
+                              label={t("offerEditor.customCss.fieldLabel")}
                               value={widgetDisplay.customCss}
                               onChange={(v) =>
                                 patchWidgetDisplay({
@@ -3475,15 +3975,362 @@ export function VolumeDiscountCreateView({
                               multiline={10}
                               autoComplete="off"
                               monospaced
-                              helpText={`Max ${WIDGET_DISPLAY_CUSTOM_CSS_MAX_CHARS.toLocaleString()} characters.`}
+                              helpText={t("offerEditor.customCss.maxChars", {
+                                n: WIDGET_DISPLAY_CUSTOM_CSS_MAX_CHARS.toLocaleString(),
+                              })}
                             />
                               </>
                             )}
                           </BlockStack>
                         </Card>
                       </BlockStack>
+                    ) : (
+                      <BlockStack gap="400">
+                        <Card padding="400">
+                          <BlockStack gap="400">
+                            <Text as="h2" variant="headingSm">
+                              {t("offerEditor.translations.title")}
+                            </Text>
+                            {!canEditTranslations ? (
+                              <PlanUpgradeBanner feature="translations" />
+                            ) : null}
+                            <Text as="p" tone="subdued">
+                              {t("offerEditor.translations.help")}
+                            </Text>
+                            <Divider />
+                            <AdminLanguageDropdown
+                              label={t("settings.language")}
+                              options={shopLanguages.map((opt) => ({
+                                label: opt.label,
+                                value: opt.value,
+                              }))}
+                              value={selectedTransLang}
+                              onChange={setSelectedTransLang}
+                              disabled={
+                                !canEditTranslations || shopLanguages.length === 0
+                              }
+                              helpText={
+                                canEditTranslations
+                                  ? t("offerEditor.translations.languageHelp")
+                                  : t("settings.languageHelpLocked")
+                              }
+                            />
+                            <InlineStack gap="200" wrap>
+                              <Button
+                                icon={AutomationIcon}
+                                onClick={handleAutoTranslateCampaignLanguage}
+                                loading={isAutoTranslating}
+                                disabled={
+                                  !canEditTranslations ||
+                                  selectedTransLang === primaryLang ||
+                                  isAutoTranslating
+                                }
+                                tone="success"
+                              >
+                                {t("settings.autoTranslate")}
+                              </Button>
+                              <Button
+                                icon={ResetIcon}
+                                onClick={handleResetCampaignLanguage}
+                                disabled={!canEditTranslations || isAutoTranslating}
+                              >
+                                {t("settings.reset")}
+                              </Button>
+                            </InlineStack>
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              {t("settings.autoTranslateHelp")}
+                            </Text>
+                            <Divider />
+                            <FormLayout>
+                              <FormLayout.Group>
+                                <TextField
+                                  label={t("settings.widgetHeading")}
+                                  value={translationFieldValue("transHeading")}
+                                  onChange={(v) =>
+                                    handleCampaignTranslationFieldChange(
+                                      "transHeading",
+                                      v,
+                                    )
+                                  }
+                                  autoComplete="off"
+                                  placeholder={translationFieldPlaceholder(
+                                    "transHeading",
+                                  )}
+                                  disabled={!canEditTranslations}
+                                />
+                                <TextField
+                                  label={t("settings.ctaText")}
+                                  value={translationFieldValue("transCta")}
+                                  onChange={(v) =>
+                                    handleCampaignTranslationFieldChange(
+                                      "transCta",
+                                      v,
+                                    )
+                                  }
+                                  autoComplete="off"
+                                  placeholder={translationFieldPlaceholder(
+                                    "transCta",
+                                  )}
+                                  disabled={!canEditTranslations}
+                                />
+                              </FormLayout.Group>
+                              <FormLayout.Group>
+                                <TextField
+                                  label={t("settings.qtyColumn")}
+                                  value={translationFieldValue("transQty")}
+                                  onChange={(v) =>
+                                    handleCampaignTranslationFieldChange(
+                                      "transQty",
+                                      v,
+                                    )
+                                  }
+                                  autoComplete="off"
+                                  placeholder={translationFieldPlaceholder(
+                                    "transQty",
+                                  )}
+                                  disabled={!canEditTranslations}
+                                />
+                                <TextField
+                                  label={t("settings.discountColumn")}
+                                  value={translationFieldValue("transDiscount")}
+                                  onChange={(v) =>
+                                    handleCampaignTranslationFieldChange(
+                                      "transDiscount",
+                                      v,
+                                    )
+                                  }
+                                  autoComplete="off"
+                                  placeholder={translationFieldPlaceholder(
+                                    "transDiscount",
+                                  )}
+                                  disabled={!canEditTranslations}
+                                />
+                              </FormLayout.Group>
+                              <FormLayout.Group>
+                                <TextField
+                                  label={t("settings.priceColumn")}
+                                  value={translationFieldValue("transPrice")}
+                                  onChange={(v) =>
+                                    handleCampaignTranslationFieldChange(
+                                      "transPrice",
+                                      v,
+                                    )
+                                  }
+                                  autoComplete="off"
+                                  placeholder={translationFieldPlaceholder(
+                                    "transPrice",
+                                  )}
+                                  disabled={!canEditTranslations}
+                                />
+                                <TextField
+                                  label={t("settings.buyPrefix")}
+                                  value={translationFieldValue("transBuy")}
+                                  onChange={(v) =>
+                                    handleCampaignTranslationFieldChange(
+                                      "transBuy",
+                                      v,
+                                    )
+                                  }
+                                  autoComplete="off"
+                                  placeholder={translationFieldPlaceholder(
+                                    "transBuy",
+                                  )}
+                                  disabled={!canEditTranslations}
+                                />
+                              </FormLayout.Group>
+                              <FormLayout.Group>
+                                <TextField
+                                  label={t("settings.youSave")}
+                                  value={translationFieldValue("transYouSave")}
+                                  onChange={(v) =>
+                                    handleCampaignTranslationFieldChange(
+                                      "transYouSave",
+                                      v,
+                                    )
+                                  }
+                                  autoComplete="off"
+                                  placeholder={translationFieldPlaceholder(
+                                    "transYouSave",
+                                  )}
+                                  disabled={!canEditTranslations}
+                                />
+                                <TextField
+                                  label={t("settings.addLabel")}
+                                  value={translationFieldValue("transAdd")}
+                                  onChange={(v) =>
+                                    handleCampaignTranslationFieldChange(
+                                      "transAdd",
+                                      v,
+                                    )
+                                  }
+                                  autoComplete="off"
+                                  placeholder={translationFieldPlaceholder(
+                                    "transAdd",
+                                  )}
+                                  disabled={!canEditTranslations}
+                                />
+                              </FormLayout.Group>
+                              <FormLayout.Group>
+                                <TextField
+                                  label={t("settings.cartDiscount")}
+                                  value={translationFieldValue(
+                                    "transCartDiscount",
+                                  )}
+                                  onChange={(v) =>
+                                    handleCampaignTranslationFieldChange(
+                                      "transCartDiscount",
+                                      v,
+                                    )
+                                  }
+                                  autoComplete="off"
+                                  placeholder={translationFieldPlaceholder(
+                                    "transCartDiscount",
+                                  )}
+                                  disabled={!canEditTranslations}
+                                  helpText={t(
+                                    "offerEditor.translations.cartBadgeHelp",
+                                  )}
+                                />
+                                <TextField
+                                  label={t("settings.cartDiscountQty")}
+                                  value={translationFieldValue(
+                                    "transCartDiscountQty",
+                                  )}
+                                  onChange={(v) =>
+                                    handleCampaignTranslationFieldChange(
+                                      "transCartDiscountQty",
+                                      v,
+                                    )
+                                  }
+                                  autoComplete="off"
+                                  placeholder={translationFieldPlaceholder(
+                                    "transCartDiscountQty",
+                                  )}
+                                  disabled={!canEditTranslations}
+                                />
+                              </FormLayout.Group>
+                              <TextField
+                                label={t("settings.countdown")}
+                                value={translationFieldValue("transCountdown")}
+                                onChange={(v) =>
+                                  handleCampaignTranslationFieldChange(
+                                    "transCountdown",
+                                    v,
+                                  )
+                                }
+                                autoComplete="off"
+                                placeholder={translationFieldPlaceholder(
+                                  "transCountdown",
+                                )}
+                                disabled={!canEditTranslations}
+                              />
+                              <TextField
+                                label={t("settings.footnote")}
+                                value={translationFieldValue("transFootnote")}
+                                onChange={(v) =>
+                                  handleCampaignTranslationFieldChange(
+                                    "transFootnote",
+                                    v,
+                                  )
+                                }
+                                autoComplete="off"
+                                multiline={3}
+                                placeholder={translationFieldPlaceholder(
+                                  "transFootnote",
+                                )}
+                                disabled={!canEditTranslations}
+                              />
+                              <Divider />
+                              <Text as="h3" variant="headingSm">
+                                {t("offerEditor.translations.tierCopyTitle")}
+                              </Text>
+                              <Text as="p" variant="bodySm" tone="subdued">
+                                {t("offerEditor.translations.tierCopyHelp")}
+                              </Text>
+                              {tiers.map((tier, tierIndex) => {
+                                const row =
+                                  activeTierCopyRows[tierIndex] ??
+                                  emptyTierCopyFields();
+                                return (
+                                  <BlockStack key={`tier-copy-${tierIndex}`} gap="200">
+                                    <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                      {t("offerEditor.translations.tierN", {
+                                        n: String(tierIndex + 1),
+                                      })}
+                                    </Text>
+                                    <TextField
+                                      label={t("offerEditor.tier.optionLabel")}
+                                      value={row.buyLabelText}
+                                      onChange={(v) =>
+                                        handleCampaignTierCopyFieldChange(
+                                          tierIndex,
+                                          "buyLabelText",
+                                          v,
+                                        )
+                                      }
+                                      autoComplete="off"
+                                      placeholder={
+                                        tier.buyLabelText.trim() ||
+                                        t(
+                                          "offerEditor.tier.optionLabelPlaceholder",
+                                        )
+                                      }
+                                      disabled={!canEditTranslations}
+                                    />
+                                    {!isVolumeTableOffer ? (
+                                      <>
+                                        <TextField
+                                          label={t(
+                                            "offerEditor.tier.optionSubtext",
+                                          )}
+                                          value={row.optionSubtext}
+                                          onChange={(v) =>
+                                            handleCampaignTierCopyFieldChange(
+                                              tierIndex,
+                                              "optionSubtext",
+                                              v,
+                                            )
+                                          }
+                                          autoComplete="off"
+                                          placeholder={
+                                            tier.optionSubtext.trim() ||
+                                            t(
+                                              "offerEditor.tier.optionSubtextPlaceholder",
+                                            )
+                                          }
+                                          disabled={!canEditTranslations}
+                                        />
+                                        <TextField
+                                          label={t("offerEditor.tier.badge")}
+                                          value={row.badge}
+                                          onChange={(v) =>
+                                            handleCampaignTierCopyFieldChange(
+                                              tierIndex,
+                                              "badge",
+                                              v,
+                                            )
+                                          }
+                                          autoComplete="off"
+                                          placeholder={
+                                            tier.badge.trim() ||
+                                            t(
+                                              "offerEditor.tier.badgePlaceholder",
+                                            )
+                                          }
+                                          disabled={!canEditTranslations}
+                                        />
+                                      </>
+                                    ) : null}
+                                  </BlockStack>
+                                );
+                              })}
+                            </FormLayout>
+                          </BlockStack>
+                        </Card>
+                      </BlockStack>
                     )}
                   </Tabs>
+                  </div>
                 </Box>
               </div>
               <aside className={createStyles.previewColumn}>
@@ -3498,10 +4345,16 @@ export function VolumeDiscountCreateView({
                       >
                         <InlineStack gap="200" blockAlign="center" wrap>
                           <Text as="h3" variant="headingSm">
-                            Campaign status
+                            {t("offerEditor.campaignStatus")}
                           </Text>
                           <Badge tone={statusBadgeTone(editorCampaignStatus)}>
-                            {statusLabel(editorCampaignStatus)}
+                            {(() => {
+                              const key =
+                                CAMPAIGN_STATUS_LABEL_KEYS[
+                                  editorCampaignStatus.toLowerCase()
+                                ];
+                              return key ? t(key) : statusLabel(editorCampaignStatus);
+                            })()}
                           </Badge>
                         </InlineStack>
                         <Button
@@ -3526,26 +4379,26 @@ export function VolumeDiscountCreateView({
                           }}
                         >
                           {editorCampaignStatus === "active"
-                            ? "Turn off"
-                            : "Turn on"}
+                            ? t("offerEditor.turnOff")
+                            : t("offerEditor.turnOn")}
                         </Button>
                       </InlineStack>
                       {turnOnBlockedReason === "expired" ? (
                         <InlineStack gap="100" blockAlign="center" wrap>
                           <Text as="p" variant="bodySm" tone="critical">
-                            To turn on, set a future end time in
+                            {t("offerEditor.expiredHint")}
                           </Text>
-                          <Button
-                            variant="plain"
-                            tone="critical"
+                          <button
+                            type="button"
+                            className={createStyles.scheduleJumpLink}
                             onClick={goToScheduleSettings}
                           >
-                            Schedule
-                          </Button>
+                            {t("offerEditor.schedule")}
+                          </button>
                         </InlineStack>
                       ) : editorCampaignStatus === "scheduled" ? (
                         <Text as="p" variant="bodySm" tone="subdued">
-                          Waiting for start
+                          {t("offerEditor.waitingForStart")}
                           {formatDatetimeLocalDisplay(countdownStartsAtLocal)
                             ? ` (${formatDatetimeLocalDisplay(countdownStartsAtLocal)})`
                             : ""}

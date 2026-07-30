@@ -6,6 +6,7 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type {
@@ -35,12 +36,17 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { OfferLimitUpgradeModal } from "../components/OfferLimitUpgradeModal";
 import { OffersPolarisHome, type OfferTab } from "../components/OffersPolarisHome";
 import {
+  QuantityBreaksSelectCard,
+  VolumeDiscountComingSoonCard,
+} from "../components/OfferTypeSelectCards";
+import {
   adminEmbeddedPath,
   adminEmbeddedPathWithQuery,
 } from "../utils/adminEmbeddedPath";
 import { buildVolumeDiscountOffersCsvExport } from "../utils/offersCsvExport.server";
 import type { OffersListTab } from "../utils/offersTableViewOrder.server";
 import { filterSortOffersForListView } from "../utils/offersTableViewOrder.shared";
+import { resolveOffersListDisplayStatus } from "../utils/offersListLiveStatus";
 import { storefrontProductPreviewUrl } from "../utils/storefrontProductPreviewUrl.server";
 import { widgetPresentationFromStoredJson } from "../utils/widgetDisplay";
 import {
@@ -59,16 +65,6 @@ import { useAdminI18n } from "../components/AdminI18nProvider";
 const OfferTypePreviewModal = lazy(() =>
   import("../components/OfferTypePreviewModal").then((m) => ({
     default: m.OfferTypePreviewModal,
-  })),
-);
-const QuantityBreaksSelectCard = lazy(() =>
-  import("../components/OfferTypeSelectCards").then((m) => ({
-    default: m.QuantityBreaksSelectCard,
-  })),
-);
-const VolumeDiscountComingSoonCard = lazy(() =>
-  import("../components/OfferTypeSelectCards").then((m) => ({
-    default: m.VolumeDiscountComingSoonCard,
   })),
 );
 
@@ -110,6 +106,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (flipped.shopsNeedingShopifySync.length) {
     scheduleVolumeDiscountShopSync(admin, session.shop, {
       skipScheduleTransitions: true,
+      force: true,
     });
   }
 
@@ -123,6 +120,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         status: string;
         createdAt: Date;
         updatedAt: Date;
+        countdownStartsAt: Date | null;
+        countdownEndsAt: Date | null;
         tierCount: bigint;
         widgetPresentation: string | null;
       }>
@@ -135,6 +134,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         c."status",
         c."createdAt",
         c."updatedAt",
+        c."countdownStartsAt",
+        c."countdownEndsAt",
         c."widgetDisplay"->>'widgetPresentation' AS "widgetPresentation",
         CASE
           WHEN jsonb_typeof(c."tiers") = 'array' THEN jsonb_array_length(c."tiers")
@@ -176,6 +177,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       status: c.status,
       createdAt: c.createdAt.toISOString(),
       updatedAt: c.updatedAt.toISOString(),
+      countdownStartsAt: c.countdownStartsAt?.toISOString() ?? null,
+      countdownEndsAt: c.countdownEndsAt?.toISOString() ?? null,
       tierCount: Number(c.tierCount),
       widgetPresentation: widgetPresentationFromStoredJson(
         c.widgetPresentation
@@ -416,6 +419,38 @@ export default function Index() {
   const [sortSelected, setSortSelected] = useState<string[]>(["modified desc"]);
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
+  // Tick every second so Scheduled → Active (and end → Draft) flip live in the table.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  // Persist schedule flips + analytics via loader (stable interval; ref avoids effect churn).
+  const revalidatorRef = useRef(revalidator);
+  revalidatorRef.current = revalidator;
+  useEffect(() => {
+    const POLL_MS = 8_000;
+    const softRevalidate = () => {
+      if (document.visibilityState !== "visible") return;
+      const r = revalidatorRef.current;
+      if (r.state !== "idle") return;
+      r.revalidate();
+    };
+    const timer = window.setInterval(softRevalidate, POLL_MS);
+    softRevalidate();
+    const onVis = () => {
+      if (document.visibilityState === "visible") softRevalidate();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", softRevalidate);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", softRevalidate);
+    };
+  }, []);
+
   // Deep link from Setup Guide / home "Create offer" → Select offer type.
   useEffect(() => {
     const params = new URLSearchParams(
@@ -448,9 +483,18 @@ export default function Index() {
     setScreen("select");
   }, [atOfferCap, showOfferLimitUpgrade]);
 
+  const liveCampaigns = useMemo(
+    () =>
+      campaigns.map((c) => ({
+        ...c,
+        status: resolveOffersListDisplayStatus(c, nowMs),
+      })),
+    [campaigns, nowMs],
+  );
+
   const nextDefaultCampaignName = useMemo(
-    () => t("offers.defaultName", { n: campaigns.length + 1 }),
-    [campaigns.length, t],
+    () => t("offers.defaultName", { n: liveCampaigns.length + 1 }),
+    [liveCampaigns.length, t],
   );
 
   const toastSoon = useCallback(
@@ -462,12 +506,12 @@ export default function Index() {
 
   const filteredCampaigns = useMemo(
     () =>
-      filterSortOffersForListView(campaigns, {
+      filterSortOffersForListView(liveCampaigns, {
         tab: offerTab,
         searchQuery: deferredSearchQuery,
         sort: sortSelected[0] ?? "modified desc",
       }),
-    [campaigns, deferredSearchQuery, offerTab, sortSelected],
+    [liveCampaigns, deferredSearchQuery, offerTab, sortSelected],
   );
 
   const notify = useCallback(
@@ -512,56 +556,54 @@ export default function Index() {
               }}
             >
               <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
-                <Suspense fallback={null}>
-                  <QuantityBreaksSelectCard
-                    title={t("offers.quantityBreaks")}
-                    createLocked={atOfferCap}
-                    onPreview={() => setOfferPreviewModal("quantity")}
-                    onLearnMore={() => toastSoon(t("common.learnMore"))}
-                    onCreate={() => {
-                      if (atOfferCap) {
-                        showOfferLimitUpgrade();
-                        return;
-                      }
-                      navigate(
-                        adminEmbeddedPathWithQuery(
-                          "/app/volume-discount/new",
-                          search,
-                          { preset: "quantity" },
-                        ),
-                        {
-                          state: {
-                            defaultCampaignName: nextDefaultCampaignName,
-                          },
+                <QuantityBreaksSelectCard
+                  title={t("offers.quantityBreaks")}
+                  createLocked={atOfferCap}
+                  onPreview={() => setOfferPreviewModal("quantity")}
+                  onLearnMore={() => toastSoon(t("common.learnMore"))}
+                  onCreate={() => {
+                    if (atOfferCap) {
+                      showOfferLimitUpgrade();
+                      return;
+                    }
+                    navigate(
+                      adminEmbeddedPathWithQuery(
+                        "/app/volume-discount/new",
+                        search,
+                        { preset: "quantity" },
+                      ),
+                      {
+                        state: {
+                          defaultCampaignName: nextDefaultCampaignName,
                         },
-                      );
-                    }}
-                  />
-                  <VolumeDiscountComingSoonCard
-                    title={t("offers.volumeDiscount")}
-                    createLocked={atOfferCap}
-                    onPreview={() => setOfferPreviewModal("volume")}
-                    onLearnMore={() => toastSoon(t("common.learnMore"))}
-                    onCreate={() => {
-                      if (atOfferCap) {
-                        showOfferLimitUpgrade();
-                        return;
-                      }
-                      navigate(
-                        adminEmbeddedPathWithQuery(
-                          "/app/volume-discount/new",
-                          search,
-                          { preset: "volume" },
-                        ),
-                        {
-                          state: {
-                            defaultCampaignName: nextDefaultCampaignName,
-                          },
+                      },
+                    );
+                  }}
+                />
+                <VolumeDiscountComingSoonCard
+                  title={t("offers.volumeDiscount")}
+                  createLocked={atOfferCap}
+                  onPreview={() => setOfferPreviewModal("volume")}
+                  onLearnMore={() => toastSoon(t("common.learnMore"))}
+                  onCreate={() => {
+                    if (atOfferCap) {
+                      showOfferLimitUpgrade();
+                      return;
+                    }
+                    navigate(
+                      adminEmbeddedPathWithQuery(
+                        "/app/volume-discount/new",
+                        search,
+                        { preset: "volume" },
+                      ),
+                      {
+                        state: {
+                          defaultCampaignName: nextDefaultCampaignName,
                         },
-                      );
-                    }}
-                  />
-                </Suspense>
+                      },
+                    );
+                  }}
+                />
               </InlineGrid>
             </div>
           </Box>
@@ -578,7 +620,7 @@ export default function Index() {
   return (
     <>
       <OffersPolarisHome
-        campaigns={campaigns}
+        campaigns={liveCampaigns}
         filteredCampaigns={filteredCampaigns}
         offerTab={offerTab}
         setOfferTab={setOfferTab}
@@ -593,7 +635,10 @@ export default function Index() {
         onCampaignsMutated={onCampaignsMutated}
         notify={notify}
         canImportExport={planCapabilities.importExport}
-        activeCount={activeCount}
+        activeCount={
+          liveCampaigns.filter((c) => c.status.toLowerCase() === "active")
+            .length
+        }
         maxActiveCampaigns={maxActiveCampaigns}
         atOfferCap={atOfferCap}
         createOfferBlockedMessage={offerLimitMessage}

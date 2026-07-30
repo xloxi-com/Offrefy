@@ -81,7 +81,7 @@
   box-sizing: border-box;
 }
 
-/* Expanded tier row — mirrors storefront .xloxi-card__expand + .xloxi-expand-compact + qty / + Add */
+/* Expanded tier — mirrors storefront .offrefy-card__expand + .offrefy-expand-compact */
 .expandSection {
   width: 100%;
   margin-top: 0.45rem;
@@ -105,15 +105,34 @@
 .expandCompact {
   --vd-compact-control-h: 30px;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.3rem 0.45rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   padding: 0.35rem 0.45rem;
   border-radius: var(--vd-radius-control, 10px);
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(0, 0, 0, 0.05);
   box-sizing: border-box;
+}
+
+/* Single line: # · amount · qty · + Add (variant sits above when shown) */
+.expandRow {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.3rem 0.4rem;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.expandCompactNoVariant .lineTotal,
+.expandCompactNoQty .lineTotal {
+  margin-inline-start: 0.15rem;
 }
 
 .tierIdx {
@@ -125,9 +144,10 @@
 }
 
 .selectWrap {
-  flex: 1 1 6.5rem;
-  min-width: min(100%, 5.5rem);
-  max-width: 12rem;
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
 }
 
 .variantSelect {
@@ -158,19 +178,29 @@
 }
 
 .lineTotal {
-  flex: 0 0 auto;
-  text-align: right;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  text-align: left;
   font-weight: var(--vd-fw-strong, 700);
   font-size: var(--vd-fs-price, 16px);
   line-height: var(--vd-compact-control-h);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
 }
 
 .expandTrailing {
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 0.35rem 0.4rem;
+  gap: 0.3rem 0.35rem;
   margin-inline-start: auto;
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: none;
+  white-space: nowrap;
 }
 
 .qtyGroup {
@@ -179,7 +209,8 @@
   align-items: center;
   flex: 0 0 auto;
   flex-shrink: 0;
-  min-width: 9.75rem;
+  min-width: 0;
+  width: auto;
   height: var(--vd-compact-control-h);
   min-height: var(--vd-compact-control-h);
   border-radius: var(--vd-radius-control, 10px);
@@ -246,13 +277,14 @@
 
 input.qtyValue {
   box-sizing: border-box;
+  display: block;
   flex: 0 0 auto;
-  width: 6.25rem;
-  min-width: 5.75rem;
-  max-width: 7rem;
+  width: 2.35rem;
+  min-width: 2rem;
+  max-width: 2.75rem;
   margin: 0;
   padding-block: 0;
-  padding-inline: 0.35rem;
+  padding-inline: 0.15rem;
   border: none;
   border-radius: 0;
   background: transparent;
@@ -264,6 +296,14 @@ input.qtyValue {
   color: inherit;
   letter-spacing: inherit;
   text-align: center;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input.qtyValue::-webkit-outer-spin-button,
+input.qtyValue::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 input.qtyValue:focus {
@@ -290,6 +330,8 @@ input.qtyValue:focus {
   line-height: 1;
   letter-spacing: 0.04em;
   cursor: pointer;
+  flex: 0 0 auto;
+  white-space: nowrap;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
@@ -300,6 +342,39 @@ input.qtyValue:focus {
 
 .addOutline:active {
   transform: translateY(1px);
+}
+
+/* Mobile preview toggle — match storefront <=30rem expand sizing */
+:global(.vd-admin-qb-preview[data-preview-device="mobile"]) .expandCompact {
+  --vd-compact-control-h: 34px;
+  padding: 0.4rem 0.45rem;
+  gap: 0.35rem;
+}
+
+:global(.vd-admin-qb-preview[data-preview-device="mobile"]) .expandRow {
+  gap: 0.25rem 0.35rem;
+}
+
+:global(.vd-admin-qb-preview[data-preview-device="mobile"]) .lineTotal {
+  font-size: var(--vd-fs-price, 14px);
+  line-height: 1.2;
+}
+
+:global(.vd-admin-qb-preview[data-preview-device="mobile"]) .expandTrailing {
+  gap: 0.3rem;
+}
+
+:global(.vd-admin-qb-preview[data-preview-device="mobile"]) input.qtyValue {
+  width: 1.85rem;
+  min-width: 1.6rem;
+  max-width: 2.15rem;
+  font-size: 0.875rem;
+  padding-inline: 0.05rem;
+}
+
+:global(.vd-admin-qb-preview[data-preview-device="mobile"]) .addOutline {
+  padding-inline: 0.5rem;
+  font-size: 12px;
 }
 
 /* Volume table presentation (`widgetPresentation: volume_table`) — colors from Appearance / template via inline CSS vars */

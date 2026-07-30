@@ -237,6 +237,11 @@ export async function setShopPlan(
       "updatedAt" = NOW()
   `;
 
+  const { clampCampaignWidgetDisplaysForPlan } = await import(
+    "./enforcePlanWidgetDisplay.server"
+  );
+  await clampCampaignWidgetDisplaysForPlan(shop, plan);
+
   return enforcePlanActiveCampaignCap(shop, plan);
 }
 

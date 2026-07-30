@@ -1,0 +1,12 @@
+Easter assets:
+
+PNGs (Fluent Emoji MIT):
+- egg.png, rabbit.png, bunny.png, chick.png
+- tulip.png, carrot.png, blossom.png, basket.png
+- sparkles.png (copied from newyear)
+
+Pastel decorated eggs (Offrefy-generated, transparent):
+- egg-pink.png, egg-blue.png, egg-gold.png, egg-lilac.png, egg-mint.png
+Regenerate: python scripts/gen-easter-eggs.py
+
+Theme copies: extensions/.../assets/vd-ea-*

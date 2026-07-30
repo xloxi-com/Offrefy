@@ -80,8 +80,8 @@ export function PolarisDateTimeField({
   const selectedDate = parsed?.date ?? new Date();
   const timeValue = parsed?.time ?? "00:00:00";
   const timeHelp = shopTimezone
-    ? "Hours and minutes (Shopify store timezone)."
-    : "Hours and minutes (store local time).";
+    ? "Hours, minutes, and seconds (Shopify store timezone)."
+    : "Hours, minutes, and seconds (store local time).";
 
   const [{ month, year }, setMonthYear] = useState(() => ({
     month: selectedDate.getMonth(),
@@ -134,12 +134,18 @@ export function PolarisDateTimeField({
 
   const handleTimeChange = useCallback(
     (nextTime: string) => {
-      const existingSec = timeValue.split(":")[2] ?? "00";
-      const normalized =
-        nextTime.length === 5
-          ? `${nextTime}:${existingSec}`
-          : nextTime || `00:00:${existingSec}`;
-      emit(selectedDate, normalized);
+      const raw = String(nextTime || "").trim();
+      // Browsers may emit HH:mm or HH:mm:ss depending on step / locale UI.
+      if (/^\d{2}:\d{2}:\d{2}$/.test(raw)) {
+        emit(selectedDate, raw);
+        return;
+      }
+      if (/^\d{2}:\d{2}$/.test(raw)) {
+        const existingSec = timeValue.split(":")[2] ?? "00";
+        emit(selectedDate, `${raw}:${existingSec}`);
+        return;
+      }
+      emit(selectedDate, raw || timeValue || "00:00:00");
     },
     [emit, selectedDate, timeValue],
   );
@@ -198,10 +204,11 @@ export function PolarisDateTimeField({
             selected={selectedDate}
           />
           <TextField
-            key={`vd-time-${timeValue.slice(0, 5)}`}
+            key={`vd-time-${timeValue}`}
             label="Time"
             type="time"
-            value={timeValue.slice(0, 5)}
+            step={1}
+            value={timeValue}
             onChange={handleTimeChange}
             autoComplete="off"
             helpText={timeHelp}

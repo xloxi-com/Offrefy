@@ -1,0 +1,523 @@
+/* —— Easter seasonal decorations —— */
+/* PNGs: Fluent Emoji (MIT) + Offrefy pastel eggs */
+
+[data-offrefy-theme^="easter_"] {
+  --ea-pastel: #fdf2f8;
+  --ea-decor-sm: clamp(1.05rem, 4.2vw, 1.35rem);
+  --ea-decor-md: clamp(1.35rem, 5.5vw, 1.85rem);
+  --ea-decor-lg: clamp(1.55rem, 6.5vw, 2.15rem);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden !important;
+  padding: 1.05rem 0.85rem 2.35rem !important;
+  border-radius: 18px;
+  border: 1.5px solid rgba(244, 114, 182, 0.22);
+  background-color: #fff7fb;
+  background-image:
+    url("/easter/egg-pink.png"),
+    url("/easter/egg-blue.png"),
+    url("/easter/sparkles.png"),
+    url("/easter/sparkles.png"),
+    url("/easter/rabbit.png"),
+    radial-gradient(ellipse 70% 40% at 50% -5%, rgba(251, 207, 232, 0.45), transparent 55%),
+    linear-gradient(180deg, #fff7fb 0%, #fce7f3 100%);
+  background-repeat: no-repeat;
+  background-size:
+    var(--ea-decor-lg) auto,
+    var(--ea-decor-lg) auto,
+    var(--ea-decor-sm) auto,
+    var(--ea-decor-sm) auto,
+    var(--ea-decor-md) auto,
+    auto,
+    auto;
+  background-position:
+    left 0.35rem bottom 0.15rem,
+    right 0.3rem bottom 0.15rem,
+    left 38% bottom 0.4rem,
+    right 38% bottom 0.35rem,
+    center bottom 0.25rem,
+    center top,
+    center top;
+  box-shadow: 0 8px 28px rgba(219, 39, 119, 0.08);
+  box-sizing: border-box;
+}
+
+[data-offrefy-theme^="easter_"]::before,
+[data-offrefy-theme^="easter_"]::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+  top: 0.2rem;
+  width: var(--ea-decor-lg);
+  height: var(--ea-decor-lg);
+  background-repeat: no-repeat;
+  background-size: contain;
+  opacity: 0.95;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+[data-offrefy-theme^="easter_"]::before {
+  left: 0.2rem;
+  background-image: url("/easter/egg-pink.png");
+}
+
+[data-offrefy-theme^="easter_"]::after {
+  right: 0.2rem;
+  background-image: url("/easter/egg-blue.png");
+}
+
+[data-offrefy-theme^="easter_"] .offrefy-topbar,
+[data-offrefy-theme^="easter_"] .offrefy-cards,
+[data-offrefy-theme^="easter_"] .offrefy-cta,
+[data-offrefy-theme^="easter_"] .offrefy-title,
+[data-offrefy-theme^="easter_"] > * {
+  position: relative;
+  z-index: 1;
+}
+
+[data-offrefy-theme^="easter_"] .offrefy-topbar {
+  position: relative;
+  margin-bottom: 0.9rem !important;
+  padding-bottom: 0.9rem !important;
+  border-bottom: 1.5px dashed rgba(244, 114, 182, 0.4) !important;
+}
+
+[data-offrefy-theme^="easter_"] .offrefy-topbar::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -0.55rem;
+  width: var(--ea-decor-sm);
+  height: var(--ea-decor-sm);
+  transform: translateX(-50%);
+  background: url("/easter/rabbit.png") center / contain no-repeat;
+  pointer-events: none;
+  z-index: 2;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.12));
+}
+
+[data-offrefy-theme^="easter_"] .offrefy-title {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  color: #9d174d;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  padding-inline: clamp(1.6rem, 7vw, 2.1rem);
+}
+
+[data-offrefy-theme^="easter_"] .offrefy-title::before,
+[data-offrefy-theme^="easter_"] .offrefy-title::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: var(--ea-decor-md);
+  height: var(--ea-decor-md);
+  transform: translateY(-50%);
+  background: url("/easter/egg-pink.png") center / contain no-repeat;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.12));
+}
+
+[data-offrefy-theme^="easter_"] .offrefy-title::before { left: 0; }
+[data-offrefy-theme^="easter_"] .offrefy-title::after { right: 0; }
+
+[data-offrefy-theme^="easter_"] .offrefy-cards {
+  position: relative;
+  margin-bottom: 0.55rem;
+  margin-inline: 0.1rem;
+}
+
+[data-offrefy-theme^="easter_"] .offrefy-card {
+  position: relative;
+  overflow: visible !important;
+}
+
+[data-offrefy-theme^="easter_"] .offrefy-cards::before,
+[data-offrefy-theme^="easter_"] .offrefy-cards::after {
+  content: none;
+}
+
+[data-offrefy-theme^="easter_"] .offrefy-cta {
+  position: relative !important;
+  overflow: hidden !important;
+  z-index: 1;
+  background: linear-gradient(180deg, #f9a8d4 0%, #ec4899 55%, #db2777 100%) !important;
+  border: 1.5px solid rgba(251, 207, 232, 0.95) !important;
+  box-shadow: 0 8px 20px rgba(219, 39, 119, 0.22);
+  padding-left: 2.75rem !important;
+  padding-right: 2.75rem !important;
+  color: #fff !important;
+}
+
+[data-offrefy-theme^="easter_"] .offrefy-cta::before,
+[data-offrefy-theme^="easter_"] .offrefy-cta::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 1.35rem;
+  height: 1.35rem;
+  transform: translateY(-50%);
+  background: url("/easter/egg-pink.png") center / contain no-repeat;
+  pointer-events: none;
+}
+
+[data-offrefy-theme^="easter_"] .offrefy-cta::before { left: 0.65rem; }
+[data-offrefy-theme^="easter_"] .offrefy-cta::after { right: 0.65rem; }
+
+[data-offrefy-theme^="easter_"] .offrefy-badge-pill {
+  box-shadow: 0 0 0 1.5px rgba(244, 114, 182, 0.45), 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.vd-admin-qb-preview[data-offrefy-theme^="easter_"] {
+  margin-bottom: 0.85rem;
+}
+
+/* —— Per-template —— */
+
+[data-offrefy-theme="easter_egg"] .offrefy-title { color: #9d174d; }
+[data-offrefy-theme="easter_egg"]::before,
+[data-offrefy-theme="easter_egg"]::after {
+  background-image: url("/easter/egg-pink.png");
+}
+[data-offrefy-theme="easter_egg"] .offrefy-card.offrefy-card--selected {
+  border-color: #db2777 !important;
+}
+[data-offrefy-theme="easter_egg"] .offrefy-cta {
+  background: linear-gradient(180deg, #f9a8d4 0%, #db2777 55%, #be185d 100%) !important;
+}
+
+[data-offrefy-theme="easter_rabbit"] {
+  background-color: #fafaf9;
+  border-color: rgba(120, 113, 108, 0.22);
+  background-image:
+    url("/easter/rabbit.png"),
+    url("/easter/bunny.png"),
+    url("/easter/sparkles.png"),
+    url("/easter/egg.png"),
+    url("/easter/carrot.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(245, 245, 244, 0.9), transparent 60%);
+  background-size: 2.6rem auto, 2.6rem auto, 1.2rem auto, 1.35rem auto, 1.4rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 38% bottom 0.45rem, right 38% bottom 0.4rem, center bottom 0.3rem, center top;
+}
+[data-offrefy-theme="easter_rabbit"]::before,
+[data-offrefy-theme="easter_rabbit"]::after {
+  background-image: url("/easter/rabbit.png");
+}
+[data-offrefy-theme="easter_rabbit"] .offrefy-topbar::after {
+  background-image: url("/easter/bunny.png");
+}
+[data-offrefy-theme="easter_rabbit"] .offrefy-title { color: #44403c; }
+[data-offrefy-theme="easter_rabbit"] .offrefy-title::before,
+[data-offrefy-theme="easter_rabbit"] .offrefy-title::after {
+  background-image: url("/easter/rabbit.png");
+}
+[data-offrefy-theme="easter_rabbit"] .offrefy-card.offrefy-card--selected {
+  border-color: #78716c !important;
+}
+[data-offrefy-theme="easter_rabbit"] .offrefy-cta {
+  background: linear-gradient(180deg, #a8a29e 0%, #78716c 55%, #57534e 100%) !important;
+  color: #fafaf9 !important;
+  border-color: #d6d3d1 !important;
+}
+[data-offrefy-theme="easter_rabbit"] .offrefy-cta::before,
+[data-offrefy-theme="easter_rabbit"] .offrefy-cta::after {
+  background-image: url("/easter/rabbit.png");
+}
+
+[data-offrefy-theme="easter_chick"] {
+  background-color: #fefce8;
+  border-color: rgba(202, 138, 4, 0.25);
+  background-image:
+    url("/easter/chick.png"),
+    url("/easter/chick.png"),
+    url("/easter/egg-gold.png"),
+    url("/easter/sparkles.png"),
+    url("/easter/egg-gold.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(254, 249, 195, 0.85), transparent 60%);
+  background-size: 2.6rem auto, 2.6rem auto, 1.35rem auto, 1.2rem auto, 1.35rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 38% bottom 0.4rem, right 38% bottom 0.4rem, center bottom 0.3rem, center top;
+}
+[data-offrefy-theme="easter_chick"]::before,
+[data-offrefy-theme="easter_chick"]::after {
+  background-image: url("/easter/chick.png");
+}
+[data-offrefy-theme="easter_chick"] .offrefy-topbar::after {
+  background-image: url("/easter/chick.png");
+}
+[data-offrefy-theme="easter_chick"] .offrefy-title { color: #854d0e; }
+[data-offrefy-theme="easter_chick"] .offrefy-title::before,
+[data-offrefy-theme="easter_chick"] .offrefy-title::after {
+  background-image: url("/easter/egg-gold.png");
+}
+[data-offrefy-theme="easter_chick"] .offrefy-card.offrefy-card--selected {
+  border-color: #ca8a04 !important;
+}
+[data-offrefy-theme="easter_chick"] .offrefy-cta {
+  background: linear-gradient(180deg, #facc15 0%, #ca8a04 55%, #a16207 100%) !important;
+  color: #422006 !important;
+  border-color: #fde047 !important;
+}
+[data-offrefy-theme="easter_chick"] .offrefy-cta::before,
+[data-offrefy-theme="easter_chick"] .offrefy-cta::after {
+  background-image: url("/easter/chick.png");
+}
+
+[data-offrefy-theme="easter_tulip"] {
+  background-image:
+    url("/easter/tulip.png"),
+    url("/easter/tulip.png"),
+    url("/easter/blossom.png"),
+    url("/easter/egg-pink.png"),
+    url("/easter/sparkles.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(252, 231, 243, 0.85), transparent 60%);
+  background-size: 2.5rem auto, 2.5rem auto, 1.35rem auto, 1.35rem auto, 1.15rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 38% bottom 0.4rem, right 38% bottom 0.4rem, center bottom 0.3rem, center top;
+}
+[data-offrefy-theme="easter_tulip"]::before,
+[data-offrefy-theme="easter_tulip"]::after {
+  background-image: url("/easter/tulip.png");
+}
+[data-offrefy-theme="easter_tulip"] .offrefy-topbar::after {
+  background-image: url("/easter/tulip.png");
+}
+[data-offrefy-theme="easter_tulip"] .offrefy-title { color: #9d174d; }
+[data-offrefy-theme="easter_tulip"] .offrefy-title::before,
+[data-offrefy-theme="easter_tulip"] .offrefy-title::after {
+  background-image: url("/easter/tulip.png");
+}
+[data-offrefy-theme="easter_tulip"] .offrefy-card.offrefy-card--selected {
+  border-color: #ec4899 !important;
+}
+[data-offrefy-theme="easter_tulip"] .offrefy-cta {
+  background: linear-gradient(180deg, #f472b6 0%, #ec4899 55%, #db2777 100%) !important;
+}
+[data-offrefy-theme="easter_tulip"] .offrefy-cta::before,
+[data-offrefy-theme="easter_tulip"] .offrefy-cta::after {
+  background-image: url("/easter/tulip.png");
+}
+
+[data-offrefy-theme="easter_carrot"] {
+  background-color: #fff7ed;
+  border-color: rgba(234, 88, 12, 0.22);
+  background-image:
+    url("/easter/carrot.png"),
+    url("/easter/carrot.png"),
+    url("/easter/bunny.png"),
+    url("/easter/egg-gold.png"),
+    url("/easter/sparkles.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(255, 237, 213, 0.85), transparent 60%);
+  background-size: 2.5rem auto, 2.5rem auto, 1.45rem auto, 1.3rem auto, 1.15rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 38% bottom 0.35rem, right 38% bottom 0.4rem, center bottom 0.3rem, center top;
+}
+[data-offrefy-theme="easter_carrot"]::before,
+[data-offrefy-theme="easter_carrot"]::after {
+  background-image: url("/easter/carrot.png");
+}
+[data-offrefy-theme="easter_carrot"] .offrefy-topbar::after {
+  background-image: url("/easter/carrot.png");
+}
+[data-offrefy-theme="easter_carrot"] .offrefy-title { color: #9a3412; }
+[data-offrefy-theme="easter_carrot"] .offrefy-title::before,
+[data-offrefy-theme="easter_carrot"] .offrefy-title::after {
+  background-image: url("/easter/carrot.png");
+}
+[data-offrefy-theme="easter_carrot"] .offrefy-card.offrefy-card--selected {
+  border-color: #ea580c !important;
+}
+[data-offrefy-theme="easter_carrot"] .offrefy-cta {
+  background: linear-gradient(180deg, #fb923c 0%, #ea580c 55%, #c2410c 100%) !important;
+  color: #fff7ed !important;
+  border-color: #fed7aa !important;
+}
+[data-offrefy-theme="easter_carrot"] .offrefy-cta::before,
+[data-offrefy-theme="easter_carrot"] .offrefy-cta::after {
+  background-image: url("/easter/carrot.png");
+}
+
+[data-offrefy-theme="easter_blossom"] {
+  background-image:
+    url("/easter/blossom.png"),
+    url("/easter/blossom.png"),
+    url("/easter/egg-pink.png"),
+    url("/easter/tulip.png"),
+    url("/easter/sparkles.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(255, 228, 230, 0.85), transparent 60%);
+  background-size: 2.5rem auto, 2.5rem auto, 1.35rem auto, 1.35rem auto, 1.15rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 38% bottom 0.4rem, right 38% bottom 0.4rem, center bottom 0.3rem, center top;
+}
+[data-offrefy-theme="easter_blossom"]::before,
+[data-offrefy-theme="easter_blossom"]::after {
+  background-image: url("/easter/blossom.png");
+}
+[data-offrefy-theme="easter_blossom"] .offrefy-topbar::after {
+  background-image: url("/easter/blossom.png");
+}
+[data-offrefy-theme="easter_blossom"] .offrefy-title { color: #9f1239; }
+[data-offrefy-theme="easter_blossom"] .offrefy-title::before,
+[data-offrefy-theme="easter_blossom"] .offrefy-title::after {
+  background-image: url("/easter/blossom.png");
+}
+[data-offrefy-theme="easter_blossom"] .offrefy-card.offrefy-card--selected {
+  border-color: #e11d48 !important;
+}
+[data-offrefy-theme="easter_blossom"] .offrefy-cta {
+  background: linear-gradient(180deg, #fb7185 0%, #e11d48 55%, #be123c 100%) !important;
+}
+[data-offrefy-theme="easter_blossom"] .offrefy-cta::before,
+[data-offrefy-theme="easter_blossom"] .offrefy-cta::after {
+  background-image: url("/easter/blossom.png");
+}
+
+[data-offrefy-theme="easter_basket"] {
+  background-color: #fffbeb;
+  border-color: rgba(180, 83, 9, 0.22);
+  background-image:
+    url("/easter/basket.png"),
+    url("/easter/basket.png"),
+    url("/easter/egg-pink.png"),
+    url("/easter/egg-blue.png"),
+    url("/easter/egg-gold.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(254, 243, 199, 0.85), transparent 60%);
+  background-size: 2.7rem auto, 2.7rem auto, 1.3rem auto, 1.3rem auto, 1.3rem auto, auto;
+  background-position: left 0.25rem bottom 0.1rem, right 0.2rem bottom 0.1rem, left 36% bottom 0.4rem, right 36% bottom 0.4rem, center bottom 0.3rem, center top;
+}
+[data-offrefy-theme="easter_basket"]::before,
+[data-offrefy-theme="easter_basket"]::after {
+  background-image: url("/easter/basket.png");
+}
+[data-offrefy-theme="easter_basket"] .offrefy-topbar::after {
+  background-image: url("/easter/egg-gold.png");
+}
+[data-offrefy-theme="easter_basket"] .offrefy-title { color: #92400e; }
+[data-offrefy-theme="easter_basket"] .offrefy-title::before,
+[data-offrefy-theme="easter_basket"] .offrefy-title::after {
+  background-image: url("/easter/egg-pink.png");
+}
+[data-offrefy-theme="easter_basket"] .offrefy-card.offrefy-card--selected {
+  border-color: #b45309 !important;
+}
+[data-offrefy-theme="easter_basket"] .offrefy-cta {
+  background: linear-gradient(180deg, #f59e0b 0%, #b45309 55%, #92400e 100%) !important;
+  color: #fffbeb !important;
+  border-color: #fde68a !important;
+}
+[data-offrefy-theme="easter_basket"] .offrefy-cta::before,
+[data-offrefy-theme="easter_basket"] .offrefy-cta::after {
+  background-image: url("/easter/egg-gold.png");
+}
+
+[data-offrefy-theme="easter_lavender"] {
+  background-color: #faf5ff;
+  border-color: rgba(147, 51, 234, 0.22);
+  background-image:
+    url("/easter/egg-lilac.png"),
+    url("/easter/egg-lilac.png"),
+    url("/easter/blossom.png"),
+    url("/easter/sparkles.png"),
+    url("/easter/rabbit.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(243, 232, 255, 0.9), transparent 60%);
+  background-size: 2.5rem auto, 2.5rem auto, 1.35rem auto, 1.2rem auto, 1.4rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 38% bottom 0.4rem, right 38% bottom 0.4rem, center bottom 0.3rem, center top;
+}
+[data-offrefy-theme="easter_lavender"]::before,
+[data-offrefy-theme="easter_lavender"]::after {
+  background-image: url("/easter/egg-lilac.png");
+}
+[data-offrefy-theme="easter_lavender"] .offrefy-topbar::after {
+  background-image: url("/easter/egg-lilac.png");
+}
+[data-offrefy-theme="easter_lavender"] .offrefy-title { color: #6b21a8; }
+[data-offrefy-theme="easter_lavender"] .offrefy-title::before,
+[data-offrefy-theme="easter_lavender"] .offrefy-title::after {
+  background-image: url("/easter/egg-lilac.png");
+}
+[data-offrefy-theme="easter_lavender"] .offrefy-card.offrefy-card--selected {
+  border-color: #9333ea !important;
+}
+[data-offrefy-theme="easter_lavender"] .offrefy-cta {
+  background: linear-gradient(180deg, #c084fc 0%, #9333ea 55%, #7e22ce 100%) !important;
+  color: #faf5ff !important;
+  border-color: #e9d5ff !important;
+}
+[data-offrefy-theme="easter_lavender"] .offrefy-cta::before,
+[data-offrefy-theme="easter_lavender"] .offrefy-cta::after {
+  background-image: url("/easter/egg-lilac.png");
+}
+
+[data-offrefy-theme="easter_mint"] {
+  background-color: #ecfdf5;
+  border-color: rgba(5, 150, 105, 0.22);
+  background-image:
+    url("/easter/egg-mint.png"),
+    url("/easter/egg-mint.png"),
+    url("/easter/tulip.png"),
+    url("/easter/sparkles.png"),
+    url("/easter/bunny.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(209, 250, 229, 0.85), transparent 60%);
+  background-size: 2.5rem auto, 2.5rem auto, 1.35rem auto, 1.2rem auto, 1.4rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 38% bottom 0.4rem, right 38% bottom 0.4rem, center bottom 0.3rem, center top;
+}
+[data-offrefy-theme="easter_mint"]::before,
+[data-offrefy-theme="easter_mint"]::after {
+  background-image: url("/easter/egg-mint.png");
+}
+[data-offrefy-theme="easter_mint"] .offrefy-topbar::after {
+  background-image: url("/easter/egg-mint.png");
+}
+[data-offrefy-theme="easter_mint"] .offrefy-title { color: #065f46; }
+[data-offrefy-theme="easter_mint"] .offrefy-title::before,
+[data-offrefy-theme="easter_mint"] .offrefy-title::after {
+  background-image: url("/easter/egg-mint.png");
+}
+[data-offrefy-theme="easter_mint"] .offrefy-card.offrefy-card--selected {
+  border-color: #059669 !important;
+}
+[data-offrefy-theme="easter_mint"] .offrefy-cta {
+  background: linear-gradient(180deg, #34d399 0%, #059669 55%, #047857 100%) !important;
+  color: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
+}
+[data-offrefy-theme="easter_mint"] .offrefy-cta::before,
+[data-offrefy-theme="easter_mint"] .offrefy-cta::after {
+  background-image: url("/easter/egg-mint.png");
+}
+
+[data-offrefy-theme="easter_sunrise"] {
+  background-color: #fffbeb;
+  border-color: rgba(217, 119, 6, 0.25);
+  background-image:
+    url("/easter/egg-gold.png"),
+    url("/easter/egg-gold.png"),
+    url("/easter/chick.png"),
+    url("/easter/sparkles.png"),
+    url("/easter/rabbit.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(254, 243, 199, 0.9), transparent 60%);
+  background-size: 2.5rem auto, 2.5rem auto, 1.45rem auto, 1.2rem auto, 1.4rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 38% bottom 0.35rem, right 38% bottom 0.4rem, center bottom 0.3rem, center top;
+}
+[data-offrefy-theme="easter_sunrise"]::before,
+[data-offrefy-theme="easter_sunrise"]::after {
+  background-image: url("/easter/egg-gold.png");
+}
+[data-offrefy-theme="easter_sunrise"] .offrefy-topbar::after {
+  background-image: url("/easter/chick.png");
+}
+[data-offrefy-theme="easter_sunrise"] .offrefy-title { color: #92400e; }
+[data-offrefy-theme="easter_sunrise"] .offrefy-title::before,
+[data-offrefy-theme="easter_sunrise"] .offrefy-title::after {
+  background-image: url("/easter/egg-gold.png");
+}
+[data-offrefy-theme="easter_sunrise"] .offrefy-card.offrefy-card--selected {
+  border-color: #d97706 !important;
+}
+[data-offrefy-theme="easter_sunrise"] .offrefy-cta {
+  background: linear-gradient(180deg, #fbbf24 0%, #d97706 55%, #b45309 100%) !important;
+  color: #fffbeb !important;
+  border-color: #fde68a !important;
+}
+[data-offrefy-theme="easter_sunrise"] .offrefy-cta::before,
+[data-offrefy-theme="easter_sunrise"] .offrefy-cta::after {
+  background-image: url("/easter/egg-gold.png");
+}

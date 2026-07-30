@@ -10,7 +10,6 @@ import { useLoaderData, useLocation, useNavigate, useSearchParams } from "react-
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import type { Prisma } from "@prisma/client";
 
-import { IndeterminateLinearProgress } from "../components/IndeterminateLinearProgress";
 import { prisma } from "../db.server";
 import {
   scheduleStorefrontWidgetRefresh,
@@ -24,6 +23,10 @@ import {
   createOfferBlockedMessage,
 } from "../utils/pricingPlans";
 import {
+  appearanceTemplateSaveBlockedMessage,
+  isWidgetDisplayAppearanceAbovePlan,
+} from "../utils/appearanceTemplateAccess";
+import {
   countActiveCampaigns,
   countAllCampaigns,
   resolveShopPlanContext,
@@ -36,6 +39,49 @@ import {
 import type { VolumeDiscountNewOfferPreset } from "../types/volumeDiscount";
 import { adminEmbeddedPath } from "../utils/adminEmbeddedPath";
 import { resolveShopIanaTimezone } from "../utils/shopTimezone.server";
+import {
+  isCartDiscountDisplayTemplate,
+  syncCartDiscountTranslationsFromDisplayName,
+  languageKeysFromShopLanguages,
+  parseStoredStorefrontTranslations,
+  readStorefrontSettingsRow,
+  runCampaignAutoTranslateFromForm,
+} from "../utils/storefrontTranslations.server";
+import {
+  packCampaignTranslationBlob,
+  seedCampaignCartOverridesFromDisplayName,
+  sparsifyStorefrontTranslations,
+  type SparseStorefrontTranslationsMap,
+} from "../utils/storefrontTranslations";
+import {
+  FALLBACK_SHOP_LANGUAGES,
+  fetchShopPublishedLocales,
+} from "../utils/shopPublishedLocales.server";
+
+async function resolveCampaignTranslationsForSave(
+  admin: {
+    graphql: (
+      query: string,
+      options?: { variables?: Record<string, unknown> },
+    ) => Promise<Response>;
+  },
+  formOverrides: SparseStorefrontTranslationsMap,
+  displayName: string,
+): Promise<SparseStorefrontTranslationsMap> {
+  let sparse = sparsifyStorefrontTranslations(formOverrides);
+  if (!isCartDiscountDisplayTemplate(displayName)) {
+    return sparse;
+  }
+  const { languages } = await fetchShopPublishedLocales(admin);
+  const languageKeys = languageKeysFromShopLanguages(
+    languages.length > 0 ? languages : FALLBACK_SHOP_LANGUAGES,
+  );
+  return seedCampaignCartOverridesFromDisplayName(
+    sparse,
+    displayName,
+    languageKeys,
+  );
+}
 
 const VolumeDiscountCreateView = lazy(() =>
   import("../components/VolumeDiscountCreateView").then((m) => ({
@@ -52,17 +98,27 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const presetParam = new URL(request.url).searchParams.get("preset");
   const newOfferPreset: VolumeDiscountNewOfferPreset =
     presetParam === "volume" ? "volume_table" : "quantity_breaks";
-  const [{ plan, capabilities }, activeCount, shopTimezone] = await Promise.all([
-    resolveShopPlanContext(session.shop),
-    countActiveCampaigns(session.shop),
-    resolveShopIanaTimezone(admin),
-  ]);
+  const [{ plan, capabilities }, activeCount, shopTimezone, shopLocales, settingsRow] =
+    await Promise.all([
+      resolveShopPlanContext(session.shop),
+      countActiveCampaigns(session.shop),
+      resolveShopIanaTimezone(admin),
+      fetchShopPublishedLocales(admin),
+      readStorefrontSettingsRow(session.shop),
+    ]);
   return {
     newOfferPreset,
     plan,
     planCapabilities: capabilities,
     activeCount,
     shopTimezone,
+    shopLanguages:
+      shopLocales.languages.length > 0
+        ? shopLocales.languages
+        : FALLBACK_SHOP_LANGUAGES,
+    shopTranslations: parseStoredStorefrontTranslations(
+      settingsRow.translationsString,
+    ),
   };
 };
 
@@ -93,15 +149,32 @@ function newOfferPresetFromSearchParam(
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   const form = await request.formData();
+  if (String(form.get("intent") ?? "") === "autoTranslateCampaign") {
+    return runCampaignAutoTranslateFromForm(session.shop, form);
+  }
+
   const parsed = parseVolumeDiscountForm(form);
   if (!parsed.ok) {
     return { ok: false as const, error: parsed.error };
   }
 
-  const [{ plan }, offerCount] = await Promise.all([
+  const [{ plan, capabilities }, offerCount] = await Promise.all([
     resolveShopPlanContext(session.shop),
     countAllCampaigns(session.shop),
   ]);
+  if (
+    isWidgetDisplayAppearanceAbovePlan(
+      capabilities.appearanceTemplates,
+      parsed.data.widgetDisplay,
+    )
+  ) {
+    return {
+      ok: false as const,
+      error: appearanceTemplateSaveBlockedMessage(
+        capabilities.appearanceTemplates,
+      ),
+    };
+  }
   const d = sanitizeCampaignForPlan(parsed.data, plan);
 
   if (!canCreateAnotherOffer(plan, offerCount)) {
@@ -121,11 +194,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
+  const nextDisplayName = (d.displayName || "").trim();
+  const displayNameLocales = await resolveCampaignTranslationsForSave(
+    admin,
+    d.displayNameTranslations,
+    nextDisplayName,
+  );
+  const displayNameTranslations = packCampaignTranslationBlob(
+    displayNameLocales,
+    d.tierCopyTranslations,
+  );
+
   const record = await prisma.volumeDiscountCampaign.create({
     data: {
       shop: session.shop,
       campaignName: d.campaignName,
       displayName: d.displayName || null,
+      displayNameTranslations,
       status: d.campaignStatus,
       productScope: d.productScope,
       quantityCondition: d.quantityCondition,
@@ -140,6 +225,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       shopifyDiscountIds: [],
     } as unknown as Prisma.VolumeDiscountCampaignCreateInput,
   });
+
+  if (isCartDiscountDisplayTemplate(nextDisplayName)) {
+    try {
+      await syncCartDiscountTranslationsFromDisplayName(
+        session.shop,
+        admin,
+        nextDisplayName,
+        { autoTranslate: capabilities.translations },
+      );
+    } catch (error) {
+      console.error(
+        "[volume-discount] Cart badge translation sync after new offer display name",
+        error,
+      );
+    }
+  }
 
   const transition = await applyDueCampaignScheduleTransitions(session.shop);
   const needsFunctionSync =
@@ -173,6 +274,8 @@ export default function VolumeDiscountNewRoute() {
     newOfferPreset: loaderPreset,
     planCapabilities,
     shopTimezone,
+    shopLanguages,
+    shopTranslations,
   } = useLoaderData<typeof loader>();
   const [searchParams] = useSearchParams();
   const location = useLocation();
@@ -192,7 +295,7 @@ export default function VolumeDiscountNewRoute() {
   }, [navigate, search, shopify]);
 
   return (
-    <Suspense fallback={<IndeterminateLinearProgress fixed />}>
+    <Suspense fallback={null}>
       <VolumeDiscountCreateView
         key={`${location.pathname}${location.search}`}
         onBack={() => navigate(adminEmbeddedPath("/app/offers", search))}
@@ -201,6 +304,8 @@ export default function VolumeDiscountNewRoute() {
         newOfferPreset={newOfferPreset}
         planCapabilities={planCapabilities}
         shopTimezone={shopTimezone}
+        shopLanguages={shopLanguages}
+        shopTranslations={shopTranslations}
       />
     </Suspense>
   );

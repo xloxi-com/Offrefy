@@ -1,0 +1,6 @@
+Diwali SVG sources (free / commercial-safe):
+- UXWing: diwali-festival-diya, sunflower — https://uxwing.com (commercial OK, no attribution required)
+- SVG Repo Diwali Elements (CC0): lantern, candle/diya-string, gift, diwali wordmark — https://www.svgrepo.com/collection/diwali-elements/
+- Fluent Emoji Flat (MIT): sparkles, fireworks, hibiscus, sunflower — via Iconify
+- Noto Emoji: red-paper-lantern — via Iconify
+- Wikimedia Commons: WP20Symbols RANGOLI.svg

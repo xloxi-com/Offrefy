@@ -488,6 +488,58 @@ export function translationPresetForLanguage(
   );
 }
 
+/**
+ * Adapt a curated-language cart badge preset to match the English display-name
+ * placeholders (e.g. `{{ amount }} OFF` → French `{{ amount }} DE RÉDUCTION`).
+ * Keeps locale wording; only swaps `{{ discount }}` / `{{ amount }}`.
+ */
+export function adaptCartDiscountTemplateForLanguage(
+  englishTemplate: string,
+  targetLang: string,
+): string {
+  const raw = String(englishTemplate ?? "").trim();
+  if (!raw) return raw;
+  const to = targetLang.trim().toLowerCase().split("-")[0] ?? "";
+  if (!to || to === "en" || !hasCuratedTranslationPreset(to)) {
+    return raw;
+  }
+
+  const preset = translationPresetForLanguage(to).transCartDiscount.trim();
+  if (
+    raw === ENGLISH_STOREFRONT_TRANSLATION.transCartDiscount ||
+    raw.toLowerCase() ===
+      ENGLISH_STOREFRONT_TRANSLATION.transCartDiscount.toLowerCase()
+  ) {
+    return preset;
+  }
+
+  const wantsAmount = /\{\{\s*amount\s*\}\}/i.test(raw);
+  const wantsDiscount = /\{\{\s*discount\s*\}\}/i.test(raw);
+  if (!wantsAmount && !wantsDiscount) {
+    return raw;
+  }
+
+  let out = preset;
+  if (wantsAmount && !wantsDiscount) {
+    out = out.replace(/\{\{\s*discount\s*\}\}/gi, "{{ amount }}");
+    if (!/\{\{\s*amount\s*\}\}/i.test(out)) {
+      const suffix = preset
+        .replace(/\{\{\s*(discount|amount)\s*\}\}/gi, "")
+        .trim();
+      out = `{{ amount }} ${suffix || "OFF"}`.trim();
+    }
+  } else if (wantsDiscount && !wantsAmount) {
+    out = out.replace(/\{\{\s*amount\s*\}\}/gi, "{{ discount }}");
+    if (!/\{\{\s*discount\s*\}\}/i.test(out)) {
+      const suffix = preset
+        .replace(/\{\{\s*(discount|amount)\s*\}\}/gi, "")
+        .trim();
+      out = `{{ discount }} ${suffix || "OFF"}`.trim();
+    }
+  }
+  return out;
+}
+
 function fillEmptyTranslationFields(
   languageKey: string,
   existing?: Partial<StorefrontTranslationFields>,
@@ -547,21 +599,29 @@ export type DiscountFunctionCartTranslations = Record<
 export function compactTranslationsForDiscountFunction(
   translations: StorefrontTranslationsMap,
 ): DiscountFunctionCartTranslations {
+  const englishTemplate = (
+    translations.en?.transCartDiscount?.trim() ||
+    ENGLISH_STOREFRONT_TRANSLATION.transCartDiscount
+  );
+  const englishQty = (
+    translations.en?.transCartDiscountQty?.trim() ||
+    ENGLISH_STOREFRONT_TRANSLATION.transCartDiscountQty
+  );
+
   const result: DiscountFunctionCartTranslations = {};
   for (const [lang, fields] of Object.entries(translations)) {
     const key = lang.trim().toLowerCase();
     if (!key) continue;
 
-    let cartDiscount = fields.transCartDiscount.trim();
-    let cartDiscountQty = fields.transCartDiscountQty.trim();
+    const fieldCart = String(fields.transCartDiscount ?? "").trim();
+    let cartDiscount =
+      key === "en"
+        ? englishTemplate
+        : fieldCart
+          ? fieldCart
+          : adaptCartDiscountTemplateForLanguage(englishTemplate, key);
+    let cartDiscountQty = fields.transCartDiscountQty.trim() || englishQty;
 
-    if (
-      key !== "en" &&
-      cartDiscount === ENGLISH_STOREFRONT_TRANSLATION.transCartDiscount &&
-      fields.transDiscount.trim()
-    ) {
-      cartDiscount = `{{ discount }} ${fields.transDiscount.trim()}`;
-    }
     if (
       key !== "en" &&
       cartDiscountQty === ENGLISH_STOREFRONT_TRANSLATION.transCartDiscountQty &&
@@ -576,4 +636,297 @@ export function compactTranslationsForDiscountFunction(
     };
   }
   return result;
+}
+
+/** Sparse campaign overrides — only non-empty fields are stored. */
+export type SparseStorefrontTranslationsMap = Record<
+  string,
+  Partial<StorefrontTranslationFields>
+>;
+
+export function parseSparseStorefrontTranslations(
+  raw: unknown,
+): SparseStorefrontTranslationsMap {
+  if (raw == null) return {};
+  let parsed: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return {};
+    }
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return {};
+  }
+  const out: SparseStorefrontTranslationsMap = {};
+  for (const [langRaw, fieldsRaw] of Object.entries(
+    parsed as Record<string, unknown>,
+  )) {
+    const lang = langRaw.trim().toLowerCase();
+    if (!lang || !fieldsRaw || typeof fieldsRaw !== "object" || Array.isArray(fieldsRaw)) {
+      continue;
+    }
+    const sparse: Partial<StorefrontTranslationFields> = {};
+    let any = false;
+    const fields = fieldsRaw as Record<string, unknown>;
+    for (const field of STOREFRONT_TRANSLATION_FIELD_KEYS) {
+      const value = fields[field];
+      if (typeof value !== "string") continue;
+      const trimmed = value.trim();
+      if (!trimmed) continue;
+      sparse[field] = trimmed;
+      any = true;
+    }
+    if (any) out[lang] = sparse;
+  }
+  return out;
+}
+
+/** Drop empty fields/locales so DB JSON stays sparse. */
+export function sparsifyStorefrontTranslations(
+  map: SparseStorefrontTranslationsMap | StorefrontTranslationsMap,
+): SparseStorefrontTranslationsMap {
+  return parseSparseStorefrontTranslations(map);
+}
+
+export function campaignHasTranslationOverrides(
+  overrides: SparseStorefrontTranslationsMap,
+): boolean {
+  return Object.keys(overrides).length > 0;
+}
+
+/**
+ * Shop Settings sheet + sparse campaign overrides → full effective map for one offer.
+ */
+export function mergeShopAndCampaignTranslations(
+  shop: StorefrontTranslationsMap,
+  overrides: SparseStorefrontTranslationsMap,
+): StorefrontTranslationsMap {
+  if (!campaignHasTranslationOverrides(overrides)) {
+    return shop;
+  }
+  const result: StorefrontTranslationsMap = { ...shop };
+  for (const [lang, override] of Object.entries(overrides)) {
+    const base =
+      result[lang] ?? translationPresetForLanguage(lang);
+    const merged: StorefrontTranslationFields = { ...base };
+    for (const field of STOREFRONT_TRANSLATION_FIELD_KEYS) {
+      const value = override[field];
+      if (typeof value === "string" && value.trim()) {
+        merged[field] = value.trim();
+      }
+    }
+    result[lang] = merged;
+  }
+  return result;
+}
+
+/**
+ * Compact Function `tr` map from campaign cart-badge overrides (+ English display name).
+ */
+export function compactCartTrFromCampaignOverrides(
+  overrides: SparseStorefrontTranslationsMap,
+  englishDisplayName?: string | null,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  const enFromDisplay = String(englishDisplayName ?? "").trim();
+  const enOverride = String(overrides.en?.transCartDiscount ?? "").trim();
+  const en =
+    enOverride ||
+    (enFromDisplay.includes("{{") ? enFromDisplay : "");
+  if (en) out.en = en;
+
+  for (const [lang, fields] of Object.entries(overrides)) {
+    if (lang === "en") continue;
+    const cart = String(fields.transCartDiscount ?? "").trim();
+    if (cart) out[lang] = cart;
+  }
+  return out;
+}
+
+/**
+ * When Display name is a template, seed EN cart badge and fill other locales
+ * only where that locale has no manual `transCartDiscount` override yet.
+ */
+export function seedCampaignCartOverridesFromDisplayName(
+  existing: SparseStorefrontTranslationsMap,
+  displayName: string,
+  languageKeys: string[],
+): SparseStorefrontTranslationsMap {
+  const trimmed = String(displayName ?? "").trim();
+  if (!trimmed.includes("{{")) return sparsifyStorefrontTranslations(existing);
+
+  const next: SparseStorefrontTranslationsMap = { ...existing };
+  const enPrev = { ...(next.en ?? {}) };
+  enPrev.transCartDiscount = trimmed;
+  next.en = enPrev;
+
+  const keys =
+    languageKeys.length > 0
+      ? languageKeys
+      : Object.keys(existing).length > 0
+        ? Object.keys(existing)
+        : ["en"];
+
+  for (const rawKey of keys) {
+    const key = rawKey.trim().toLowerCase();
+    if (!key || key === "en") continue;
+    const prev = next[key] ?? {};
+    if (String(prev.transCartDiscount ?? "").trim()) continue;
+    next[key] = {
+      ...prev,
+      transCartDiscount: adaptCartDiscountTemplateForLanguage(trimmed, key),
+    };
+  }
+  return sparsifyStorefrontTranslations(next);
+}
+
+/**
+ * Primary-language source sheet for campaign Auto translate:
+ * shop primary sheet → campaign primary overrides → Display settings
+ * heading/CTA/footnote/countdown → Display name cart badge → Discount rules text
+ * is applied separately via tier rows.
+ */
+export function resolveCampaignEnglishSourceForAutoTranslate(args: {
+  /** Shopify storefront primary language key (e.g. "en", "de"). Defaults to "en". */
+  primaryLang?: string | null;
+  shopTranslations?: StorefrontTranslationsMap | null;
+  campaignOverrides?: SparseStorefrontTranslationsMap | null;
+  widgetHeading?: string | null;
+  ctaLabel?: string | null;
+  footnote?: string | null;
+  countdownLabel?: string | null;
+  displayName?: string | null;
+}): StorefrontTranslationFields {
+  const primary =
+    String(args.primaryLang ?? "en").trim().toLowerCase() || "en";
+  const basePreset =
+    primary === "en" || !hasCuratedTranslationPreset(primary)
+      ? ENGLISH_STOREFRONT_TRANSLATION
+      : translationPresetForLanguage(primary);
+  const shopPrimary = args.shopTranslations?.[primary];
+  const campaignPrimary = args.campaignOverrides?.[primary];
+  const merged: StorefrontTranslationFields = {
+    ...basePreset,
+    ...(shopPrimary ?? {}),
+    ...(campaignPrimary ?? {}),
+  };
+
+  for (const field of STOREFRONT_TRANSLATION_FIELD_KEYS) {
+    if (!String(merged[field] ?? "").trim()) {
+      merged[field] = basePreset[field];
+    }
+  }
+
+  const heading = String(args.widgetHeading ?? "").trim();
+  if (heading) merged.transHeading = heading;
+
+  const cta = String(args.ctaLabel ?? "").trim();
+  if (cta) merged.transCta = cta;
+
+  const footnote = String(args.footnote ?? "").trim();
+  if (footnote) merged.transFootnote = footnote;
+
+  const countdown = String(args.countdownLabel ?? "").trim();
+  if (countdown) merged.transCountdown = countdown;
+
+  const displayName = String(args.displayName ?? "").trim();
+  if (displayName.includes("{{")) {
+    merged.transCartDiscount = displayName;
+  }
+
+  return merged;
+}
+
+/** Stored inside `displayNameTranslations` JSON (not a locale code). */
+export const TIER_COPY_TRANSLATIONS_KEY = "_tierCopy";
+
+export type TierCopyFields = {
+  buyLabelText: string;
+  optionSubtext: string;
+  badge: string;
+};
+
+export type TierCopyTranslationsMap = Record<string, TierCopyFields[]>;
+
+export function emptyTierCopyFields(): TierCopyFields {
+  return { buyLabelText: "", optionSubtext: "", badge: "" };
+}
+
+function normalizeTierCopyFields(raw: unknown): TierCopyFields | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const o = raw as Record<string, unknown>;
+  const buyLabelText =
+    typeof o.buyLabelText === "string" ? o.buyLabelText.trim() : "";
+  const optionSubtext =
+    typeof o.optionSubtext === "string" ? o.optionSubtext.trim() : "";
+  const badge = typeof o.badge === "string" ? o.badge.trim() : "";
+  if (!buyLabelText && !optionSubtext && !badge) return null;
+  return { buyLabelText, optionSubtext, badge };
+}
+
+/** Read per-locale tier label/subtext/badge overrides from the campaign translations blob. */
+export function parseTierCopyTranslations(raw: unknown): TierCopyTranslationsMap {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const root = raw as Record<string, unknown>;
+  const nested = root[TIER_COPY_TRANSLATIONS_KEY];
+  const source =
+    nested && typeof nested === "object" && !Array.isArray(nested)
+      ? (nested as Record<string, unknown>)
+      : {};
+  const out: TierCopyTranslationsMap = {};
+  for (const [langRaw, rowsRaw] of Object.entries(source)) {
+    const lang = langRaw.trim().toLowerCase();
+    if (!lang || lang.startsWith("_") || !Array.isArray(rowsRaw)) continue;
+    const rows: TierCopyFields[] = [];
+    let any = false;
+    for (const row of rowsRaw) {
+      const normalized = normalizeTierCopyFields(row);
+      if (normalized) {
+        rows.push(normalized);
+        any = true;
+      } else {
+        rows.push(emptyTierCopyFields());
+      }
+    }
+    if (any) out[lang] = rows;
+  }
+  return out;
+}
+
+/** Merge locale overrides + tier copy into one JSON value for Prisma. */
+export function packCampaignTranslationBlob(
+  locales: SparseStorefrontTranslationsMap,
+  tierCopy: TierCopyTranslationsMap,
+): Record<string, unknown> {
+  const sparseLocales = sparsifyStorefrontTranslations(locales);
+  const packed: Record<string, unknown> = { ...sparseLocales };
+  const sparseTiers: TierCopyTranslationsMap = {};
+  for (const [lang, rows] of Object.entries(tierCopy)) {
+    const key = lang.trim().toLowerCase();
+    if (!key || key.startsWith("_") || !Array.isArray(rows)) continue;
+    const next = rows.map((row) => ({
+      buyLabelText: String(row?.buyLabelText ?? "").trim(),
+      optionSubtext: String(row?.optionSubtext ?? "").trim(),
+      badge: String(row?.badge ?? "").trim(),
+    }));
+    if (next.some((r) => r.buyLabelText || r.optionSubtext || r.badge)) {
+      sparseTiers[key] = next;
+    }
+  }
+  if (Object.keys(sparseTiers).length > 0) {
+    packed[TIER_COPY_TRANSLATIONS_KEY] = sparseTiers;
+  }
+  return packed;
+}
+
+export function unpackCampaignTranslationBlob(raw: unknown): {
+  locales: SparseStorefrontTranslationsMap;
+  tierCopy: TierCopyTranslationsMap;
+} {
+  return {
+    locales: parseSparseStorefrontTranslations(raw),
+    tierCopy: parseTierCopyTranslations(raw),
+  };
 }

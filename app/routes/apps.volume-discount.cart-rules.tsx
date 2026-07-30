@@ -6,6 +6,7 @@ import {
   getMemoryCachedJson,
   setMemoryCachedJson,
 } from "../utils/memoryCache.server";
+import { applyShopCampaignScheduleTransitionsIfNeeded } from "../services/scheduledVolumeDiscountSync.server";
 /**
  * App proxy: POST /apps/volume-discount/cart-rules
  * Returns discount rules for specific cart product ids only (not the full 1000+ catalog).
@@ -49,6 +50,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       headers: jsonHeaders,
     });
   }
+
+  applyShopCampaignScheduleTransitionsIfNeeded(shop);
 
   let body: { product_ids?: unknown };
   try {

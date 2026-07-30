@@ -68,19 +68,10 @@
 }
 
 /*
- * Polaris BulkActions grows an empty flex spacer (OuterLayout) to full width and
- * right-aligns the menu — keep the Actions dropdown beside "N selected".
+ * Keep Active / Draft / Delete beside "N selected" (Polaris defaults right-align).
+ * OuterLayout must keep width:100% / flex grow so BulkActionsMeasurer can measure
+ * space — width:auto collapses measurement and hides all promoted actions.
  */
-.tableWrap :global(.Polaris-BulkActions__BulkActionsPromotedActionsWrapper) {
-  flex: 0 1 auto;
-}
-
-.tableWrap :global(.Polaris-BulkActions__BulkActionsOuterLayout) {
-  flex: 0 0 auto;
-  width: auto;
-  min-width: 0;
-}
-
 .tableWrap :global(.Polaris-BulkActions__BulkActionsLayout) {
   justify-content: flex-start;
 }

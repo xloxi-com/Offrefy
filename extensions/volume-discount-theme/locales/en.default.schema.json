@@ -6,7 +6,7 @@
       },
       "embed": {
         "name": "Offrefy (global)",
-        "paragraph": "Turn this ON on the live theme to enable Offrefy on product pages. Scripts and CSS load only where you add the “Quantity breaks” block on a product template (Product information → Add block → Apps)."
+        "paragraph": "Turn this ON on the live theme. It injects early hide CSS in the page head (no flash of theme price/variants/ATC). Also enable the “Quantity breaks” block on the product template for the widget."
       }
     }
   }

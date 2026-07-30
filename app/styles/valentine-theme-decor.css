@@ -1,0 +1,502 @@
+/* —— Valentine's Day seasonal decorations —— */
+/* PNGs: Microsoft Fluent Emoji (MIT) */
+
+[data-offrefy-theme^="valentine_"] {
+  --vl-rose: #e11d48;
+  --vl-blush: #fce7f3;
+  --vl-decor-sm: clamp(1.05rem, 4.2vw, 1.35rem);
+  --vl-decor-md: clamp(1.35rem, 5.5vw, 1.85rem);
+  --vl-decor-lg: clamp(1.55rem, 6.5vw, 2.15rem);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden !important;
+  padding: 1.05rem 0.85rem 2.35rem !important;
+  border-radius: 18px;
+  border: 1.5px solid rgba(225, 29, 72, 0.18);
+  background-color: #fff1f2;
+  background-image:
+    url("/valentine/heart.png"),
+    url("/valentine/heart.png"),
+    url("/valentine/sparkles.png"),
+    url("/valentine/sparkles.png"),
+    url("/valentine/ribbon.png"),
+    radial-gradient(ellipse 70% 40% at 50% -5%, rgba(251, 113, 133, 0.18), transparent 55%),
+    linear-gradient(180deg, #fff1f2 0%, #fce7f3 100%);
+  background-repeat: no-repeat;
+  background-size:
+    var(--vl-decor-lg) auto,
+    var(--vl-decor-lg) auto,
+    var(--vl-decor-sm) auto,
+    var(--vl-decor-sm) auto,
+    var(--vl-decor-md) auto,
+    auto,
+    auto;
+  background-position:
+    left 0.35rem bottom 0.2rem,
+    right 0.3rem bottom 0.2rem,
+    left 38% bottom 0.4rem,
+    right 38% bottom 0.35rem,
+    center bottom 0.3rem,
+    center top,
+    center top;
+  box-shadow: 0 8px 28px rgba(190, 24, 93, 0.1);
+  box-sizing: border-box;
+}
+
+[data-offrefy-theme^="valentine_"]::before,
+[data-offrefy-theme^="valentine_"]::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+  top: 0.2rem;
+  width: var(--vl-decor-lg);
+  height: var(--vl-decor-lg);
+  background-repeat: no-repeat;
+  background-size: contain;
+  opacity: 0.95;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
+}
+
+[data-offrefy-theme^="valentine_"]::before {
+  left: 0.2rem;
+  background-image: url("/valentine/heart.png");
+}
+
+[data-offrefy-theme^="valentine_"]::after {
+  right: 0.2rem;
+  background-image: url("/valentine/heart.png");
+}
+
+[data-offrefy-theme^="valentine_"] .offrefy-topbar,
+[data-offrefy-theme^="valentine_"] .offrefy-cards,
+[data-offrefy-theme^="valentine_"] .offrefy-cta,
+[data-offrefy-theme^="valentine_"] .offrefy-title,
+[data-offrefy-theme^="valentine_"] > * {
+  position: relative;
+  z-index: 1;
+}
+
+[data-offrefy-theme^="valentine_"] .offrefy-topbar {
+  position: relative;
+  margin-bottom: 0.9rem !important;
+  padding-bottom: 0.9rem !important;
+  border-bottom: 1.5px dashed rgba(244, 114, 182, 0.45) !important;
+}
+
+[data-offrefy-theme^="valentine_"] .offrefy-topbar::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -0.55rem;
+  width: var(--vl-decor-sm);
+  height: var(--vl-decor-sm);
+  transform: translateX(-50%);
+  background: url("/valentine/heart.png") center / contain no-repeat;
+  pointer-events: none;
+  z-index: 2;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
+}
+
+[data-offrefy-theme^="valentine_"] .offrefy-title {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  color: #9f1239;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  padding-inline: clamp(1.6rem, 7vw, 2.1rem);
+}
+
+[data-offrefy-theme^="valentine_"] .offrefy-title::before,
+[data-offrefy-theme^="valentine_"] .offrefy-title::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: var(--vl-decor-md);
+  height: var(--vl-decor-md);
+  transform: translateY(-50%);
+  background: url("/valentine/sparkles.png") center / contain no-repeat;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.14));
+}
+
+[data-offrefy-theme^="valentine_"] .offrefy-title::before { left: 0; }
+[data-offrefy-theme^="valentine_"] .offrefy-title::after { right: 0; }
+
+[data-offrefy-theme^="valentine_"] .offrefy-cards {
+  position: relative;
+  margin-bottom: 0.55rem;
+  margin-inline: 0.1rem;
+}
+
+[data-offrefy-theme^="valentine_"] .offrefy-card {
+  position: relative;
+  overflow: visible !important;
+}
+
+[data-offrefy-theme^="valentine_"] .offrefy-cards::before,
+[data-offrefy-theme^="valentine_"] .offrefy-cards::after {
+  content: none;
+}
+
+[data-offrefy-theme^="valentine_"] .offrefy-cta {
+  position: relative !important;
+  overflow: hidden !important;
+  z-index: 1;
+  background: linear-gradient(180deg, #fb7185 0%, #e11d48 55%, #be123c 100%) !important;
+  border: 1.5px solid rgba(253, 164, 175, 0.9) !important;
+  box-shadow: 0 8px 20px rgba(190, 24, 93, 0.28);
+  padding-left: 2.75rem !important;
+  padding-right: 2.75rem !important;
+  color: #fff1f2 !important;
+}
+
+[data-offrefy-theme^="valentine_"] .offrefy-cta::before,
+[data-offrefy-theme^="valentine_"] .offrefy-cta::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 1.35rem;
+  height: 1.35rem;
+  transform: translateY(-50%);
+  background: url("/valentine/heart.png") center / contain no-repeat;
+  pointer-events: none;
+}
+
+[data-offrefy-theme^="valentine_"] .offrefy-cta::before { left: 0.65rem; }
+[data-offrefy-theme^="valentine_"] .offrefy-cta::after { right: 0.65rem; }
+
+[data-offrefy-theme^="valentine_"] .offrefy-badge-pill {
+  box-shadow: 0 0 0 1.5px rgba(251, 113, 133, 0.55), 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.vd-admin-qb-preview[data-offrefy-theme^="valentine_"] {
+  margin-bottom: 0.85rem;
+}
+
+/* —— Per-template —— */
+
+[data-offrefy-theme="valentine_rose"] .offrefy-title { color: #9f1239; }
+[data-offrefy-theme="valentine_rose"]::before,
+[data-offrefy-theme="valentine_rose"]::after {
+  background-image: url("/valentine/heart.png");
+}
+[data-offrefy-theme="valentine_rose"] .offrefy-card.offrefy-card--selected {
+  border-color: #e11d48 !important;
+  box-shadow: 0 0 0 1px #fda4af, 0 10px 24px rgba(225, 29, 72, 0.12) !important;
+}
+[data-offrefy-theme="valentine_rose"] .offrefy-cta {
+  background: linear-gradient(180deg, #fb7185 0%, #e11d48 55%, #be123c 100%) !important;
+  color: #fff1f2 !important;
+}
+
+[data-offrefy-theme="valentine_blush"] {
+  background-color: #fdf2f8;
+  border-color: rgba(236, 72, 153, 0.22);
+  background-image:
+    url("/valentine/sparkles.png"),
+    url("/valentine/sparkles.png"),
+    url("/valentine/heart.png"),
+    url("/valentine/heart.png"),
+    url("/valentine/ribbon.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(252, 231, 243, 0.8), transparent 60%);
+  background-size: 2.2rem auto, 2.2rem auto, 1.3rem auto, 1.3rem auto, 1.4rem auto, auto;
+  background-position: left 0.35rem bottom 0.15rem, right 0.3rem bottom 0.15rem, left 38% bottom 0.45rem, right 38% bottom 0.4rem, center bottom 0.35rem, center top;
+}
+[data-offrefy-theme="valentine_blush"]::before,
+[data-offrefy-theme="valentine_blush"]::after {
+  background-image: url("/valentine/sparkles.png");
+}
+[data-offrefy-theme="valentine_blush"] .offrefy-title { color: #9d174d; }
+[data-offrefy-theme="valentine_blush"] .offrefy-title::before,
+[data-offrefy-theme="valentine_blush"] .offrefy-title::after {
+  background-image: url("/valentine/sparkles.png");
+}
+[data-offrefy-theme="valentine_blush"] .offrefy-card.offrefy-card--selected {
+  border-color: #ec4899 !important;
+}
+[data-offrefy-theme="valentine_blush"] .offrefy-cta {
+  background: linear-gradient(180deg, #f9a8d4 0%, #ec4899 55%, #db2777 100%) !important;
+  color: #fff !important;
+  border-color: #fbcfe8 !important;
+}
+[data-offrefy-theme="valentine_blush"] .offrefy-cta::before,
+[data-offrefy-theme="valentine_blush"] .offrefy-cta::after {
+  background-image: url("/valentine/sparkles.png");
+}
+
+[data-offrefy-theme="valentine_cupid"] {
+  background-image:
+    url("/valentine/ribbon.png"),
+    url("/valentine/ribbon.png"),
+    url("/valentine/sparkles.png"),
+    url("/valentine/heart.png"),
+    url("/valentine/sparkles.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(252, 231, 243, 0.75), transparent 60%);
+  background-size: 2.5rem auto, 2.5rem auto, 1.2rem auto, 1.35rem auto, 1.1rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 38% bottom 0.45rem, right 38% bottom 0.4rem, center bottom 0.35rem, center top;
+}
+[data-offrefy-theme="valentine_cupid"]::before,
+[data-offrefy-theme="valentine_cupid"]::after {
+  background-image: url("/valentine/ribbon.png");
+}
+[data-offrefy-theme="valentine_cupid"] .offrefy-title { color: #9d174d; }
+[data-offrefy-theme="valentine_cupid"] .offrefy-title::before,
+[data-offrefy-theme="valentine_cupid"] .offrefy-title::after {
+  background-image: url("/valentine/ribbon.png");
+}
+[data-offrefy-theme="valentine_cupid"] .offrefy-card.offrefy-card--selected {
+  border-color: #be185d !important;
+}
+[data-offrefy-theme="valentine_cupid"] .offrefy-cta {
+  background: linear-gradient(180deg, #ec4899 0%, #be185d 55%, #9d174d 100%) !important;
+  color: #fff1f2 !important;
+}
+[data-offrefy-theme="valentine_cupid"] .offrefy-cta::before,
+[data-offrefy-theme="valentine_cupid"] .offrefy-cta::after {
+  background-image: url("/valentine/ribbon.png");
+}
+
+[data-offrefy-theme="valentine_velvet"] {
+  background-color: #fff1f2;
+  border-color: rgba(159, 18, 57, 0.24);
+  background-image:
+    url("/valentine/crown.png"),
+    url("/valentine/crown.png"),
+    url("/valentine/sparkles.png"),
+    url("/valentine/heart.png"),
+    url("/valentine/sparkles.png"),
+    radial-gradient(ellipse 70% 40% at 50% -5%, rgba(159, 18, 57, 0.1), transparent 55%);
+  background-size: 2.3rem auto, 2.3rem auto, 1.2rem auto, 1.35rem auto, 1.1rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 38% bottom 0.45rem, right 38% bottom 0.4rem, center bottom 0.35rem, center top;
+}
+[data-offrefy-theme="valentine_velvet"]::before,
+[data-offrefy-theme="valentine_velvet"]::after {
+  background-image: url("/valentine/crown.png");
+}
+[data-offrefy-theme="valentine_velvet"] .offrefy-title { color: #881337; }
+[data-offrefy-theme="valentine_velvet"] .offrefy-title::before,
+[data-offrefy-theme="valentine_velvet"] .offrefy-title::after {
+  background-image: url("/valentine/crown.png");
+}
+[data-offrefy-theme="valentine_velvet"] .offrefy-card.offrefy-card--selected {
+  border-color: #9f1239 !important;
+}
+[data-offrefy-theme="valentine_velvet"] .offrefy-cta {
+  background: linear-gradient(180deg, #be123c 0%, #9f1239 55%, #881337 100%) !important;
+  color: #fecdd3 !important;
+  border-color: #fda4af !important;
+}
+[data-offrefy-theme="valentine_velvet"] .offrefy-cta::before,
+[data-offrefy-theme="valentine_velvet"] .offrefy-cta::after {
+  background-image: url("/valentine/crown.png");
+}
+
+[data-offrefy-theme="valentine_candy"] {
+  background-color: #fdf2f8;
+  border-color: rgba(244, 114, 182, 0.25);
+  background-image:
+    url("/valentine/candy.png"),
+    url("/valentine/candy.png"),
+    url("/valentine/lollipop.png"),
+    url("/valentine/sparkles.png"),
+    url("/valentine/heart.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(252, 231, 243, 0.8), transparent 60%);
+  background-size: 2.4rem auto, 2.4rem auto, 1.4rem auto, 1.2rem auto, 1.3rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 38% bottom 0.4rem, right 38% bottom 0.4rem, center bottom 0.35rem, center top;
+}
+[data-offrefy-theme="valentine_candy"]::before,
+[data-offrefy-theme="valentine_candy"]::after {
+  background-image: url("/valentine/candy.png");
+}
+[data-offrefy-theme="valentine_candy"] .offrefy-title { color: #be185d; }
+[data-offrefy-theme="valentine_candy"] .offrefy-title::before,
+[data-offrefy-theme="valentine_candy"] .offrefy-title::after {
+  background-image: url("/valentine/lollipop.png");
+}
+[data-offrefy-theme="valentine_candy"] .offrefy-card.offrefy-card--selected {
+  border-color: #f472b6 !important;
+}
+[data-offrefy-theme="valentine_candy"] .offrefy-cta {
+  background: linear-gradient(180deg, #f9a8d4 0%, #f472b6 55%, #ec4899 100%) !important;
+  color: #fff !important;
+  border-color: #fbcfe8 !important;
+}
+[data-offrefy-theme="valentine_candy"] .offrefy-cta::before,
+[data-offrefy-theme="valentine_candy"] .offrefy-cta::after {
+  background-image: url("/valentine/candy.png");
+}
+
+[data-offrefy-theme="valentine_admirer"] {
+  background-color: #fdf4ff;
+  border-color: rgba(162, 28, 175, 0.22);
+  background-image:
+    url("/valentine/lollipop.png"),
+    url("/valentine/lollipop.png"),
+    url("/valentine/sparkles.png"),
+    url("/valentine/heart.png"),
+    url("/valentine/sparkles.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(250, 232, 255, 0.75), transparent 60%);
+  background-size: 2.4rem auto, 2.4rem auto, 1.2rem auto, 1.3rem auto, 1.1rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 38% bottom 0.45rem, right 38% bottom 0.4rem, center bottom 0.35rem, center top;
+}
+[data-offrefy-theme="valentine_admirer"]::before,
+[data-offrefy-theme="valentine_admirer"]::after {
+  background-image: url("/valentine/lollipop.png");
+}
+[data-offrefy-theme="valentine_admirer"] .offrefy-title { color: #86198f; }
+[data-offrefy-theme="valentine_admirer"] .offrefy-title::before,
+[data-offrefy-theme="valentine_admirer"] .offrefy-title::after {
+  background-image: url("/valentine/lollipop.png");
+}
+[data-offrefy-theme="valentine_admirer"] .offrefy-card.offrefy-card--selected {
+  border-color: #a21caf !important;
+}
+[data-offrefy-theme="valentine_admirer"] .offrefy-cta {
+  background: linear-gradient(180deg, #e879f9 0%, #a21caf 55%, #86198f 100%) !important;
+  color: #fdf4ff !important;
+  border-color: #f0abfc !important;
+}
+[data-offrefy-theme="valentine_admirer"] .offrefy-cta::before,
+[data-offrefy-theme="valentine_admirer"] .offrefy-cta::after {
+  background-image: url("/valentine/lollipop.png");
+}
+
+[data-offrefy-theme="valentine_ruby"] {
+  background-image:
+    url("/valentine/gem.png"),
+    url("/valentine/gem.png"),
+    url("/valentine/sparkles.png"),
+    url("/valentine/heart.png"),
+    url("/valentine/sparkles.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(254, 226, 226, 0.7), transparent 60%);
+  background-size: 2.3rem auto, 2.3rem auto, 1.2rem auto, 1.3rem auto, 1.1rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 38% bottom 0.45rem, right 38% bottom 0.4rem, center bottom 0.35rem, center top;
+}
+[data-offrefy-theme="valentine_ruby"]::before,
+[data-offrefy-theme="valentine_ruby"]::after {
+  background-image: url("/valentine/gem.png");
+}
+[data-offrefy-theme="valentine_ruby"] .offrefy-title { color: #9f1239; }
+[data-offrefy-theme="valentine_ruby"] .offrefy-title::before,
+[data-offrefy-theme="valentine_ruby"] .offrefy-title::after {
+  background-image: url("/valentine/gem.png");
+}
+[data-offrefy-theme="valentine_ruby"] .offrefy-card.offrefy-card--selected {
+  border-color: #be123c !important;
+}
+[data-offrefy-theme="valentine_ruby"] .offrefy-cta {
+  background: linear-gradient(180deg, #e11d48 0%, #be123c 55%, #9f1239 100%) !important;
+  color: #fff !important;
+}
+[data-offrefy-theme="valentine_ruby"] .offrefy-cta::before,
+[data-offrefy-theme="valentine_ruby"] .offrefy-cta::after {
+  background-image: url("/valentine/gem.png");
+}
+
+[data-offrefy-theme="valentine_pearl"] {
+  background-color: #fff7f7;
+  border-color: rgba(253, 164, 175, 0.4);
+  background-image:
+    url("/valentine/rose.png"),
+    url("/valentine/rose.png"),
+    url("/valentine/sparkles.png"),
+    url("/valentine/heart.png"),
+    url("/valentine/sparkles.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(255, 241, 242, 0.9), transparent 60%);
+  background-size: 2.3rem auto, 2.3rem auto, 1.2rem auto, 1.3rem auto, 1.1rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 38% bottom 0.45rem, right 38% bottom 0.4rem, center bottom 0.35rem, center top;
+}
+[data-offrefy-theme="valentine_pearl"]::before,
+[data-offrefy-theme="valentine_pearl"]::after {
+  background-image: url("/valentine/rose.png");
+}
+[data-offrefy-theme="valentine_pearl"] .offrefy-title { color: #be123c; }
+[data-offrefy-theme="valentine_pearl"] .offrefy-title::before,
+[data-offrefy-theme="valentine_pearl"] .offrefy-title::after {
+  background-image: url("/valentine/rose.png");
+}
+[data-offrefy-theme="valentine_pearl"] .offrefy-card.offrefy-card--selected {
+  border-color: #fda4af !important;
+}
+[data-offrefy-theme="valentine_pearl"] .offrefy-cta {
+  background: linear-gradient(180deg, #fecdd3 0%, #fb7185 55%, #e11d48 100%) !important;
+  color: #881337 !important;
+  border-color: #fecdd3 !important;
+}
+[data-offrefy-theme="valentine_pearl"] .offrefy-cta::before,
+[data-offrefy-theme="valentine_pearl"] .offrefy-cta::after {
+  background-image: url("/valentine/rose.png");
+}
+
+[data-offrefy-theme="valentine_letter"] {
+  background-color: #fff7ed;
+  border-color: rgba(194, 65, 12, 0.22);
+  background-image:
+    url("/valentine/gift.png"),
+    url("/valentine/gift.png"),
+    url("/valentine/sparkles.png"),
+    url("/valentine/heart.png"),
+    url("/valentine/ribbon.png"),
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(255, 237, 213, 0.75), transparent 60%);
+  background-size: 2.4rem auto, 2.4rem auto, 1.2rem auto, 1.3rem auto, 1.35rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 38% bottom 0.45rem, right 38% bottom 0.4rem, center bottom 0.35rem, center top;
+}
+[data-offrefy-theme="valentine_letter"]::before,
+[data-offrefy-theme="valentine_letter"]::after {
+  background-image: url("/valentine/gift.png");
+}
+[data-offrefy-theme="valentine_letter"] .offrefy-title { color: #9a3412; }
+[data-offrefy-theme="valentine_letter"] .offrefy-title::before,
+[data-offrefy-theme="valentine_letter"] .offrefy-title::after {
+  background-image: url("/valentine/gift.png");
+}
+[data-offrefy-theme="valentine_letter"] .offrefy-card.offrefy-card--selected {
+  border-color: #c2410c !important;
+}
+[data-offrefy-theme="valentine_letter"] .offrefy-cta {
+  background: linear-gradient(180deg, #fb923c 0%, #c2410c 55%, #9a3412 100%) !important;
+  color: #fff7ed !important;
+  border-color: #fed7aa !important;
+}
+[data-offrefy-theme="valentine_letter"] .offrefy-cta::before,
+[data-offrefy-theme="valentine_letter"] .offrefy-cta::after {
+  background-image: url("/valentine/gift.png");
+}
+
+[data-offrefy-theme="valentine_midnight"] {
+  background-color: #fff1f2;
+  border-color: rgba(76, 5, 25, 0.2);
+  background-image:
+    url("/valentine/chocolate.png"),
+    url("/valentine/chocolate.png"),
+    url("/valentine/sparkles.png"),
+    url("/valentine/heart.png"),
+    url("/valentine/sparkles.png"),
+    radial-gradient(ellipse 70% 40% at 50% -5%, rgba(76, 5, 25, 0.08), transparent 55%);
+  background-size: 2.4rem auto, 2.4rem auto, 1.2rem auto, 1.3rem auto, 1.1rem auto, auto;
+  background-position: left 0.3rem bottom 0.15rem, right 0.25rem bottom 0.15rem, left 38% bottom 0.45rem, right 38% bottom 0.4rem, center bottom 0.35rem, center top;
+}
+[data-offrefy-theme="valentine_midnight"]::before,
+[data-offrefy-theme="valentine_midnight"]::after {
+  background-image: url("/valentine/chocolate.png");
+}
+[data-offrefy-theme="valentine_midnight"] .offrefy-title { color: #4c0519; }
+[data-offrefy-theme="valentine_midnight"] .offrefy-title::before,
+[data-offrefy-theme="valentine_midnight"] .offrefy-title::after {
+  background-image: url("/valentine/chocolate.png");
+}
+[data-offrefy-theme="valentine_midnight"] .offrefy-card.offrefy-card--selected {
+  border-color: #4c0519 !important;
+  box-shadow: 0 0 0 1px #fda4af, 0 10px 24px rgba(76, 5, 25, 0.12) !important;
+}
+[data-offrefy-theme="valentine_midnight"] .offrefy-cta {
+  background: linear-gradient(180deg, #881337 0%, #4c0519 55%, #3b0413 100%) !important;
+  color: #fecdd3 !important;
+  border-color: #fb7185 !important;
+}
+[data-offrefy-theme="valentine_midnight"] .offrefy-cta::before,
+[data-offrefy-theme="valentine_midnight"] .offrefy-cta::after {
+  background-image: url("/valentine/chocolate.png");
+}

@@ -16,6 +16,12 @@ import {
 } from "./pricingPlans";
 import { toTierPayload } from "./volumeDiscountTier";
 import {
+  parseSparseStorefrontTranslations,
+  parseTierCopyTranslations,
+  type SparseStorefrontTranslationsMap,
+  type TierCopyTranslationsMap,
+} from "./storefrontTranslations";
+import {
   normalizeVolumeDiscountWidgetDisplay,
   type VolumeDiscountWidgetDisplay,
 } from "./widgetDisplay";
@@ -33,6 +39,10 @@ export type VolumeDiscountFormData = {
   productIds: string[];
   collectionIds: string[];
   widgetDisplay: VolumeDiscountWidgetDisplay;
+  /** Sparse per-locale storefront overrides for this offer. */
+  displayNameTranslations: SparseStorefrontTranslationsMap;
+  /** Per-locale option label / subtext / badge overrides (by tier index). */
+  tierCopyTranslations: TierCopyTranslationsMap;
   countdownStartsAt: Date | null;
   countdownEndsAt: Date | null;
 };
@@ -86,6 +96,9 @@ export function sanitizeCampaignForPlan(
       customCss: "",
     };
   }
+
+  // Appearance templates: do not silently clamp on save — reject in the route
+  // when above plan so the merchant sees an upgrade notice. Storefront still clamps.
 
   // Re-resolve status if schedule was stripped
   if (!caps.scheduling) {
@@ -213,6 +226,21 @@ export function parseVolumeDiscountForm(form: FormData): ParsedVolumeDiscountFor
   }
   const widgetDisplay = normalizeVolumeDiscountWidgetDisplay(widgetDisplayRaw);
 
+  let displayNameTranslationsRaw: unknown = {};
+  try {
+    displayNameTranslationsRaw = JSON.parse(
+      String(form.get("displayNameTranslations") ?? "{}"),
+    ) as unknown;
+  } catch {
+    return { ok: false, error: "Invalid campaign translations" };
+  }
+  const displayNameTranslations = parseSparseStorefrontTranslations(
+    displayNameTranslationsRaw,
+  );
+  const tierCopyTranslations = parseTierCopyTranslations(
+    displayNameTranslationsRaw,
+  );
+
   const countdownStartsRaw = String(form.get("countdownStartsAt") ?? "").trim();
   const countdownEndsRaw = String(form.get("countdownEndsAt") ?? "").trim();
   const countdownStartsAt = parseOptionalIsoDate(countdownStartsRaw);
@@ -279,6 +307,8 @@ export function parseVolumeDiscountForm(form: FormData): ParsedVolumeDiscountFor
       productIds: productIdsParsed,
       collectionIds: collectionIdsParsed,
       widgetDisplay,
+      displayNameTranslations,
+      tierCopyTranslations,
       countdownStartsAt,
       countdownEndsAt,
     },

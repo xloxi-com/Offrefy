@@ -56,6 +56,8 @@ model VolumeDiscountCampaign {
   shop                String
   campaignName        String
   displayName         String?
+  /// Sparse per-locale storefront + cart overrides for this offer (inherit shop Settings when empty)
+  displayNameTranslations Json @default("{}")
   productScope        String
   quantityCondition   String
   customerType        String

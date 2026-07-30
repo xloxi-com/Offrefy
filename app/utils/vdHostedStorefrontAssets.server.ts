@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 /** Keep in sync with `vd-storefront-assets.liquid` + storefront embed.version. */
-const ASSET_VERSION = "1.29.5";
+const ASSET_VERSION = "1.30.2";
 
 function assetPath(fileName: string) {
   return path.join(

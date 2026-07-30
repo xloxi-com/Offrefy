@@ -26,6 +26,7 @@ import {
   countdownAlignToFlexJustify,
   DEFAULT_WIDGET_DISPLAY,
   isVolumeDiscountBadgeTopFloat,
+  resolveWidgetAppearanceDecorThemeId,
   scaledWidgetFontSizeCss,
   sanitizeCountdownLabelForDisplay,
   WIDGET_DISPLAY_CUSTOM_CSS_MAX_CHARS,
@@ -34,6 +35,16 @@ import {
 } from "../utils/widgetDisplay";
 
 import previewWidgetStyles from "./QuantityBreaksTailwindPreview.module.css";
+import createStyles from "../styles/volume-discount-create.module.css";
+import "../styles/christmas-theme-decor.css";
+import "../styles/newyear-theme-decor.css";
+import "../styles/halloween-theme-decor.css";
+import "../styles/ramadan-theme-decor.css";
+import "../styles/diwali-theme-decor.css";
+import "../styles/pongal-theme-decor.css";
+import "../styles/valentine-theme-decor.css";
+import "../styles/easter-theme-decor.css";
+import "../styles/seasonal-theme-responsive.css";
 
 export type QuantityBreaksPreviewTierRow = {
   key: string;
@@ -256,6 +267,8 @@ function QuantityBreaksTailwindPreviewInner({
     ["--vd-badge-size-scale" as string]: String(
       clampBadgeSizeScalePercent(d.badgeSizeScalePercent) / 100,
     ),
+    ["--vd-badge-bg" as string]: d.badgeBackgroundColor,
+    ["--vd-badge-text" as string]: d.badgeTextColor,
     ["--vd-fw-strong" as string]: String(d.fontWeightStrong),
     ["--vd-fw-accent" as string]: String(d.fontWeightAccent),
     ["--vd-fw-body" as string]: String(d.fontWeightBody),
@@ -422,16 +435,33 @@ function QuantityBreaksTailwindPreviewInner({
     );
   }
 
+  const decorThemeId = resolveWidgetAppearanceDecorThemeId(d);
+  const isSeasonalDecorTheme = Boolean(
+    decorThemeId &&
+      /^(christmas_|newyear_|halloween_|ramadan_|diwali_|pongal_|valentine_|easter_)/.test(
+        decorThemeId,
+      ),
+  );
+  const seasonalDecorStyle = isSeasonalDecorTheme
+    ? ({ overflow: "hidden" as const, maxWidth: "100%" } as const)
+    : undefined;
+
   if (isVolumeTableLayout) {
     return (
       <div
         ref={previewRootRef}
         className="vd-admin-qb-preview"
-        style={cssVars}
+        data-preview-device={previewDevice}
+        data-offrefy-theme={decorThemeId ?? undefined}
+        style={{
+          ...cssVars,
+          ...seasonalDecorStyle,
+        }}
       >
         <BlockStack gap="300">
           {showHeaderBar ? (
           <div
+            className="offrefy-topbar"
             style={{
               display: "flex",
               flexDirection: headerUsesColumn ? "column" : "row",
@@ -480,12 +510,15 @@ function QuantityBreaksTailwindPreviewInner({
                 }
               >
                 <span
+                  className="offrefy-title"
                   style={{
                     fontFamily:
                       "var(--vd-theme-font-heading), Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, emoji",
                     fontSize: `var(--vd-fs-title, ${fs(d.fontSizeTitle)})`,
                     fontWeight: "var(--vd-fw-strong)",
-                    color: d.primaryColor,
+                    ...(isSeasonalDecorTheme
+                      ? {}
+                      : { color: d.primaryColor }),
                   }}
                 >
                   {headingResolved}
@@ -548,7 +581,7 @@ function QuantityBreaksTailwindPreviewInner({
             ) : null}
           </div>
           ) : null}
-          <div className={previewWidgetStyles.volumeTableWrap}>
+          <div className={`offrefy-cards offrefy-cards--volume-table ${previewWidgetStyles.volumeTableWrap}`}>
             <div className={previewWidgetStyles.volumeTableScroll}>
               <table className={previewWidgetStyles.volumeTable}>
                 <thead>
@@ -574,6 +607,7 @@ function QuantityBreaksTailwindPreviewInner({
             <Box width="100%">
               <button
                 type="button"
+                className="offrefy-cta"
                 onClick={() => {}}
                 style={{
                   width: "100%",
@@ -625,11 +659,17 @@ function QuantityBreaksTailwindPreviewInner({
     <div
       ref={previewRootRef}
       className="vd-admin-qb-preview"
-      style={cssVars}
+      data-preview-device={previewDevice}
+      data-offrefy-theme={decorThemeId ?? undefined}
+      style={{
+        ...cssVars,
+        ...seasonalDecorStyle,
+      }}
     >
       <BlockStack gap="300">
         {showHeaderBar ? (
         <div
+          className="offrefy-topbar"
           style={{
             display: "flex",
             flexDirection: headerUsesColumn ? "column" : "row",
@@ -677,6 +717,7 @@ function QuantityBreaksTailwindPreviewInner({
               }
             >
               <span
+                className="offrefy-title"
                 style={{
                   fontFamily:
                     "var(--vd-theme-font-heading), Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, emoji",
@@ -745,7 +786,11 @@ function QuantityBreaksTailwindPreviewInner({
         </div>
         ) : null}
 
-        <div role="radiogroup" aria-label={radiogroupLabel}>
+        <div
+          role="radiogroup"
+          aria-label={radiogroupLabel}
+          className="offrefy-cards"
+        >
           <div style={{ paddingTop: floatTopBadge ? "12px" : undefined }}>
             <BlockStack gap="400">
             {rows.map((row, index) => {
@@ -775,22 +820,8 @@ function QuantityBreaksTailwindPreviewInner({
 
               const badgeEl = row.badge ? (
                 <span
-                  style={{
-                    display: "inline-block",
-                    maxWidth: "100%",
-                    padding: "2px 30px",
-                    borderRadius: "9999px",
-                    fontWeight: "var(--vd-fw-accent)",
-                    color: d.badgeTextColor,
-                    backgroundColor: d.badgeBackgroundColor,
-                    fontSize: `calc(var(--vd-fs-badge, ${fs(d.fontSizeBadge)}) * var(--vd-badge-size-scale, 1))`,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    verticalAlign: "middle",
-                    boxSizing: "border-box",
-                    boxShadow: "0 1px 2px rgba(107, 29, 30, 0.2)",
-                  }}
+                  className={`${createStyles.badgePill} ${createStyles.badgePillPreview}`}
+                  data-badge-design={d.badgeDesign ?? "pill"}
                 >
                   {row.badge}
                 </span>
@@ -829,6 +860,12 @@ function QuantityBreaksTailwindPreviewInner({
                 <div
                   key={row.key}
                   role="presentation"
+                  className={[
+                    "offrefy-card",
+                    isSelected ? "offrefy-card--selected" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                   onClick={() => setSelectedIndex(index)}
                   style={{
                     position: "relative",
@@ -960,10 +997,19 @@ function QuantityBreaksTailwindPreviewInner({
                             className={previewWidgetStyles.expandDivider}
                             aria-hidden
                           />
-                          <div className={previewWidgetStyles.expandCompact}>
-                            <span className={previewWidgetStyles.tierIdx}>
-                              #{index + 1}
-                            </span>
+                          <div
+                            className={[
+                              previewWidgetStyles.expandCompact,
+                              d.hideWidgetVariantSelector
+                                ? previewWidgetStyles.expandCompactNoVariant
+                                : "",
+                              d.hideWidgetQuantitySelector
+                                ? previewWidgetStyles.expandCompactNoQty
+                                : "",
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
+                          >
                             {!d.hideWidgetVariantSelector ? (
                               <div className={previewWidgetStyles.selectWrap}>
                                 <select
@@ -983,92 +1029,104 @@ function QuantityBreaksTailwindPreviewInner({
                                 </select>
                               </div>
                             ) : null}
-                            {!d.hideWidgetLineTotal ? (
-                              <span className={previewWidgetStyles.lineTotal}>
-                                {formatMoney(
-                                  row.perUnitPrice * qty,
-                                  currencySymbol,
-                                )}
+                            <div className={previewWidgetStyles.expandRow}>
+                              <span className={previewWidgetStyles.tierIdx}>
+                                #{index + 1}
                               </span>
-                            ) : null}
-                            {!d.hideWidgetQuantitySelector ||
-                            !d.hideWidgetTierAddButton ? (
-                              <div className={previewWidgetStyles.expandTrailing}>
-                                {!d.hideWidgetQuantitySelector ? (
-                                  <div
-                                    className={previewWidgetStyles.qtyGroup}
-                                    role="group"
-                                    aria-label="Quantity"
-                                  >
-                                    <button
-                                      type="button"
-                                      className={previewWidgetStyles.qtyBtn}
-                                      disabled={qty <= tierMinQty}
-                                      aria-label="Decrease quantity"
-                                      onClick={() => decQty()}
-                                    >
-                                      <MinusIcon
-                                        className="size-3"
-                                        strokeWidth={2.5}
-                                      />
-                                    </button>
-                                    <input
-                                      type="text"
-                                      inputMode="numeric"
-                                      maxLength={PREVIEW_MAX_QTY_DIGITS}
-                                      className={previewWidgetStyles.qtyValue}
+                              {!d.hideWidgetLineTotal ? (
+                                <span className={previewWidgetStyles.lineTotal}>
+                                  {formatMoney(
+                                    row.perUnitPrice * qty,
+                                    currencySymbol,
+                                  )}
+                                </span>
+                              ) : null}
+                              {!d.hideWidgetQuantitySelector ||
+                              !d.hideWidgetTierAddButton ? (
+                                <div
+                                  className={previewWidgetStyles.expandTrailing}
+                                >
+                                  {!d.hideWidgetQuantitySelector ? (
+                                    <div
+                                      className={previewWidgetStyles.qtyGroup}
+                                      role="group"
                                       aria-label="Quantity"
-                                      value={qtyInputStr}
-                                      onChange={(e) => {
-                                        setQtyInputStr(
-                                          e.target.value
-                                            .replace(/\D/g, "")
-                                            .slice(0, PREVIEW_MAX_QTY_DIGITS),
-                                        );
-                                      }}
-                                      onBlur={() => {
-                                        const minQ = row.buyNum ?? 1;
-                                        let n = parseInt(qtyInputStr, 10);
-                                        if (
-                                          !Number.isFinite(n) ||
-                                          qtyInputStr === ""
-                                        ) {
-                                          n = minQ;
-                                        }
-                                        n = Math.min(PREVIEW_MAX_QTY, Math.max(minQ, n));
-                                        setQty(n);
-                                        setQtyInputStr(String(n));
-                                      }}
-                                      onKeyDown={(e: KeyboardEvent) => {
-                                        if (e.key === "Enter") {
-                                          (e.target as HTMLInputElement).blur();
-                                        }
-                                      }}
-                                    />
+                                    >
+                                      <button
+                                        type="button"
+                                        className={previewWidgetStyles.qtyBtn}
+                                        disabled={qty <= tierMinQty}
+                                        aria-label="Decrease quantity"
+                                        onClick={() => decQty()}
+                                      >
+                                        <MinusIcon
+                                          className="size-3"
+                                          strokeWidth={2.5}
+                                        />
+                                      </button>
+                                      <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        maxLength={PREVIEW_MAX_QTY_DIGITS}
+                                        className={previewWidgetStyles.qtyValue}
+                                        aria-label="Quantity"
+                                        value={qtyInputStr}
+                                        onChange={(e) => {
+                                          setQtyInputStr(
+                                            e.target.value
+                                              .replace(/\D/g, "")
+                                              .slice(0, PREVIEW_MAX_QTY_DIGITS),
+                                          );
+                                        }}
+                                        onBlur={() => {
+                                          const minQ = row.buyNum ?? 1;
+                                          let n = parseInt(qtyInputStr, 10);
+                                          if (
+                                            !Number.isFinite(n) ||
+                                            qtyInputStr === ""
+                                          ) {
+                                            n = minQ;
+                                          }
+                                          n = Math.min(
+                                            PREVIEW_MAX_QTY,
+                                            Math.max(minQ, n),
+                                          );
+                                          setQty(n);
+                                          setQtyInputStr(String(n));
+                                        }}
+                                        onKeyDown={(e: KeyboardEvent) => {
+                                          if (e.key === "Enter") {
+                                            (
+                                              e.target as HTMLInputElement
+                                            ).blur();
+                                          }
+                                        }}
+                                      />
+                                      <button
+                                        type="button"
+                                        className={previewWidgetStyles.qtyBtn}
+                                        aria-label="Increase quantity"
+                                        onClick={() => incQty()}
+                                      >
+                                        <PlusIcon
+                                          className="size-3"
+                                          strokeWidth={2.5}
+                                        />
+                                      </button>
+                                    </div>
+                                  ) : null}
+                                  {!d.hideWidgetTierAddButton ? (
                                     <button
                                       type="button"
-                                      className={previewWidgetStyles.qtyBtn}
-                                      aria-label="Increase quantity"
-                                      onClick={() => incQty()}
+                                      className={previewWidgetStyles.addOutline}
+                                      onClick={() => {}}
                                     >
-                                      <PlusIcon
-                                        className="size-3"
-                                        strokeWidth={2.5}
-                                      />
+                                      + Add
                                     </button>
-                                  </div>
-                                ) : null}
-                                {!d.hideWidgetTierAddButton ? (
-                                  <button
-                                    type="button"
-                                    className={previewWidgetStyles.addOutline}
-                                    onClick={() => {}}
-                                  >
-                                    + Add
-                                  </button>
-                                ) : null}
-                              </div>
-                            ) : null}
+                                  ) : null}
+                                </div>
+                              ) : null}
+                            </div>
                           </div>
                         </div>
                       ) : null}
@@ -1084,6 +1142,7 @@ function QuantityBreaksTailwindPreviewInner({
         <Box width="100%">
           <button
             type="button"
+            className="offrefy-cta"
             onClick={() => {}}
             style={{
               width: "100%",

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56" fill="none" aria-hidden="true">
+  <!-- Traditional brass dallah / teapot — gold, professional -->
+  <defs>
+    <linearGradient id="rdTeaGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0d78c"/>
+      <stop offset="45%" stop-color="#d4af37"/>
+      <stop offset="100%" stop-color="#8a5a00"/>
+    </linearGradient>
+    <linearGradient id="rdTeaDark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#c9a227"/>
+      <stop offset="100%" stop-color="#6b1d1e"/>
+    </linearGradient>
+  </defs>
+  <!-- Spout -->
+  <path d="M12 28 C6 24 4 18 8 14 C10 16 12 20 14 24" fill="url(#rdTeaGold)" stroke="#8a5a00" stroke-width="0.8"/>
+  <!-- Body -->
+  <ellipse cx="30" cy="34" rx="16" ry="14" fill="url(#rdTeaGold)"/>
+  <ellipse cx="30" cy="34" rx="12" ry="10" fill="#f5e6b8" opacity="0.25"/>
+  <!-- Neck band -->
+  <rect x="22" y="18" width="16" height="5" rx="1.5" fill="url(#rdTeaDark)"/>
+  <!-- Lid -->
+  <ellipse cx="30" cy="18" rx="9" ry="3.5" fill="url(#rdTeaGold)"/>
+  <path d="M24 18 Q30 10 36 18" fill="url(#rdTeaGold)"/>
+  <circle cx="30" cy="11" r="2.2" fill="#e8c547"/>
+  <!-- Handle -->
+  <path d="M44 26 C52 28 52 42 44 44" fill="none" stroke="url(#rdTeaGold)" stroke-width="3.2" stroke-linecap="round"/>
+  <!-- Base -->
+  <ellipse cx="30" cy="48" rx="10" ry="2.5" fill="#8a5a00"/>
+  <path d="M22 46 Q30 50 38 46" fill="url(#rdTeaGold)"/>
+</svg>

@@ -1,0 +1,2042 @@
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+{
+  "name": "function.wasm",
+  "size": 25,
+  "memory_usage": 1408,
+  "instructions": 9371281,
+  "logs": "",
+  "input": {
+    "cart": {
+      "buyerIdentity": null,
+      "lines": [
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/0",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1000",
+            "product": {
+              "id": "gid://shopify/Product/2000",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-0",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/1",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1001",
+            "product": {
+              "id": "gid://shopify/Product/2001",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-1",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/2",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1002",
+            "product": {
+              "id": "gid://shopify/Product/2002",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-2",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/3",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1003",
+            "product": {
+              "id": "gid://shopify/Product/2003",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-3",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/4",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1004",
+            "product": {
+              "id": "gid://shopify/Product/2004",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-4",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/5",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1005",
+            "product": {
+              "id": "gid://shopify/Product/2005",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-5",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/6",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1006",
+            "product": {
+              "id": "gid://shopify/Product/2006",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-6",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/7",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1007",
+            "product": {
+              "id": "gid://shopify/Product/2007",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-7",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/8",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1008",
+            "product": {
+              "id": "gid://shopify/Product/2008",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-8",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/9",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1009",
+            "product": {
+              "id": "gid://shopify/Product/2009",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-9",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/10",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1010",
+            "product": {
+              "id": "gid://shopify/Product/2010",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-10",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/11",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1011",
+            "product": {
+              "id": "gid://shopify/Product/2011",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-11",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/12",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1012",
+            "product": {
+              "id": "gid://shopify/Product/2012",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-12",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/13",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1013",
+            "product": {
+              "id": "gid://shopify/Product/2013",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-13",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/14",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1014",
+            "product": {
+              "id": "gid://shopify/Product/2014",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-14",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/15",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1015",
+            "product": {
+              "id": "gid://shopify/Product/2015",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-15",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/16",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1016",
+            "product": {
+              "id": "gid://shopify/Product/2016",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-16",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/17",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1017",
+            "product": {
+              "id": "gid://shopify/Product/2017",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-17",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/18",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1018",
+            "product": {
+              "id": "gid://shopify/Product/2018",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-18",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/19",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1019",
+            "product": {
+              "id": "gid://shopify/Product/2019",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-19",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/20",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1020",
+            "product": {
+              "id": "gid://shopify/Product/2020",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-20",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/21",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1021",
+            "product": {
+              "id": "gid://shopify/Product/2021",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-21",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/22",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1022",
+            "product": {
+              "id": "gid://shopify/Product/2022",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-22",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/23",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1023",
+            "product": {
+              "id": "gid://shopify/Product/2023",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-23",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/24",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1024",
+            "product": {
+              "id": "gid://shopify/Product/2024",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-24",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/25",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1025",
+            "product": {
+              "id": "gid://shopify/Product/2025",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-25",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/26",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1026",
+            "product": {
+              "id": "gid://shopify/Product/2026",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-26",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/27",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1027",
+            "product": {
+              "id": "gid://shopify/Product/2027",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-27",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/28",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1028",
+            "product": {
+              "id": "gid://shopify/Product/2028",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-28",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/29",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1029",
+            "product": {
+              "id": "gid://shopify/Product/2029",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-29",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/30",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1030",
+            "product": {
+              "id": "gid://shopify/Product/2030",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-30",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/31",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1031",
+            "product": {
+              "id": "gid://shopify/Product/2031",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-31",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/32",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1032",
+            "product": {
+              "id": "gid://shopify/Product/2032",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-32",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/33",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1033",
+            "product": {
+              "id": "gid://shopify/Product/2033",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-33",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/34",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1034",
+            "product": {
+              "id": "gid://shopify/Product/2034",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-34",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/35",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1035",
+            "product": {
+              "id": "gid://shopify/Product/2035",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-35",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/36",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1036",
+            "product": {
+              "id": "gid://shopify/Product/2036",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-36",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/37",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1037",
+            "product": {
+              "id": "gid://shopify/Product/2037",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-37",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/38",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1038",
+            "product": {
+              "id": "gid://shopify/Product/2038",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-38",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        },
+        {
+          "cost": {
+            "subtotalAmount": {
+              "amount": "100.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/CartLine/39",
+          "merchandise": {
+            "__typename": "ProductVariant",
+            "id": "gid://shopify/ProductVariant/1039",
+            "product": {
+              "id": "gid://shopify/Product/2039",
+              "tiersMetafield": {
+                "jsonValue": {
+                  "c": "camp-39",
+                  "ct": "e",
+                  "m": "{{ discount }} OFF",
+                  "q": "p",
+                  "t": [
+                    {
+                      "m": 5,
+                      "p": 10
+                    },
+                    {
+                      "m": 10,
+                      "p": 15
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "quantity": 10
+        }
+      ]
+    },
+    "discount": {
+      "discountClasses": [
+        "PRODUCT"
+      ],
+      "ruleSource": {
+        "jsonValue": {
+          "mode": "metafield"
+        }
+      }
+    },
+    "localization": {
+      "language": {
+        "isoCode": "en"
+      }
+    }
+  },
+  "output": {
+    "operations": [
+      {
+        "productDiscountsAdd": {
+          "candidates": [
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/0"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/1"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/2"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/3"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/4"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/5"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/6"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/7"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/8"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/9"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/10"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/11"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/12"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/13"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/14"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/15"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/16"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/17"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/18"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/19"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/20"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/21"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/22"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/23"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/24"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/25"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/26"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/27"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/28"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/29"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/30"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/31"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/32"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/33"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/34"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/35"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/36"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/37"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/38"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            },
+            {
+              "message": "15%",
+              "targets": [
+                {
+                  "cartLine": {
+                    "id": "gid://shopify/CartLine/39"
+                  }
+                }
+              ],
+              "value": {
+                "percentage": {
+                  "value": "15"
+                }
+              }
+            }
+          ],
+          "selectionStrategy": "ALL"
+        }
+      }
+    ]
+  },
+  "success": true
+}

@@ -14,7 +14,8 @@ import {
 /** Compact tier for metafield / Function (min bytes). */
 export type CompactProductRule = {
   c: string;
-  m: string;
+  /** Cart badge — omit when empty (Function uses default `N% OFF`). */
+  m?: string;
   q: string;
   ct: string;
   tg?: string[];
@@ -22,6 +23,25 @@ export type CompactProductRule = {
   vs?: string[];
   /** Collection numeric ids this product belongs to (for per-collection qty). */
   cx?: string[];
+  /** Legacy — omit from writes. */
+  tr?: Record<string, string>;
+  /**
+   * Schedule-aware marker (v5+). Storefront ignores legacy product rules without
+   * this until /widget-config confirms the offer is live (hides Scheduled).
+   */
+  sv?: 1;
+  /** Schedule start (unix seconds) — storefront widget hides until this time. */
+  sa?: number;
+  /** Schedule end (unix seconds) — storefront widget hides after this time. */
+  ea?: number;
+  /** showCountdown (1) — product-rule early paint must not drop the timer. */
+  sc?: 1;
+  /** Countdown label (short). */
+  cl?: string;
+  /** countdownTimeAmount */
+  ca?: number;
+  /** countdownTimeUnit: d|h|m */
+  cu?: "d" | "h" | "m";
   t: Array<
     | { m: number; p: number; u?: number }
     | { m: number; f: number; e?: number; u?: number }
@@ -41,6 +61,25 @@ const CT_MAP: Record<string, string> = {
   "logged-in": "l",
   "logged-in-tag-any": "t",
 };
+
+/**
+ * Cart/checkout discount label from Display name only.
+ * Empty → Function uses default badge (e.g. `13% OFF`), never campaign title.
+ */
+export function compactRuleDisplayMessage(
+  displayName?: string | null,
+): string {
+  const s = typeof displayName === "string" ? displayName.trim() : "";
+  return s ? s.slice(0, 80) : "";
+}
+
+/** Spread into compact rule only when Display name is set (saves Function parse fuel). */
+export function compactRuleMessageField(
+  displayName?: string | null,
+): { m: string } | Record<string, never> {
+  const m = compactRuleDisplayMessage(displayName);
+  return m ? { m } : {};
+}
 
 function compactTiers(tiers: FunctionTierConfig[]): CompactProductRule["t"] {
   const out: CompactProductRule["t"] = [];
@@ -91,7 +130,55 @@ export type ProductRuleCampaignInput = {
   variantIds?: string[];
   collectionIdsByProduct?: Record<string, string[]>;
   tiers: FunctionTierConfig[];
+  /** Sparse locale → cart badge (synced to rule_source.ctr, not product tiers). */
+  cartTr?: Record<string, string>;
+  countdownStartsAt?: Date | null;
+  countdownEndsAt?: Date | null;
+  /** From campaign widgetDisplay — needed for product-rule countdown early paint. */
+  showCountdown?: boolean;
+  countdownLabel?: string | null;
+  countdownTimeAmount?: number | null;
+  countdownTimeUnit?: string | null;
 };
+
+function compactScheduleFields(campaign: ProductRuleCampaignInput): {
+  sa?: number;
+  ea?: number;
+} {
+  const out: { sa?: number; ea?: number } = {};
+  if (campaign.countdownStartsAt) {
+    out.sa = Math.floor(campaign.countdownStartsAt.getTime() / 1000);
+  }
+  if (campaign.countdownEndsAt) {
+    out.ea = Math.floor(campaign.countdownEndsAt.getTime() / 1000);
+  }
+  return out;
+}
+
+function compactCountdownDisplayFields(campaign: ProductRuleCampaignInput): {
+  sc?: 1;
+  cl?: string;
+  ca?: number;
+  cu?: "d" | "h" | "m";
+} {
+  if (!campaign.showCountdown) return {};
+  const unit = String(campaign.countdownTimeUnit || "days");
+  const cu: "d" | "h" | "m" =
+    unit === "hours" ? "h" : unit === "minutes" ? "m" : "d";
+  const ca = Math.max(
+    1,
+    Math.min(9999, Math.floor(Number(campaign.countdownTimeAmount)) || 1),
+  );
+  const cl = String(campaign.countdownLabel || "")
+    .trim()
+    .slice(0, 80);
+  return {
+    sc: 1,
+    ...(cl ? { cl } : {}),
+    ca,
+    cu,
+  };
+}
 
 export function buildProductRuleIndex(args: {
   campaigns: ProductRuleCampaignInput[];
@@ -107,16 +194,16 @@ export function buildProductRuleIndex(args: {
   };
 
   for (const campaign of args.campaigns) {
-    const label =
-      (campaign.displayName && campaign.displayName.trim()) ||
-      campaign.campaignName;
     const compact: CompactProductRule = {
       c: campaign.id,
-      m: label.slice(0, 80),
+      ...compactRuleMessageField(campaign.displayName),
       q: compactQtyMode(campaign.productScope, campaign.quantityCondition),
       ct: CT_MAP[campaign.customerType] ?? "e",
+      sv: 1,
       ...(campaign.customerTags.length ? { tg: campaign.customerTags } : {}),
       ...(campaign.variantIds?.length ? { vs: campaign.variantIds } : {}),
+      ...compactScheduleFields(campaign),
+      ...compactCountdownDisplayFields(campaign),
       t: compactTiers(campaign.tiers),
     };
 
@@ -314,19 +401,19 @@ export function buildCompactRuleForProduct(args: {
   productId: string;
 }): CompactProductRule {
   const { campaign, productId } = args;
-  const label =
-    (campaign.displayName && campaign.displayName.trim()) ||
-    campaign.campaignName;
   return {
     c: campaign.id,
-    m: label.slice(0, 80),
+    ...compactRuleMessageField(campaign.displayName),
     q: compactQtyMode(campaign.productScope, campaign.quantityCondition),
     ct: CT_MAP[campaign.customerType] ?? "e",
+    sv: 1,
     ...(campaign.customerTags.length ? { tg: campaign.customerTags } : {}),
     ...(campaign.variantIds?.length ? { vs: campaign.variantIds } : {}),
     ...(campaign.collectionIdsByProduct?.[productId]?.length
       ? { cx: campaign.collectionIdsByProduct[productId] }
       : {}),
+    ...compactScheduleFields(campaign),
+    ...compactCountdownDisplayFields(campaign),
     t: compactTiers(campaign.tiers),
   };
 }

@@ -19,6 +19,7 @@ query CartInput($customerSegmentTags: [String!] = []) {
       cost {
         subtotalAmount {
           amount
+          currencyCode
         }
       }
       merchandise {
