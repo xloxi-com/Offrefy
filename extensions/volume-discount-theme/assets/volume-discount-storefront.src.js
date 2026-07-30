@@ -4293,6 +4293,7 @@
       panel.style.removeProperty("--offrefy-fw-body");
       panel.style.removeProperty("--offrefy-fw-strong");
       panel._offrefyOnPick = null;
+      panel._offrefyClose = null;
       panel._offrefyOwnerBox = null;
       panel._offrefyOwnerMount = null;
       panel._offrefyPortalHome = null;
@@ -4378,6 +4379,9 @@
       panel._offrefyOnPick = function (vid, node) {
         applyVdVariantChoice(vid, node);
       };
+      panel._offrefyClose = function () {
+        closeAllVdVariantPickers();
+      };
       positionPortaledVdPanel(panel, trigger);
     }
 
@@ -4416,42 +4420,33 @@
       var cardsWrap = mountEl.querySelector(".offrefy-cards");
       if (cardsWrap) cardsWrap.classList.remove("offrefy-cards--vsel-open");
       if (root) root.classList.remove("offrefy-theme--vsel-open");
-      teardownVdPortalListeners();
-    }
-
-    function repositionOpenVdPortal() {
-      var openBox = mountEl.querySelector("[data-offrefy-vd-vsel].is-open");
-      if (!openBox) return;
-      var trigger = openBox.querySelector("[data-offrefy-vd-vsel-trigger]");
-      var panel =
-        document.querySelector(".offrefy-vd-vsel__panel.is-portaled") ||
-        openBox.querySelector("[data-offrefy-vd-vsel-panel]");
-      if (panel && trigger && panel._offrefyOwnerBox === openBox) {
-        positionPortaledVdPanel(panel, trigger);
-      }
-    }
-
-    function teardownVdPortalListeners() {
-      /* Global scroll/resize listener is shared — nothing per-mount to remove. */
     }
 
     function setupVdPortalListeners() {
-      if (offrefyNs()._offrefyVdPortalReposition) return;
-      offrefyNs()._offrefyVdPortalReposition = true;
-      var tick = function () {
+      if (offrefyNs()._offrefyVdPortalScrollClose) return;
+      offrefyNs()._offrefyVdPortalScrollClose = true;
+      /* Page scroll/resize: close menu so it never floats away from the trigger.
+         Keep open when the user scrolls inside the portaled options list. */
+      var onScrollOrResize = function (ev) {
+        var t = ev && ev.target;
+        if (
+          t &&
+          t.nodeType === 1 &&
+          t.closest &&
+          t.closest(".offrefy-vd-vsel__panel.is-portaled")
+        ) {
+          return;
+        }
         var panels = document.querySelectorAll(
           ".offrefy-vd-vsel__panel.is-portaled",
         );
         for (var i = 0; i < panels.length; i++) {
-          var panel = panels[i];
-          var box = panel._offrefyOwnerBox;
-          var trigger =
-            box && box.querySelector("[data-offrefy-vd-vsel-trigger]");
-          if (panel && trigger) positionPortaledVdPanel(panel, trigger);
+          var closeFn = panels[i]._offrefyClose;
+          if (typeof closeFn === "function") closeFn();
         }
       };
-      window.addEventListener("scroll", tick, true);
-      window.addEventListener("resize", tick);
+      window.addEventListener("scroll", onScrollOrResize, true);
+      window.addEventListener("resize", onScrollOrResize);
     }
 
     function scrollToAtc() {
@@ -5206,6 +5201,7 @@
                   panel.style.removeProperty("bottom");
                   panel.style.removeProperty("max-height");
                   panel._offrefyOnPick = null;
+                  panel._offrefyClose = null;
                   panel._offrefyOwnerBox = null;
                   panel._offrefyOwnerMount = null;
                   panel._offrefyPortalHome = null;
@@ -5342,7 +5338,7 @@
     }, 2500);
     trackImpression(campaign, root.getAttribute("data-product-id"));
     offrefyNs().embed = offrefyNs().embed || {};
-    offrefyNs().embed.version = "1.31.12";
+    offrefyNs().embed.version = "1.31.13";
 
   }
   /**
