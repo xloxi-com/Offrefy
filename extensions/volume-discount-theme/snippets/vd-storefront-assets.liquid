@@ -41,7 +41,7 @@
 %}
 <script>
 (function () {
-  var VD_ASSET_VERSION = "1.31.13";
+  var VD_ASSET_VERSION = "1.31.14";
   /* App host for rare hosted-asset fallback — not the merchant shop origin. */
   var APP_ORIGIN = "https://offrey.xloxi.com";
 
@@ -150,26 +150,8 @@
     loc = String(loc).toLowerCase().split("-")[0];
     try {
       if (sessionStorage.getItem("vd_locale_attr") === loc) return;
+      sessionStorage.setItem("vd_locale_attr", loc);
     } catch (e) {}
-    var root = "/";
-    try {
-      if (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) {
-        root = window.Shopify.routes.root;
-        if (root.slice(-1) !== "/") root += "/";
-      }
-    } catch (e) {}
-    fetch(root + "cart/update.js", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ attributes: { vd_locale: loc } }),
-    })
-      .then(function () {
-        try {
-          sessionStorage.setItem("vd_locale_attr", loc);
-        } catch (e) {}
-      })
-      .catch(function () {});
   }
   var deferLocale =
     typeof requestIdleCallback === "function"

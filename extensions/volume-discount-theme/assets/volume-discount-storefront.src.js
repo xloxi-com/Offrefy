@@ -323,23 +323,13 @@
     }
   }
 
-  function syncOffrefyCartAttributes(attribution) {
-    if (!attribution || !attribution.campaignId) return Promise.resolve();
-    var attrs = {};
-    attrs[OFFREFY_CART_FLAG_ATTR] = "1";
-    attrs[OFFREFY_CART_CAMPAIGN_ATTR] = String(attribution.campaignId);
-    if (attribution.productId) {
-      attrs[OFFREFY_CART_PRODUCT_ATTR] = String(attribution.productId);
-    }
-    return fetch("/cart/update.js", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({ attributes: attrs }),
-    }).catch(function () {});
+  /**
+   * Do not write Offrefy keys onto cart attributes — they become order
+   * "Additional details". Attribution stays on private line item properties
+   * (`_offrefy*`) plus analytics events.
+   */
+  function syncOffrefyCartAttributes() {
+    return Promise.resolve();
   }
 
   function trackAnalyticsEvent(payload) {
@@ -1230,10 +1220,127 @@
 
   var VD_CART_LOCALE_ATTR = "vd_locale";
   var VD_LOCKED_PRODUCTS_ATTR = "vd_locked_products";
+  var VD_LOCKED_SESSION_KEY = "vd_locked_products";
+  /** Legacy cart keys that surface on Shopify admin order Additional details. */
+  var VD_ORDER_VISIBLE_CART_ATTRS = [
+    VD_CART_LOCALE_ATTR,
+    VD_LOCKED_PRODUCTS_ATTR,
+    OFFREFY_CART_FLAG_ATTR,
+    OFFREFY_CART_CAMPAIGN_ATTR,
+    OFFREFY_CART_PRODUCT_ATTR,
+  ];
   var VD_MAX_DISCOUNT_PRODUCTS_STANDARD = 500;
   var vdLastSyncedCartLocale = "";
   var vdLastSyncedLockedProducts = "";
   var vdCachedMaxDiscountProducts = VD_MAX_DISCOUNT_PRODUCTS_STANDARD;
+  var vdLegacyCartAttrClearInFlight = null;
+  var vdLegacyCartAttrsCleared = false;
+
+  function readLockedProductsSession() {
+    try {
+      return String(sessionStorage.getItem(VD_LOCKED_SESSION_KEY) || "");
+    } catch (e) {
+      void e;
+      return "";
+    }
+  }
+
+  function writeLockedProductsSession(value) {
+    try {
+      var s = String(value || "");
+      if (s) sessionStorage.setItem(VD_LOCKED_SESSION_KEY, s);
+      else sessionStorage.removeItem(VD_LOCKED_SESSION_KEY);
+    } catch (e) {
+      void e;
+    }
+  }
+
+  /** Strip app cart attributes so they never copy onto new orders. */
+  function clearOrderVisibleVdCartAttributes(cart) {
+    if (vdLegacyCartAttrsCleared) return Promise.resolve(cart || null);
+    if (vdLegacyCartAttrClearInFlight) {
+      return vdLegacyCartAttrClearInFlight.then(function () {
+        return cart || null;
+      });
+    }
+
+    function hasLegacy(attrs) {
+      if (!attrs || typeof attrs !== "object") return false;
+      for (var i = 0; i < VD_ORDER_VISIBLE_CART_ATTRS.length; i++) {
+        var key = VD_ORDER_VISIBLE_CART_ATTRS[i];
+        if (attrs[key] != null && String(attrs[key]).length) return true;
+      }
+      return false;
+    }
+
+    var work = (
+      cart
+        ? Promise.resolve(cart)
+        : fetch(cartJsUrl(), {
+            credentials: "same-origin",
+            headers: { Accept: "application/json" },
+          })
+            .then(function (r) {
+              return r.ok ? r.json() : null;
+            })
+            .catch(function () {
+              return null;
+            })
+    ).then(function (c) {
+      if (!c || !hasLegacy(c.attributes)) {
+        vdLegacyCartAttrsCleared = true;
+        return c;
+      }
+      /* migrate locked list into session before wiping cart attr */
+      try {
+        var legacyLocked = String(
+          (c.attributes && c.attributes[VD_LOCKED_PRODUCTS_ATTR]) || "",
+        );
+        if (legacyLocked && !readLockedProductsSession()) {
+          writeLockedProductsSession(legacyLocked);
+          vdLastSyncedLockedProducts = legacyLocked;
+        }
+      } catch (eMig) {
+        void eMig;
+      }
+      var attrs = {};
+      for (var j = 0; j < VD_ORDER_VISIBLE_CART_ATTRS.length; j++) {
+        attrs[VD_ORDER_VISIBLE_CART_ATTRS[j]] = "";
+      }
+      return fetch(shopifyRoutesRoot() + "cart/update.js", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ attributes: attrs }),
+      })
+        .then(function () {
+          vdLegacyCartAttrsCleared = true;
+          return c;
+        })
+        .catch(function () {
+          return c;
+        });
+    });
+
+    vdLegacyCartAttrClearInFlight = work.then(
+      function (result) {
+        if (vdLegacyCartAttrClearInFlight === work) {
+          vdLegacyCartAttrClearInFlight = null;
+        }
+        return result;
+      },
+      function (err) {
+        if (vdLegacyCartAttrClearInFlight === work) {
+          vdLegacyCartAttrClearInFlight = null;
+        }
+        throw err;
+      },
+    );
+    return vdLegacyCartAttrClearInFlight;
+  }
 
   function resolveMaxDiscountProducts(cfg) {
     if (
@@ -1293,10 +1400,15 @@
         ? maxProducts
         : resolveMaxDiscountProducts(null);
     if (!cart || !Array.isArray(cart.items)) return [];
-    var locked = parseLockedProductIds(
-      cart.attributes && cart.attributes[VD_LOCKED_PRODUCTS_ATTR],
-      max,
-    );
+    var lockedRaw = readLockedProductsSession();
+    if (
+      !lockedRaw &&
+      cart.attributes &&
+      cart.attributes[VD_LOCKED_PRODUCTS_ATTR]
+    ) {
+      lockedRaw = String(cart.attributes[VD_LOCKED_PRODUCTS_ATTR] || "");
+    }
+    var locked = parseLockedProductIds(lockedRaw, max);
     var inCart = {};
     for (var i = 0; i < cart.items.length; i++) {
       var pid = productIdFromCartItem(cart.items[i]);
@@ -1319,7 +1431,7 @@
     return locked;
   }
 
-  /** Keep discount slots stable: already-locked products stay; only new products fill open slots. */
+  /** Keep discount slots stable in sessionStorage (not cart — avoids order Additional details). */
   var vdLockedSyncInFlight = null;
   function syncCartLockedProductsAttribute(cart) {
     if (!cart && vdLockedSyncInFlight) return vdLockedSyncInFlight;
@@ -1339,28 +1451,18 @@
 
     var promise = work.then(function (c) {
       if (!c) return null;
+      if (!vdLastSyncedLockedProducts) {
+        vdLastSyncedLockedProducts = readLockedProductsSession();
+      }
       var next = computeLockedProductIds(c);
       var nextStr = next.join(",");
-      if (!nextStr && !vdLastSyncedLockedProducts) return c;
-      if (nextStr === vdLastSyncedLockedProducts) return c;
-      vdLastSyncedLockedProducts = nextStr;
-      var attrs = {};
-      attrs[VD_LOCKED_PRODUCTS_ATTR] = nextStr;
-      return fetch(shopifyRoutesRoot() + "cart/update.js", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({ attributes: attrs }),
-      })
-        .then(function () {
-          return c;
-        })
-        .catch(function () {
-          return c;
-        });
+      if (nextStr !== vdLastSyncedLockedProducts) {
+        vdLastSyncedLockedProducts = nextStr;
+        writeLockedProductsSession(nextStr);
+      }
+      return clearOrderVisibleVdCartAttributes(c).then(function () {
+        return c;
+      });
     });
 
     function clearLockedInFlight() {
@@ -1407,7 +1509,7 @@
     return isVdAttributeOnlyCartUpdate(init, VD_CART_LOCALE_ATTR);
   }
 
-  /** Persist active theme locale on the cart so the discount function badge matches /fr/, /de/, etc. */
+  /** Persist storefront locale in sessionStorage only (never cart / order notes). */
   function syncCartLocaleAttribute(force) {
     var locale = resolveStorefrontLocale(null);
     if (!locale) locale = "en";
@@ -1420,17 +1522,7 @@
     } catch (e) {
       void e;
     }
-    var attrs = {};
-    attrs[VD_CART_LOCALE_ATTR] = locale;
-    return fetch(shopifyRoutesRoot() + "cart/update.js", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({ attributes: attrs }),
-    }).catch(function () {});
+    return clearOrderVisibleVdCartAttributes(null).then(function () {});
   }
 
   function cartJsUrl() {
