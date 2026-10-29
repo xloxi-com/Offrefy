@@ -19,12 +19,16 @@ function resolveAppScopes(): string[] {
   return fromEnv.length > 0 ? fromEnv : [...SHOPIFY_APP_SCOPES];
 }
 
+// Cloudflare Workers: process.env may only be filled from bindings in fetch().
+// Empty appUrl crashes module init (Error 1101) — keep a valid origin fallback.
 const shopify = shopifyApp({
-  apiKey: process.env.SHOPIFY_API_KEY,
-  apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
+  apiKey: process.env.SHOPIFY_API_KEY || "missing-shopify-api-key",
+  apiSecretKey: process.env.SHOPIFY_API_SECRET || "missing-shopify-api-secret",
   apiVersion: ApiVersion.October25,
   scopes: resolveAppScopes(),
-  appUrl: process.env.SHOPIFY_APP_URL || "",
+  appUrl:
+    process.env.SHOPIFY_APP_URL ||
+    "https://offrefy.nirojannirojan68.workers.dev",
   authPathPrefix: "/auth",
   // Hoisted @shopify/shopify-api vs nested copy under shopify-app-react-router — types differ; runtime is fine.
   // @ts-expect-error SessionStorage / Session mismatch from duplicate shopify-api installations
