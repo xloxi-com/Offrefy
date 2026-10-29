@@ -1,43 +1,35 @@
+import fs from "node:fs";
 import pg from "pg";
 
-const url =
-  process.env.DATABASE_URL ||
-  "postgresql://postgres.trvnpmgiepaijryvrtth:VIv1JBdFrxFp2EKk@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true";
-
-async function tryConnect(label, config) {
-  const client = new pg.Client(config);
-  try {
-    await client.connect();
-    const r = await client.query(
-      `SELECT 1 AS ok, to_regclass('public."Session"') AS session_table`,
-    );
-    console.log(label, "OK", r.rows[0]);
-    await client.end();
-    return true;
-  } catch (e) {
-    console.log(label, "FAIL", e.message);
-    try {
-      await client.end();
-    } catch {
-      /* ignore */
-    }
-    return false;
-  }
+const env = fs.readFileSync(".env", "utf8");
+const match = env.match(/^DIRECT_URL=(.+)$/m);
+if (!match) {
+  console.error("DIRECT_URL missing");
+  process.exit(1);
 }
+const connectionString = match[1].trim().replace(/^["']|["']$/g, "");
+const client = new pg.Client({
+  connectionString,
+  ssl: { rejectUnauthorized: false },
+  connectionTimeoutMillis: 15000,
+});
 
-await tryConnect("no-ssl", {
-  connectionString: url,
-  connectionTimeoutMillis: 10000,
-});
-await tryConnect("ssl-false", {
-  connectionString: url,
-  ssl: { rejectUnauthorized: false },
-  connectionTimeoutMillis: 10000,
-});
-await tryConnect("sslmode-require", {
-  connectionString: url.includes("sslmode=")
-    ? url
-    : url + (url.includes("?") ? "&" : "?") + "sslmode=require",
-  ssl: { rejectUnauthorized: false },
-  connectionTimeoutMillis: 10000,
-});
+try {
+  await client.connect();
+  const tables = await client.query(`
+    select table_name
+    from information_schema.tables
+    where table_schema = 'public'
+      and table_name in ('Session', 'session', 'VolumeDiscountCampaign')
+    order by table_name
+  `);
+  console.log("TABLES", tables.rows);
+  const sessionCount = await client.query(
+    `select count(*)::int as n from "Session"`,
+  ).catch((e) => ({ rows: [{ error: e.message }] }));
+  console.log("SESSION", sessionCount.rows[0]);
+  await client.end();
+} catch (error) {
+  console.error("DB_FAIL", error.message);
+  process.exit(1);
+}

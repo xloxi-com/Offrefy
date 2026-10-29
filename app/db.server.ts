@@ -99,10 +99,13 @@ function createPrismaClient(): AppPrismaClient {
     global.prismaPoolGlobal ??
     new pg.Pool({
       connectionString: datasourceUrl,
-      // Hyperdrive docs: keep Worker-side pool small; Hyperdrive pools to origin.
-      max: usingHyperdrive() ? 5 : 3,
-      idleTimeoutMillis: 10_000,
-      connectionTimeoutMillis: 10_000,
+      // Hyperdrive pools to origin — Worker-side max must stay 1 or isolates
+      // exhaust slots ("Timed out while waiting for an open slot in the pool")
+      // and Shopify auth fails → embedded Admin "Application Error".
+      max: usingHyperdrive() ? 1 : 3,
+      idleTimeoutMillis: usingHyperdrive() ? 5_000 : 10_000,
+      connectionTimeoutMillis: usingHyperdrive() ? 15_000 : 10_000,
+      allowExitOnIdle: true,
       ...(needsTls(datasourceUrl)
         ? { ssl: { rejectUnauthorized: false } }
         : {}),
