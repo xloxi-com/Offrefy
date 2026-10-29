@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "offrefy",
+  "compatibility_date": "2026-10-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "./workers/app.ts",
+  "observability": {
+    "enabled": true
+  },
+  "triggers": {
+    "crons": ["0 0 * * *"]
+  }
+}

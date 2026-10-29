@@ -1,5 +1,9 @@
-import { handleRequest as vercelHandleRequest } from "@vercel/react-router/entry.server";
+import { PassThrough } from "node:stream";
+import { createReadableStreamFromReadable } from "@react-router/node";
+import { isbot } from "isbot";
 import type { AppLoadContext, EntryContext } from "react-router";
+import { ServerRouter } from "react-router";
+import { renderToPipeableStream } from "react-dom/server";
 import { addDocumentResponseHeaders } from "./shopify.server";
 import { ensureLocalScheduledSyncTicker } from "./services/scheduledVolumeDiscountSync.server";
 
@@ -13,14 +17,38 @@ export default async function handleRequest(
   responseStatusCode: number,
   responseHeaders: Headers,
   reactRouterContext: EntryContext,
-  loadContext?: AppLoadContext,
+  _loadContext?: AppLoadContext,
 ) {
   addDocumentResponseHeaders(request, responseHeaders);
-  return vercelHandleRequest(
-    request,
-    responseStatusCode,
-    responseHeaders,
-    reactRouterContext,
-    loadContext,
-  );
+  const userAgent = request.headers.get("user-agent");
+  const callbackName = isbot(userAgent ?? "") ? "onAllReady" : "onShellReady";
+
+  return new Promise<Response>((resolve, reject) => {
+    const { pipe, abort } = renderToPipeableStream(
+      <ServerRouter context={reactRouterContext} url={request.url} />,
+      {
+        [callbackName]: () => {
+          const body = new PassThrough();
+          const stream = createReadableStreamFromReadable(body);
+          responseHeaders.set("Content-Type", "text/html");
+          resolve(
+            new Response(stream, {
+              headers: responseHeaders,
+              status: responseStatusCode,
+            }),
+          );
+          pipe(body);
+        },
+        onShellError(error) {
+          reject(error);
+        },
+        onError(error) {
+          responseStatusCode = 500;
+          console.error(error);
+        },
+      },
+    );
+
+    setTimeout(abort, streamTimeout + 1000);
+  });
 }

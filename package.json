@@ -4,6 +4,8 @@
   "scripts": {
     "postinstall": "prisma generate",
     "build": "react-router build",
+    "build:cloudflare": "DEPLOY_TARGET=cloudflare react-router build",
+    "deploy:cloudflare": "DEPLOY_TARGET=cloudflare react-router build && wrangler deploy",
     "dev": "node scripts/free-shopify-ports.mjs && shopify app:dev",
     "config:link": "shopify app config link",
     "generate": "shopify app generate",
@@ -49,6 +51,7 @@
     "vite-tsconfig-paths": "^5.1.4"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.66.0",
     "@shopify/api-codegen-preset": "^1.2.0",
     "@shopify/cli": "3.84.1",
     "@shopify/polaris-types": "^1.0.1",
@@ -70,7 +73,8 @@
     "prettier": "^3.6.2",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.9.3",
-    "vite": "^6.3.6"
+    "vite": "^6.3.6",
+    "wrangler": "^4.155.0"
   },
   "workspaces": [
     "extensions/*"

@@ -1,7 +1,12 @@
 import { reactRouter } from "@react-router/dev/vite";
+import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, type UserConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
+
+const useCloudflare =
+  process.env.WORKERS_CI === "1" ||
+  process.env.DEPLOY_TARGET === "cloudflare";
 
 // Related: https://github.com/remix-run/remix/issues/2835#issuecomment-1144102176
 // Replace the HOST env var with SHOPIFY_APP_URL so that it doesn't break the Vite server.
@@ -39,9 +44,14 @@ if (host === "localhost") {
 export default defineConfig({
   // Prisma must run from Node, not a Vite SSR bundle, or model delegates
   // (e.g. volumeDiscountCampaign.findMany) end up undefined.
-  ssr: {
-    external: ["@prisma/client"],
-  },
+  // Cloudflare Vite plugin forbids resolve.external in the Worker env.
+  ...(useCloudflare
+    ? {}
+    : {
+        ssr: {
+          external: ["@prisma/client"],
+        },
+      }),
   server: {
     allowedHosts: [host],
     cors: {
@@ -56,6 +66,10 @@ export default defineConfig({
   },
   plugins: [
     tailwindcss(),
+    // Only on Cloudflare Workers Builds — keeps `shopify app:dev` on Node/Vercel.
+    ...(useCloudflare
+      ? [cloudflare({ viteEnvironment: { name: "ssr" } })]
+      : []),
     reactRouter(),
     tsconfigPaths(),
   ],
