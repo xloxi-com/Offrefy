@@ -55,7 +55,7 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.66.0",
     "@shopify/api-codegen-preset": "^1.2.0",
-    "@shopify/cli": "3.84.1",
+    "@shopify/cli": "^3.94.3",
     "@shopify/polaris-types": "^1.0.1",
     "@tailwindcss/vite": "^4.2.2",
     "@types/eslint": "^9.6.1",
