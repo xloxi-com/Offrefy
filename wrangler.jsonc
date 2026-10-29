@@ -22,29 +22,15 @@
 			"id": "d74bcb0f876e4b4681ba76aa2b7d76bb"
 		}
 	],
-	// Support Chat — messages as JSON objects in R2 (not in repo).
-	"r2_buckets": [
-		{
-			"binding": "SUPPORT_CHAT_R2",
-			"bucket_name": "offrefy-support-chat"
-		}
-	],
-	"durable_objects": {
-		"bindings": [
-			{
-				"name": "SUPPORT_CHAT_ROOM",
-				"class_name": "SupportChatRoom"
-			}
-		]
-	},
+	// Remove Support Chat Durable Object (was added then fully removed).
 	"migrations": [
 		{
 			"tag": "v1-support-chat-room",
-			"new_classes": ["SupportChatRoom"]
+			"new_sqlite_classes": ["SupportChatRoom"]
+		},
+		{
+			"tag": "v2-remove-support-chat-room",
+			"deleted_classes": ["SupportChatRoom"]
 		}
-	],
-	"vars": {
-		"SUPPORT_EMAIL": "info@xloxi.com",
-		"SUPPORT_CHAT_REPLY_DOMAIN": "chat-replies.xloxi.com"
-	}
+	]
 }
