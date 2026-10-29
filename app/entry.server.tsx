@@ -1,7 +1,9 @@
 import { isbot } from "isbot";
 import type { AppLoadContext, EntryContext } from "react-router";
 import { ServerRouter } from "react-router";
-import { renderToReadableStream } from "react-dom/server";
+// Node's react-dom/server resolves to server.node.js (pipeable only).
+// Readable streams live on the browser build — needed for Vite SSR + Workers.
+import { renderToReadableStream } from "react-dom/server.browser";
 import { addDocumentResponseHeaders } from "./shopify.server";
 import { ensureLocalScheduledSyncTicker } from "./services/scheduledVolumeDiscountSync.server";
 

@@ -2,6 +2,7 @@ import { createRequestHandler } from "react-router";
 
 type CloudflareEnv = Record<string, unknown> & {
   CRON_SECRET?: string;
+  HYPERDRIVE?: { connectionString: string };
 };
 
 type CloudflareCtx = {
@@ -19,6 +20,11 @@ function applyEnvToProcess(env: CloudflareEnv) {
     if (typeof value !== "string") continue;
     // Always prefer Worker secrets/vars over any stale process.env from the isolate.
     process.env[key] = value;
+  }
+  // Hyperdrive provides a Worker-local pooled TCP path to Postgres (direct pg times out).
+  if (env.HYPERDRIVE?.connectionString) {
+    process.env.DATABASE_URL = env.HYPERDRIVE.connectionString;
+    process.env.CF_HYPERDRIVE = "1";
   }
   // Fallback when secret not set yet — keeps shopifyApp() from throwing on "".
   if (!process.env.SHOPIFY_APP_URL) {

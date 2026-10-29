@@ -41,10 +41,17 @@ function stripWrappingQuotes(value: string): string {
   return v;
 }
 
+/** True when Workers wired Hyperdrive into DATABASE_URL (see workers/app.ts). */
+function usingHyperdrive(): boolean {
+  return process.env.CF_HYPERDRIVE === "1";
+}
+
 /** Append Supabase/PgBouncer-friendly pool params for serverless when missing from DATABASE_URL. */
 function runtimeDatasourceUrl(): string | undefined {
   const raw = stripWrappingQuotes(process.env.DATABASE_URL ?? "");
   if (!raw) return undefined;
+  // Hyperdrive already pools — leave its connection string untouched.
+  if (usingHyperdrive()) return raw;
   try {
     const url = new URL(raw);
     if (!url.searchParams.has("pgbouncer") && url.port === "6543") {
@@ -57,8 +64,6 @@ function runtimeDatasourceUrl(): string | undefined {
     if (!url.searchParams.has("pool_timeout")) {
       url.searchParams.set("pool_timeout", "10");
     }
-    // TLS is enabled on the pg.Pool below (rejectUnauthorized: false). Do not set
-    // sslmode=require here — it can force verify-full and fail on Supabase's chain.
     return url.toString();
   } catch {
     return raw;
@@ -66,6 +71,8 @@ function runtimeDatasourceUrl(): string | undefined {
 }
 
 function needsTls(connectionString: string): boolean {
+  // Hyperdrive terminates TLS to origin; Worker↔Hyperdrive must not force custom ssl.
+  if (usingHyperdrive()) return false;
   try {
     const host = new URL(connectionString).hostname;
     return host !== "localhost" && host !== "127.0.0.1";
@@ -76,8 +83,9 @@ function needsTls(connectionString: string): boolean {
 
 function createPrismaClient(): AppPrismaClient {
   /**
-   * Supabase: use pooler URL on DATABASE_URL (port 6543, ?pgbouncer=true) for runtime.
-   * Use DIRECT_URL (port 5432) for migrations only. Keeps serverless/worker warm paths fast.
+   * Workers: DATABASE_URL comes from Hyperdrive (direct Supabase :5432 origin).
+   * Node/Vercel: use pooler URL on DATABASE_URL (port 6543, ?pgbouncer=true).
+   * DIRECT_URL (port 5432) is for migrations only.
    * `engineType = "client"` requires a driver adapter (works on Node, Vercel, and Workers).
    */
   const datasourceUrl = runtimeDatasourceUrl();
@@ -91,10 +99,10 @@ function createPrismaClient(): AppPrismaClient {
     global.prismaPoolGlobal ??
     new pg.Pool({
       connectionString: datasourceUrl,
-      max: 3,
+      // Hyperdrive docs: keep Worker-side pool small; Hyperdrive pools to origin.
+      max: usingHyperdrive() ? 5 : 3,
       idleTimeoutMillis: 10_000,
       connectionTimeoutMillis: 10_000,
-      // Cloudflare Workers → Supabase: TLS required; pooler uses a chain Node rejects as self-signed.
       ...(needsTls(datasourceUrl)
         ? { ssl: { rejectUnauthorized: false } }
         : {}),

@@ -1,13 +1,23 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "offrefy",
-  "compatibility_date": "2026-10-29",
-  "compatibility_flags": ["nodejs_compat"],
-  "main": "./workers/app.ts",
-  "observability": {
-    "enabled": true
-  },
-  "triggers": {
-    "crons": ["0 0 * * *"]
-  }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "offrefy",
+	"compatibility_date": "2026-10-29",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"main": "./workers/app.ts",
+	"observability": {
+		"enabled": true
+	},
+	"triggers": {
+		"crons": [
+			"0 0 * * *"
+		]
+	},
+	"hyperdrive": [
+		{
+			"binding": "HYPERDRIVE",
+			"id": "cfdf18cb05494c38923bc02fe9a1a7b1"
+		}
+	]
 }
