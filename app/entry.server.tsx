@@ -7,7 +7,14 @@ import { renderToPipeableStream } from "react-dom/server";
 import { addDocumentResponseHeaders } from "./shopify.server";
 import { ensureLocalScheduledSyncTicker } from "./services/scheduledVolumeDiscountSync.server";
 
-ensureLocalScheduledSyncTicker();
+const isCloudflareWorker =
+  typeof navigator !== "undefined" &&
+  navigator.userAgent === "Cloudflare-Workers";
+
+// Local Node/Vercel only — Workers forbid timers at module scope.
+if (!isCloudflareWorker) {
+  ensureLocalScheduledSyncTicker();
+}
 
 /** Allow slow DB / tunnel; aborting the stream early can yield incomplete HTML. */
 export const streamTimeout = 25000;

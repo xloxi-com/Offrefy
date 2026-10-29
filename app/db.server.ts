@@ -1,25 +1,16 @@
 import "./env.server";
-import { createRequire } from "node:module";
-import path from "node:path";
-import type { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "@prisma/client";
+import pg from "pg";
 
-/**
- * Resolve Prisma from the app root. Vite’s SSR runner can make
- * `createRequire(import.meta.url)` point at the wrong place, which loads an
- * empty client (no `volumeDiscountCampaign.findMany`).
- */
-const requireFromRoot = createRequire(
-  path.join(process.cwd(), "package.json"),
-);
-const prismaPkg = requireFromRoot("@prisma/client") as typeof import("@prisma/client");
-const { PrismaClient: PrismaClientConstructor } = prismaPkg;
-
-/** Generated client at app root — use explicit import type so IDE/tsc see all models. */
+/** Generated client — typings follow `@prisma/client`. */
 export type AppPrismaClient = PrismaClient;
 
 declare global {
   // eslint-disable-next-line no-var
   var prismaGlobal: AppPrismaClient | undefined;
+  // eslint-disable-next-line no-var
+  var prismaPoolGlobal: pg.Pool | undefined;
 }
 
 function clientHasExpectedModels(client: AppPrismaClient | undefined): boolean {
@@ -64,10 +55,28 @@ function createPrismaClient(): AppPrismaClient {
   /**
    * Supabase: use pooler URL on DATABASE_URL (port 6543, ?pgbouncer=true) for runtime.
    * Use DIRECT_URL (port 5432) for migrations only. Keeps serverless/worker warm paths fast.
+   * `engineType = "client"` requires a driver adapter (works on Node, Vercel, and Workers).
    */
   const datasourceUrl = runtimeDatasourceUrl();
-  return new PrismaClientConstructor({
-    ...(datasourceUrl ? { datasourceUrl } : {}),
+  if (!datasourceUrl) {
+    throw new Error(
+      "DATABASE_URL is not set. Configure it as a Worker secret / env var.",
+    );
+  }
+
+  const pool =
+    global.prismaPoolGlobal ??
+    new pg.Pool({
+      connectionString: datasourceUrl,
+      max: 3,
+      idleTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 10_000,
+    });
+  global.prismaPoolGlobal = pool;
+
+  const adapter = new PrismaPg(pool);
+  return new PrismaClient({
+    adapter,
     log:
       process.env.PRISMA_LOG === "query"
         ? ["query", "warn", "error"]
@@ -87,7 +96,18 @@ function getPrisma(): AppPrismaClient {
   return client;
 }
 
-/** Shared client — typings follow the generated client at `process.cwd()`. */
-export const prisma = getPrisma();
+/**
+ * Lazy proxy — Cloudflare Workers forbid I/O / timers at module top-level.
+ * Pool + PrismaClient are created on first property access inside a request.
+ */
+export const prisma: AppPrismaClient = new Proxy({} as AppPrismaClient, {
+  get(_target, prop, receiver) {
+    const client = getPrisma();
+    const value = Reflect.get(client as object, prop, receiver);
+    return typeof value === "function"
+      ? (value as (...args: unknown[]) => unknown).bind(client)
+      : value;
+  },
+});
 
 export default prisma;

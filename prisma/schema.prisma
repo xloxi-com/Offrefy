@@ -3,7 +3,9 @@
 // Do not wrap the DB password in [brackets] inside the URI.
 
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
+  // No Rust query-engine binary — required for Cloudflare Workers bundling.
+  engineType = "client"
 }
 
 datasource db {

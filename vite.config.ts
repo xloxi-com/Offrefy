@@ -1,3 +1,5 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { reactRouter } from "@react-router/dev/vite";
 import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
@@ -7,6 +9,9 @@ import tsconfigPaths from "vite-tsconfig-paths";
 const useCloudflare =
   process.env.WORKERS_CI === "1" ||
   process.env.DEPLOY_TARGET === "cloudflare";
+
+const rootDir = path.dirname(fileURLToPath(import.meta.url));
+const prismaClientDir = path.join(rootDir, "node_modules", ".prisma", "client");
 
 // Related: https://github.com/remix-run/remix/issues/2835#issuecomment-1144102176
 // Replace the HOST env var with SHOPIFY_APP_URL so that it doesn't break the Vite server.
@@ -46,7 +51,35 @@ export default defineConfig({
   // (e.g. volumeDiscountCampaign.findMany) end up undefined.
   // Cloudflare Vite plugin forbids resolve.external in the Worker env.
   ...(useCloudflare
-    ? {}
+    ? {
+        // Bundle generated Prisma client instead of leaving bare
+        // `.prisma/client/default` imports that Workers cannot resolve.
+        resolve: {
+          alias: [
+            {
+              // Exact match only — keep `@prisma/client/runtime/*` resolving normally.
+              find: /^@prisma\/client$/,
+              replacement: path.join(prismaClientDir, "wasm.js"),
+            },
+            {
+              find: ".prisma/client/default",
+              replacement: path.join(prismaClientDir, "default.js"),
+            },
+            {
+              find: ".prisma/client",
+              replacement: prismaClientDir,
+            },
+          ],
+          conditions: [
+            "workerd",
+            "worker",
+            "module",
+            "browser",
+            "import",
+            "default",
+          ],
+        },
+      }
     : {
         ssr: {
           external: ["@prisma/client"],
