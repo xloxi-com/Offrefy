@@ -33,71 +33,28 @@ function applyEnvToProcess(env: CloudflareEnv) {
   }
 }
 
-function resetPrismaGlobals() {
-  // Hyperdrive TCP is not safe to reuse across Worker requests via a cached Pool/client.
-  const g = globalThis as typeof globalThis & {
-    prismaGlobal?: unknown;
-    prismaPoolGlobal?: { end?: () => Promise<unknown> };
-  };
-  const pool = g.prismaPoolGlobal;
-  g.prismaGlobal = undefined;
-  g.prismaPoolGlobal = undefined;
-  void pool?.end?.().catch(() => {});
-}
-
 export default {
   async fetch(request: Request, env: CloudflareEnv, ctx: CloudflareCtx) {
     applyEnvToProcess(env);
-    resetPrismaGlobals();
 
     // Temporary DB probe (remove once Application Error is confirmed fixed).
     const probeUrl = new URL(request.url);
     if (probeUrl.pathname === "/__db_ping") {
-      const cs = env.HYPERDRIVE?.connectionString;
-      if (!cs) {
-        return Response.json(
-          { ok: false, error: "HYPERDRIVE binding missing" },
-          { status: 500 },
-        );
-      }
-      const out: Record<string, unknown> = { hyperdrive: false, prisma: false };
       try {
-        const { Client } = await import("pg");
-        const client = new Client({ connectionString: cs });
-        const started = Date.now();
-        await client.connect();
-        const r = await client.query(
-          `SELECT 1 AS ok, to_regclass('public."Session"') AS session_table`,
-        );
-        await client.end();
-        out.hyperdrive = true;
-        out.pgMs = Date.now() - started;
-        out.row = r.rows[0];
-      } catch (error) {
-        out.pgError = error instanceof Error ? error.message : String(error);
-      }
-      try {
-        process.env.DATABASE_URL = cs;
-        process.env.CF_HYPERDRIVE = "1";
-        const { PrismaPg } = await import("@prisma/adapter-pg");
-        const { PrismaClient } = await import("@prisma/client");
-        const adapter = new PrismaPg({ connectionString: cs });
-        const prisma = new PrismaClient({ adapter });
+        const { prisma } = await import("../app/db.server");
         const started = Date.now();
         const count = await prisma.session.count();
-        await prisma.$disconnect();
-        out.prisma = true;
-        out.prismaMs = Date.now() - started;
-        out.sessionCount = count;
+        return Response.json({
+          ok: true,
+          ms: Date.now() - started,
+          sessionCount: count,
+          hyperdrive: process.env.CF_HYPERDRIVE === "1",
+        });
       } catch (error) {
-        out.prismaError =
-          error instanceof Error
-            ? { message: error.message, name: error.name, stack: error.stack?.split("\n").slice(0, 6) }
-            : String(error);
+        const message = error instanceof Error ? error.message : String(error);
+        console.error("[offrefy] __db_ping failed", message);
+        return Response.json({ ok: false, error: message }, { status: 500 });
       }
-      return Response.json(out, {
-        status: out.hyperdrive && out.prisma ? 200 : 500,
-      });
     }
 
     try {
