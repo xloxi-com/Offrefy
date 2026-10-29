@@ -1,9 +1,7 @@
-import { PassThrough } from "node:stream";
-import { createReadableStreamFromReadable } from "@react-router/node";
 import { isbot } from "isbot";
 import type { AppLoadContext, EntryContext } from "react-router";
 import { ServerRouter } from "react-router";
-import { renderToPipeableStream } from "react-dom/server";
+import { renderToReadableStream } from "react-dom/server";
 import { addDocumentResponseHeaders } from "./shopify.server";
 import { ensureLocalScheduledSyncTicker } from "./services/scheduledVolumeDiscountSync.server";
 
@@ -27,35 +25,35 @@ export default async function handleRequest(
   _loadContext?: AppLoadContext,
 ) {
   addDocumentResponseHeaders(request, responseHeaders);
-  const userAgent = request.headers.get("user-agent");
-  const callbackName = isbot(userAgent ?? "") ? "onAllReady" : "onShellReady";
 
-  return new Promise<Response>((resolve, reject) => {
-    const { pipe, abort } = renderToPipeableStream(
+  // Workers have no Node pipeable streams — use Web Streams for CF + Node.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), streamTimeout + 1000);
+
+  let shellErrored = false;
+  try {
+    const body = await renderToReadableStream(
       <ServerRouter context={reactRouterContext} url={request.url} />,
       {
-        [callbackName]: () => {
-          const body = new PassThrough();
-          const stream = createReadableStreamFromReadable(body);
-          responseHeaders.set("Content-Type", "text/html");
-          resolve(
-            new Response(stream, {
-              headers: responseHeaders,
-              status: responseStatusCode,
-            }),
-          );
-          pipe(body);
-        },
-        onShellError(error) {
-          reject(error);
-        },
+        signal: controller.signal,
         onError(error) {
-          responseStatusCode = 500;
+          shellErrored = true;
           console.error(error);
+          responseStatusCode = 500;
         },
       },
     );
 
-    setTimeout(abort, streamTimeout + 1000);
-  });
+    if (isbot(request.headers.get("user-agent") ?? "")) {
+      await body.allReady;
+    }
+
+    responseHeaders.set("Content-Type", "text/html");
+    return new Response(body, {
+      headers: responseHeaders,
+      status: shellErrored ? 500 : responseStatusCode,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }

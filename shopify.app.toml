@@ -2,7 +2,7 @@
 
 client_id = "5bc674730835cd4d44ce63b0da5cbd59"
 name = "Offrefy"
-application_url = "https://offrey.xloxi.com"
+application_url = "https://offrefy.nirojannirojan68.workers.dev"
 embedded = true
 
 [build]
@@ -35,9 +35,13 @@ optional_scopes = [ ]
 use_legacy_install_flow = false
 
 [auth]
-redirect_urls = [ "https://offrey.xloxi.com/auth/callback" ]
+redirect_urls = [
+  "https://offrefy.nirojannirojan68.workers.dev/auth/callback",
+  "https://offrefy.nirojannirojan68.workers.dev/auth/shopify/callback",
+  "https://offrefy.nirojannirojan68.workers.dev/api/auth/callback"
+]
 
 [app_proxy]
-url = "https://offrey.xloxi.com"
+url = "https://offrefy.nirojannirojan68.workers.dev"
 subpath = "volume-discount"
 prefix = "apps"
