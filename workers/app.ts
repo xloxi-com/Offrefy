@@ -2,7 +2,7 @@ import { createRequestHandler } from "react-router";
 
 type CloudflareEnv = Record<string, unknown> & {
   CRON_SECRET?: string;
-  HYPERDRIVE?: { connectionString: string };
+  HYPERDRIVE?: { connectionString?: string };
 };
 
 type CloudflareCtx = {

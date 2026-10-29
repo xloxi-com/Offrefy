@@ -87,7 +87,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   >["session"] | undefined;
 
   try {
-    ({ admin, session } = await authenticate.public.appProxy(request));
+    // Cap session/DB wait — storefront storms must not exhaust Hyperdrive slots
+    // needed by embedded admin authenticate.admin (Application Error).
+    ({ admin, session } = await Promise.race([
+      authenticate.public.appProxy(request),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("app-proxy auth timeout")), 1200);
+      }),
+    ]));
   } catch (e) {
     console.warn("[volume-discount] widget-config app proxy auth failed, trying fallback", e);
   }

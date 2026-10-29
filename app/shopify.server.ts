@@ -33,9 +33,10 @@ const shopify = shopifyApp({
   // Hoisted @shopify/shopify-api vs nested copy under shopify-app-react-router — types differ; runtime is fine.
   // @ts-expect-error SessionStorage / Session mismatch from duplicate shopify-api installations
   sessionStorage: new PrismaSessionStorage(prisma, {
-    // Serverless cold starts + PgBouncer: fail fast between retries instead of 5s×2.
-    connectionRetries: 5,
-    connectionRetryIntervalMs: 500,
+    // Workers + Hyperdrive: fail fast — long retries saturate the pool and
+    // turn storefront app-proxy traffic into admin "Application Error".
+    connectionRetries: 1,
+    connectionRetryIntervalMs: 200,
   }),
   distribution: AppDistribution.AppStore,
   // Free is not a Shopify Billing plan (amount must be > 0).

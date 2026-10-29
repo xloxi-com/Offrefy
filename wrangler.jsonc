@@ -17,7 +17,9 @@
 	"hyperdrive": [
 		{
 			"binding": "HYPERDRIVE",
-			"id": "cfdf18cb05494c38923bc02fe9a1a7b1"
+			// Session-mode pooler :5432 (IPv4). Direct db.*.supabase.co is IPv6-only
+			// on free plans — Hyperdrive cannot reach it and admin auth times out.
+			"id": "d74bcb0f876e4b4681ba76aa2b7d76bb"
 		}
 	]
 }

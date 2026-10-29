@@ -83,7 +83,7 @@ function needsTls(connectionString: string): boolean {
 
 function createPrismaClient(): AppPrismaClient {
   /**
-   * Workers: DATABASE_URL comes from Hyperdrive (direct Supabase :5432 origin).
+   * Workers: DATABASE_URL comes from Hyperdrive (session-mode pooler :5432 / IPv4).
    * Node/Vercel: use pooler URL on DATABASE_URL (port 6543, ?pgbouncer=true).
    * DIRECT_URL (port 5432) is for migrations only.
    * `engineType = "client"` requires a driver adapter (works on Node, Vercel, and Workers).
@@ -95,16 +95,27 @@ function createPrismaClient(): AppPrismaClient {
     );
   }
 
+  // Hyperdrive: pass connectionString straight to the adapter (same path as a
+  // working raw pg.Client). A long-lived pg.Pool on Workers was timing out
+  // even when Hyperdrive itself was healthy (~17ms for Client.connect).
+  if (usingHyperdrive()) {
+    const adapter = new PrismaPg({ connectionString: datasourceUrl });
+    return new PrismaClient({
+      adapter,
+      log:
+        process.env.PRISMA_LOG === "query"
+          ? ["query", "warn", "error"]
+          : ["warn", "error"],
+    });
+  }
+
   const pool =
     global.prismaPoolGlobal ??
     new pg.Pool({
       connectionString: datasourceUrl,
-      // Hyperdrive pools to origin — Worker-side max must stay 1 or isolates
-      // exhaust slots ("Timed out while waiting for an open slot in the pool")
-      // and Shopify auth fails → embedded Admin "Application Error".
-      max: usingHyperdrive() ? 1 : 3,
-      idleTimeoutMillis: usingHyperdrive() ? 5_000 : 10_000,
-      connectionTimeoutMillis: usingHyperdrive() ? 15_000 : 10_000,
+      max: 3,
+      idleTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 10_000,
       allowExitOnIdle: true,
       ...(needsTls(datasourceUrl)
         ? { ssl: { rejectUnauthorized: false } }
