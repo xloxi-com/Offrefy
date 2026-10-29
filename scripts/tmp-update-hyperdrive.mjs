@@ -2,11 +2,17 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 
 const secrets = JSON.parse(fs.readFileSync(".env.cf-secrets.json", "utf8"));
-const connectionString = secrets.DATABASE_URL;
-if (!connectionString) {
+const base = secrets.DATABASE_URL;
+if (!base) {
   console.error("DATABASE_URL missing from .env.cf-secrets.json");
   process.exit(1);
 }
+
+// Session-mode pooler :5432 (IPv4). Transaction :6543 timed out via Hyperdrive.
+const url = new URL(base);
+url.port = "5432";
+url.searchParams.delete("pgbouncer");
+const connectionString = url.toString();
 
 const result = spawnSync(
   "npx",
@@ -19,7 +25,7 @@ const result = spawnSync(
     connectionString,
     "--caching-disabled",
     "--origin-connection-limit",
-    "10",
+    "8",
   ],
   { encoding: "utf8", shell: true },
 );

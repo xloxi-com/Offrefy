@@ -40,15 +40,26 @@ export default {
     // Temporary DB probe (remove once Application Error is confirmed fixed).
     const probeUrl = new URL(request.url);
     if (probeUrl.pathname === "/__db_ping") {
+      const cs = env.HYPERDRIVE?.connectionString;
+      if (!cs) {
+        return Response.json(
+          { ok: false, error: "HYPERDRIVE binding missing" },
+          { status: 500 },
+        );
+      }
       try {
-        const { prisma } = await import("../app/db.server");
+        const { Client } = await import("pg");
+        const client = new Client({ connectionString: cs });
         const started = Date.now();
-        const count = await prisma.session.count();
+        await client.connect();
+        const r = await client.query(
+          `select 1 as ok, count(*)::int as sessions from "Session"`,
+        );
+        await client.end();
         return Response.json({
           ok: true,
           ms: Date.now() - started,
-          sessionCount: count,
-          hyperdrive: process.env.CF_HYPERDRIVE === "1",
+          row: r.rows[0],
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -58,9 +69,14 @@ export default {
     }
 
     try {
-      return await requestHandler(request, {
-        cloudflare: { env, ctx },
-      });
+      const { withHyperdrivePrisma } = await import("../app/db.server");
+      return await withHyperdrivePrisma(
+        () =>
+          requestHandler(request, {
+            cloudflare: { env, ctx },
+          }),
+        ctx.waitUntil,
+      );
     } catch (error) {
       console.error("[offrefy] worker fetch failed", error);
       const message = error instanceof Error ? error.message : String(error);

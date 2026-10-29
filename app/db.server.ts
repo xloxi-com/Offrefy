@@ -1,4 +1,5 @@
 import "./env.server";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import pg from "pg";
@@ -12,6 +13,8 @@ declare global {
   // eslint-disable-next-line no-var
   var prismaPoolGlobal: pg.Pool | undefined;
 }
+
+const hyperdrivePrismaAls = new AsyncLocalStorage<AppPrismaClient>();
 
 function clientHasExpectedModels(client: AppPrismaClient | undefined): boolean {
   const c = client as unknown as {
@@ -83,10 +86,9 @@ function needsTls(connectionString: string): boolean {
 
 function createPrismaClient(): AppPrismaClient {
   /**
-   * Workers: DATABASE_URL comes from Hyperdrive (transaction pooler :6543 / IPv4).
+   * Workers: DATABASE_URL comes from Hyperdrive (session pooler :5432 / IPv4).
    * Node/Vercel: use pooler URL on DATABASE_URL (port 6543, ?pgbouncer=true).
    * DIRECT_URL (port 5432) is for migrations only.
-   * `engineType = "client"` requires a driver adapter (works on Node, Vercel, and Workers).
    */
   const datasourceUrl = runtimeDatasourceUrl();
   if (!datasourceUrl) {
@@ -95,14 +97,23 @@ function createPrismaClient(): AppPrismaClient {
     );
   }
 
-  // One small pool per isolate. Hyperdrive pools to origin; Worker-side max
-  // must stay tiny or Supabase session/transaction limits exhaust (EMAXCONNSESSION).
+  const log =
+    process.env.PRISMA_LOG === "query"
+      ? (["query", "warn", "error"] as const)
+      : (["warn", "error"] as const);
+
+  if (usingHyperdrive()) {
+    // Request-scoped client (see withHyperdrivePrisma). Do not share Pool across requests.
+    const adapter = new PrismaPg({ connectionString: datasourceUrl });
+    return new PrismaClient({ adapter, log: [...log] });
+  }
+
   const pool =
     global.prismaPoolGlobal ??
     new pg.Pool({
       connectionString: datasourceUrl,
-      max: usingHyperdrive() ? 1 : 3,
-      idleTimeoutMillis: usingHyperdrive() ? 5_000 : 10_000,
+      max: 3,
+      idleTimeoutMillis: 10_000,
       connectionTimeoutMillis: 10_000,
       allowExitOnIdle: true,
       ...(needsTls(datasourceUrl)
@@ -114,14 +125,18 @@ function createPrismaClient(): AppPrismaClient {
   const adapter = new PrismaPg(pool);
   return new PrismaClient({
     adapter,
-    log:
-      process.env.PRISMA_LOG === "query"
-        ? ["query", "warn", "error"]
-        : ["warn", "error"],
+    log: [...log],
   });
 }
 
 function getPrisma(): AppPrismaClient {
+  if (usingHyperdrive()) {
+    const fromAls = hyperdrivePrismaAls.getStore();
+    if (fromAls) return fromAls;
+    // Fallback if a module touches prisma outside withHyperdrivePrisma.
+    return createPrismaClient();
+  }
+
   const existing = global.prismaGlobal;
   if (clientHasExpectedModels(existing)) {
     return existing!;
@@ -131,6 +146,25 @@ function getPrisma(): AppPrismaClient {
   const client = createPrismaClient();
   global.prismaGlobal = client;
   return client;
+}
+
+/**
+ * Run a Worker request with one Prisma client for the whole async chain, then disconnect.
+ * Prevents cross-request pg Pool promise leaks on Cloudflare Workers.
+ */
+export async function withHyperdrivePrisma<T>(
+  run: () => Promise<T>,
+  waitUntil: (promise: Promise<unknown>) => void,
+): Promise<T> {
+  if (!usingHyperdrive()) {
+    return run();
+  }
+  const client = createPrismaClient();
+  try {
+    return await hyperdrivePrismaAls.run(client, run);
+  } finally {
+    waitUntil(client.$disconnect().catch(() => {}));
+  }
 }
 
 /**

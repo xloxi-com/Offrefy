@@ -17,8 +17,8 @@
 	"hyperdrive": [
 		{
 			"binding": "HYPERDRIVE",
-			// Transaction-mode pooler :6543 (IPv4). Session mode :5432 hits
-			// EMAXCONNSESSION (pool_size 15) under Worker concurrency.
+			// Session-mode pooler :5432 (IPv4). Transaction :6543 timed out via
+			// Hyperdrive; keep Worker Prisma clients per-request (no shared Pool).
 			"id": "d74bcb0f876e4b4681ba76aa2b7d76bb"
 		}
 	]
