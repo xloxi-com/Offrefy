@@ -1,4 +1,5 @@
 import { createRequestHandler } from "react-router";
+import { withHyperdrivePrisma } from "../app/db.server";
 
 type CloudflareEnv = Record<string, unknown> & {
   CRON_SECRET?: string;
@@ -36,46 +37,14 @@ function applyEnvToProcess(env: CloudflareEnv) {
 export default {
   async fetch(request: Request, env: CloudflareEnv, ctx: CloudflareCtx) {
     applyEnvToProcess(env);
-
-    // Temporary DB probe (remove once Application Error is confirmed fixed).
-    const probeUrl = new URL(request.url);
-    if (probeUrl.pathname === "/__db_ping") {
-      const cs = env.HYPERDRIVE?.connectionString;
-      if (!cs) {
-        return Response.json(
-          { ok: false, error: "HYPERDRIVE binding missing" },
-          { status: 500 },
-        );
-      }
-      try {
-        const { Client } = await import("pg");
-        const client = new Client({ connectionString: cs });
-        const started = Date.now();
-        await client.connect();
-        const r = await client.query(
-          `select 1 as ok, count(*)::int as sessions from "Session"`,
-        );
-        await client.end();
-        return Response.json({
-          ok: true,
-          ms: Date.now() - started,
-          row: r.rows[0],
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error("[offrefy] __db_ping failed", message);
-        return Response.json({ ok: false, error: message }, { status: 500 });
-      }
-    }
-
     try {
-      const { withHyperdrivePrisma } = await import("../app/db.server");
+      // Bind waitUntil — passing ctx.waitUntil unbound throws Illegal invocation.
       return await withHyperdrivePrisma(
         () =>
           requestHandler(request, {
             cloudflare: { env, ctx },
           }),
-        ctx.waitUntil,
+        (promise) => ctx.waitUntil(promise),
       );
     } catch (error) {
       console.error("[offrefy] worker fetch failed", error);
@@ -103,9 +72,13 @@ export default {
       { headers: { Authorization: `Bearer ${secret}` } },
     );
     ctx.waitUntil(
-      requestHandler(request, {
-        cloudflare: { env, ctx },
-      }).catch((error) => {
+      withHyperdrivePrisma(
+        () =>
+          requestHandler(request, {
+            cloudflare: { env, ctx },
+          }),
+        (promise) => ctx.waitUntil(promise),
+      ).catch((error) => {
         console.error("[offrefy] scheduled sync failed", error);
       }),
     );
