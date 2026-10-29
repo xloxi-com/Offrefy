@@ -29,9 +29,21 @@ function clientHasExpectedModels(client: AppPrismaClient | undefined): boolean {
   );
 }
 
+/** Strip accidental quotes from secret/env values (wrangler .env bulk can keep them). */
+function stripWrappingQuotes(value: string): string {
+  const v = value.trim();
+  if (
+    (v.startsWith('"') && v.endsWith('"')) ||
+    (v.startsWith("'") && v.endsWith("'"))
+  ) {
+    return v.slice(1, -1).trim();
+  }
+  return v;
+}
+
 /** Append Supabase/PgBouncer-friendly pool params for serverless when missing from DATABASE_URL. */
 function runtimeDatasourceUrl(): string | undefined {
-  const raw = process.env.DATABASE_URL?.trim();
+  const raw = stripWrappingQuotes(process.env.DATABASE_URL ?? "");
   if (!raw) return undefined;
   try {
     const url = new URL(raw);
@@ -45,9 +57,20 @@ function runtimeDatasourceUrl(): string | undefined {
     if (!url.searchParams.has("pool_timeout")) {
       url.searchParams.set("pool_timeout", "10");
     }
+    // TLS is enabled on the pg.Pool below (rejectUnauthorized: false). Do not set
+    // sslmode=require here — it can force verify-full and fail on Supabase's chain.
     return url.toString();
   } catch {
     return raw;
+  }
+}
+
+function needsTls(connectionString: string): boolean {
+  try {
+    const host = new URL(connectionString).hostname;
+    return host !== "localhost" && host !== "127.0.0.1";
+  } catch {
+    return true;
   }
 }
 
@@ -71,6 +94,10 @@ function createPrismaClient(): AppPrismaClient {
       max: 3,
       idleTimeoutMillis: 10_000,
       connectionTimeoutMillis: 10_000,
+      // Cloudflare Workers → Supabase: TLS required; pooler uses a chain Node rejects as self-signed.
+      ...(needsTls(datasourceUrl)
+        ? { ssl: { rejectUnauthorized: false } }
+        : {}),
     });
   global.prismaPoolGlobal = pool;
 

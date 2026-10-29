@@ -16,9 +16,9 @@ const requestHandler = createRequestHandler(
 /** Copy Worker bindings into process.env before app modules read them. */
 function applyEnvToProcess(env: CloudflareEnv) {
   for (const [key, value] of Object.entries(env)) {
-    if (typeof value === "string" && process.env[key] === undefined) {
-      process.env[key] = value;
-    }
+    if (typeof value !== "string") continue;
+    // Always prefer Worker secrets/vars over any stale process.env from the isolate.
+    process.env[key] = value;
   }
   // Fallback when secret not set yet — keeps shopifyApp() from throwing on "".
   if (!process.env.SHOPIFY_APP_URL) {
