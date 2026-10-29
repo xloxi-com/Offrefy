@@ -2359,11 +2359,12 @@ export function VolumeDiscountCreateView({
                     </BlockStack>
                   </Card>
 
-                  {planCaps.scheduling ? (
-                    <div id="vd-offer-schedule">
+                  <div id="vd-offer-schedule">
                     <CampaignStatusScheduleCard
+                      schedulingLocked={!planCaps.scheduling}
                       scheduleStartEnabled={scheduleStartEnabled}
                       onScheduleStartEnabledChange={(next) => {
+                        if (!planCaps.scheduling) return;
                         setScheduleStartEnabled(next);
                         if (next) {
                           const seed =
@@ -2384,6 +2385,7 @@ export function VolumeDiscountCreateView({
                       }}
                       scheduleStartLocal={countdownStartsAtLocal}
                       onScheduleStartLocalChange={(v) => {
+                        if (!planCaps.scheduling) return;
                         setCountdownStartsAtLocal(v);
                         const iso = datetimeLocalToIsoUtc(v, shopTimezone);
                         const start = iso ? parseOptionalIsoDate(iso) : null;
@@ -2398,6 +2400,7 @@ export function VolumeDiscountCreateView({
                       }}
                       scheduleEndEnabled={scheduleEndEnabled}
                       onScheduleEndEnabledChange={(next) => {
+                        if (!planCaps.scheduling) return;
                         setScheduleEndEnabled(next);
                         if (!next) {
                           patchWidgetDisplay({ showCountdown: false });
@@ -2428,6 +2431,7 @@ export function VolumeDiscountCreateView({
                       }}
                       scheduleEndLocal={countdownEndsAtLocal}
                       onScheduleEndLocalChange={(v) => {
+                        if (!planCaps.scheduling) return;
                         setCountdownEndsAtLocal(v);
                         setScheduleEndEnabled(true);
                         const iso = datetimeLocalToIsoUtc(v, shopTimezone);
@@ -2443,29 +2447,18 @@ export function VolumeDiscountCreateView({
                       shopTimezone={shopTimezone}
                       shopTimezoneLabel={shopTimezoneLabel}
                       showCountdown={widgetDisplay.showCountdown}
-                      onShowCountdownChange={(checked) =>
-                        patchWidgetDisplay({ showCountdown: checked })
-                      }
+                      onShowCountdownChange={(checked) => {
+                        if (!planCaps.countdown) return;
+                        patchWidgetDisplay({ showCountdown: checked });
+                      }}
                       countdownLabel={widgetDisplay.countdownLabel}
-                      onCountdownLabelChange={(v) =>
-                        patchWidgetDisplay({ countdownLabel: v })
-                      }
+                      onCountdownLabelChange={(v) => {
+                        if (!planCaps.countdown) return;
+                        patchWidgetDisplay({ countdownLabel: v });
+                      }}
                       countdownLocked={!planCaps.countdown}
                     />
-                    </div>
-                  ) : (
-                    <Card padding="400">
-                      <BlockStack gap="300">
-                        <InlineStack gap="200" blockAlign="center" wrap>
-                          <Text as="h2" variant="headingSm">
-                            {t("offerEditor.schedule")}
-                          </Text>
-                          <PlanUpgradeBadge />
-                        </InlineStack>
-                        <PlanUpgradeBanner feature="scheduling" />
-                      </BlockStack>
-                    </Card>
-                  )}
+                  </div>
 
                   <Card padding="400">
                     <BlockStack gap="300">
@@ -2495,7 +2488,9 @@ export function VolumeDiscountCreateView({
                           },
                         ]}
                         value={
-                          planCaps.customerTargeting ? customerType : "everyone"
+                          planCaps.customerTargeting
+                            ? customerType
+                            : "logged-in-tag-any"
                         }
                         onChange={(v) => {
                           if (!planCaps.customerTargeting) return;
@@ -2504,25 +2499,30 @@ export function VolumeDiscountCreateView({
                           }
                         }}
                       />
-                      {customerType === "logged-in-tag-any" ? (
+                      {(planCaps.customerTargeting
+                        ? customerType === "logged-in-tag-any"
+                        : true) ? (
                         <BlockStack gap="300">
                           <Text as="p" variant="bodyMd" tone="subdued">
                             Match spelling to customer tags in Shopify admin
                             (Customers). Add one tag per chip; remove with ×.
                           </Text>
-                          <InlineStack gap="200" wrap>
-                            {customerTags.map((tag) => (
-                              <Tag
-                                key={tag}
-                                onRemove={() => removeCustomerTag(tag)}
-                              >
-                                {tag}
-                              </Tag>
-                            ))}
-                          </InlineStack>
+                          {planCaps.customerTargeting ? (
+                            <InlineStack gap="200" wrap>
+                              {customerTags.map((tag) => (
+                                <Tag
+                                  key={tag}
+                                  onRemove={() => removeCustomerTag(tag)}
+                                >
+                                  {tag}
+                                </Tag>
+                              ))}
+                            </InlineStack>
+                          ) : null}
                           <form
                             onSubmit={(e) => {
                               e.preventDefault();
+                              if (!planCaps.customerTargeting) return;
                               addCustomerTag();
                             }}
                           >
@@ -2530,13 +2530,22 @@ export function VolumeDiscountCreateView({
                               <div style={{ flex: "1 1 12rem", minWidth: 0 }}>
                                 <TextField
                                   label="Add customer tag"
-                                  value={customerTagInput}
+                                  value={
+                                    planCaps.customerTargeting
+                                      ? customerTagInput
+                                      : ""
+                                  }
                                   onChange={(v) => setCustomerTagInput(v)}
                                   autoComplete="off"
                                   placeholder="e.g. Wholesale"
+                                  disabled={!planCaps.customerTargeting}
                                 />
                               </div>
-                              <Button submit variant="primary">
+                              <Button
+                                submit
+                                variant="primary"
+                                disabled={!planCaps.customerTargeting}
+                              >
                                 Add
                               </Button>
                             </InlineStack>

@@ -1,6 +1,6 @@
 /**
  * Plan gates for appearance templates.
- * Free: Classic only · Standard: Classic + first N per season · Premium: all
+ * All plans: full template library (tier still used for clamp helpers).
  */
 
 import type {

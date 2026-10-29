@@ -56,35 +56,40 @@ export const PLANS: Record<PricingPlanId, PlanDefinition> = {
       "5 active campaigns",
       "Quantity breaks (tier cards)",
       "Volume discount (pricing table)",
-      "Classic appearance templates",
+      "All appearance templates",
       "Product page widget",
       "Automatic checkout discounts",
-      "Basic analytics",
+      "Analytics dashboard",
+      "Auto sync intervals",
+      "Storefront translations",
+      "Custom CSS & advanced styling",
       "Email support",
     ],
   },
   standard: {
     id: "standard",
     title: "Standard",
-    description: "Targeting, scheduling, and campaign analytics.",
+    description: "Targeting, scheduling, and storefront translations.",
     monthlyCents: 899,
     maxCampaigns: 25,
     cardFeatures: [
       "25 active campaigns",
       "Quantity breaks (tier cards)",
       "Volume discount (pricing table)",
-      "Classic + 3 templates per season",
+      "All appearance templates",
       "Product, collection & customer targeting",
       "Offer scheduling & countdown timers",
-      "Campaign analytics",
+      "Analytics dashboard",
+      "Auto sync intervals",
       "Storefront translations",
+      "Custom CSS & advanced styling",
       "Email support",
     ],
   },
   premium: {
     id: "premium",
     title: "Premium",
-    description: "Unlimited campaigns, import/export, and advanced analytics.",
+    description: "Unlimited campaigns, import/export, and priority support.",
     monthlyCents: 1999,
     maxCampaigns: null,
     featuredText: "Most popular",
@@ -93,8 +98,8 @@ export const PLANS: Record<PricingPlanId, PlanDefinition> = {
       "Quantity breaks (tier cards)",
       "Volume discount (pricing table)",
       "All appearance templates",
-      "Advanced analytics & attribution",
-      "Scheduling & automation",
+      "Analytics dashboard",
+      "Auto sync intervals",
       "Import & export (CSV)",
       "Custom CSS & advanced styling",
       "Priority support",
@@ -185,11 +190,11 @@ export function planCapabilities(planId: PricingPlanId): PlanCapabilities {
         scheduling: true,
         countdown: true,
         translations: true,
-        analytics: "standard",
-        schedulingAutomation: false,
+        analytics: "advanced",
+        schedulingAutomation: true,
         importExport: false,
-        customCss: false,
-        appearanceTemplates: "seasonal_limited",
+        customCss: true,
+        appearanceTemplates: "all",
       };
     case "free":
     default:
@@ -198,12 +203,12 @@ export function planCapabilities(planId: PricingPlanId): PlanCapabilities {
         customerTargeting: false,
         scheduling: false,
         countdown: false,
-        translations: false,
-        analytics: "basic",
-        schedulingAutomation: false,
+        translations: true,
+        analytics: "advanced",
+        schedulingAutomation: true,
         importExport: false,
-        customCss: false,
-        appearanceTemplates: "classic",
+        customCss: true,
+        appearanceTemplates: "all",
       };
   }
 }
@@ -257,17 +262,17 @@ const UPGRADE_MESSAGES: Record<PlanFeatureKey, string> = {
   countdown:
     "Countdown timers are available on Standard and Premium. Upgrade to unlock.",
   translations:
-    "Storefront translations are available on Standard and Premium. Upgrade to unlock.",
+    "Storefront translations are included on every plan.",
   analytics:
-    "Advanced analytics are available on a higher plan. Upgrade to unlock.",
+    "Analytics are included on every plan.",
   schedulingAutomation:
-    "Scheduling automation is available on Premium. Upgrade to unlock.",
+    "Auto sync intervals are included on every plan.",
   importExport:
     "Import & export is available on Premium. Upgrade to unlock.",
   customCss:
-    "Custom CSS is available on Premium. Upgrade to unlock.",
+    "Custom CSS is included on every plan.",
   appearanceTemplates:
-    "Standard unlocks 3 templates per season. Premium unlocks all appearance templates.",
+    "All appearance templates are included on every plan.",
 };
 
 export function upgradeMessage(featureKey: PlanFeatureKey): string {
@@ -277,16 +282,16 @@ export function upgradeMessage(featureKey: PlanFeatureKey): string {
 export function minPlanForFeature(featureKey: PlanFeatureKey): PricingPlanId {
   switch (featureKey) {
     case "importExport":
+      return "premium";
     case "customCss":
+    case "appearanceTemplates":
     case "schedulingAutomation":
     case "analytics":
-      return featureKey === "analytics" ? "standard" : "premium";
-    case "appearanceTemplates":
-      return "premium";
+    case "translations":
+      return "free";
     case "customerTargeting":
     case "scheduling":
     case "countdown":
-    case "translations":
     case "activeCampaigns":
       return "standard";
     default:
@@ -356,9 +361,9 @@ export const FEATURE_COMPARE_ROWS: FeatureCompareRow[] = [
   {
     id: "appearanceTemplates",
     feature: "Appearance templates",
-    free: "Classic",
-    standard: "3 / season",
-    premium: "All",
+    free: true,
+    standard: true,
+    premium: true,
   },
   {
     id: "productPageWidget",
@@ -412,22 +417,22 @@ export const FEATURE_COMPARE_ROWS: FeatureCompareRow[] = [
   {
     id: "campaignAnalytics",
     feature: "Campaign analytics",
-    free: "Basic",
+    free: true,
     standard: true,
-    premium: "Advanced",
+    premium: true,
   },
   {
     id: "storefrontTranslations",
     feature: "Storefront translations",
-    free: false,
+    free: true,
     standard: true,
     premium: true,
   },
   {
     id: "schedulingAutomation",
-    feature: "Scheduling & automation",
-    free: false,
-    standard: false,
+    feature: "Auto sync intervals",
+    free: true,
+    standard: true,
     premium: true,
   },
   {
@@ -440,8 +445,8 @@ export const FEATURE_COMPARE_ROWS: FeatureCompareRow[] = [
   {
     id: "customCss",
     feature: "Custom CSS & advanced styling",
-    free: false,
-    standard: false,
+    free: true,
+    standard: true,
     premium: true,
   },
   {

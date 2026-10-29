@@ -1,4 +1,4 @@
-import { BlockStack, Checkbox, InlineStack, Select } from "@shopify/polaris";
+import { BlockStack, Checkbox, InlineStack, Select, Text } from "@shopify/polaris";
 
 import {
   isVolumeDiscountWidgetHeaderLayout,
@@ -161,6 +161,10 @@ export function WidgetHeaderAlignFields({
           />
         </BlockStack>
       ) : null}
+
+      <Text as="p" variant="bodySm" tone="subdued">
+        {t("offerEditor.widget.timerScheduleNotice")}
+      </Text>
     </BlockStack>
   );
 }

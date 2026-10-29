@@ -20,6 +20,7 @@ export type PolarisDateTimeFieldProps = {
   helpText?: string;
   /** When set, “Today” uses this shop IANA timezone (not the browser). */
   shopTimezone?: string;
+  disabled?: boolean;
 };
 
 function pad2(n: number): string {
@@ -73,6 +74,7 @@ export function PolarisDateTimeField({
   onChange,
   helpText,
   shopTimezone,
+  disabled = false,
 }: PolarisDateTimeFieldProps) {
   const [open, setOpen] = useState(false);
 
@@ -172,15 +174,21 @@ export function PolarisDateTimeField({
       label={label}
       value={formatDatetimeLocalDisplay(value)}
       onChange={() => {}}
-      onFocus={() => setOpen(true)}
+      onFocus={() => {
+        if (!disabled) setOpen(true);
+      }}
       autoComplete="off"
       readOnly
+      disabled={disabled}
       helpText={helpText}
       connectedRight={
         <Button
           icon={CalendarIcon}
           accessibilityLabel={`Pick ${label.toLowerCase()}`}
-          onClick={() => setOpen((v) => !v)}
+          disabled={disabled}
+          onClick={() => {
+            if (!disabled) setOpen((v) => !v);
+          }}
         />
       }
     />
@@ -188,7 +196,7 @@ export function PolarisDateTimeField({
 
   return (
     <Popover
-      active={open}
+      active={!disabled && open}
       activator={activator}
       onClose={() => setOpen(false)}
       preferredAlignment="left"

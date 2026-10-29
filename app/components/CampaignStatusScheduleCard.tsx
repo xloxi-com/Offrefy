@@ -2,14 +2,12 @@ import {
   BlockStack,
   Card,
   Checkbox,
-  InlineStack,
   Text,
   TextField,
 } from "@shopify/polaris";
 
 import { useAdminI18n } from "./AdminI18nProvider";
-import { PlanUpgradeBadge } from "./PlanUpgradeBadge";
-import { PlanUpgradeBanner } from "./PlanUpgradeBanner";
+import { PlanUpgradeHint } from "./PlanUpgradeBanner";
 import { PolarisDateTimeField } from "./PolarisDateTimeField";
 
 export type CampaignStatusScheduleCardProps = {
@@ -30,14 +28,16 @@ export type CampaignStatusScheduleCardProps = {
   onShowCountdownChange?: (next: boolean) => void;
   countdownLabel?: string;
   onCountdownLabelChange?: (next: string) => void;
-  /** When true, show upgrade banner instead of editable countdown controls. */
+  /** When true, schedule controls are visible but disabled (Free plan). */
+  schedulingLocked?: boolean;
+  /** When true, countdown controls are visible but disabled. */
   countdownLocked?: boolean;
 };
 
 /**
  * Optional start/end schedule (Polaris Card).
  * Start/end map to `countdownStartsAt` / `countdownEndsAt` in shop timezone.
- * Countdown timer controls appear only when end date is enabled.
+ * Countdown timer controls appear when end date is enabled (or when locked, previewed).
  */
 export function CampaignStatusScheduleCard({
   scheduleStartEnabled,
@@ -54,11 +54,17 @@ export function CampaignStatusScheduleCard({
   onShowCountdownChange,
   countdownLabel = "",
   onCountdownLabelChange,
+  schedulingLocked = false,
   countdownLocked = false,
 }: CampaignStatusScheduleCardProps) {
   const { t } = useAdminI18n();
   const tzLabel =
     shopTimezoneLabel?.trim() || shopTimezone?.trim() || "";
+
+  // Locked plans preview the full Premium layout (dates + countdown), all disabled.
+  const startEnabled = schedulingLocked ? true : scheduleStartEnabled;
+  const endEnabled = schedulingLocked ? true : scheduleEndEnabled;
+  const timerLocked = schedulingLocked || countdownLocked;
 
   return (
     <Card padding="400">
@@ -72,64 +78,69 @@ export function CampaignStatusScheduleCard({
             : t("offerEditor.schedule.timezoneFallback")}
         </Text>
 
+        {schedulingLocked ? (
+          <PlanUpgradeHint feature="scheduling" />
+        ) : null}
+
         <Checkbox
           label={t("offerEditor.schedule.setStartDate")}
-          checked={scheduleStartEnabled}
+          checked={startEnabled}
+          disabled={schedulingLocked}
           onChange={(checked) => onScheduleStartEnabledChange(checked)}
         />
-        {scheduleStartEnabled ? (
+        {startEnabled ? (
           <PolarisDateTimeField
             label={t("offerEditor.schedule.start")}
             value={scheduleStartLocal}
             onChange={onScheduleStartLocalChange}
             shopTimezone={shopTimezone}
             helpText={t("offerEditor.schedule.startHelp")}
+            disabled={schedulingLocked}
           />
         ) : null}
 
         <Checkbox
           label={t("offerEditor.schedule.setEndDate")}
-          checked={scheduleEndEnabled}
+          checked={endEnabled}
+          disabled={schedulingLocked}
           onChange={(checked) => onScheduleEndEnabledChange(checked)}
         />
-        {scheduleEndEnabled ? (
+        {endEnabled ? (
           <PolarisDateTimeField
             label={t("offerEditor.schedule.end")}
             value={scheduleEndLocal}
             onChange={onScheduleEndLocalChange}
             shopTimezone={shopTimezone}
             helpText={t("offerEditor.schedule.endHelp")}
+            disabled={schedulingLocked}
           />
         ) : null}
 
-        {scheduleEndEnabled ? (
+        {endEnabled ? (
           <BlockStack gap="300">
-            <InlineStack gap="200" blockAlign="center" wrap>
-              <Text as="h2" variant="headingSm">
-                {t("offerEditor.countdownTimer")}
-              </Text>
-              {countdownLocked ? <PlanUpgradeBadge /> : null}
-            </InlineStack>
+            <Text as="h2" variant="headingSm">
+              {t("offerEditor.countdownTimer")}
+            </Text>
 
-            {countdownLocked ? (
-              <PlanUpgradeBanner feature="countdown" />
-            ) : (
-              <>
-                <Checkbox
-                  label={t("offerEditor.showCountdown")}
-                  checked={showCountdown}
-                  onChange={(checked) => onShowCountdownChange?.(checked)}
-                />
-                <TextField
-                  label={t("offerEditor.timerLabel")}
-                  name="countdownLabel"
-                  value={countdownLabel}
-                  onChange={(v) => onCountdownLabelChange?.(v)}
-                  autoComplete="off"
-                  placeholder={t("offerEditor.timerLabelPlaceholder")}
-                />
-              </>
-            )}
+            {timerLocked && !schedulingLocked ? (
+              <PlanUpgradeHint feature="countdown" />
+            ) : null}
+
+            <Checkbox
+              label={t("offerEditor.showCountdown")}
+              checked={timerLocked ? true : showCountdown}
+              disabled={timerLocked}
+              onChange={(checked) => onShowCountdownChange?.(checked)}
+            />
+            <TextField
+              label={t("offerEditor.timerLabel")}
+              name="countdownLabel"
+              value={timerLocked ? "" : countdownLabel}
+              onChange={(v) => onCountdownLabelChange?.(v)}
+              autoComplete="off"
+              placeholder={t("offerEditor.timerLabelPlaceholder")}
+              disabled={timerLocked}
+            />
           </BlockStack>
         ) : null}
       </BlockStack>

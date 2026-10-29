@@ -1,10 +1,24 @@
 import { createRequestHandler } from "react-router";
 import { withHyperdrivePrisma } from "../app/db.server";
+import {
+  applySupportChatEnvToProcess,
+  type SupportChatEnv,
+} from "../app/utils/supportChat.cloudflare.server";
+import { verifyChatToken } from "../app/utils/supportChat.crypto.server";
+import { cleanupInactiveConversations } from "../app/utils/supportChat.r2.server";
+import { SupportChatRoom } from "./support-chat-room";
+import {
+  handleSupportChatEmail,
+  type InboundEmailMessage,
+} from "./support-chat-email";
 
-type CloudflareEnv = Record<string, unknown> & {
-  CRON_SECRET?: string;
-  HYPERDRIVE?: { connectionString?: string };
-};
+export { SupportChatRoom };
+
+type CloudflareEnv = Record<string, unknown> &
+  SupportChatEnv & {
+    CRON_SECRET?: string;
+    HYPERDRIVE?: { connectionString?: string };
+  };
 
 type CloudflareCtx = {
   waitUntil: (promise: Promise<unknown>) => void;
@@ -32,11 +46,52 @@ function applyEnvToProcess(env: CloudflareEnv) {
     process.env.SHOPIFY_APP_URL =
       "https://offrefy.nirojannirojan68.workers.dev";
   }
+  applySupportChatEnvToProcess(env);
+}
+
+async function handleSupportChatWebSocket(
+  request: Request,
+  env: CloudflareEnv,
+): Promise<Response> {
+  if (!env.SUPPORT_CHAT_ROOM) {
+    return new Response("Support chat realtime unavailable", { status: 503 });
+  }
+  const url = new URL(request.url);
+  const token = url.searchParams.get("token") ?? "";
+  const payload = await verifyChatToken(token);
+  if (!payload) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+  const id = env.SUPPORT_CHAT_ROOM.idFromName(payload.cid);
+  const stub = env.SUPPORT_CHAT_ROOM.get(id);
+  const doUrl = new URL("https://support-chat-room/ws");
+  doUrl.searchParams.set("token", token);
+  return stub.fetch(
+    new Request(doUrl.toString(), {
+      headers: request.headers,
+      method: request.method,
+    }),
+  );
 }
 
 export default {
   async fetch(request: Request, env: CloudflareEnv, ctx: CloudflareCtx) {
     applyEnvToProcess(env);
+
+    const url = new URL(request.url);
+    // WebSocket upgrade must be handled outside React Router.
+    if (
+      url.pathname === "/api/support-chat/ws" ||
+      url.pathname === "/api/support-chat/ws/"
+    ) {
+      try {
+        return await handleSupportChatWebSocket(request, env);
+      } catch (error) {
+        console.error("[offrefy] support-chat ws failed", error);
+        return new Response("WebSocket error", { status: 500 });
+      }
+    }
+
     try {
       return await withHyperdrivePrisma(() =>
         requestHandler(request, {
@@ -53,6 +108,24 @@ export default {
     }
   },
 
+  async email(
+    message: InboundEmailMessage,
+    env: CloudflareEnv,
+    _ctx: CloudflareCtx,
+  ) {
+    applyEnvToProcess(env);
+    try {
+      await handleSupportChatEmail(message, env);
+    } catch (error) {
+      console.error("[offrefy] support-chat email failed", error);
+      try {
+        message.setReject("Internal error");
+      } catch {
+        // ignore
+      }
+    }
+  },
+
   async scheduled(
     _controller: unknown,
     env: CloudflareEnv,
@@ -64,6 +137,7 @@ export default {
       console.error("[offrefy] CRON_SECRET missing; skipping scheduled sync");
       return;
     }
+
     const request = new Request(
       "https://offrefy.nirojannirojan68.workers.dev/api/cron/scheduled-sync",
       { headers: { Authorization: `Bearer ${secret}` } },
@@ -77,5 +151,18 @@ export default {
         console.error("[offrefy] scheduled sync failed", error);
       }),
     );
+
+    // 30-day inactivity cleanup for Support Chat (entire conversation).
+    if (env.SUPPORT_CHAT_R2) {
+      ctx.waitUntil(
+        cleanupInactiveConversations(env.SUPPORT_CHAT_R2)
+          .then((result) => {
+            console.log("[offrefy] support-chat cleanup", result);
+          })
+          .catch((error) => {
+            console.error("[offrefy] support-chat cleanup failed", error);
+          }),
+      );
+    }
   },
 };

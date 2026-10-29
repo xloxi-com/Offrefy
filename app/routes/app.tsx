@@ -25,7 +25,7 @@ import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { useAppBridge } from "@shopify/app-bridge-react";
 
 import { APP_DISPLAY_NAME } from "../branding";
-import { CrispChat } from "../components/CrispChat";
+import { SupportEmailChat } from "../components/SupportEmailChat";
 import {
   AdminI18nProvider,
   useAdminI18n,
@@ -196,7 +196,7 @@ export default function App() {
         <PolarisLocaleBridge fallbackAdminLanguage={adminLanguage}>
           <AppNav />
           <Outlet />
-          <CrispChat />
+          <SupportEmailChat />
         </PolarisLocaleBridge>
       </AdminI18nProvider>
     </AppProvider>

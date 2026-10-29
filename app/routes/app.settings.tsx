@@ -258,17 +258,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       normalizeSyncInterval,
       persistDiscountCombinesWith,
     } = await import("../utils/discountCombinesWith.server");
-    const { capabilities } = await resolveShopPlanContext(session.shop);
-    let syncInterval = normalizeSyncInterval(
+    const syncInterval = normalizeSyncInterval(
       String(formData.get("syncInterval") ?? "disabled"),
     );
-    // Auto intervals (cron) are Premium schedulingAutomation; others can use Manual.
-    if (
-      syncInterval !== "disabled" &&
-      !capabilities.schedulingAutomation
-    ) {
-      syncInterval = "disabled";
-    }
     const combinesWith = {
       productDiscounts: formData.get("combinesWithProduct") === "1",
       orderDiscounts: formData.get("combinesWithOrder") === "1",
