@@ -30,6 +30,7 @@ import {
   useAdminI18n,
   useAdminI18nOptional,
 } from "../components/AdminI18nProvider";
+import { TawkChat } from "../components/TawkChat";
 import {
   adminEmbeddedPath,
   hasEphemeralBillingParams,
@@ -195,6 +196,7 @@ export default function App() {
         <PolarisLocaleBridge fallbackAdminLanguage={adminLanguage}>
           <AppNav />
           <Outlet />
+          <TawkChat />
         </PolarisLocaleBridge>
       </AdminI18nProvider>
     </AppProvider>
