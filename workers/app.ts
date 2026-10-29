@@ -38,13 +38,10 @@ export default {
   async fetch(request: Request, env: CloudflareEnv, ctx: CloudflareCtx) {
     applyEnvToProcess(env);
     try {
-      // Bind waitUntil — passing ctx.waitUntil unbound throws Illegal invocation.
-      return await withHyperdrivePrisma(
-        () =>
-          requestHandler(request, {
-            cloudflare: { env, ctx },
-          }),
-        (promise) => ctx.waitUntil(promise),
+      return await withHyperdrivePrisma(() =>
+        requestHandler(request, {
+          cloudflare: { env, ctx },
+        }),
       );
     } catch (error) {
       console.error("[offrefy] worker fetch failed", error);
@@ -72,12 +69,10 @@ export default {
       { headers: { Authorization: `Bearer ${secret}` } },
     );
     ctx.waitUntil(
-      withHyperdrivePrisma(
-        () =>
-          requestHandler(request, {
-            cloudflare: { env, ctx },
-          }),
-        (promise) => ctx.waitUntil(promise),
+      withHyperdrivePrisma(() =>
+        requestHandler(request, {
+          cloudflare: { env, ctx },
+        }),
       ).catch((error) => {
         console.error("[offrefy] scheduled sync failed", error);
       }),

@@ -5,8 +5,8 @@ import {
   BillingInterval,
   shopifyApp,
 } from "@shopify/shopify-app-react-router/server";
-import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import { prisma } from "./db.server";
+import { resilientPrismaSessionStorage } from "./sessionStorage.server";
 import { ensureOffrefyAnalyticsPixel } from "./services/ensureOffrefyAnalyticsPixel.server";
 import { SHOPIFY_APP_SCOPES } from "./shopifyAppScopes";
 import { BILLING_PLAN, billingAmountDollars } from "./utils/billingPlans";
@@ -32,12 +32,7 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   // Hoisted @shopify/shopify-api vs nested copy under shopify-app-react-router — types differ; runtime is fine.
   // @ts-expect-error SessionStorage / Session mismatch from duplicate shopify-api installations
-  sessionStorage: new PrismaSessionStorage(prisma, {
-    // Workers + Hyperdrive: fail fast — long retries saturate the pool and
-    // turn storefront app-proxy traffic into admin "Application Error".
-    connectionRetries: 1,
-    connectionRetryIntervalMs: 200,
-  }),
+  sessionStorage: resilientPrismaSessionStorage,
   distribution: AppDistribution.AppStore,
   // Free is not a Shopify Billing plan (amount must be > 0).
   billing: {

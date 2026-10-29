@@ -15,6 +15,8 @@ declare global {
 }
 
 const hyperdrivePrismaAls = new AsyncLocalStorage<AppPrismaClient>();
+/** Single fallback when code touches Prisma outside a request. Never one Pool per property access. */
+let hyperdriveFallbackClient: AppPrismaClient | undefined;
 
 function clientHasExpectedModels(client: AppPrismaClient | undefined): boolean {
   const c = client as unknown as {
@@ -103,8 +105,16 @@ function createPrismaClient(): AppPrismaClient {
       : (["warn", "error"] as const);
 
   if (usingHyperdrive()) {
-    // Request-scoped client (see withHyperdrivePrisma). Do not share Pool across requests.
-    const adapter = new PrismaPg({ connectionString: datasourceUrl });
+    // One connection per request. PrismaPg's default Pool (max 10) exhausts
+    // Supabase session mode (~15) and the next admin load dies as Application Error.
+    const pool = new pg.Pool({
+      connectionString: datasourceUrl,
+      max: 1,
+      idleTimeoutMillis: 5_000,
+      connectionTimeoutMillis: 8_000,
+      allowExitOnIdle: true,
+    });
+    const adapter = new PrismaPg(pool, { disposeExternalPool: true });
     return new PrismaClient({ adapter, log: [...log] });
   }
 
@@ -133,8 +143,9 @@ function getPrisma(): AppPrismaClient {
   if (usingHyperdrive()) {
     const fromAls = hyperdrivePrismaAls.getStore();
     if (fromAls) return fromAls;
-    // Fallback if a module touches prisma outside withHyperdrivePrisma.
-    return createPrismaClient();
+    // A new client here used to run on every property read and opened a Pool each time.
+    hyperdriveFallbackClient ??= createPrismaClient();
+    return hyperdriveFallbackClient;
   }
 
   const existing = global.prismaGlobal;
@@ -154,7 +165,6 @@ function getPrisma(): AppPrismaClient {
  */
 export async function withHyperdrivePrisma<T>(
   run: () => Promise<T>,
-  waitUntil: (promise: Promise<unknown>) => void,
 ): Promise<T> {
   if (!usingHyperdrive()) {
     return run();
@@ -163,7 +173,14 @@ export async function withHyperdrivePrisma<T>(
   try {
     return await hyperdrivePrismaAls.run(client, run);
   } finally {
-    waitUntil(client.$disconnect().catch(() => {}));
+    // Close the pool before the request ends. waitUntil($disconnect) resolves
+    // in the next request and Cloudflare cancels that pg promise.
+    await Promise.race([
+      client.$disconnect().catch(() => {}),
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, 2_000);
+      }),
+    ]);
   }
 }
 
