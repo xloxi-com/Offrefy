@@ -50,7 +50,6 @@ import {
   runCampaignAutoTranslateFromForm,
 } from "../utils/storefrontTranslations.server";
 import {
-  parseSparseStorefrontTranslations,
   packCampaignTranslationBlob,
   seedCampaignCartOverridesFromDisplayName,
   sparsifyStorefrontTranslations,
@@ -70,7 +69,7 @@ async function resolveCampaignTranslationsForSave(
   formOverrides: SparseStorefrontTranslationsMap,
   displayName: string,
 ): Promise<SparseStorefrontTranslationsMap> {
-  let sparse = sparsifyStorefrontTranslations(formOverrides);
+  const sparse = sparsifyStorefrontTranslations(formOverrides);
   if (!isCartDiscountDisplayTemplate(displayName)) {
     return sparse;
   }

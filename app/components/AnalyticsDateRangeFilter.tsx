@@ -1,14 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
-import {
-  ActionList,
-  BlockStack,
-  Button,
-  DatePicker,
-  InlineStack,
-  Popover,
-  Text,
-} from "@shopify/polaris";
+import { DatePicker } from "@shopify/polaris";
+import { Button } from "./AppButton";
 import {
   formatAnalyticsRangeLabel,
   formatIsoDateUtc,
@@ -48,13 +41,17 @@ function buildAnalyticsRangePath(
   return serialized ? `${pathname}?${serialized}` : pathname;
 }
 
+/**
+ * Polaris web: s-button + s-popover — same URL range navigation.
+ * DatePicker kept (no App Home range picker yet).
+ */
 export function AnalyticsDateRangeFilter({
   selection,
 }: AnalyticsDateRangeFilterProps) {
   const { t } = useAdminI18n();
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
-  const [popoverActive, setPopoverActive] = useState(false);
+  const popoverId = `analytics-range-${useId().replace(/:/g, "")}`;
   const [showCustomPicker, setShowCustomPicker] = useState(false);
 
   const presetOptions = useMemo(
@@ -108,25 +105,16 @@ export function AnalyticsDateRangeFilter({
     [navigate, pathname, search],
   );
 
-  const closePopover = useCallback(() => {
-    setPopoverActive(false);
+  const closeCustom = useCallback(() => {
     setShowCustomPicker(false);
-  }, []);
-
-  const togglePopover = useCallback(() => {
-    setPopoverActive((open) => {
-      const next = !open;
-      if (!next) setShowCustomPicker(false);
-      return next;
-    });
   }, []);
 
   const handlePresetChange = useCallback(
     (next: Exclude<AnalyticsTimeRange, "custom">) => {
       navigateToSelection({ range: next, from: null, to: null });
-      closePopover();
+      setShowCustomPicker(false);
     },
-    [closePopover, navigateToSelection],
+    [navigateToSelection],
   );
 
   const openCustomPicker = useCallback(() => {
@@ -151,40 +139,35 @@ export function AnalyticsDateRangeFilter({
     const to = formatIsoDateUtc(draftRange.end);
     if (from > to) return;
     navigateToSelection({ range: "custom", from, to });
-    closePopover();
-  }, [closePopover, draftRange.end, draftRange.start, navigateToSelection]);
+    setShowCustomPicker(false);
+  }, [draftRange.end, draftRange.start, navigateToSelection]);
 
   return (
-    <Popover
-      active={popoverActive}
-      activator={
-        <Button
-          onClick={togglePopover}
-          disclosure="select"
-          accessibilityLabel={t("analytics.range.dateRange")}
-        >
-          {selectedLabel}
-        </Button>
-      }
-      onClose={closePopover}
-      preferredAlignment="right"
-      autofocusTarget="first-node"
-    >
-      {showCustomPicker ? (
-        <Popover.Pane>
-          <div style={{ padding: "12px 16px", minWidth: 280 }}>
-            <BlockStack gap="300">
-              <InlineStack align="space-between" blockAlign="center">
-                <Text as="p" variant="headingSm">
-                  {t("analytics.range.customRange")}
-                </Text>
-                <Button
-                  variant="plain"
-                  onClick={() => setShowCustomPicker(false)}
-                >
+    <>
+      {/* Polaris web: s-button + s-popover — date range presets */}
+      <s-button
+        icon="calendar"
+        commandFor={popoverId}
+        accessibilityLabel={t("analytics.range.dateRange")}
+      >
+        {selectedLabel}
+      </s-button>
+      <s-popover id={popoverId} inlineSize="320px">
+        <s-box padding="small">
+          {showCustomPicker ? (
+            /* Polaris React DatePicker — custom range (no web range picker yet) */
+            <s-stack direction="block" gap="small">
+              <s-stack
+                direction="inline"
+                gap="small"
+                justifyContent="space-between"
+                alignItems="center"
+              >
+                <s-heading>{t("analytics.range.customRange")}</s-heading>
+                <s-button variant="tertiary" onClick={closeCustom}>
                   {t("common.back")}
-                </Button>
-              </InlineStack>
+                </s-button>
+              </s-stack>
               <DatePicker
                 month={month}
                 year={year}
@@ -194,32 +177,44 @@ export function AnalyticsDateRangeFilter({
                 allowRange
                 disableDatesAfter={new Date()}
               />
-              <InlineStack align="end" gap="200">
-                <Button onClick={closePopover}>{t("common.cancel")}</Button>
+              <s-stack direction="inline" gap="small-200" justifyContent="end">
+                <Button
+                  onClick={() => {
+                    setShowCustomPicker(false);
+                  }}
+                >
+                  {t("common.cancel")}
+                </Button>
                 <Button variant="primary" onClick={applyCustomRange}>
                   {t("common.apply")}
                 </Button>
-              </InlineStack>
-            </BlockStack>
-          </div>
-        </Popover.Pane>
-      ) : (
-        <ActionList
-          actionRole="menuitemradio"
-          items={[
-            ...presetOptions.map((option) => ({
-              content: option.label,
-              active: selection.range === option.value,
-              onAction: () => handlePresetChange(option.value),
-            })),
-            {
-              content: t("analytics.range.custom"),
-              active: selection.range === "custom",
-              onAction: openCustomPicker,
-            },
-          ]}
-        />
-      )}
-    </Popover>
+              </s-stack>
+            </s-stack>
+          ) : (
+            <s-stack direction="block" gap="none">
+              {presetOptions.map((option) => (
+                <s-button
+                  key={option.value}
+                  variant={
+                    selection.range === option.value ? "primary" : "tertiary"
+                  }
+                  commandFor={popoverId}
+                  command="--hide"
+                  onClick={() => handlePresetChange(option.value)}
+                >
+                  {option.label}
+                </s-button>
+              ))}
+              <s-button
+                variant={selection.range === "custom" ? "primary" : "tertiary"}
+                onClick={openCustomPicker}
+              >
+                {t("analytics.range.custom")}
+              </s-button>
+            </s-stack>
+          )}
+        </s-box>
+      </s-popover>
+    </>
   );
 }

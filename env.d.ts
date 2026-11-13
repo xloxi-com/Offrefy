@@ -1,6 +1,8 @@
 /// <reference types="vite/client" />
 /// <reference types="@react-router/node" />
 
+import "react-router";
+
 declare namespace NodeJS {
   interface ProcessEnv {
     DATABASE_URL?: string;
@@ -18,6 +20,7 @@ declare module "virtual:react-router/server-build" {
   export default build;
 }
 
+/** Augment only — must import "react-router" above so this does not shadow the package. */
 declare module "react-router" {
   interface AppLoadContext {
     cloudflare?: {

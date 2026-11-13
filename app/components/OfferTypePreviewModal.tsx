@@ -1,18 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  BlockStack,
-  Box,
-  Button,
-  ButtonGroup,
-  Card,
-  InlineGrid,
-  InlineStack,
-  Modal,
-  Text,
-} from "@shopify/polaris";
+import { BlockStack, Box, Card, InlineGrid, InlineStack, Modal, Text } from "@shopify/polaris";
+import { Button, ButtonGroup } from "./AppButton";
 import { DesktopIcon, MobileIcon } from "@shopify/polaris-icons";
 
 import { QuantityBreaksTailwindPreview } from "./QuantityBreaksTailwindPreview";
+import { BogoOfferTypeThumb } from "./BogoOfferTypeThumb";
 import styles from "./OfferTypePreviewModal.module.css";
 import {
   getOfferTypePreviewRows,
@@ -25,7 +17,7 @@ const DEMO_PRODUCT_IMAGE =
 
 const VARIANT_LABELS = ["610ml", "400ml", "220ml"] as const;
 
-export type OfferTypePreviewPreset = "quantity" | "volume";
+export type OfferTypePreviewPreset = "quantity" | "volume" | "bogo";
 
 export type OfferTypePreviewModalProps = {
   open: boolean;
@@ -77,12 +69,16 @@ export function OfferTypePreviewModal({
       ? `${styles.viewport} ${styles.viewportMobile}`
       : `${styles.viewport} ${styles.viewportDesktop}`;
 
+  const isBogo = preset === "bogo";
+
   const footnote = (
     <BlockStack gap="100">
       <Text as="p" variant="bodyXs" tone="subdued">
-        {t("offers.preview.sampleFootnote")}
+        {isBogo
+          ? t("bogo.preview.footnote")
+          : t("offers.preview.sampleFootnote")}
       </Text>
-      {storefrontPreviewUrl && storefrontPreviewUrl.length > 0 ? (
+      {!isBogo && storefrontPreviewUrl && storefrontPreviewUrl.length > 0 ? (
         <Text as="p" variant="bodyXs">
           <Button
             variant="plain"
@@ -196,13 +192,19 @@ export function OfferTypePreviewModal({
                   >
                     <div className={viewportClass}>
                       <Box padding={{ xs: "200", sm: "300" }} background="bg-surface">
-                        <QuantityBreaksTailwindPreview
-                          rows={rows}
-                          currencySymbol="€"
-                          display={display}
-                          previewDevice={previewDevice}
-                          freezeCountdown
-                        />
+                        {isBogo ? (
+                          <div className={styles.bogoModalPreview}>
+                            <BogoOfferTypeThumb />
+                          </div>
+                        ) : (
+                          <QuantityBreaksTailwindPreview
+                            rows={rows}
+                            currencySymbol="€"
+                            display={display}
+                            previewDevice={previewDevice}
+                            freezeCountdown
+                          />
+                        )}
                       </Box>
                     </div>
                   </Box>

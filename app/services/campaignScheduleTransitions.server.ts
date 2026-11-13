@@ -77,11 +77,10 @@ export async function applyDueCampaignScheduleTransitions(
     }
 
     for (const [shop, ids] of byShop) {
+      const { countActiveCampaigns } = await import("../utils/shopPlan.server");
       const [plan, activeCount] = await Promise.all([
         resolveShopPlan(shop),
-        prisma.volumeDiscountCampaign.count({
-          where: { shop, status: "active" },
-        }),
+        countActiveCampaigns(shop),
       ]);
       const max = getMaxActiveCampaigns(plan);
       const room = max == null ? ids.length : Math.max(0, max - activeCount);

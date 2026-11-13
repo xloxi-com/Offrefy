@@ -107,11 +107,11 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 0.35rem;
+  gap: 0.45rem;
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  padding: 0.35rem 0.45rem;
+  padding: 0.5rem 0.55rem;
   border-radius: var(--vd-radius-control, 10px);
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(0, 0, 0, 0.05);
@@ -143,38 +143,28 @@
   line-height: var(--vd-compact-control-h);
 }
 
-.selectWrap {
-  flex: 0 0 auto;
-  width: 100%;
-  min-width: 0;
-  max-width: none;
-}
-
+/* Plain HTML <select> — compact system default */
 .variantSelect {
+  display: block;
   box-sizing: border-box;
   width: 100%;
-  min-height: var(--vd-compact-control-h);
   height: var(--vd-compact-control-h);
-  padding: 0 0.45rem;
+  min-height: var(--vd-compact-control-h);
+  max-height: var(--vd-compact-control-h);
+  margin: 0;
+  padding: 0 0.4rem;
+  border: 1px solid #b0b0b0;
+  /* Linked to Layout → “Qty & + Add radius” (--vd-radius-control) */
   border-radius: var(--vd-radius-control, 10px);
-  border: 1px solid var(--vd-card-border, #d4d4d4);
   font: inherit;
-  font-size: var(--vd-fs-buy, 16px);
-  background: var(--vd-surface, #fff);
+  font-size: 13px;
+  background: #fff;
   color: inherit;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  box-shadow: none;
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.variantSelect:hover {
-  border-color: #c8c8c8;
-}
-
-.variantSelect:focus {
-  outline: none;
-  border-color: var(--color-vd-maroon, #6b1d1e);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-vd-maroon, #6b1d1e) 12%, transparent);
+  appearance: auto;
+  -webkit-appearance: menulist;
+  -moz-appearance: menulist;
 }
 
 .lineTotal {

@@ -17,27 +17,30 @@
   endif
 %}
 {% if vd_is_product_page or request.design_mode %}
-  {% if request.design_mode %}
-    <script>
-      (function () {
-        var o = window.Offrefy;
-        if (!o || typeof o !== "object") {
-          o = {};
-          try {
-            Object.defineProperty(window, "Offrefy", {
-              value: o,
-              writable: true,
-              configurable: true,
-              enumerable: false,
-            });
-          } catch (e) {
-            window.Offrefy = o;
-          }
+  {%- comment -%}
+    Block on the product template = merchant wants the widget here.
+    Always arm appEmbedActive (not only design mode) so Horizon/live
+    still mounts when the head App Embed is off or late.
+  {%- endcomment -%}
+  <script>
+    (function () {
+      var o = window.Offrefy;
+      if (!o || typeof o !== "object") {
+        o = {};
+        try {
+          Object.defineProperty(window, "Offrefy", {
+            value: o,
+            writable: true,
+            configurable: true,
+            enumerable: false,
+          });
+        } catch (e) {
+          window.Offrefy = o;
         }
-        o.appEmbedActive = true;
-      })();
-    </script>
-  {% endif %}
+      }
+      o.appEmbedActive = true;
+    })();
+  </script>
   {% render 'vd-storefront-assets', vd_product: vd_product %}
   {% render 'vd-hide-theme-atc', vd_product: vd_product %}
   {% render 'vd-quantity-breaks', block: block, vd_product: vd_product %}

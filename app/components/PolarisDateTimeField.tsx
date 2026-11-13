@@ -1,12 +1,5 @@
-import {
-  BlockStack,
-  Box,
-  Button,
-  DatePicker,
-  InlineStack,
-  Popover,
-  TextField,
-} from "@shopify/polaris";
+import { BlockStack, Box, DatePicker, InlineStack, Popover, TextField } from "@shopify/polaris";
+import { Button } from "./AppButton";
 import { CalendarIcon } from "@shopify/polaris-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -79,7 +72,10 @@ export function PolarisDateTimeField({
   const [open, setOpen] = useState(false);
 
   const parsed = useMemo(() => parseDatetimeLocal(value), [value]);
-  const selectedDate = parsed?.date ?? new Date();
+  const selectedDate = useMemo(
+    () => parsed?.date ?? new Date(),
+    [parsed],
+  );
   const timeValue = parsed?.time ?? "00:00:00";
   const timeHelp = shopTimezone
     ? "Hours, minutes, and seconds (Shopify store timezone)."

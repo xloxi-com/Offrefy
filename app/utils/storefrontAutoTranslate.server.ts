@@ -1,4 +1,5 @@
 import {
+  BOGO_TRANSLATION_FIELD_KEYS,
   ENGLISH_STOREFRONT_TRANSLATION,
   STOREFRONT_TRANSLATION_FIELD_KEYS,
   adaptCartDiscountTemplateForLanguage,
@@ -317,6 +318,18 @@ export async function autoTranslateStorefrontFields(
       failures.push(`${field}: ${message}`);
       result[field] =
         preset?.[field] ?? source[field] ?? sourceDefaults[field];
+    }
+  }
+
+  for (const field of BOGO_TRANSLATION_FIELD_KEYS) {
+    const value = String(source[field] ?? "").trim();
+    if (!value) continue;
+    try {
+      result[field] = /\{\{/.test(value)
+        ? await translateTemplateWithPlaceholders(value, from, to)
+        : await translateTextWithMyMemory(value, from, to);
+    } catch {
+      result[field] = value;
     }
   }
 

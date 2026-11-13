@@ -1,14 +1,6 @@
-import {
-  BlockStack,
-  Card,
-  Checkbox,
-  Text,
-  TextField,
-} from "@shopify/polaris";
-
+import { AppHomeScheduleDateTimeField } from "./AppHomeScheduleDateTimeField";
 import { useAdminI18n } from "./AdminI18nProvider";
 import { PlanUpgradeHint } from "./PlanUpgradeBanner";
-import { PolarisDateTimeField } from "./PolarisDateTimeField";
 
 export type CampaignStatusScheduleCardProps = {
   scheduleStartEnabled: boolean;
@@ -35,9 +27,12 @@ export type CampaignStatusScheduleCardProps = {
 };
 
 /**
- * Optional start/end schedule (Polaris Card).
+ * Optional start/end schedule card.
  * Start/end map to `countdownStartsAt` / `countdownEndsAt` in shop timezone.
  * Countdown timer controls appear when end date is enabled (or when locked, previewed).
+ *
+ * Polaris web components only (`s-box`, `s-stack`, `s-heading`, `s-checkbox`, …).
+ * Schedule enable / date / countdown callbacks are unchanged.
  */
 export function CampaignStatusScheduleCard({
   scheduleStartEnabled,
@@ -60,6 +55,7 @@ export function CampaignStatusScheduleCard({
   const { t } = useAdminI18n();
   const tzLabel =
     shopTimezoneLabel?.trim() || shopTimezone?.trim() || "";
+  const tzForFields = shopTimezone?.trim() || "UTC";
 
   // Locked plans preview the full Premium layout (dates + countdown), all disabled.
   const startEnabled = schedulingLocked ? true : scheduleStartEnabled;
@@ -67,83 +63,100 @@ export function CampaignStatusScheduleCard({
   const timerLocked = schedulingLocked || countdownLocked;
 
   return (
-    <Card padding="400">
-      <BlockStack gap="300">
-        <Text as="h2" variant="headingSm">
-          {t("offerEditor.schedule")}
-        </Text>
-        <Text as="p" variant="bodySm" tone="subdued">
+    // Polaris web: s-box card shell — same schedule props / handlers
+    <s-box
+      padding="large-200"
+      borderWidth="base"
+      borderRadius="large"
+      background="base"
+    >
+      <s-stack direction="block" gap="small">
+        <s-heading>{t("offerEditor.schedule")}</s-heading>
+        <s-paragraph color="subdued">
           {tzLabel
             ? t("offerEditor.schedule.timezone", { tz: tzLabel })
             : t("offerEditor.schedule.timezoneFallback")}
-        </Text>
+        </s-paragraph>
 
         {schedulingLocked ? (
           <PlanUpgradeHint feature="scheduling" />
         ) : null}
 
-        <Checkbox
+        {/* Polaris web: s-checkbox — same start-enabled toggle */}
+        <s-checkbox
           label={t("offerEditor.schedule.setStartDate")}
           checked={startEnabled}
-          disabled={schedulingLocked}
-          onChange={(checked) => onScheduleStartEnabledChange(checked)}
+          disabled={schedulingLocked || undefined}
+          onChange={(event) =>
+            onScheduleStartEnabledChange(Boolean(event.currentTarget.checked))
+          }
         />
         {startEnabled ? (
-          <PolarisDateTimeField
+          <AppHomeScheduleDateTimeField
             label={t("offerEditor.schedule.start")}
             value={scheduleStartLocal}
             onChange={onScheduleStartLocalChange}
-            shopTimezone={shopTimezone}
-            helpText={t("offerEditor.schedule.startHelp")}
+            shopTimezone={tzForFields}
+            details={t("offerEditor.schedule.startHelp")}
             disabled={schedulingLocked}
           />
         ) : null}
 
-        <Checkbox
+        {/* Polaris web: s-checkbox — same end-enabled toggle */}
+        <s-checkbox
           label={t("offerEditor.schedule.setEndDate")}
           checked={endEnabled}
-          disabled={schedulingLocked}
-          onChange={(checked) => onScheduleEndEnabledChange(checked)}
+          disabled={schedulingLocked || undefined}
+          onChange={(event) =>
+            onScheduleEndEnabledChange(Boolean(event.currentTarget.checked))
+          }
         />
         {endEnabled ? (
-          <PolarisDateTimeField
+          <AppHomeScheduleDateTimeField
             label={t("offerEditor.schedule.end")}
             value={scheduleEndLocal}
             onChange={onScheduleEndLocalChange}
-            shopTimezone={shopTimezone}
-            helpText={t("offerEditor.schedule.endHelp")}
+            shopTimezone={tzForFields}
+            details={t("offerEditor.schedule.endHelp")}
             disabled={schedulingLocked}
           />
         ) : null}
 
         {endEnabled ? (
-          <BlockStack gap="300">
-            <Text as="h2" variant="headingSm">
-              {t("offerEditor.countdownTimer")}
-            </Text>
+          <s-stack direction="block" gap="small">
+            <s-heading>{t("offerEditor.countdownTimer")}</s-heading>
 
             {timerLocked && !schedulingLocked ? (
               <PlanUpgradeHint feature="countdown" />
             ) : null}
 
-            <Checkbox
+            {/* Polaris web: s-checkbox — same show-countdown toggle */}
+            <s-checkbox
               label={t("offerEditor.showCountdown")}
               checked={timerLocked ? true : showCountdown}
-              disabled={timerLocked}
-              onChange={(checked) => onShowCountdownChange?.(checked)}
+              disabled={timerLocked || undefined}
+              onChange={(event) =>
+                onShowCountdownChange?.(Boolean(event.currentTarget.checked))
+              }
             />
-            <TextField
+            {/* Polaris web: s-text-field — same countdown label state */}
+            <s-text-field
               label={t("offerEditor.timerLabel")}
               name="countdownLabel"
               value={timerLocked ? "" : countdownLabel}
-              onChange={(v) => onCountdownLabelChange?.(v)}
-              autoComplete="off"
+              autocomplete="off"
               placeholder={t("offerEditor.timerLabelPlaceholder")}
-              disabled={timerLocked}
+              disabled={timerLocked || undefined}
+              onChange={(event) =>
+                onCountdownLabelChange?.(String(event.currentTarget.value ?? ""))
+              }
+              onInput={(event) =>
+                onCountdownLabelChange?.(String(event.currentTarget.value ?? ""))
+              }
             />
-          </BlockStack>
+          </s-stack>
         ) : null}
-      </BlockStack>
-    </Card>
+      </s-stack>
+    </s-box>
   );
 }

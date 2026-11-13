@@ -1,4 +1,4 @@
-import type { Prisma, VolumeDiscountCampaign } from "@prisma/client";
+import type { VolumeDiscountCampaign } from "@prisma/client";
 
 import { prisma } from "../db.server";
 import { normalizeCatalogIdKey } from "./discountRules.server";
@@ -93,6 +93,10 @@ export type StorefrontWidgetCampaign = {
   customerType: string;
   customerTags: string[];
   productIds: string[];
+  /** Collection GIDs — used by BOGO (and volume collection scope) for product match. */
+  collectionIds?: string[];
+  /** volume | bogo — used when preferring specific BOGO over volume “all”. */
+  offerKind?: "volume" | "bogo";
   tiers: StorefrontWidgetTier[];
   widgetDisplay: VolumeDiscountWidgetDisplay;
   /** ISO 8601 UTC — optional; countdown hidden until this instant when set. */
@@ -164,6 +168,7 @@ function optionSubtextForMinQty(
 export async function buildStorefrontWidgetJsonString(
   rows: VolumeDiscountCampaignStorefrontRow[],
   builtCampaigns: unknown[],
+  admin?: AdminGraphql | null,
 ): Promise<string> {
   const built = builtCampaigns as StorefrontWidgetCampaign[];
   const rowById = new Map(rows.map((r) => [r.id, r]));
@@ -224,11 +229,21 @@ export async function buildStorefrontWidgetJsonString(
     });
   }
 
-  return JSON.stringify({
+  const baseJson = JSON.stringify({
     version: 1,
     campaigns: out,
     translations,
   });
+  if (!shop) return baseJson;
+  try {
+    const { mergeBogoIntoStorefrontWidgetJson } = await import(
+      "./bogoStorefront.server"
+    );
+    return await mergeBogoIntoStorefrontWidgetJson(shop, baseJson, admin);
+  } catch (e) {
+    console.warn("[volume-discount] merge BOGO into storefront widget", e);
+    return baseJson;
+  }
 }
 
 function readMaxDiscountProductsFromPayload(
@@ -393,6 +408,7 @@ function storefrontProductMatch(
   campaign: StorefrontWidgetCampaign,
   productId: string,
   variantId: string | null,
+  productCollectionIds?: string[] | null,
 ): boolean {
   if (campaign.productScope === "all") return true;
   const p = productId.trim();
@@ -414,13 +430,38 @@ function storefrontProductMatch(
       }
     }
   }
+  /* BOGO / collection-scoped: match product’s collection GIDs to campaign.collectionIds. */
+  const campCols = campaign.collectionIds ?? [];
+  const productCols = productCollectionIds ?? [];
+  if (campCols.length && productCols.length) {
+    for (const cid of campCols) {
+      const cNorm = normalizeCatalogIdKey(String(cid));
+      if (!cNorm) continue;
+      for (const pc of productCols) {
+        const pNorm = normalizeCatalogIdKey(String(pc));
+        if (pNorm && (pNorm === cNorm || pNorm.includes(cNorm) || cNorm.includes(pNorm))) {
+          return true;
+        }
+      }
+    }
+  }
   return false;
+}
+
+function campaignMatchSpecificity(c: StorefrontWidgetCampaign): number {
+  if (c.offerKind === "bogo") return 3;
+  if (c.productScope === "specific-products" || c.productScope === "products") {
+    return 2;
+  }
+  if (c.productScope === "collections") return 1;
+  return 0; // all
 }
 
 function pickStorefrontCampaignFromPayload(
   payload: string,
   productId: string,
   variantId: string | null,
+  productCollectionIds?: string[] | null,
 ): StorefrontWidgetCampaign | null {
   const now = new Date();
   try {
@@ -428,16 +469,26 @@ function pickStorefrontCampaignFromPayload(
       campaigns?: StorefrontWidgetCampaign[];
     };
     const list = Array.isArray(cfg.campaigns) ? cfg.campaigns : [];
+    let best: StorefrontWidgetCampaign | null = null;
+    let bestScore = -1;
     for (const c of list) {
-      if (!c?.tiers?.length) continue;
+      if (!c?.tiers?.length && c.offerKind !== "bogo") continue;
       const startsAt = c.countdownStartsAt
         ? new Date(c.countdownStartsAt)
         : null;
       const endsAt = c.countdownEndsAt ? new Date(c.countdownEndsAt) : null;
       if (isCampaignSchedulePendingStart(startsAt, now)) continue;
       if (isCampaignScheduleExpired(endsAt, now)) continue;
-      if (storefrontProductMatch(c, productId, variantId)) return c;
+      if (!storefrontProductMatch(c, productId, variantId, productCollectionIds)) {
+        continue;
+      }
+      const score = campaignMatchSpecificity(c);
+      if (score > bestScore) {
+        best = c;
+        bestScore = score;
+      }
     }
+    return best;
   } catch {
     void 0;
   }
@@ -530,6 +581,53 @@ async function pickActiveCampaignRowForProduct(
   return null;
 }
 
+/** When volume cache/rules miss, still serve a matching live BOGO campaign. */
+async function buildBogoWidgetPayloadForProduct(
+  shop: string,
+  productKey: string,
+  variantKey: string | null,
+  admin: AdminGraphql | null,
+  fallbackPayload?: string | null,
+): Promise<string | null> {
+  try {
+    const { mergeBogoIntoStorefrontWidgetJson } = await import(
+      "./bogoStorefront.server"
+    );
+    const base =
+      fallbackPayload && storefrontWidgetPayloadHasCampaigns(fallbackPayload)
+        ? fallbackPayload
+        : JSON.stringify({ version: 1, campaigns: [] });
+    const merged = await mergeBogoIntoStorefrontWidgetJson(shop, base, admin);
+    const camp = pickStorefrontCampaignFromPayload(
+      merged,
+      productKey,
+      variantKey,
+    );
+    if (!camp || (camp.offerKind !== "bogo" && !(camp as { bogo?: unknown }).bogo)) {
+      return null;
+    }
+    const planId = await resolveShopPlan(shop).catch(() => "free" as const);
+    const clampedCamp: StorefrontWidgetCampaign = {
+      ...camp,
+      widgetDisplay: widgetDisplayForStorefrontPlan(planId, camp.widgetDisplay),
+    };
+    const translations = await resolveStorefrontTranslationsForWidget(
+      shop,
+      merged,
+    );
+    return buildSingleCampaignWidgetPayload(
+      clampedCamp,
+      translations,
+      null,
+      readMaxDiscountProductsFromPayload(merged) ??
+        readMaxDiscountProductsFromPayload(fallbackPayload),
+    );
+  } catch (e) {
+    console.warn("[volume-discount] BOGO product widget fallback", e);
+    return null;
+  }
+}
+
 /**
  * Build widget JSON for one product page (avoids downloading 1000+ campaigns to the browser).
  */
@@ -565,8 +663,35 @@ export async function buildStorefrontWidgetForProduct(
   }
 
   if (fullPayload) {
+    let payloadForPick = fullPayload;
+    /* Stale volume-only cache can omit BOGO — merge live BOGO before pick. */
+    let cachedHasBogo = false;
+    try {
+      const parsed = JSON.parse(fullPayload) as {
+        campaigns?: Array<{ offerKind?: string; bogo?: unknown }>;
+      };
+      cachedHasBogo = (parsed.campaigns || []).some(
+        (c) => c?.offerKind === "bogo" || Boolean(c?.bogo),
+      );
+    } catch {
+      void 0;
+    }
+    if (!cachedHasBogo) {
+      try {
+        const { mergeBogoIntoStorefrontWidgetJson } = await import(
+          "./bogoStorefront.server"
+        );
+        payloadForPick = await mergeBogoIntoStorefrontWidgetJson(
+          shop,
+          fullPayload,
+          admin,
+        );
+      } catch {
+        void 0;
+      }
+    }
     const camp = pickStorefrontCampaignFromPayload(
-      fullPayload,
+      payloadForPick,
       productKey,
       variantKey || null,
     );
@@ -581,12 +706,12 @@ export async function buildStorefrontWidgetForProduct(
       };
       const translations = await resolveStorefrontTranslationsForWidget(
         shop,
-        fullPayload,
+        payloadForPick,
       );
       let rev: string | number | null = null;
       let maxDiscountProducts: number | null = null;
       try {
-        const parsed = JSON.parse(fullPayload) as {
+        const parsed = JSON.parse(payloadForPick) as {
           rev?: string | number;
           maxDiscountProducts?: number;
         };
@@ -627,7 +752,7 @@ export async function buildStorefrontWidgetForProduct(
     rules.map((r) => [r.productId, r.campaignId] as const),
   );
 
-  let campaignId =
+  const campaignId =
     (productKey && ruleByProductId.get(productKey)) ||
     (variantKey && ruleByProductId.get(variantKey)) ||
     ruleByProductId.get("*");
@@ -662,6 +787,14 @@ export async function buildStorefrontWidgetForProduct(
         );
       }
     }
+    const bogoOnly = await buildBogoWidgetPayloadForProduct(
+      shop,
+      productKey,
+      variantKey || null,
+      admin,
+      fullPayload,
+    );
+    if (bogoOnly) return bogoOnly;
     return JSON.stringify({ version: 1, campaigns: [] });
   }
 
@@ -673,13 +806,37 @@ export async function buildStorefrontWidgetForProduct(
     select: volumeDiscountCampaignSyncSelect,
   });
   if (!row) {
+    const bogoOnly = await buildBogoWidgetPayloadForProduct(
+      shop,
+      productKey,
+      variantKey || null,
+      admin,
+      fullPayload,
+    );
+    if (bogoOnly) return bogoOnly;
     return JSON.stringify({ version: 1, campaigns: [] });
   }
   const now = new Date();
   if (isCampaignSchedulePendingStart(row.countdownStartsAt, now)) {
+    const bogoOnly = await buildBogoWidgetPayloadForProduct(
+      shop,
+      productKey,
+      variantKey || null,
+      admin,
+      fullPayload,
+    );
+    if (bogoOnly) return bogoOnly;
     return JSON.stringify({ version: 1, campaigns: [] });
   }
   if (isCampaignScheduleExpired(row.countdownEndsAt, now)) {
+    const bogoOnly = await buildBogoWidgetPayloadForProduct(
+      shop,
+      productKey,
+      variantKey || null,
+      admin,
+      fullPayload,
+    );
+    if (bogoOnly) return bogoOnly;
     return JSON.stringify({ version: 1, campaigns: [] });
   }
 
@@ -744,6 +901,14 @@ export async function buildStorefrontWidgetForProduct(
         );
       }
     }
+    const bogoOnly = await buildBogoWidgetPayloadForProduct(
+      shop,
+      productKey,
+      variantKey || null,
+      admin,
+      fallbackPayload || fullPayload,
+    );
+    if (bogoOnly) return bogoOnly;
     return JSON.stringify({ version: 1, campaigns: [] });
   }
 
@@ -798,7 +963,7 @@ export async function buildStorefrontWidgetValue(
     shop,
   );
 
-  return await buildStorefrontWidgetJsonString(rows, campaigns);
+  return await buildStorefrontWidgetJsonString(rows, campaigns, admin);
 }
 
 /**

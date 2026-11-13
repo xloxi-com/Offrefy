@@ -55,6 +55,18 @@ export function statusBadgeTone(
   return "warning";
 }
 
+/** Polaris web `s-badge` tones (attention → caution). */
+export function statusBadgeToneWeb(
+  status: string,
+): "success" | "caution" | "warning" | "critical" | "info" | "auto" {
+  const s = status.toLowerCase();
+  if (s === "active") return "success";
+  if (s === "scheduled") return "caution";
+  if (s === "draft") return "info";
+  if (s === "archived") return "critical";
+  return "warning";
+}
+
 export function statusLabel(status: string): string {
   const s = status.toLowerCase();
   if (s === "active") return "Active";

@@ -33,6 +33,8 @@
       "routes/app.volume-discount.new": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/app.additional": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/app.analytics": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/app.bogo.$id": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/app.bogo.new": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/app.settings": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/app.pricing": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/app.offers": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
@@ -260,6 +262,24 @@
         "parentId": "routes/app",
         "file": "app/routes/app.analytics.tsx",
         "path": "analytics",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/app.bogo.$id": {
+        "id": "routes/app.bogo.$id",
+        "parentId": "routes/app",
+        "file": "app/routes/app.bogo.$id.tsx",
+        "path": "bogo/:id",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/app.bogo.new": {
+        "id": "routes/app.bogo.new",
+        "parentId": "routes/app",
+        "file": "app/routes/app.bogo.new.tsx",
+        "path": "bogo/new",
         "config": {
           "runtime": "nodejs"
         }
@@ -507,6 +527,18 @@
         "file": "routes/app.analytics.tsx",
         "path": "analytics"
       },
+      "routes/app.bogo.$id": {
+        "id": "routes/app.bogo.$id",
+        "parentId": "routes/app",
+        "file": "routes/app.bogo.$id.tsx",
+        "path": "bogo/:id"
+      },
+      "routes/app.bogo.new": {
+        "id": "routes/app.bogo.new",
+        "parentId": "routes/app",
+        "file": "routes/app.bogo.new.tsx",
+        "path": "bogo/new"
+      },
       "routes/app.settings": {
         "id": "routes/app.settings",
         "parentId": "routes/app",
@@ -695,6 +727,16 @@
                 "id": "routes/app.analytics",
                 "file": "routes/app.analytics.tsx",
                 "path": "analytics"
+              },
+              {
+                "id": "routes/app.bogo.$id",
+                "file": "routes/app.bogo.$id.tsx",
+                "path": "bogo/:id"
+              },
+              {
+                "id": "routes/app.bogo.new",
+                "file": "routes/app.bogo.new.tsx",
+                "path": "bogo/new"
               },
               {
                 "id": "routes/app.settings",

@@ -1,9 +1,9 @@
-import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { Form, redirect, useActionData, useLoaderData } from "react-router";
 import { Page, Card, Text, BlockStack, Spinner } from "@shopify/polaris";
 
+import { ShopifyAppProvider } from "../../components/ShopifyAppProvider";
 import { login } from "../../shopify.server";
 import {
   isEmbeddedAdminRequest,
@@ -64,7 +64,7 @@ export default function Auth() {
     const apiKey =
       "apiKey" in loaderData && loaderData.apiKey ? loaderData.apiKey : "";
     return (
-      <AppProvider embedded apiKey={apiKey}>
+      <ShopifyAppProvider embedded apiKey={apiKey}>
         <Page title="Connecting…">
           <Card>
             <BlockStack gap="300" inlineAlign="center">
@@ -75,12 +75,12 @@ export default function Auth() {
             </BlockStack>
           </Card>
         </Page>
-      </AppProvider>
+      </ShopifyAppProvider>
     );
   }
 
   return (
-    <AppProvider embedded={false}>
+    <ShopifyAppProvider embedded={false}>
       <s-page>
         <Form method="post">
           <s-section heading="Log in">
@@ -97,6 +97,6 @@ export default function Auth() {
           </s-section>
         </Form>
       </s-page>
-    </AppProvider>
+    </ShopifyAppProvider>
   );
 }

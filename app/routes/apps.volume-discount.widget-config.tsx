@@ -75,6 +75,22 @@ function jsonBody(
   });
 }
 
+async function maybeEnrichBogoGets(
+  admin: Awaited<ReturnType<typeof authenticate.public.appProxy>>["admin"] | undefined,
+  body: string,
+): Promise<string> {
+  if (!admin) return body;
+  try {
+    const { enrichBogoWidgetJsonWithGetsLines } = await import(
+      "../utils/bogoStorefront.server"
+    );
+    return await enrichBogoWidgetJsonWithGetsLines(admin, body);
+  } catch (e) {
+    console.warn("[volume-discount] enrich BOGO getsLines", e);
+    return body;
+  }
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: STOREFRONT_CORS_HEADERS });
@@ -145,11 +161,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             admin ?? null,
           );
           if (storefrontWidgetPayloadHasCampaigns(rebuilt)) {
-            return jsonBody(request, rebuilt);
+            return jsonBody(
+              request,
+              await maybeEnrichBogoGets(admin, rebuilt),
+            );
           }
         }
       }
-      return jsonBody(request, value);
+      return jsonBody(request, await maybeEnrichBogoGets(admin, value));
     } catch (e) {
       console.error("[volume-discount] widget-config product", e);
       return emptyJson(request);
@@ -164,7 +183,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
     return jsonBody(
       request,
-      cached.body,
+      await maybeEnrichBogoGets(admin, cached.body),
       cached.updatedAt ? cached.updatedAt.getTime() : null,
     );
   }
@@ -177,17 +196,43 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
 
     if (rows.length === 0) {
+      /* BOGO-only shops: still build + cache a BOGO payload (never wipe empty). */
+      if (admin) {
+        const value = await rebuildAndPersistStorefrontPayload(
+          shop,
+          [],
+          admin,
+        );
+        if (storefrontWidgetPayloadHasCampaigns(value)) {
+          return jsonBody(request, await maybeEnrichBogoGets(admin, value));
+        }
+      } else {
+        try {
+          const { mergeBogoIntoStorefrontWidgetJson } = await import(
+            "../utils/bogoStorefront.server"
+          );
+          const withBogo = await mergeBogoIntoStorefrontWidgetJson(
+            shop,
+            STOREFRONT_EMPTY_PAYLOAD,
+          );
+          if (storefrontWidgetPayloadHasCampaigns(withBogo)) {
+            return jsonBody(request, withBogo);
+          }
+        } catch (e) {
+          console.warn("[volume-discount] BOGO-only widget merge", e);
+        }
+      }
       await upsertEmptyStorefrontPayload(shop);
       return emptyJson(request);
     }
 
     if (admin) {
       const value = await rebuildAndPersistStorefrontPayload(shop, rows, admin);
-      return jsonBody(request, value);
+      return jsonBody(request, await maybeEnrichBogoGets(admin, value));
     }
 
     const dbOnly = await persistDbOnlyStorefrontPayload(shop, rows);
-    return jsonBody(request, dbOnly);
+    return jsonBody(request, await maybeEnrichBogoGets(admin, dbOnly));
   } catch (e) {
     console.error("[volume-discount] widget-config", e);
     return cachedJsonResponse(STOREFRONT_EMPTY_PAYLOAD, {

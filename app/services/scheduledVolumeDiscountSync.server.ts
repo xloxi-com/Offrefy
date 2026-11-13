@@ -150,11 +150,51 @@ export async function runDueScheduledSyncs(): Promise<{
   triggered: number;
   shops: string[];
   scheduleTransitionShops: string[];
+  bogoScheduleShops: string[];
 }> {
   const transition = await applyDueCampaignScheduleTransitions();
   const scheduleTransitionShops = transition.shopsNeedingShopifySync;
   for (const shop of scheduleTransitionShops) {
     enqueueScheduledSyncForShop(shop, { force: true });
+  }
+
+  /* BOGO BXGY schedule flips (activate/deactivate) — separate from volume Function sync. */
+  const bogoScheduleShops: string[] = [];
+  try {
+    const { applyDueBogoScheduleTransitions, syncDueBogoScheduleToShopify } =
+      await import("./bogoBxgySync.server");
+    const { prisma } = await import("../db.server");
+    const shopsWithBogo = await prisma.bogoCampaign.findMany({
+      where: {
+        OR: [
+          { status: "scheduled" },
+          { status: { in: ["active", "scheduled"] }, endsAt: { not: null } },
+        ],
+      },
+      select: { shop: true },
+      distinct: ["shop"],
+    });
+    for (const { shop } of shopsWithBogo) {
+      const flipped = await applyDueBogoScheduleTransitions(shop);
+      if (!flipped.idsNeedingSync.length) continue;
+      bogoScheduleShops.push(shop);
+      runAfterResponse(
+        (async () => {
+          try {
+            const { admin } = await unauthenticated.admin(shop);
+            await syncDueBogoScheduleToShopify(
+              admin,
+              shop,
+              flipped.idsNeedingSync,
+            );
+          } catch (e) {
+            console.warn("[bogo] cron schedule sync", shop, e);
+          }
+        })(),
+      );
+    }
+  } catch (e) {
+    console.warn("[bogo] runDueScheduledSyncs BOGO pass", e);
   }
 
   const rows = await listShopsWithScheduledSync();
@@ -166,13 +206,20 @@ export async function runDueScheduledSyncs(): Promise<{
     enqueueScheduledSyncForShop(row.shop);
   }
 
-  const shops = [...new Set([...dueShops, ...scheduleTransitionShops])];
+  const shops = [
+    ...new Set([
+      ...dueShops,
+      ...scheduleTransitionShops,
+      ...bogoScheduleShops,
+    ]),
+  ];
 
   return {
     checked: rows.length,
     triggered: shops.length,
     shops,
     scheduleTransitionShops,
+    bogoScheduleShops,
   };
 }
 

@@ -2,11 +2,17 @@
   App embed (head) — Theme settings → App embeds → Offrefy (global).
   Runs in <head> on product pages so Theme product form hide CSS applies
   before price / variants / ATC paint (no flash on refresh).
+  Also loads storefront JS so BOGO Buy→Get auto-add works even when the
+  Quantity Breaks block is not on the product template.
 {% endcomment %}
 {% liquid
   assign vd_is_product_page = false
   if request.page_type == 'product' or template.name == 'product'
     assign vd_is_product_page = true
+  endif
+  assign vd_is_cart_page = false
+  if request.page_type == 'cart' or template.name == 'cart'
+    assign vd_is_cart_page = true
   endif
 
   if product != blank
@@ -15,7 +21,7 @@
     assign vd_product = closest.product
   endif
 %}
-{% if vd_is_product_page %}
+{% if vd_is_product_page or vd_is_cart_page %}
   <script>
     (function () {
       var o = window.Offrefy;
@@ -35,7 +41,10 @@
       o.appEmbedActive = true;
     })();
   </script>
-  {% render 'vd-hide-theme-atc', vd_product: vd_product %}
+  {% if vd_is_product_page %}
+    {% render 'vd-hide-theme-atc', vd_product: vd_product %}
+  {% endif %}
+  {% render 'vd-storefront-assets', vd_product: vd_product %}
 {% endif %}
 
 {% schema %}

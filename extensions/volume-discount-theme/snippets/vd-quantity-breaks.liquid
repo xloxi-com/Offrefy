@@ -54,9 +54,17 @@
 {%- endcomment -%}
 {%- liquid
   assign vd_product_form_id = 'offrefy-atc-form-' | append: vd_id_suffix
+  assign vd_early_paint = false
+  if request.design_mode
+    assign vd_early_paint = true
+  elsif vd_product != blank and vd_product.metafields.volume_discount.tiers.value
+    assign vd_early_paint = true
+  elsif vd_widget != blank and vd_widget.campaigns.size > 0
+    assign vd_early_paint = true
+  endif
 -%}
 <div
-  class="offrefy-root offrefy-qb"
+  class="offrefy-root offrefy-qb{% if vd_early_paint %} offrefy-root--early{% endif %}"
   id="offrefy-shopify-{{ vd_id_suffix }}"
   data-offrefy-root
   data-offrefy-widget-host
@@ -69,9 +77,17 @@
   data-section-heading="{{ vd_section_heading | escape }}"
   data-offrefy-product-form-id="{{ vd_product_form_id }}"
   data-offrefy-use-liquid-form="1"
+  data-offrefy-cart-drawer-section="cart-drawer"
+  {% if vd_early_paint %}data-offrefy-early="1"{% endif %}
   {% if vd_product != blank %}
     data-product-id="{{ vd_product.id }}"
     data-variant-id="{{ vd_product.selected_or_first_available_variant.id }}"
+    data-product-title="{{ vd_product.title | escape }}"
+    {% if vd_product.featured_image %}
+      data-product-image="{{ vd_product.featured_image | image_url: width: 240 | escape }}"
+    {% elsif vd_product.featured_media and vd_product.featured_media.preview_image %}
+      data-product-image="{{ vd_product.featured_media.preview_image | image_url: width: 240 | escape }}"
+    {% endif %}
     {% if vd_product.admin_graphql_api_id != blank %}
       data-product-gid="{{ vd_product.admin_graphql_api_id | escape }}"
     {% endif %}
@@ -80,28 +96,33 @@
     {% endif %}
     data-unit-price-cents="{{ vd_product.selected_or_first_available_variant.price }}"
     data-currency="{% if cart.currency.iso_code %}{{ cart.currency.iso_code }}{% elsif shop.currency.iso_code %}{{ shop.currency.iso_code }}{% else %}USD{% endif %}"
+    data-collection-gids="{% if vd_product.collections.size > 0 %}[{% for col in vd_product.collections %}{{ col.admin_graphql_api_id | json }}{% unless forloop.last %},{% endunless %}{% endfor %}]{% else %}[]{% endif %}"
   {% elsif request.design_mode %}
     data-product-id="0"
     data-variant-id="0"
+    data-product-title="Sample product"
     data-unit-price-cents="2500"
     data-currency="{% if cart.currency.iso_code %}{{ cart.currency.iso_code }}{% elsif shop.currency.iso_code %}{{ shop.currency.iso_code }}{% else %}USD{% endif %}"
   {% endif %}
   {% if request.design_mode %}
     data-design-mode="true"
-  {% else %}
+  {% elsif vd_early_paint == false %}
     {%- comment -%}
-      Live storefront: hide root until JS finds a matching offer.
-      Prevents empty-block margin CLS / page shake on non-discount products.
+      No shop/product offer signal: hide until JS confirms (avoids empty CLS).
+      When offers exist, paint immediately (skeleton → real widget, no refresh delay).
     {%- endcomment -%}
     hidden
     style="display:none;margin:0;padding:0;min-height:0;"
   {% endif %}
 >
   {% if vd_product != blank %}
+    <script type="application/json" data-offrefy-options-json>
+      {{ vd_product.options | json }}
+    </script>
     <script type="application/json" data-offrefy-variants-json>
       [
         {%- for v in vd_product.variants -%}
-          {"id":{{ v.id }},"title":{{ v.title | json }},"price":{{ v.price }},"available":{% if v.available %}true{% else %}false{% endif %}}{%- unless forloop.last -%},{%- endunless -%}
+          {"id":{{ v.id }},"title":{{ v.title | json }},"price":{{ v.price }},"available":{% if v.available %}true{% else %}false{% endif %},"option1":{{ v.option1 | json }},"option2":{{ v.option2 | json }},"option3":{{ v.option3 | json }}}{%- unless forloop.last -%},{%- endunless -%}
         {%- endfor -%}
       ]
     </script>
@@ -127,48 +148,61 @@
   {%- comment -%}
     Keep mount visible in the theme editor so Shopify does not mark the app block
     as "hidden" (red eye icon). Live storefront starts hidden until JS mounts tiers.
-    Liquid ATC bridge form lives INSIDE the mount so it stays hidden with the
-    mount until the widget paints (avoids a stray theme-styled “Add” button).
+
+    Liquid {% form 'product' %} is the universal Add to cart path on every theme:
+    theme JS intercepts submit → /cart/add.js → cart drawer / notification update.
+    BOGO "Add N + unlock offer" is type=submit form="{{ vd_product_form_id }}"
+    so it uses this same form — no custom cart API.
+
+    Do NOT set name="id"/name="quantity" in HTML — themes querySelector those
+    and would bind qty +/- to this hidden field. JS arms names only on submit.
   {%- endcomment -%}
+  {% if vd_product != blank %}
+    {% form 'product', vd_product, id: vd_product_form_id, class: 'offrefy-liquid-product-form', data-offrefy-liquid-product-form: '1' %}
+      <input
+        type="hidden"
+        value="{{ vd_product.selected_or_first_available_variant.id }}"
+        data-offrefy-liquid-variant-id
+      >
+      <input
+        type="hidden"
+        value="1"
+        min="1"
+        data-offrefy-liquid-qty
+      >
+      <button
+        type="submit"
+        class="offrefy-liquid-submit"
+        hidden
+        tabindex="-1"
+        aria-hidden="true"
+        data-offrefy-liquid-submit
+        data-offrefy-action="liquid-submit"
+        style="display:none!important;visibility:hidden!important;position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;"
+      >
+        {{ vd_trans_add | escape }}
+      </button>
+    {% endform %}
+  {% endif %}
   <div
     class="offrefy-qb__inner offrefy-mount"
     data-offrefy-mount
-    {% unless request.design_mode %}hidden{% endunless %}
-  >
-    {% if vd_product != blank %}
-      {%- comment -%}
-        Platform product form — valid on all Shopify themes (free + premium).
-        Always visually hidden; used by +Add / Grab This Deal when theme ATC is missing.
-        Do NOT set name="id"/name="quantity" in HTML — Valor (and similar) themes use
-        product-info querySelector('input[name="quantity"]') and would bind +/- to
-        this hidden field when the app block is above the theme qty selector.
-        JS arms the names only right before submit/sync.
-      {%- endcomment -%}
-      {% form 'product', vd_product, id: vd_product_form_id, class: 'offrefy-liquid-product-form', data-offrefy-liquid-product-form: '1' %}
-        <input
-          type="hidden"
-          value="{{ vd_product.selected_or_first_available_variant.id }}"
-          data-offrefy-liquid-variant-id
-        >
-        <input
-          type="hidden"
-          value="1"
-          min="1"
-          data-offrefy-liquid-qty
-        >
-        <button
-          type="submit"
-          class="offrefy-liquid-submit"
-          hidden
-          tabindex="-1"
-          aria-hidden="true"
-          data-offrefy-liquid-submit
-          data-offrefy-action="liquid-submit"
-          style="display:none!important;visibility:hidden!important;position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;"
-        >
-          {{ vd_trans_add | escape }}
-        </button>
-      {% endform %}
-    {% endif %}
-  </div>
+    {% unless vd_early_paint or request.design_mode %}hidden{% endunless %}
+  >{% if vd_early_paint %}<div class="offrefy-vd-skel" data-offrefy-vd-skel aria-busy="true" aria-hidden="true"><span class="offrefy-vd-skel__bar"></span><span class="offrefy-vd-skel__card"></span><span class="offrefy-vd-skel__card"></span><span class="offrefy-vd-skel__card"></span><span class="offrefy-vd-skel__cta"></span></div>{% endif %}</div>
+  {% if vd_early_paint %}
+  <script>
+    (function () {
+      var root = document.getElementById({{ 'offrefy-shopify-' | append: vd_id_suffix | json }});
+      if (!root) return;
+      root.removeAttribute("hidden");
+      root.hidden = false;
+      root.style.display = "";
+      root.style.removeProperty("margin");
+      root.style.removeProperty("padding");
+      root.style.removeProperty("min-height");
+      var mount = root.querySelector("[data-offrefy-mount]");
+      if (mount) mount.hidden = false;
+    })();
+  </script>
+  {% endif %}
 </div>

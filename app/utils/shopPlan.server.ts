@@ -166,8 +166,8 @@ export type PlanDowngradeEnforceResult = {
 };
 
 /**
- * After a plan change, keep at most `maxActiveCampaigns` actives (newest first).
- * Excess active campaigns become draft. Premium (unlimited) is a no-op.
+ * After a plan change, keep at most `maxActiveCampaigns` actives (newest first)
+ * across volume + BOGO. Excess actives become draft. Premium (unlimited) is a no-op.
  */
 export async function enforcePlanActiveCampaignCap(
   shop: string,
@@ -178,10 +178,26 @@ export async function enforcePlanActiveCampaignCap(
     return { keptActiveIds: [], draftedIds: [] };
   }
 
-  const actives = await prisma.volumeDiscountCampaign.findMany({
-    where: { shop, status: "active" },
-    select: { id: true },
-    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+  const [volumeActives, bogoActives] = await Promise.all([
+    prisma.volumeDiscountCampaign.findMany({
+      where: { shop, status: "active" },
+      select: { id: true, updatedAt: true, createdAt: true },
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+    }),
+    prisma.bogoCampaign.findMany({
+      where: { shop, status: "active" },
+      select: { id: true, updatedAt: true, createdAt: true },
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+    }),
+  ]);
+
+  const actives = [
+    ...volumeActives.map((r) => ({ ...r, kind: "volume" as const })),
+    ...bogoActives.map((r) => ({ ...r, kind: "bogo" as const })),
+  ].sort((a, b) => {
+    const ub = b.updatedAt.getTime() - a.updatedAt.getTime();
+    if (ub !== 0) return ub;
+    return b.createdAt.getTime() - a.createdAt.getTime();
   });
 
   if (actives.length <= max) {
@@ -194,11 +210,23 @@ export async function enforcePlanActiveCampaignCap(
   const kept = actives.slice(0, max);
   const excess = actives.slice(max);
   const draftedIds = excess.map((r) => r.id);
+  const volumeDraft = excess.filter((r) => r.kind === "volume").map((r) => r.id);
+  const bogoDraft = excess.filter((r) => r.kind === "bogo").map((r) => r.id);
 
-  await prisma.volumeDiscountCampaign.updateMany({
-    where: { shop, id: { in: draftedIds } },
-    data: { status: "draft" },
-  });
+  await Promise.all([
+    volumeDraft.length
+      ? prisma.volumeDiscountCampaign.updateMany({
+          where: { shop, id: { in: volumeDraft } },
+          data: { status: "draft" },
+        })
+      : Promise.resolve(),
+    bogoDraft.length
+      ? prisma.bogoCampaign.updateMany({
+          where: { shop, id: { in: bogoDraft } },
+          data: { status: "draft" },
+        })
+      : Promise.resolve(),
+  ]);
 
   return {
     keptActiveIds: kept.map((r) => r.id),
@@ -246,13 +274,21 @@ export async function setShopPlan(
 }
 
 export async function countActiveCampaigns(shop: string): Promise<number> {
-  return prisma.volumeDiscountCampaign.count({
-    where: { shop, status: "active" },
-  });
+  const [volume, bogo] = await Promise.all([
+    prisma.volumeDiscountCampaign.count({
+      where: { shop, status: "active" },
+    }),
+    prisma.bogoCampaign.count({
+      where: { shop, status: "active" },
+    }),
+  ]);
+  return volume + bogo;
 }
 
 export async function countAllCampaigns(shop: string): Promise<number> {
-  return prisma.volumeDiscountCampaign.count({
-    where: { shop },
-  });
+  const [volume, bogo] = await Promise.all([
+    prisma.volumeDiscountCampaign.count({ where: { shop } }),
+    prisma.bogoCampaign.count({ where: { shop } }),
+  ]);
+  return volume + bogo;
 }

@@ -142,6 +142,57 @@ model VolumeDiscountAnalyticsEvent {
   @@index([shop, eventType, variantId, createdAt])
 }
 
+/// Buy X Get Y campaigns — native Shopify automatic BXGY (not the volume Function AD).
+model BogoCampaign {
+  id                 String    @id @default(cuid())
+  shop               String
+  campaignName       String
+  /// Title shown on the Shopify automatic discount / cart line.
+  displayName        String?
+  /// draft | active | scheduled | archived
+  status             String    @default("draft")
+  startsAt           DateTime
+  endsAt             DateTime?
+  /// quantity | amount
+  buysRequirement    String    @default("quantity")
+  buysQuantity       Int?
+  /// Decimal string for Shopify Decimal (e.g. "50.00")
+  buysAmount         String?
+  /// products | collections
+  buysScope          String    @default("products")
+  buysProductIds     Json      @default("[]")
+  buysCollectionIds  Json      @default("[]")
+  getsQuantity       Int       @default(1)
+  /// products | collections
+  getsScope          String    @default("products")
+  getsProductIds     Json      @default("[]")
+  getsCollectionIds  Json      @default("[]")
+  /// free | percentage | amount
+  getsValueType      String    @default("free")
+  /// Percent 0–100 or fixed amount decimal string when getsValueType is percentage/amount
+  getsValue          String?
+  usesPerOrderLimit  Int?
+  /// DiscountAutomaticNode GID for this campaign’s native BXGY
+  shopifyDiscountId  String?
+  /// Product-page BOGO widget appearance (same shape as volume widgetDisplay).
+  widgetDisplay            Json @default("{}")
+  /// Per-locale storefront copy overrides for this BOGO offer.
+  displayNameTranslations  Json @default("{}")
+  /// Shopify BXGY Combinations (stack with other discount classes).
+  combinesWithProductDiscounts  Boolean @default(true)
+  combinesWithOrderDiscounts    Boolean @default(false)
+  combinesWithShippingDiscounts Boolean @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([shop])
+  @@index([shop, createdAt(sort: Desc)])
+  @@index([shop, status])
+  @@index([shop, status, createdAt(sort: Desc)])
+  @@index([status, startsAt])
+  @@index([status, endsAt])
+}
+
 model VolumeDiscountSettings {
   shop                  String   @id
   syncInterval          String   @default("disabled") // disabled, 5m, 15m, 30m, 1h, 6h, 12h, 24h

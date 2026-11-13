@@ -1,3 +1,4 @@
+import type { DiscountCombinesWith } from "./discountCombinesWith.server";
 import { mergeCampaignConfigFromMetafieldNodes } from "./volumeDiscountCampaignMetafieldChunks.server";
 
 export type AdminGraphql = {
@@ -14,6 +15,23 @@ const READ_DISCOUNT_MF_NODES = `#graphql
         nodes {
           key
           value
+        }
+      }
+    }
+  }
+`;
+
+const READ_DISCOUNT_COMBINES_WITH = `#graphql
+  query VolumeDiscountReadCombinesWith($id: ID!) {
+    automaticDiscountNode(id: $id) {
+      automaticDiscount {
+        __typename
+        ... on DiscountAutomaticApp {
+          combinesWith {
+            orderDiscounts
+            productDiscounts
+            shippingDiscounts
+          }
         }
       }
     }
@@ -42,6 +60,55 @@ export async function readDiscountVolumeMetafieldNodes(
   } catch {
     return null;
   }
+}
+
+/** Live Shopify Combinations flags on the shared automatic app discount. */
+export async function readLiveDiscountCombinesWith(
+  admin: AdminGraphql,
+  discountNodeId: string,
+): Promise<DiscountCombinesWith | null> {
+  try {
+    const res = await admin.graphql(READ_DISCOUNT_COMBINES_WITH, {
+      variables: { id: discountNodeId },
+    });
+    const parsed = (await res.json()) as {
+      errors?: { message: string }[];
+      data?: {
+        automaticDiscountNode?: {
+          automaticDiscount?: {
+            __typename?: string;
+            combinesWith?: {
+              orderDiscounts?: boolean;
+              productDiscounts?: boolean;
+              shippingDiscounts?: boolean;
+            } | null;
+          } | null;
+        } | null;
+      };
+    };
+    if (parsed.errors?.length) return null;
+    const cw =
+      parsed.data?.automaticDiscountNode?.automaticDiscount?.combinesWith;
+    if (!cw) return null;
+    return {
+      productDiscounts: Boolean(cw.productDiscounts),
+      orderDiscounts: Boolean(cw.orderDiscounts),
+      shippingDiscounts: Boolean(cw.shippingDiscounts),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function discountCombinesWithEqual(
+  a: DiscountCombinesWith,
+  b: DiscountCombinesWith,
+): boolean {
+  return (
+    a.productDiscounts === b.productDiscounts &&
+    a.orderDiscounts === b.orderDiscounts &&
+    a.shippingDiscounts === b.shippingDiscounts
+  );
 }
 
 export function existingCampaignsByIdFromMetafieldNodes(

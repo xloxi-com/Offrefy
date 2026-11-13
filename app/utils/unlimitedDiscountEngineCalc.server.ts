@@ -365,13 +365,22 @@ export function computeUnlimitedDiscountPreview(
   function tiersForCampaign(row: DiscountEngineCampaignRow): FunctionTierConfig[] {
     let cached = tiersByCampaignId.get(row.id);
     if (!cached) {
-      const rawTiers = row.tiers as any;
-      const isCampaignFormat = Array.isArray(rawTiers) && rawTiers.length > 0 && typeof rawTiers[0] === "object" && rawTiers[0].buyFrom !== undefined;
-      
+      const rawTiers = row.tiers as unknown;
+      const firstTier =
+        Array.isArray(rawTiers) && rawTiers.length > 0 ? rawTiers[0] : null;
+      const isCampaignFormat =
+        firstTier !== null &&
+        typeof firstTier === "object" &&
+        "buyFrom" in firstTier;
+
       if (isCampaignFormat) {
-        cached = bestTiersFromPayload(normalizeTiersFromDb(rawTiers));
+        cached = bestTiersFromPayload(
+          normalizeTiersFromDb(rawTiers as Parameters<typeof normalizeTiersFromDb>[0]),
+        );
       } else {
-        cached = parseFunctionTiersFromDbRule(rawTiers);
+        cached = parseFunctionTiersFromDbRule(
+          rawTiers as Parameters<typeof parseFunctionTiersFromDbRule>[0],
+        );
       }
       tiersByCampaignId.set(row.id, cached);
     }

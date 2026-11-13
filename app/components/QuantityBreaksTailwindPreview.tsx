@@ -10,7 +10,6 @@ import {
   type MouseEvent,
 } from "react";
 
-import { BlockStack, Box, InlineStack, Text } from "@shopify/polaris";
 import { MinusIcon, PlusIcon } from "lucide-react";
 
 import {
@@ -45,6 +44,8 @@ import "../styles/pongal-theme-decor.css";
 import "../styles/valentine-theme-decor.css";
 import "../styles/easter-theme-decor.css";
 import "../styles/seasonal-theme-responsive.css";
+
+/* Polaris web: preview layout uses s-stack / s-box / s-text; storefront chrome stays native HTML. */
 
 export type QuantityBreaksPreviewTierRow = {
   key: string;
@@ -426,12 +427,15 @@ function QuantityBreaksTailwindPreviewInner({
     rows.some((r) => Boolean(r.badge?.trim()));
 
   if (!rows.length) {
+    /* Polaris web: s-box / s-text — empty preview */
     return (
-      <Box padding="400" background="bg-surface-secondary" borderRadius="300">
-        <Text as="p" variant="bodySm" tone="subdued" alignment="center">
-          Add tiers under Rule settings to see a preview.
-        </Text>
-      </Box>
+      <s-box padding="base" background="subdued" borderRadius="base">
+        <s-stack direction="block" alignItems="center">
+          <s-text color="subdued">
+            Add tiers under Rule settings to see a preview.
+          </s-text>
+        </s-stack>
+      </s-box>
     );
   }
 
@@ -458,7 +462,8 @@ function QuantityBreaksTailwindPreviewInner({
           ...seasonalDecorStyle,
         }}
       >
-        <BlockStack gap="300">
+        {/* Polaris web: s-stack — preview vertical layout */}
+        <s-stack direction="block" gap="small">
           {showHeaderBar ? (
           <div
             className="offrefy-topbar"
@@ -495,35 +500,20 @@ function QuantityBreaksTailwindPreviewInner({
                   : d.widgetHeadingAlign,
               }}
             >
-              <Text
-                as="h3"
-                variant="headingSm"
-                breakWord
-                alignment={
-                  headerMobileCentered
-                    ? "center"
-                    : d.widgetHeadingAlign === "center"
-                      ? "center"
-                      : d.widgetHeadingAlign === "end"
-                        ? "end"
-                        : "start"
-                }
+              <span
+                className="offrefy-title"
+                style={{
+                  fontFamily:
+                    "var(--vd-theme-font-heading), Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, emoji",
+                  fontSize: `var(--vd-fs-title, ${fs(d.fontSizeTitle)})`,
+                  fontWeight: "var(--vd-fw-strong)",
+                  ...(isSeasonalDecorTheme
+                    ? {}
+                    : { color: d.primaryColor }),
+                }}
               >
-                <span
-                  className="offrefy-title"
-                  style={{
-                    fontFamily:
-                      "var(--vd-theme-font-heading), Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, emoji",
-                    fontSize: `var(--vd-fs-title, ${fs(d.fontSizeTitle)})`,
-                    fontWeight: "var(--vd-fw-strong)",
-                    ...(isSeasonalDecorTheme
-                      ? {}
-                      : { color: d.primaryColor }),
-                  }}
-                >
-                  {headingResolved}
-                </span>
-              </Text>
+                {headingResolved}
+              </span>
             </div>
             ) : null}
             {showCountdownInHeader ? (
@@ -547,8 +537,7 @@ function QuantityBreaksTailwindPreviewInner({
                       : undefined,
                 }}
               >
-                <Text as="span" variant="bodySm" tone="subdued">
-                  <span
+                                  <span
                     style={{
                       color: d.mutedColor,
                       fontWeight: "var(--vd-fw-normal)",
@@ -558,7 +547,6 @@ function QuantityBreaksTailwindPreviewInner({
                     {sanitizeCountdownLabelForDisplay(d.countdownLabel.trim()) ||
                       "Sale end in"}
                   </span>
-                </Text>
                 <span
                   style={{
                     display: "inline-flex",
@@ -604,7 +592,8 @@ function QuantityBreaksTailwindPreviewInner({
             </div>
           </div>
           {!d.hideWidgetMainCta ? (
-            <Box width="100%">
+            /* Polaris web: s-box — full-width CTA wrap */
+            <s-box inlineSize="100%">
               <button
                 type="button"
                 className="offrefy-cta"
@@ -625,32 +614,22 @@ function QuantityBreaksTailwindPreviewInner({
               >
                 {ctaLabel}
               </button>
-            </Box>
+            </s-box>
           ) : null}
-          <Text
-            as="p"
-            variant="bodySm"
-            tone="subdued"
-            alignment="center"
-            breakWord
-          >
-            <span
-              style={{
-                fontSize: `var(--vd-fs-footnote, ${fs(d.fontSizeFootnote)})`,
-                fontWeight: "var(--vd-fw-normal)",
-                color: d.mutedColor,
-              }}
-            >
-              {d.footnote}
-            </span>
-          </Text>
-          <Text as="p" variant="bodyXs" tone="subdued" alignment="center">
-            <span style={{ color: d.mutedColor }}>
-              Admin preview uses a $98 sample unit. Tier labels come from Rule
-              settings (or defaults when empty).
-            </span>
-          </Text>
-        </BlockStack>
+          {d.footnote.trim() ? (
+            <s-stack direction="block" alignItems="center">
+              <span
+                style={{
+                  fontSize: `var(--vd-fs-footnote, ${fs(d.fontSizeFootnote)})`,
+                  fontWeight: "var(--vd-fw-normal)",
+                  color: d.mutedColor,
+                }}
+              >
+                {d.footnote}
+              </span>
+            </s-stack>
+          ) : null}
+        </s-stack>
       </div>
     );
   }
@@ -666,7 +645,8 @@ function QuantityBreaksTailwindPreviewInner({
         ...seasonalDecorStyle,
       }}
     >
-      <BlockStack gap="300">
+      {/* Polaris web: s-stack — preview vertical layout */}
+        <s-stack direction="block" gap="small">
         {showHeaderBar ? (
         <div
           className="offrefy-topbar"
@@ -702,32 +682,17 @@ function QuantityBreaksTailwindPreviewInner({
                 : d.widgetHeadingAlign,
             }}
           >
-            <Text
-              as="h3"
-              variant="headingSm"
-              breakWord
-              alignment={
-                headerMobileCentered
-                  ? "center"
-                  : d.widgetHeadingAlign === "center"
-                    ? "center"
-                    : d.widgetHeadingAlign === "end"
-                      ? "end"
-                      : "start"
-              }
+            <span
+              className="offrefy-title"
+              style={{
+                fontFamily:
+                  "var(--vd-theme-font-heading), Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, emoji",
+                fontSize: `var(--vd-fs-title, ${fs(d.fontSizeTitle)})`,
+                fontWeight: "var(--vd-fw-strong)",
+              }}
             >
-              <span
-                className="offrefy-title"
-                style={{
-                  fontFamily:
-                    "var(--vd-theme-font-heading), Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, emoji",
-                  fontSize: `var(--vd-fs-title, ${fs(d.fontSizeTitle)})`,
-                  fontWeight: "var(--vd-fw-strong)",
-                }}
-              >
-                {headingResolved}
-              </span>
-            </Text>
+              {headingResolved}
+            </span>
           </div>
           ) : null}
           {showCountdownInHeader ? (
@@ -751,8 +716,7 @@ function QuantityBreaksTailwindPreviewInner({
                     : undefined,
               }}
             >
-              <Text as="span" variant="bodySm" tone="subdued">
-                <span
+                              <span
                   style={{
                     color: d.mutedColor,
                     fontWeight: "var(--vd-fw-normal)",
@@ -762,7 +726,6 @@ function QuantityBreaksTailwindPreviewInner({
                   {sanitizeCountdownLabelForDisplay(d.countdownLabel.trim()) ||
                     "Sale end in"}
                 </span>
-              </Text>
               <span
                 style={{
                   display: "inline-flex",
@@ -792,7 +755,8 @@ function QuantityBreaksTailwindPreviewInner({
           className="offrefy-cards"
         >
           <div style={{ paddingTop: floatTopBadge ? "12px" : undefined }}>
-            <BlockStack gap="400">
+            {/* Polaris web: s-stack — tier cards */}
+            <s-stack direction="block" gap="base">
             {rows.map((row, index) => {
               const isSelected = index === selectedIndex;
               const showExpandedTierRow =
@@ -829,7 +793,7 @@ function QuantityBreaksTailwindPreviewInner({
 
               const showComparePrice = showStrike && !d.hideWidgetComparePrice;
               const priceColumn = (
-                <BlockStack gap="050" inlineAlign="end">
+                <s-stack direction="block" gap="small-200" alignItems="end">
                   {badgePos === "price_column" ? badgeEl : null}
                   {showComparePrice ? (
                     <span
@@ -843,17 +807,15 @@ function QuantityBreaksTailwindPreviewInner({
                       {formatMoney(cardStrikeAmount, currencySymbol)}
                     </span>
                   ) : null}
-                  <Text as="span" variant="bodyMd" alignment="end">
-                    <span
-                      style={{
-                        fontSize: `var(--vd-fs-price, ${fs(d.fontSizePrice)})`,
-                        fontWeight: "var(--vd-fw-strong)",
-                      }}
-                    >
-                      {formatMoney(cardMainAmount, currencySymbol)}
-                    </span>
-                  </Text>
-                </BlockStack>
+                  <span
+                    style={{
+                      fontSize: `var(--vd-fs-price, ${fs(d.fontSizePrice)})`,
+                      fontWeight: "var(--vd-fw-strong)",
+                    }}
+                  >
+                    {formatMoney(cardMainAmount, currencySymbol)}
+                  </span>
+                </s-stack>
               );
 
               return (
@@ -898,18 +860,19 @@ function QuantityBreaksTailwindPreviewInner({
                       {badgeEl}
                     </div>
                   ) : null}
-                  <Box padding={{ xs: "300", sm: "400" }}>
-                    <BlockStack gap="300">
-                      <InlineStack
-                        align="space-between"
-                        blockAlign="start"
-                        wrap
-                        gap="300"
+                  {/* Polaris web: s-box / s-stack — tier card padding */}
+                  <s-box padding="base">
+                    <s-stack direction="block" gap="small">
+                      <s-stack
+                        direction="inline"
+                        justifyContent="space-between"
+                        alignItems="start"
+                        gap="small"
                       >
-                        <InlineStack
-                          gap="200"
-                          blockAlign="start"
-                          wrap
+                        <s-stack
+                          direction="inline"
+                          gap="small-200"
+                          alignItems="start"
                         >
                           <div
                             onClick={(e: MouseEvent) => e.stopPropagation()}
@@ -934,57 +897,51 @@ function QuantityBreaksTailwindPreviewInner({
                               />
                             </label>
                           </div>
-                          <BlockStack gap="100" inlineAlign="start">
-                            <InlineStack
-                              gap="200"
-                              blockAlign="center"
-                              wrap
+                          <s-stack direction="block" gap="small-200" alignItems="start">
+                            <s-stack
+                              direction="inline"
+                              gap="small-200"
+                              alignItems="center"
                             >
-                              <Text as="span" variant="bodyMd">
-                                <span
-                                  style={{
-                                    fontSize: `var(--vd-fs-buy, ${fs(d.fontSizeBuyLabel)})`,
-                                    fontWeight: "var(--vd-fw-strong)",
-                                  }}
-                                >
-                                  {row.qtyLabel}
-                                </span>
-                              </Text>
+                              <span
+                                style={{
+                                  fontSize: `var(--vd-fs-buy, ${fs(d.fontSizeBuyLabel)})`,
+                                  fontWeight: "var(--vd-fw-strong)",
+                                }}
+                              >
+                                {row.qtyLabel}
+                              </span>
                               {badgePos === "after_label" ? badgeEl : null}
-                            </InlineStack>
+                            </s-stack>
                             {badgePos === "below_label" ? badgeEl : null}
                             {row.optionSubtext.trim() ? (
-                              <Text as="span" variant="bodySm" alignment="start">
-                                <span
-                                  style={{
-                                    color: d.optionSubtextColor,
-                                    fontWeight: "var(--vd-fw-body)",
-                                    fontSize: `var(--vd-fs-option-subtext, ${fs(d.fontSizeOptionSubtext)})`,
-                                  }}
-                                >
-                                  {row.optionSubtext.trim()}
-                                </span>
-                              </Text>
+                              <span
+                                style={{
+                                  color: d.optionSubtextColor,
+                                  fontWeight: "var(--vd-fw-body)",
+                                  fontSize: `var(--vd-fs-option-subtext, ${fs(d.fontSizeOptionSubtext)})`,
+                                }}
+                              >
+                                {row.optionSubtext.trim()}
+                              </span>
                             ) : null}
                             {badgePos === "after_subtext" ? badgeEl : null}
                             {showSavingsLine ? (
-                              <Text as="span" variant="bodySm" alignment="start">
-                                <span
-                                  style={{
-                                    color: d.savingsColor,
-                                    fontWeight: "var(--vd-fw-body)",
-                                    fontSize: `var(--vd-fs-save, ${fs(d.fontSizeSavings)})`,
-                                  }}
-                                >
-                                  You save{" "}
-                                  {formatMoney(row.savings, currencySymbol)}
-                                </span>
-                              </Text>
+                              <span
+                                style={{
+                                  color: d.savingsColor,
+                                  fontWeight: "var(--vd-fw-body)",
+                                  fontSize: `var(--vd-fs-save, ${fs(d.fontSizeSavings)})`,
+                                }}
+                              >
+                                You save{" "}
+                                {formatMoney(row.savings, currencySymbol)}
+                              </span>
                             ) : null}
-                          </BlockStack>
-                        </InlineStack>
-                        <Box minWidth="fit-content">{priceColumn}</Box>
-                      </InlineStack>
+                          </s-stack>
+                        </s-stack>
+                        <div style={{ minWidth: "fit-content" }}>{priceColumn}</div>
+                      </s-stack>
 
                       {showExpandedTierRow ? (
                         <div
@@ -1011,23 +968,19 @@ function QuantityBreaksTailwindPreviewInner({
                               .join(" ")}
                           >
                             {!d.hideWidgetVariantSelector ? (
-                              <div className={previewWidgetStyles.selectWrap}>
-                                <select
-                                  className={previewWidgetStyles.variantSelect}
-                                  aria-label="Variant"
-                                  value={variant}
-                                  onChange={(e) => setVariant(e.target.value)}
-                                >
-                                  {visibleVariantOptions.map((opt) => (
-                                    <option
-                                      key={opt.value}
-                                      value={opt.value}
-                                    >
-                                      {opt.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
+                              <select
+                                data-offrefy-variant=""
+                                aria-label="Variant"
+                                className={previewWidgetStyles.variantSelect}
+                                value={variant}
+                                onChange={(e) => setVariant(e.target.value)}
+                              >
+                                {visibleVariantOptions.map((opt) => (
+                                  <option key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
                             ) : null}
                             <div className={previewWidgetStyles.expandRow}>
                               <span className={previewWidgetStyles.tierIdx}>
@@ -1130,16 +1083,17 @@ function QuantityBreaksTailwindPreviewInner({
                           </div>
                         </div>
                       ) : null}
-                    </BlockStack>
-                  </Box>
+                    </s-stack>
+                  </s-box>
                 </div>
               );
             })}
-          </BlockStack>
+          </s-stack>
           </div>
         </div>
 
-        <Box width="100%">
+        {/* Polaris web: s-box — full-width CTA wrap */}
+          <s-box inlineSize="100%">
           <button
             type="button"
             className="offrefy-cta"
@@ -1160,29 +1114,21 @@ function QuantityBreaksTailwindPreviewInner({
           >
             {ctaLabel}
           </button>
-        </Box>
+        </s-box>
 
-        <Text
-          as="p"
-          variant="bodySm"
-          tone="subdued"
-          alignment="center"
-          breakWord
-        >
-          <span
-            style={{
-              fontSize: `var(--vd-fs-footnote, ${fs(d.fontSizeFootnote)})`,
-              fontWeight: "var(--vd-fw-normal)",
-            }}
-          >
-            {d.footnote}
-          </span>
-        </Text>
-        <Text as="p" variant="bodyXs" tone="subdued" alignment="center">
-          Admin preview uses a $98 sample unit. Tier badges use Rule settings
-          (or defaults when empty).
-        </Text>
-      </BlockStack>
+        {d.footnote.trim() ? (
+          <s-stack direction="block" alignItems="center">
+            <span
+              style={{
+                fontSize: `var(--vd-fs-footnote, ${fs(d.fontSizeFootnote)})`,
+                fontWeight: "var(--vd-fw-normal)",
+              }}
+            >
+              {d.footnote}
+            </span>
+          </s-stack>
+        ) : null}
+      </s-stack>
     </div>
   );
 }

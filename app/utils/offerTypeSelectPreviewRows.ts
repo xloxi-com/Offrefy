@@ -141,6 +141,10 @@ export function getOfferTypePreviewRows(
   return buildRows(preset === "volume" ? VOLUME_TIERS : QUANTITY_TIERS);
 }
 
+/**
+ * Full storefront-like thumbs (heading + countdown + expand), matching the
+ * original select-type look. Footnotes cleared after normalize.
+ */
 export function getOfferTypePreviewWidgetDisplay(
   preset: "quantity" | "volume",
 ): VolumeDiscountWidgetDisplay {
@@ -148,12 +152,20 @@ export function getOfferTypePreviewWidgetDisplay(
     const base = normalizeVolumeDiscountWidgetDisplay({
       ...DEFAULT_WIDGET_DISPLAY,
       widgetHeading: "Buy more save more",
+      showCountdown: true,
       widgetPresentation: "volume_table",
       ctaLabel: "Add to cart",
       ctaButtonAction: "add_to_cart",
-      footnote: "Set quantity, then add to cart.",
     });
-    return applyVolumeTableAppearancePreset(base, "ocean_blue");
+    return {
+      ...applyVolumeTableAppearancePreset(base, "ocean_blue"),
+      widgetHeading: "Buy more save more",
+      showCountdown: true,
+      footnote: "",
+    };
   }
-  return normalizeVolumeDiscountWidgetDisplay({ ...DEFAULT_WIDGET_DISPLAY });
+  return {
+    ...normalizeVolumeDiscountWidgetDisplay({ ...DEFAULT_WIDGET_DISPLAY }),
+    footnote: "",
+  };
 }

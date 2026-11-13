@@ -2,9 +2,9 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { prisma } from "../db.server";
 import { lookupDiscountRulesForProducts } from "../utils/discountRules.server";
 import { authenticate } from "../shopify.server";
-import type { DiscountEngineCalcRequest } from "../utils/unlimitedDiscountEngineCalc.server";
 import {
   computeUnlimitedDiscountPreview,
+  type DiscountEngineCalcRequest,
   type DiscountEngineCampaignRow,
 } from "../utils/unlimitedDiscountEngineCalc.server";
 

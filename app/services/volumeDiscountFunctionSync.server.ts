@@ -49,8 +49,10 @@ import { invalidateMemoryCachePrefix } from "../utils/memoryCache.server";
 import { mergeCampaignConfigFromMetafieldNodes } from "../utils/volumeDiscountCampaignMetafieldChunks.server";
 import { getVolumeDiscountStorefrontPayload } from "./volumeDiscountStorefrontCache.server";
 import {
+  discountCombinesWithEqual,
   existingCampaignsByIdFromMetafieldNodes,
   readDiscountVolumeMetafieldNodes,
+  readLiveDiscountCombinesWith,
 } from "../utils/discountMetafieldRead.server";
 import { rowSyncFingerprint } from "../utils/syncRowFingerprint.server";
 import {
@@ -575,7 +577,7 @@ async function syncVolumeDiscountShopImpl(
      * so cart discounts stop immediately (Shopify AD endsAt can lag).
      */
     const shopGidPromise = resolveStorefrontWidgetShopGid(admin, shop);
-    let clearProductErrors: string[] = [];
+    const clearProductErrors: string[] = [];
     try {
       const { previousProductIds } = await rebuildDiscountRulesForShop(shop, []);
       const clearMf: Array<{
@@ -802,7 +804,6 @@ async function syncVolumeDiscountShopImpl(
   const keepId = state?.functionDiscountId ?? null;
 
   let campaignMfEntries: { key: string; value: string }[];
-  let needsRemoteLookup = false;
   let widgetJsonFull: string;
   let wildcardCompact: Record<string, unknown> | undefined;
   let discountFunctionTranslations: ReturnType<
@@ -1026,13 +1027,18 @@ async function syncVolumeDiscountShopImpl(
               productId: row.productId,
             });
           } else {
-            let tiersArray: any[] = [];
+            let tiersArray: Array<Record<string, unknown>> = [];
             if (Array.isArray(row.tiers)) {
-              tiersArray = row.tiers;
+              tiersArray = row.tiers as Array<Record<string, unknown>>;
             } else if (typeof row.tiers === "string") {
               try {
-                tiersArray = JSON.parse(row.tiers);
-              } catch {}
+                const parsed = JSON.parse(row.tiers);
+                if (Array.isArray(parsed)) {
+                  tiersArray = parsed as Array<Record<string, unknown>>;
+                }
+              } catch {
+                /* ignore invalid JSON */
+              }
             }
 
             const compactTiers = tiersArray
@@ -1210,7 +1216,6 @@ async function syncVolumeDiscountShopImpl(
     }
 
     campaignMfEntries = built.chunks;
-    needsRemoteLookup = built.needsRemoteLookup;
     wildcardCompact = built.wildcard
       ? (built.wildcard as unknown as Record<string, unknown>)
       : undefined;
@@ -1259,11 +1264,27 @@ async function syncVolumeDiscountShopImpl(
   );
 
   const discountIdExisting = state?.functionDiscountId;
+  /** Skip full metafield rewrite only when Combinations also already match Shopify. */
+  const stackingMatchesLive = async (discountId: string): Promise<boolean> => {
+    const { readDiscountCombinesWith } = await import(
+      "../utils/discountCombinesWith.server"
+    );
+    const [desired, live] = await Promise.all([
+      readDiscountCombinesWith(shop),
+      readLiveDiscountCombinesWith(admin, discountId),
+    ]);
+    if (!live) return false;
+    return discountCombinesWithEqual(desired, live);
+  };
+
   if (!force && discountIdExisting && liveMetafieldNodes) {
     const liveFp = fingerprintMetafieldEntries(liveMetafieldNodes);
     if (liveFp === metafieldFingerprint) {
       const cachedPayload = await getVolumeDiscountStorefrontPayload(shop);
-      if (cachedPayload?.payload === widgetJsonFullWithCap) {
+      if (
+        cachedPayload?.payload === widgetJsonFullWithCap &&
+        (await stackingMatchesLive(discountIdExisting))
+      ) {
         try {
           await prisma.volumeDiscountStorefrontPayload.upsert({
             where: { shop },
@@ -1287,7 +1308,8 @@ async function syncVolumeDiscountShopImpl(
     ]);
     if (
       liveFp === metafieldFingerprint &&
-      cachedPayload?.payload === widgetJsonFullWithCap
+      cachedPayload?.payload === widgetJsonFullWithCap &&
+      (await stackingMatchesLive(discountIdExisting))
     ) {
       return { discountIds: [discountIdExisting], errors: [] };
     }

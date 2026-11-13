@@ -16,10 +16,7 @@ import {
 } from "./shopStorefrontMetafield.server";
 import { getVolumeDiscountStorefrontPayload } from "./volumeDiscountStorefrontCache.server";
 import { applyDueCampaignScheduleTransitions } from "./campaignScheduleTransitions.server";
-import {
-  discountSyncCampaignWhere,
-  storefrontLiveCampaignWhere,
-} from "../utils/campaignScheduleStatus";
+import { storefrontLiveCampaignWhere } from "../utils/campaignScheduleStatus";
 
 type AdminGraphql = {
   graphql: (
@@ -77,9 +74,16 @@ export async function flushStorefrontWidgetPayloadNow(
   const rev = Date.now();
   let widgetJsonFull: string;
   try {
+    const { mergeBogoIntoStorefrontWidgetJson } = await import(
+      "../utils/bogoStorefront.server"
+    );
     if (rows.length === 0) {
       widgetJsonFull = stampStorefrontWidgetRev(
-        JSON.stringify({ version: 1, campaigns: [] }),
+        await mergeBogoIntoStorefrontWidgetJson(
+          shop,
+          JSON.stringify({ version: 1, campaigns: [] }),
+          admin,
+        ),
         rev,
       );
     } else {
@@ -148,23 +152,56 @@ export async function refreshStorefrontWidgetForShop(
   const emptyPayload = JSON.stringify({ version: 1, campaigns: [] });
 
   if (!rows.length) {
+    const { mergeBogoIntoStorefrontWidgetJson } = await import(
+      "../utils/bogoStorefront.server"
+    );
+    const withBogo = await mergeBogoIntoStorefrontWidgetJson(
+      shop,
+      emptyPayload,
+      admin,
+    );
     const gid = await resolveStorefrontWidgetShopGid(admin, shop);
     await syncShopStorefrontWidgetMetafield(
       admin,
       [],
       shop,
-      emptyPayload,
+      withBogo,
       gid ?? undefined,
+      compactStorefrontShopMetafieldPayload(withBogo),
     );
+    invalidateMemoryCachePrefix(`widget:${shop}:`);
     return { errors: [] };
   }
 
   if (!state?.functionDiscountId) {
-    return {
-      errors: [
-        "No Shopify discount linked yet — activate the offer or use Sync all offers.",
-      ],
-    };
+    /* Volume Function AD missing — still publish BOGO-only storefront widget. */
+    const { mergeBogoIntoStorefrontWidgetJson } = await import(
+      "../utils/bogoStorefront.server"
+    );
+    try {
+      const withBogo = await mergeBogoIntoStorefrontWidgetJson(
+        shop,
+        emptyPayload,
+        admin,
+      );
+      const gid = await resolveStorefrontWidgetShopGid(admin, shop);
+      await syncShopStorefrontWidgetMetafield(
+        admin,
+        [],
+        shop,
+        withBogo,
+        gid ?? undefined,
+        compactStorefrontShopMetafieldPayload(withBogo),
+      );
+      invalidateMemoryCachePrefix(`widget:${shop}:`);
+      return { errors: [] };
+    } catch {
+      return {
+        errors: [
+          "No Shopify discount linked yet — activate the offer or use Sync all offers.",
+        ],
+      };
+    }
   }
 
   let builtCampaigns: unknown[] = [];

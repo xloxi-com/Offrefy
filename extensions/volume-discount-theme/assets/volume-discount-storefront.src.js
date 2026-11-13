@@ -1,4 +1,5 @@
-"use strict";
+import EmblaCarousel from "embla-carousel";
+
 (function () {
   "use strict";
 
@@ -269,25 +270,51 @@
         : Promise.resolve(null);
 
     var candidates = widgetConfigCandidateUrls(productId, variantId);
-    var networkPromises = candidates.map(function (url) {
+    var sameOrigin = [];
+    var crossOrigin = [];
+    for (var ci = 0; ci < candidates.length; ci++) {
+      if (String(candidates[ci]).indexOf("://") !== -1) {
+        crossOrigin.push(candidates[ci]);
+      } else {
+        sameOrigin.push(candidates[ci]);
+      }
+    }
+    function fetchCandidate(url) {
       var cross = String(url).indexOf("://") !== -1;
       return fetch(url, {
         credentials: cross ? "omit" : "same-origin",
         cache: "no-store",
         headers: { Accept: "application/json" },
-      }).then(parseWidgetConfigResponse);
-    });
+      })
+        .then(parseWidgetConfigResponse)
+        .catch(function () {
+          return null;
+        });
+    }
+    var sameOriginPromises = [];
+    for (var si = 0; si < sameOrigin.length; si++) {
+      sameOriginPromises.push(fetchCandidate(sameOrigin[si]));
+    }
 
+    /* Same-origin app proxy first. The direct app host is only a fallback,
+       so a missing CORS header does not print an error when the proxy works. */
     var promise = raceUsableConfigs(
-      [prefetchPromise].concat(networkPromises),
-    ).then(function (body) {
-      if (isUsableWidgetConfig(body)) {
-        return body;
-      }
-      fetchPromiseByKey.delete(key);
-      if (pid) fetchPromiseByProductId.delete(pid);
-      return { version: 1, campaigns: [] };
-    });
+      [prefetchPromise].concat(sameOriginPromises),
+    )
+      .then(function (body) {
+        if (isUsableWidgetConfig(body) || !crossOrigin.length) return body;
+        var crossPromises = [];
+        for (var xi = 0; xi < crossOrigin.length; xi++) {
+          crossPromises.push(fetchCandidate(crossOrigin[xi]));
+        }
+        return raceUsableConfigs(crossPromises);
+      })
+      .then(function (body) {
+        if (isUsableWidgetConfig(body)) return body;
+        fetchPromiseByKey.delete(key);
+        if (pid) fetchPromiseByProductId.delete(pid);
+        return { version: 1, campaigns: [] };
+      });
 
     fetchPromiseByKey.set(key, promise);
     if (pid) fetchPromiseByProductId.set(pid, promise);
@@ -525,7 +552,7 @@
     return copyWidgetConfigMeta(cfg, { version: cfg.version || 1, campaigns: out });
   }
 
-  function productMatch(campaign, productId, variantId, productGid, variantGid) {
+  function productMatch(campaign, productId, variantId, productGid, variantGid, collectionGids) {
     if (campaign.productScope === "all") return true;
     var p = String(productId || "");
     var v = String(variantId || "");
@@ -554,6 +581,26 @@
         var gids = (groups[gi] && groups[gi].productIds) || [];
         for (var gj = 0; gj < gids.length; gj++) {
           if (idHit(gids[gj])) return true;
+        }
+      }
+    }
+    var campCols = campaign.collectionIds || [];
+    if (campCols.length && collectionGids && collectionGids.length) {
+      var colSet = {};
+      for (var ci = 0; ci < collectionGids.length; ci++) {
+        colSet[String(collectionGids[ci])] = true;
+      }
+      for (var cj = 0; cj < campCols.length; cj++) {
+        var cid = String(campCols[cj] || "");
+        if (!cid) continue;
+        if (colSet[cid]) return true;
+        for (var ck in colSet) {
+          if (
+            Object.prototype.hasOwnProperty.call(colSet, ck) &&
+            (ck.indexOf(cid) !== -1 || cid.indexOf(ck) !== -1)
+          ) {
+            return true;
+          }
         }
       }
     }
@@ -606,16 +653,2310 @@
     );
   }
 
-  function pickCampaign(cfg, productId, variantId, productGid, variantGid) {
+  function readCollectionGidsFromRoot(root) {
+    if (!root) return [];
+    var raw = root.getAttribute("data-collection-gids") || "";
+    if (!raw) return [];
+    try {
+      if (raw.charAt(0) === "[") {
+        var parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed.map(String).filter(Boolean);
+        }
+      }
+    } catch (e) {
+      /* fall through */
+    }
+    return raw
+      .split(",")
+      .map(function (s) {
+        return String(s || "").trim();
+      })
+      .filter(Boolean);
+  }
+
+  function campaignPickScore(campaign) {
+    if (isBogoCampaign(campaign)) return 3;
+    var scope = String((campaign && campaign.productScope) || "");
+    if (scope === "specific-products" || scope === "products") return 2;
+    if (scope === "collections") return 1;
+    return 0;
+  }
+
+  function pickCampaign(cfg, productId, variantId, productGid, variantGid, collectionGids) {
     var list = (cfg && cfg.campaigns) || [];
+    var cols = collectionGids || [];
+    var best = null;
+    var bestScore = -1;
     for (var i = 0; i < list.length; i++) {
       if (!campaignInScheduleWindow(list[i])) continue;
       if (!customerAllowsCampaign(list[i])) continue;
-      if (productMatch(list[i], productId, variantId, productGid, variantGid)) {
-        return list[i];
+      if (
+        !productMatch(
+          list[i],
+          productId,
+          variantId,
+          productGid,
+          variantGid,
+          cols,
+        )
+      ) {
+        continue;
+      }
+      var score = campaignPickScore(list[i]);
+      if (score > bestScore) {
+        best = list[i];
+        bestScore = score;
       }
     }
+    return best;
+  }
+
+  function isBogoCampaign(campaign) {
+    return (
+      campaign &&
+      (campaign.offerKind === "bogo" ||
+        (campaign.bogo && typeof campaign.bogo === "object"))
+    );
+  }
+
+  function bogoIdNumericTail(id) {
+    var s = String(id || "");
+    var m = s.match(/\/(\d+)\s*$/);
+    if (m) return m[1];
+    if (/^\d+$/.test(s)) return s;
+    return "";
+  }
+
+  function bogoProductIdInList(productId, list) {
+    var p = String(productId || "");
+    if (!p || !Array.isArray(list) || !list.length) return false;
+    for (var i = 0; i < list.length; i++) {
+      var id = String(list[i] || "");
+      if (!id) continue;
+      if (id === p) return true;
+      if (id.indexOf("/Product/" + p) !== -1) return true;
+      if (bogoIdNumericTail(id) === p) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Same-product Buy X Get Y: Shopify BXGY needs buyQty+getQty in cart
+   * (one paid + free/discounted). Classic Buy 1 Get 1 → qty 2.
+   */
+  function bogoSameProductQuantityDeal(campaign, productId) {
+    var bogo = campaign && campaign.bogo;
+    if (!bogo || bogo.buysRequirement === "amount") return null;
+    if (bogo.buysScope === "collections" || bogo.getsScope === "collections") {
+      return null;
+    }
+    var buysIds = bogo.buysProductIds || [];
+    var getsIds = bogo.getsProductIds || [];
+    var inBuys =
+      bogoProductIdInList(productId, buysIds) ||
+      (!buysIds.length &&
+        bogoProductIdInList(productId, campaign.productIds || []));
+    var inGets =
+      bogoProductIdInList(productId, getsIds) ||
+      (!getsIds.length &&
+        bogoProductIdInList(productId, campaign.productIds || []));
+    if (!inBuys || !inGets) return null;
+    var buysQty = Math.max(1, Number(bogo.buysQuantity) || 1);
+    var getsQty = Math.max(1, Number(bogo.getsQuantity) || 1);
+    return { buysQty: buysQty, getsQty: getsQty, needQty: buysQty + getsQty };
+  }
+
+  /**
+   * True when BOGO tiles can paint without a later /widget-config remount flash
+   * (cross-product Get needs image + priceCents; same-SKU can use page product).
+   */
+  function bogoCampaignHasStableTileMedia(campaign, productId) {
+    if (!campaign || !campaign.bogo) return false;
+    if (bogoSameProductQuantityDeal(campaign, productId)) return true;
+    var bogo = campaign.bogo;
+    var buys0 =
+      Array.isArray(bogo.buysLines) && bogo.buysLines[0]
+        ? bogo.buysLines[0]
+        : null;
+    var gets0 =
+      Array.isArray(bogo.getsLines) && bogo.getsLines[0]
+        ? bogo.getsLines[0]
+        : null;
+    if (!gets0) return false;
+    var getOk =
+      String(gets0.title || "").trim() &&
+      String(gets0.imageUrl || "").trim() &&
+      Number(gets0.priceCents) > 0;
+    if (!getOk) return false;
+    /* Buy tile can fall back to page product; prefer buysLines when present. */
+    if (!buys0) return true;
+    return (
+      String(buys0.title || "").trim() &&
+      (String(buys0.imageUrl || "").trim() || Number(buys0.priceCents) > 0)
+    );
+  }
+
+  function paintBogoPendingSkeleton(mountEl) {
+    if (!mountEl) return;
+    if (
+      mountEl.querySelector(".offrefy-bogo") ||
+      mountEl.querySelector("[data-offrefy-bogo-shadow]")
+    ) {
+      return;
+    }
+    mountEl.hidden = false;
+    try {
+      var host = mountEl.closest && mountEl.closest("[data-offrefy-root]");
+      if (host && host.classList) host.classList.add("offrefy-bogo-host");
+    } catch (eHost) {}
+    mountEl.innerHTML =
+      '<div class="offrefy-bogo offrefy-bogo--pending" aria-busy="true" aria-hidden="true"></div>';
+  }
+
+  function cartQtyForVariant(cart, variantId) {
+    var lines = collectCartLinesForVariant(cart, variantId);
+    var total = 0;
+    for (var i = 0; i < lines.length; i++) {
+      total += lines[i].qty;
+    }
+    return total;
+  }
+
+  function readFormVariantId(form) {
+    if (!form) return "";
+    var sel = form.querySelector('select[name="id"]');
+    if (sel && sel.value) return String(sel.value);
+    var input = form.querySelector('input[name="id"]');
+    if (input && input.value) return String(input.value);
+    return "";
+  }
+
+  function bumpBogoFormQuantity(form, qty) {
+    var n = Math.min(VD_MAX_LINE_QTY, Math.max(1, Number(qty) || 1));
+    ensureThemeFormQuantity(form, n);
+    var inputs = form.querySelectorAll('input[name="quantity"], select[name="quantity"]');
+    for (var i = 0; i < inputs.length; i++) {
+      inputs[i].value = String(n);
+      try {
+        inputs[i].dispatchEvent(new Event("change", { bubbles: true }));
+        inputs[i].dispatchEvent(new Event("input", { bubbles: true }));
+      } catch (e) {
+        void e;
+      }
+    }
+    return n;
+  }
+
+  function cartQtyForProductIds(cart, productIds) {
+    if (!cart || !Array.isArray(cart.items) || !Array.isArray(productIds)) {
+      return 0;
+    }
+    var total = 0;
+    for (var i = 0; i < cart.items.length; i++) {
+      var item = cart.items[i];
+      if (!item) continue;
+      var pid = String(item.product_id || "");
+      if (!pid) continue;
+      if (bogoProductIdInList(pid, productIds)) {
+        total += Math.max(0, Number(item.quantity) || 0);
+      }
+    }
+    return total;
+  }
+
+  function numericIdFromGid(gid) {
+    var s = String(gid || "");
+    var m = s.match(/\/(\d+)\s*$/);
+    return m ? m[1] : /^\d+$/.test(s) ? s : "";
+  }
+
+  /** True when Buy and Get product lists are the same pool (classic same-SKU BXGY). */
+  function bogoIsIdenticalBuyGetProducts(bogo) {
+    if (!bogo || bogo.buysScope === "collections" || bogo.getsScope === "collections") {
+      return false;
+    }
+    var buys = bogo.buysProductIds || [];
+    var gets = bogo.getsProductIds || [];
+    if (!buys.length || !gets.length || buys.length !== gets.length) return false;
+    for (var i = 0; i < gets.length; i++) {
+      if (!bogoProductIdInList(bogoIdNumericTail(gets[i]) || gets[i], buys)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function collectCartLinesForVariant(cart, variantId) {
+    var vid = String(variantId || "");
+    var lines = [];
+    if (!vid || !cart || !Array.isArray(cart.items)) return lines;
+    for (var i = 0; i < cart.items.length; i++) {
+      var item = cart.items[i];
+      if (!item) continue;
+      var itemVid = String(
+        item.variant_id != null && item.variant_id !== ""
+          ? item.variant_id
+          : item.id || "",
+      );
+      if (itemVid !== vid) continue;
+      var key = item.key != null && String(item.key) ? String(item.key) : "";
+      var q = Math.max(0, Number(item.quantity) || 0);
+      lines.push({
+        key: key,
+        line: i + 1,
+        qty: q,
+        price: Math.max(
+          0,
+          Number(item.final_line_price || item.line_price) || 0,
+        ),
+      });
+    }
+    return lines;
+  }
+
+  /**
+   * @deprecated Line indexes go stale and cause "line parameter is invalid".
+   * BOGO paths must use bogoCartChangeByKey / cart/update.js only.
+   */
+  function bogoCartChangeByLine(lineNum, quantity) {
+    void lineNum;
+    void quantity;
+    return Promise.resolve(null);
+  }
+
+  function bogoCartChangeByKey(lineKey, quantity) {
+    if (!lineKey) return Promise.resolve(null);
+    return fetch(shopifyRoutesRoot() + "cart/change.js", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        id: String(lineKey),
+        quantity: Math.max(0, Number(quantity) || 0),
+      }),
+    })
+      .then(function (r) {
+        return r
+          .json()
+          .catch(function () {
+            return null;
+          })
+          .then(function (data) {
+            if (!r.ok) return null;
+            return data;
+          });
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  /** Zero many line keys in one cart/update.js call (avoids stale line indexes). */
+  function bogoCartZeroKeys(keys) {
+    var list = (keys || []).filter(Boolean);
+    if (!list.length) return Promise.resolve(null);
+    var updates = {};
+    for (var i = 0; i < list.length; i++) updates[String(list[i])] = 0;
+    return bogoCartUpdateLines(updates);
+  }
+
+  /** Group cart lines by variant_id (includes lines without keys). */
+  function groupCartLinesByVariant(cart) {
+    var groups = {};
+    if (!cart || !Array.isArray(cart.items)) return groups;
+    for (var i = 0; i < cart.items.length; i++) {
+      var item = cart.items[i];
+      if (!item) continue;
+      var vid = String(
+        item.variant_id != null && item.variant_id !== ""
+          ? item.variant_id
+          : item.id || "",
+      );
+      if (!vid) continue;
+      if (!groups[vid]) groups[vid] = [];
+      groups[vid].push({
+        key: item.key != null && String(item.key) ? String(item.key) : "",
+        qty: Math.max(0, Number(item.quantity) || 0),
+        line: i + 1,
+        price: Math.max(
+          0,
+          Number(item.final_line_price || item.line_price) || 0,
+        ),
+      });
+    }
+    return groups;
+  }
+
+  function cartHasDuplicateVariants(cart) {
+    var groups = groupCartLinesByVariant(cart);
+    var vids = Object.keys(groups);
+    for (var i = 0; i < vids.length; i++) {
+      if (groups[vids[i]].length > 1) return true;
+    }
+    return false;
+  }
+
+  /** Build { lineKey: qty } map collapsing every duplicate variant into one line. */
+  function buildBogoMergeUpdates(cart) {
+    var updates = {};
+    var groups = groupCartLinesByVariant(cart);
+    var vids = Object.keys(groups);
+    for (var gi = 0; gi < vids.length; gi++) {
+      var lines = groups[vids[gi]];
+      if (lines.length <= 1) continue;
+      var keyed = lines.filter(function (l) {
+        return !!l.key;
+      });
+      if (keyed.length <= 1) continue;
+      keyed.sort(function (a, b) {
+        return a.line - b.line;
+      });
+      var total = 0;
+      for (var li = 0; li < lines.length; li++) total += lines[li].qty;
+      updates[keyed[0].key] = total;
+      for (var lj = 1; lj < keyed.length; lj++) {
+        updates[keyed[lj].key] = 0;
+      }
+    }
+    return updates;
+  }
+
+  function bogoCartUpdateLines(updates) {
+    var keys = updates ? Object.keys(updates) : [];
+    if (!keys.length) return Promise.resolve(null);
+    return fetch(shopifyRoutesRoot() + "cart/update.js", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ updates: updates }),
+    })
+      .then(function (r) {
+        return r.ok ? r.json() : null;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  function fetchCartJsSilent() {
+    return fetch(cartJsUrl(), {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (r) {
+        return r.ok ? r.json() : null;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  /**
+   * Collapse one variant's duplicate lines → single line with combined qty.
+   * Keys only — never line indexes ("line parameter is invalid").
+   */
+  function mergeOneVariantLines(cart, variantId) {
+    var vid = String(variantId || "");
+    if (!vid || !cart) return Promise.resolve(cart);
+    var lines = collectCartLinesForVariant(cart, vid);
+    if (lines.length <= 1) return Promise.resolve(cart);
+    lines.sort(function (a, b) {
+      return a.line - b.line;
+    });
+    var total = 0;
+    for (var i = 0; i < lines.length; i++) total += lines[i].qty;
+    total = Math.min(VD_MAX_LINE_QTY, Math.max(0, total));
+
+    var keyed = lines.filter(function (l) {
+      return !!l.key;
+    });
+    if (!keyed.length) {
+      /* No keys — wipe via variant clear+readd. */
+      return forceReaddVariantAsSingleLine(cart, vid, total);
+    }
+
+    var updates = {};
+    updates[keyed[0].key] = total;
+    for (var li = 1; li < keyed.length; li++) {
+      updates[keyed[li].key] = 0;
+    }
+    return bogoCartUpdateLines(updates).then(function () {
+      return fetchCartJsSilent().then(function (fresh) {
+        var next = fresh || cart;
+        if (collectCartLinesForVariant(next, vid).length <= 1) return next;
+        /* update.js blocked — sequential change.js by key */
+        var chain = Promise.resolve(null);
+        for (var ri = 1; ri < keyed.length; ri++) {
+          (function (line) {
+            chain = chain.then(function () {
+              return bogoCartChangeByKey(line.key, 0);
+            });
+          })(keyed[ri]);
+        }
+        return chain
+          .then(function () {
+            return bogoCartChangeByKey(keyed[0].key, total);
+          })
+          .then(function () {
+            return fetchCartJsSilent();
+          })
+          .then(function (after) {
+            if (collectCartLinesForVariant(after, vid).length <= 1) {
+              return after;
+            }
+            return forceReaddVariantAsSingleLine(after || next, vid, total);
+          });
+      });
+    });
+  }
+
+  /**
+   * Collapse duplicate cart lines for one variant into a single line.
+   */
+  function mergeDuplicateVariantLines(cart, variantId) {
+    return mergeOneVariantLines(cart, variantId).then(function (next) {
+      return fetchCartAndRefresh().then(function () {
+        return next;
+      });
+    });
+  }
+
+  /** Lower Get-variant qty to needQty (paid lines first). */
+  function trimBogoGetVariantToNeed(cart, variantId, needQty) {
+    return setBogoGetVariantToNeed(cart, variantId, needQty);
+  }
+
+  /**
+   * Cross-product Get lines are app-managed ("we'll add the Get item").
+   * Force that variant to exactly needQty (0 = remove all) — never leave
+   * extra paid Coca-Cola units from a bad auto-add.
+   */
+  function setBogoGetVariantToNeed(cart, variantId, needQty) {
+    var vid = String(variantId || "");
+    var need = Math.max(0, Math.min(VD_MAX_LINE_QTY, Number(needQty) || 0));
+    if (!vid) return Promise.resolve(cart);
+
+    var lines = collectCartLinesForVariant(cart, vid);
+    var have = 0;
+    for (var i = 0; i < lines.length; i++) have += lines[i].qty;
+    if (have === need && lines.length <= 1) return Promise.resolve(cart);
+
+    if (need <= 0) {
+      var keys = lines.map(function (l) {
+        return l.key;
+      }).filter(Boolean);
+      if (!keys.length) return Promise.resolve(cart);
+      return bogoCartZeroKeys(keys).then(function () {
+        return fetchCartJsSilent();
+      });
+    }
+
+    if (!lines.length) {
+      return addBogoPlainCartAdd(vid, need).then(function () {
+        return fetchCartJsSilent();
+      });
+    }
+
+    if (lines.length === 1 && lines[0] && lines[0].key) {
+      return bogoCartChangeByKey(lines[0].key, need).then(function () {
+        return fetchCartJsSilent();
+      });
+    }
+
+    /* Multiple Get lines: zero extras by key, set first to need — no wipe+readd. */
+    var keyed = lines.filter(function (l) {
+      return !!l.key;
+    });
+    if (!keyed.length) {
+      return addBogoPlainCartAdd(vid, need).then(function () {
+        return fetchCartJsSilent();
+      });
+    }
+    var upd = {};
+    upd[keyed[0].key] = need;
+    for (var gi = 1; gi < keyed.length; gi++) {
+      upd[keyed[gi].key] = 0;
+    }
+    return bogoCartUpdateLines(upd).then(function () {
+      return fetchCartJsSilent();
+    });
+  }
+
+  /**
+   * Nuclear collapse for property-split lines (Boga 2+5 → one Boga 7).
+   * Wipe every line key of the variant, then re-add one clean line (no props).
+   * Never uses line indexes (avoids "line parameter is invalid").
+   */
+  function forceReaddVariantAsSingleLine(cart, variantId, desiredTotal) {
+    var vid = String(variantId || "");
+    if (!vid || !cart) return Promise.resolve(cart);
+    var lines = collectCartLinesForVariant(cart, vid);
+    var summed = 0;
+    for (var i = 0; i < lines.length; i++) summed += lines[i].qty;
+    var total =
+      desiredTotal != null && Number.isFinite(Number(desiredTotal))
+        ? Math.max(0, Number(desiredTotal))
+        : summed;
+    total = Math.min(VD_MAX_LINE_QTY, total);
+    if (total < 1 && lines.length === 0) return Promise.resolve(cart);
+
+    var keys = lines
+      .map(function (l) {
+        return l.key;
+      })
+      .filter(Boolean);
+
+    var wipe =
+      keys.length > 0
+        ? bogoCartZeroKeys(keys)
+        : Promise.resolve(null);
+
+    return wipe
+      .then(function () {
+        return fetchCartJsSilent();
+      })
+      .then(function (cleared) {
+        var left = collectCartLinesForVariant(cleared, vid);
+        var leftKeys = left
+          .map(function (l) {
+            return l.key;
+          })
+          .filter(Boolean);
+        if (!leftKeys.length) return cleared;
+        return bogoCartZeroKeys(leftKeys).then(function () {
+          return fetchCartJsSilent();
+        });
+      })
+      .then(function (cleared2) {
+        if (total < 1) return cleared2;
+        return addVariantToCartByAjax(String(vid), total).then(function () {
+          return fetchCartJsSilent();
+        });
+      })
+      .then(function (finalCart) {
+        var still = collectCartLinesForVariant(finalCart, vid);
+        if (still.length <= 1) {
+          var have = 0;
+          for (var s = 0; s < still.length; s++) have += still[s].qty;
+          if (have === total || total < 1) return finalCart;
+          if (still[0] && still[0].key) {
+            return bogoCartChangeByKey(still[0].key, total).then(function () {
+              return fetchCartJsSilent();
+            });
+          }
+        }
+        /* Theme re-split on add — zero extras by key, keep first at total. */
+        if (still.length > 1 && still[0].key) {
+          var upd = {};
+          upd[still[0].key] = total;
+          for (var u = 1; u < still.length; u++) {
+            if (still[u].key) upd[still[u].key] = 0;
+          }
+          return bogoCartUpdateLines(upd).then(function () {
+            return fetchCartJsSilent();
+          });
+        }
+        return finalCart;
+      });
+  }
+
+  /**
+   * Merge every duplicate variant into one line (Boga 5+5 → Boga 10).
+   * Silent by default — caller refreshes theme UI after sync so the drawer
+   * never paints a half-merged cart.
+   */
+  function mergeAllDuplicateVariantLines(cart, opts) {
+    var refreshUi = opts && opts.refreshUi === true;
+    if (!cart || !Array.isArray(cart.items) || !cart.items.length) {
+      return Promise.resolve(cart);
+    }
+    if (!cartHasDuplicateVariants(cart)) {
+      return Promise.resolve(cart);
+    }
+
+    function pass(current, attempt) {
+      if (!current || attempt > 6) return Promise.resolve(current);
+      if (!cartHasDuplicateVariants(current)) return Promise.resolve(current);
+
+      var groups = groupCartLinesByVariant(current);
+      var vids = Object.keys(groups);
+      var dupVid = "";
+      for (var i = 0; i < vids.length; i++) {
+        if (groups[vids[i]].length > 1) {
+          dupVid = vids[i];
+          break;
+        }
+      }
+      if (!dupVid) return Promise.resolve(current);
+
+      var step =
+        attempt >= 1
+          ? forceReaddVariantAsSingleLine(current, dupVid)
+          : mergeOneVariantLines(current, dupVid);
+
+      return step.then(function (next) {
+        return fetchCartJsSilent().then(function (fresh) {
+          var cartNow = fresh || next || current;
+          if (cartHasDuplicateVariants(cartNow)) {
+            return pass(cartNow, attempt + 1);
+          }
+          return cartNow;
+        });
+      });
+    }
+
+    /* Fast path: single update.js with all key→qty maps. */
+    var updates = buildBogoMergeUpdates(cart);
+    var start = Promise.resolve(cart);
+    if (Object.keys(updates).length) {
+      start = bogoCartUpdateLines(updates).then(function (updated) {
+        return fetchCartJsSilent().then(function (fresh) {
+          return fresh || updated || cart;
+        });
+      });
+    }
+
+    return start
+      .then(function (afterFast) {
+        return pass(afterFast || cart, 0);
+      })
+      .then(function (finalCart) {
+        if (!refreshUi) return finalCart;
+        return fetchCartAndRefresh().then(function () {
+          return finalCart;
+        });
+      });
+  }
+
+  /**
+   * BOGO Buy add: bump one existing line by key, else plain cart/add.js.
+   * Never force-readd / wipe (that split Boga lines on Valor).
+   */
+  function addBogoVariantToCart(variantId, quantity) {
+    var id = parseInt(String(variantId), 10);
+    var qty = parseInt(String(quantity), 10) || 1;
+    if (!Number.isFinite(id) || id < 1) {
+      return Promise.reject(new Error("Invalid variant"));
+    }
+    qty = Math.min(VD_MAX_LINE_QTY, Math.max(1, qty));
+    return fetchCartJsSilent().then(function (cart) {
+      var lines = collectCartLinesForVariant(cart, String(id));
+      if (!lines.length) {
+        return addBogoPlainCartAdd(String(id), qty);
+      }
+      var have = 0;
+      for (var i = 0; i < lines.length; i++) have += lines[i].qty;
+      var total = Math.min(VD_MAX_LINE_QTY, have + qty);
+      if (lines.length === 1 && lines[0].key) {
+        return bogoCartChangeByKey(lines[0].key, total);
+      }
+      /* Already split — append only; do not wipe/merge Buy lines. */
+      return addBogoPlainCartAdd(String(id), qty);
+    });
+  }
+
+  function sectionsUrlPath() {
+    var p = String(window.location.pathname || "/");
+    if (p.charAt(0) !== "/") p = "/" + p;
+    return p;
+  }
+
+  /**
+   * Theme Liquid section IDs for bundled Cart API rendering (max 5).
+   * Dawn: cart-drawer.getSectionsToRender(); Valor: data-section-id / shopify-section-*.
+   */
+  function getCartSectionsToRequest() {
+    var ids = [];
+    var seen = {};
+    function add(id) {
+      var s = String(id || "").trim();
+      if (!s || seen[s]) return;
+      seen[s] = true;
+      ids.push(s);
+    }
+    try {
+      var fromNs = offrefyNs().cartSectionIds;
+      if (Array.isArray(fromNs)) {
+        for (var i = 0; i < fromNs.length; i++) add(fromNs[i]);
+      }
+    } catch (eNs) {
+      void eNs;
+    }
+    try {
+      var dawn = document.querySelector("cart-drawer");
+      if (dawn && typeof dawn.getSectionsToRender === "function") {
+        var list = dawn.getSectionsToRender() || [];
+        for (var d = 0; d < list.length; d++) {
+          add(list[d] && (list[d].id || list[d].section));
+        }
+      }
+    } catch (eDawn) {
+      void eDawn;
+    }
+    var collected = collectCartDrawerSectionIds();
+    for (var c = 0; c < collected.length; c++) add(collected[c]);
+    add(resolveCartDrawerSectionId(findCartDrawerHost()));
+    add("cart-icon-bubble");
+    add("cart-drawer");
+    return ids.slice(0, 5);
+  }
+
+  /**
+   * Apply Liquid HTML returned by Cart API bundled `sections` (official theme pattern).
+   */
+  function applyBundledCartSections(payload) {
+    if (!payload || !payload.sections || typeof payload.sections !== "object") {
+      return false;
+    }
+    var applied = false;
+    try {
+      var dawn = document.querySelector("cart-drawer");
+      if (dawn && typeof dawn.renderContents === "function") {
+        dawn.classList.remove("is-empty");
+        dawn.renderContents(payload);
+        openCartDrawerHost(dawn);
+        applied = true;
+      }
+    } catch (eDawn) {
+      void eDawn;
+    }
+
+    var sections = payload.sections;
+    var keys = Object.keys(sections);
+    for (var i = 0; i < keys.length; i++) {
+      var id = keys[i];
+      var html = sections[id];
+      if (!html || html === "null") continue;
+      try {
+        var el =
+          document.getElementById("shopify-section-" + id) ||
+          document.querySelector('[id="shopify-section-' + id + '"]') ||
+          document.querySelector('[data-section-id="' + id + '"]');
+        if (el) {
+          var tmp = document.createElement("div");
+          tmp.innerHTML = html;
+          var next = tmp.firstElementChild;
+          if (next) {
+            el.innerHTML = next.innerHTML;
+            if (next.className) el.className = next.className;
+          } else {
+            el.innerHTML = html;
+          }
+          applied = true;
+          continue;
+        }
+        /* Valor drawer host may not use shopify-section-* id — paint into host. */
+        if (
+          /cart-drawer|cart_drawer|CartDrawer/i.test(id) ||
+          i === 0
+        ) {
+          if (applyCartDrawerSectionHtml(html, payload)) applied = true;
+        }
+      } catch (eSec) {
+        void eSec;
+      }
+    }
+
+    try {
+      var valor = document.querySelector("valor-cart-drawer");
+      if (valor) {
+        valor.classList.remove("is-empty");
+        openCartDrawerHost(valor);
+        if (typeof valor.updateCartCount === "function" && payload.item_count != null) {
+          valor.updateCartCount({ item_count: payload.item_count | 0 });
+        }
+      }
+    } catch (eV) {
+      void eV;
+    }
+
+    updateCartCountBubbles(payload);
+    scheduleCartDrawerDiscountLabelPatch();
+    return applied;
+  }
+
+  /**
+   * BOGO cart/add.js — items only, never request Liquid cart-drawer/page sections.
+   * Theme owns drawer/page HTML; BOGO must not refresh or open them.
+   */
+  function addBogoItemsWithSections(items, withSections) {
+    void withSections;
+    var list = Array.isArray(items) ? items : [];
+    var cleaned = [];
+    for (var i = 0; i < list.length; i++) {
+      var id = parseInt(String(list[i] && list[i].id), 10);
+      var qty = parseInt(String(list[i] && list[i].quantity), 10) || 1;
+      if (!Number.isFinite(id) || id < 1) continue;
+      cleaned.push({
+        id: id,
+        quantity: Math.min(VD_MAX_LINE_QTY, Math.max(1, qty)),
+      });
+    }
+    if (!cleaned.length) return Promise.resolve(null);
+
+    return fetch(shopifyRoutesRoot() + "cart/add.js", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: JSON.stringify({ items: cleaned }),
+    }).then(function (res) {
+      return res
+        .json()
+        .catch(function () {
+          return null;
+        })
+        .then(function (data) {
+          if (res.ok) return data || {};
+          var msg =
+            data && data.description
+              ? String(data.description)
+              : data && data.message
+                ? String(data.message)
+                : "Cart add failed";
+          var err = new Error(msg);
+          err.status = res.status;
+          err.data = data;
+          throw err;
+        });
+    });
+  }
+
+  /** cart/add.js with id+qty only (no Offrefy properties) so BXGY can mark free. */
+  function addBogoPlainCartAdd(variantId, quantity, opts) {
+    void opts;
+    return addBogoItemsWithSections(
+      [{ id: variantId, quantity: quantity }],
+      false,
+    );
+  }
+
+  /** Parse variant id + qty from /cart/add.js request body. */
+  function parseCartAddBody(init) {
+    try {
+      if (!init || init.body == null) return null;
+      if (typeof init.body === "string") {
+        var parsed = JSON.parse(init.body);
+        var id = parsed && (parsed.id || parsed.variant_id);
+        var qty = parsed && parsed.quantity;
+        if (id != null) {
+          return {
+            id: String(id),
+            qty: Math.max(1, Number(qty) || 1),
+          };
+        }
+      }
+      if (typeof FormData !== "undefined" && init.body instanceof FormData) {
+        var fid = init.body.get("id") || init.body.get("variant_id");
+        var fqty = init.body.get("quantity");
+        if (fid) {
+          return {
+            id: String(fid),
+            qty: Math.max(1, Number(fqty) || 1),
+          };
+        }
+      }
+    } catch (e) {
+      void e;
+    }
     return null;
+  }
+
+  /**
+   * Buy product IDs for BXGY qualification. Never fall back to campaign.productIds
+   * when that list also contains Get products (would count Coca-Cola toward Buy 5).
+   * Always strip Get product IDs for cross-product deals.
+   */
+  function bogoBuyProductIdsForCart(campaign) {
+    var bogo = campaign && campaign.bogo;
+    if (!bogo) return [];
+    var buyIds = (bogo.buysProductIds || []).length
+      ? bogo.buysProductIds.slice()
+      : [];
+    if (!buyIds.length) {
+      /* Only use campaign.productIds when Get pool is identical / empty. */
+      var all = campaign.productIds || [];
+      if (bogoIsIdenticalBuyGetProducts(bogo) || !(bogo.getsProductIds || []).length) {
+        buyIds = all.slice();
+      } else {
+        buyIds = all.filter(function (id) {
+          return !bogoProductIdInList(
+            bogoIdNumericTail(id) || id,
+            bogo.getsProductIds || [],
+          );
+        });
+      }
+    }
+    if (bogoIsIdenticalBuyGetProducts(bogo)) return buyIds;
+
+    var getIds = (bogo.getsProductIds || []).slice();
+    var lines = bogo.getsLines || [];
+    for (var i = 0; i < lines.length; i++) {
+      if (lines[i] && lines[i].productId) getIds.push(lines[i].productId);
+    }
+    if (!getIds.length) return buyIds;
+    return buyIds.filter(function (id) {
+      return !bogoProductIdInList(bogoIdNumericTail(id) || id, getIds);
+    });
+  }
+
+  function bogoResolveBuysQuantity(bogo, campaign) {
+    var fromBogo = Number(bogo && bogo.buysQuantity);
+    if (Number.isFinite(fromBogo) && fromBogo >= 1) return Math.floor(fromBogo);
+    var tier0 =
+      campaign &&
+      Array.isArray(campaign.tiers) &&
+      campaign.tiers[0] &&
+      Number(campaign.tiers[0].minQty);
+    if (Number.isFinite(tier0) && tier0 >= 1) return Math.floor(tier0);
+    return 1;
+  }
+
+  /**
+   * CTA-only: add missing Get units via cart/add.js.
+   * Never cart/change or cart/update — those extend drawer qty loading spinners.
+   * Do not strip/trim Get lines here; native Shopify BXGY owns pricing.
+   */
+  function reconcileBogoGetVariantQty(cart, variantId, needGet) {
+    var vid = String(variantId || "");
+    var need = Math.max(0, Math.min(VD_MAX_LINE_QTY, Number(needGet) || 0));
+    if (!vid || need <= 0) return Promise.resolve(cart);
+    var lines = collectCartLinesForVariant(cart, vid);
+    var have = 0;
+    for (var i = 0; i < lines.length; i++) have += lines[i].qty;
+    if (have >= need) return Promise.resolve(cart);
+    return addBogoPlainCartAdd(vid, need - have, { sections: false }).then(
+      function () {
+        return cart;
+      },
+    );
+  }
+
+  /**
+   * Resolve which Get line the shopper selected in the BOGO widget.
+   * Falls back to getsLines[0] (legacy behavior) when no selection exists.
+   */
+  function resolveBogoSelectedGetLine(campaign) {
+    var bogo = campaign && campaign.bogo;
+    var lines = bogo && Array.isArray(bogo.getsLines) ? bogo.getsLines : [];
+    if (!lines.length) return null;
+    var idx = 0;
+    try {
+      var roots = document.querySelectorAll('[data-offrefy-inited="1"]');
+      var campId = campaign && campaign.id != null ? String(campaign.id) : "";
+      for (var i = 0; i < roots.length; i++) {
+        var r = roots[i];
+        var rc = r && r._offrefyBogoCampaign;
+        if (!rc) continue;
+        if (campId && String(rc.id) !== campId) continue;
+        var s = Number(r._offrefyBogoSelectedGetIndex);
+        if (Number.isFinite(s) && s >= 0 && s < lines.length) {
+          idx = Math.floor(s);
+          break;
+        }
+      }
+    } catch (eSel) {
+      void eSel;
+    }
+    return lines[idx] || lines[0];
+  }
+
+  /** Never strip Get lines from drawer/qty flows — no cart/update. */
+  function stripOtherBogoGetFreeLines(cart) {
+    return Promise.resolve(cart || null);
+  }
+
+  /**
+   * Shopify POST /cart/add.js accepts one variant (`id`) or many (`items`).
+   * Quantity-break ATC submits the theme product form, and the theme renders
+   * the drawer from that response. When a BOGO gift is armed, fold it into
+   * that same request so the theme still owns the drawer and both lines land
+   * together. https://shopify.dev/docs/api/ajax/reference/cart
+   */
+  function bogoCartAddWithGift(parsed, pending) {
+    if (!parsed || typeof parsed !== "object" || !pending) return null;
+    var giftId = parseInt(String(pending.id), 10);
+    var giftQty = Math.min(
+      VD_MAX_LINE_QTY,
+      Math.max(1, parseInt(String(pending.qty), 10) || 1),
+    );
+    if (!Number.isFinite(giftId) || giftId < 1) return null;
+
+    var items = [];
+    if (Array.isArray(parsed.items) && parsed.items.length) {
+      for (var i = 0; i < parsed.items.length; i++) items.push(parsed.items[i]);
+    } else if (parsed.id != null) {
+      var line = {
+        id: parseInt(String(parsed.id), 10),
+        quantity: parseInt(String(parsed.quantity), 10) || 1,
+      };
+      if (parsed.properties) line.properties = parsed.properties;
+      if (parsed.selling_plan) line.selling_plan = parsed.selling_plan;
+      items.push(line);
+    } else {
+      return null;
+    }
+    var already = false;
+    for (var j = 0; j < items.length; j++) {
+      if (parseInt(String(items[j] && items[j].id), 10) === giftId) already = true;
+    }
+    if (!already) items.push({ id: giftId, quantity: giftQty });
+
+    var next = { items: items };
+    var keys = Object.keys(parsed);
+    for (var k = 0; k < keys.length; k++) {
+      var key = keys[k];
+      if (
+        key === "id" ||
+        key === "quantity" ||
+        key === "items" ||
+        key === "properties" ||
+        key === "selling_plan"
+      ) {
+        continue;
+      }
+      next[key] = parsed[key];
+    }
+    return next;
+  }
+
+  function bogoFormDataToCartAdd(fd) {
+    var parsed = {
+      id: fd.get("id") || fd.get("variant_id"),
+      quantity: fd.get("quantity") || 1,
+    };
+    if (parsed.id == null || parsed.id === "") return null;
+    var sections = fd.getAll ? fd.getAll("sections") : [];
+    if (sections && sections.length === 1) parsed.sections = String(sections[0]);
+    else if (sections && sections.length > 1) {
+      parsed.sections = sections.map(function (s) {
+        return String(s);
+      });
+    }
+    var sectionsUrl = fd.get("sections_url");
+    if (sectionsUrl) parsed.sections_url = String(sectionsUrl);
+    var selling = fd.get("selling_plan");
+    if (selling) parsed.selling_plan = String(selling);
+    var props = {};
+    var propCount = 0;
+    if (typeof fd.forEach === "function") {
+      fd.forEach(function (value, key) {
+        var m = String(key).match(/^properties\[(.+)\]$/);
+        if (!m) return;
+        props[m[1]] = String(value);
+        propCount += 1;
+      });
+    }
+    if (propCount) parsed.properties = props;
+    return parsed;
+  }
+
+  function rewriteBogoCartAddBody(body, pending) {
+    if (body == null || !pending) return null;
+    try {
+      if (typeof body === "string") {
+        var parsed = JSON.parse(body);
+        var next = bogoCartAddWithGift(parsed, pending);
+        return next ? JSON.stringify(next) : null;
+      }
+      if (typeof URLSearchParams !== "undefined" && body instanceof URLSearchParams) {
+        var fromParams = bogoFormDataToCartAdd(body);
+        var nextParams = fromParams ? bogoCartAddWithGift(fromParams, pending) : null;
+        return nextParams ? JSON.stringify(nextParams) : null;
+      }
+      if (typeof FormData !== "undefined" && body instanceof FormData) {
+        var fromForm = bogoFormDataToCartAdd(body);
+        var nextForm = fromForm ? bogoCartAddWithGift(fromForm, pending) : null;
+        return nextForm ? JSON.stringify(nextForm) : null;
+      }
+    } catch (eBody) {
+      void eBody;
+    }
+    return null;
+  }
+
+  function rewriteBogoCartAddInit(init, pending) {
+    if (!init || init.body == null) return null;
+    var body = rewriteBogoCartAddBody(init.body, pending);
+    if (!body) return null;
+    var headers = new Headers(init.headers || {});
+    headers.set("Content-Type", "application/json");
+    if (!headers.get("Accept")) headers.set("Accept", "application/json");
+    var next = {};
+    var initKeys = Object.keys(init);
+    for (var i = 0; i < initKeys.length; i++) next[initKeys[i]] = init[initKeys[i]];
+    next.body = body;
+    next.headers = headers;
+    return next;
+  }
+
+  function installBogoGiftOnCartAdd() {
+    var ns = offrefyNs();
+    if (ns._offrefyBogoGiftHook) return;
+    ns._offrefyBogoGiftHook = true;
+
+    if (typeof window.fetch === "function") {
+      var origFetch = window.fetch.bind(window);
+      window.fetch = function (input, init) {
+        var pending = ns._offrefyBogoPendingGift;
+        var url = "";
+        try {
+          if (typeof input === "string") url = input;
+          else if (input && typeof input.url === "string") url = input.url;
+        } catch (eUrl) {
+          void eUrl;
+        }
+        if (!pending || String(url).indexOf("/cart/add") === -1) {
+          return origFetch.apply(window, arguments);
+        }
+        try {
+          if (init && init.body != null) {
+            var rewritten = rewriteBogoCartAddInit(init, pending);
+            if (rewritten) {
+              ns._offrefyBogoPendingGift = null;
+              return origFetch.call(window, input, rewritten);
+            }
+          }
+          if (typeof Request !== "undefined" && input instanceof Request) {
+            var req = input;
+            return req.clone().text().then(function (text) {
+              var parsed = null;
+              try {
+                parsed = text ? JSON.parse(text) : null;
+              } catch (eParse) {
+                void eParse;
+              }
+              var still = ns._offrefyBogoPendingGift || pending;
+              var next = parsed ? bogoCartAddWithGift(parsed, still) : null;
+              if (!next) return origFetch.call(window, req);
+              ns._offrefyBogoPendingGift = null;
+              var headers = new Headers(req.headers);
+              headers.set("Content-Type", "application/json");
+              return origFetch.call(
+                window,
+                new Request(req, {
+                  body: JSON.stringify(next),
+                  headers: headers,
+                }),
+              );
+            });
+          }
+        } catch (eHook) {
+          void eHook;
+        }
+        return origFetch.apply(window, arguments);
+      };
+    }
+
+    if (typeof XMLHttpRequest === "function") {
+      var origOpen = XMLHttpRequest.prototype.open;
+      var origSend = XMLHttpRequest.prototype.send;
+      XMLHttpRequest.prototype.open = function (method, url) {
+        try {
+          this._offrefyUrl = url;
+        } catch (eOpen) {
+          void eOpen;
+        }
+        return origOpen.apply(this, arguments);
+      };
+      XMLHttpRequest.prototype.send = function (body) {
+        try {
+          var pendingX = ns._offrefyBogoPendingGift;
+          if (
+            pendingX &&
+            String(this._offrefyUrl || "").indexOf("/cart/add") !== -1
+          ) {
+            var rewrittenX = rewriteBogoCartAddBody(body, pendingX);
+            if (rewrittenX) {
+              ns._offrefyBogoPendingGift = null;
+              try {
+                this.setRequestHeader("Content-Type", "application/json");
+              } catch (eHdr) {
+                void eHdr;
+              }
+              return origSend.call(this, rewrittenX);
+            }
+          }
+        } catch (eSend) {
+          void eSend;
+        }
+        return origSend.apply(this, arguments);
+      };
+    }
+  }
+
+  /** No automatic Get add outside the widget button. */
+  function ensureBogoGetItemsInCart(campaign) {
+    void campaign;
+    return Promise.resolve(null);
+  }
+
+  /** No cart drawer/page listeners for BOGO — free Get only on widget CTA. */
+  function initGlobalBogoGetAssist() {
+    return;
+  }
+
+  /** Campaign refs on root for CTA gift selection only — no cart interceptors. */
+  function bindBogoAtcAssist(root, campaign) {
+    if (!root || !campaign) return;
+    var productId = root.getAttribute("data-product-id");
+    root._offrefyBogoCampaign = campaign;
+    root._offrefyBogoDeal = bogoSameProductQuantityDeal(campaign, productId);
+  }
+
+  /** Liquid Section Rendering id — Valor hardcodes "cart-drawer". */
+  function cartDrawerSectionId() {
+    var ns = offrefyNs();
+    try {
+      var root = document.querySelector("[data-offrefy-cart-drawer-section]");
+      var fromRoot =
+        root && root.getAttribute("data-offrefy-cart-drawer-section");
+      if (fromRoot) return String(fromRoot);
+    } catch (eRoot) {
+      void eRoot;
+    }
+    if (ns.cartDrawerSectionId) return String(ns.cartDrawerSectionId);
+    if (Array.isArray(ns.cartSectionIds)) {
+      for (var i = 0; i < ns.cartSectionIds.length; i++) {
+        if (/cart.?drawer/i.test(String(ns.cartSectionIds[i] || ""))) {
+          return String(ns.cartSectionIds[i]);
+        }
+      }
+    }
+    return "cart-drawer";
+  }
+
+  function openValorCartDrawer(valor) {
+    var el = valor || document.querySelector("valor-cart-drawer");
+    if (!el) return;
+    try {
+      if (typeof el.open === "function") {
+        el.open();
+        return;
+      }
+    } catch (eOpen) {
+      void eOpen;
+    }
+    try {
+      el.removeAttribute("hidden");
+      el.setAttribute("data-open", "");
+      el.classList.remove("valor-cart-drawer--empty");
+      document.body.classList.add("valor-cart-drawer-open");
+    } catch (eAttr) {
+      void eAttr;
+    }
+  }
+
+  /**
+   * Same signal Valor theme ATC fires after /cart/add.js.
+   * Drawer applies Liquid sections HTML from the response and opens — no reload.
+   */
+  function notifyValorCartAdded(payload) {
+    try {
+      document.dispatchEvent(
+        new CustomEvent("valor:cart:added", {
+          bubbles: true,
+          detail: payload && typeof payload === "object" ? payload : {},
+        }),
+      );
+      return true;
+    } catch (e) {
+      void e;
+      return false;
+    }
+  }
+
+  /**
+   * BOGO no longer opens/refreshes cart drawer or cart page.
+   * Theme owns that UI after native ATC; BOGO only mutates cart JSON silently.
+   */
+  function showCartAfterBogoAdd(payload) {
+    return Promise.resolve(payload || null);
+  }
+
+  function bogoParseRgb(color) {
+    var m = String(color || "").match(
+      /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+))?\s*\)/i,
+    );
+    if (!m) return null;
+    return {
+      r: Number(m[1]),
+      g: Number(m[2]),
+      b: Number(m[3]),
+      a: m[4] == null ? 1 : Number(m[4]),
+    };
+  }
+
+  function bogoLuminance(color) {
+    var c = bogoParseRgb(color);
+    if (!c || c.a < 0.35) return null;
+    function ch(v) {
+      v = v / 255;
+      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    }
+    return 0.2126 * ch(c.r) + 0.7152 * ch(c.g) + 0.0722 * ch(c.b);
+  }
+
+  function bogoOpaqueBackground(start) {
+    var node = start;
+    var depth = 0;
+    while (node && depth < 8) {
+      try {
+        var bg = window.getComputedStyle(node).backgroundColor;
+        var lum = bogoLuminance(bg);
+        if (lum != null) return { color: bg, lum: lum, node: node };
+      } catch (eBg) {
+        void eBg;
+      }
+      node = node.parentElement;
+      depth++;
+    }
+    return null;
+  }
+
+  /**
+   * Pull font, button shape, and light/dark surfaces from the live theme
+   * so the offer card matches Dawn, Horizon, Impulse, and dark themes.
+   * A custom campaign button color still wins over the theme button.
+   */
+  function applyBogoThemeMatch(root, card) {
+    if (!card || !window.getComputedStyle) return;
+    try {
+      var bodyStyle = window.getComputedStyle(document.body);
+      if (bodyStyle && bodyStyle.fontFamily) {
+        card.style.setProperty("--ob-font", bodyStyle.fontFamily);
+      }
+
+      var sample = bogoOpaqueBackground(root.parentElement || document.body);
+      var dark = sample && sample.lum != null && sample.lum < 0.42;
+      if (dark) {
+        card.setAttribute("data-scheme", "dark");
+        card.style.setProperty("--ob-theme-surface", sample.color);
+        var fg = window.getComputedStyle(sample.node).color;
+        if (bogoLuminance(fg) != null) {
+          card.style.setProperty("--ob-theme-ink", fg);
+        }
+      } else {
+        card.setAttribute("data-scheme", "light");
+      }
+
+      var form = findThemeProductCartForm();
+      var btn = findThemeCartAddSubmitButton(form);
+      if (btn) {
+        var bs = window.getComputedStyle(btn);
+        var radius = parseFloat(bs.borderTopLeftRadius);
+        if (Number.isFinite(radius)) {
+          var clamped = Math.max(0, Math.min(16, radius));
+          card.style.setProperty("--ob-cta-radius", clamped + "px");
+        }
+        if (bs.fontWeight) card.style.setProperty("--ob-cta-weight", bs.fontWeight);
+        if (bs.letterSpacing && bs.letterSpacing !== "normal") {
+          card.style.setProperty("--ob-cta-tracking", bs.letterSpacing);
+        }
+        if (bs.textTransform && bs.textTransform !== "none") {
+          card.style.setProperty("--ob-cta-transform", bs.textTransform);
+        }
+        var merchant = String(
+          (root.style && root.style.getPropertyValue("--vd-primary")) || "",
+        )
+          .trim()
+          .toLowerCase()
+          .replace(/\s/g, "");
+        var isDefaultCta =
+          !merchant ||
+          merchant === "#111213" ||
+          merchant === "#121212" ||
+          merchant === "#111111" ||
+          merchant === "#111" ||
+          merchant === "#000" ||
+          merchant === "#000000" ||
+          merchant === "rgb(17,18,19)" ||
+          merchant === "rgb(18,18,18)" ||
+          merchant === "rgb(17,17,17)" ||
+          merchant === "rgb(0,0,0)";
+        if (isDefaultCta) {
+          var buttonLum = bogoLuminance(bs.backgroundColor);
+          if (buttonLum != null && buttonLum < 0.94) {
+            card.style.setProperty("--ob-cta", bs.backgroundColor);
+            if (bogoLuminance(bs.color) != null) {
+              card.style.setProperty("--ob-cta-text", bs.color);
+            }
+          }
+        }
+      }
+
+      var cta = card.querySelector(".offrefy-bogo__cta");
+      if (cta) {
+        var ctaBg = window.getComputedStyle(cta).backgroundColor;
+        var ctaLum = bogoLuminance(ctaBg);
+        var surfaceLum = sample && sample.lum != null ? sample.lum : 1;
+        if (
+          ctaLum != null &&
+          Math.abs(ctaLum - surfaceLum) < 0.18
+        ) {
+          if (surfaceLum < 0.5) {
+            card.style.setProperty("--ob-cta", "#f4f4f5");
+            card.style.setProperty("--ob-cta-text", "#111111");
+          } else {
+            card.style.setProperty("--ob-cta", "#111111");
+            card.style.setProperty("--ob-cta-text", "#ffffff");
+          }
+        } else if (
+          ctaLum != null &&
+          !card.style.getPropertyValue("--ob-cta-text")
+        ) {
+          card.style.setProperty(
+            "--ob-cta-text",
+            ctaLum > 0.62 ? "#111111" : "#ffffff",
+          );
+        }
+      }
+    } catch (eTheme) {
+      void eTheme;
+    }
+  }
+
+  /**
+   * Paint the BOGO card in a shadow root with the same stylesheet as the
+   * isolated HTML preview, so theme button/image rules cannot restyle it.
+   */
+  function openBogoScope(mountEl, cardHtml) {
+    var pageCss = document.querySelector(
+      'link[href*="volume-discount-storefront.css"]',
+    );
+    var wrapped =
+      '<div data-offrefy-root class="offrefy-bogo-host">' + cardHtml + "</div>";
+    if (!pageCss || !mountEl.attachShadow) {
+      mountEl.innerHTML = wrapped;
+      return mountEl;
+    }
+    var host = document.createElement("div");
+    host.setAttribute("data-offrefy-bogo-shadow", "1");
+    host.style.setProperty("display", "block", "important");
+    host.style.setProperty("width", "100%", "important");
+    host.style.setProperty("max-width", "100%", "important");
+    host.style.setProperty("min-width", "0", "important");
+    host.style.setProperty("margin", "0", "important");
+    host.style.setProperty("padding", "0", "important");
+    host.style.setProperty("border", "0", "important");
+    host.style.setProperty("background", "transparent", "important");
+    host.style.setProperty("box-shadow", "none", "important");
+    mountEl.textContent = "";
+    mountEl.appendChild(host);
+    var shadow = host.attachShadow({ mode: "open" });
+    var link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = pageCss.href;
+    shadow.appendChild(link);
+    var scope = document.createElement("div");
+    scope.setAttribute("data-offrefy-bogo-root", "1");
+    scope.innerHTML = wrapped;
+    shadow.appendChild(scope);
+    return scope;
+  }
+
+  function mountBogoBundle(root, mountEl, campaign) {
+    clearCountdown(root);
+    var bogo = campaign.bogo || {};
+    var wd =
+      campaign.widgetDisplay && typeof campaign.widgetDisplay === "object"
+        ? campaign.widgetDisplay
+        : {};
+    var locale = resolveStorefrontLocale(root);
+    var sparseMap =
+      campaign.displayNameTranslations &&
+      typeof campaign.displayNameTranslations === "object"
+        ? campaign.displayNameTranslations
+        : {};
+    var sparseLang =
+      sparseMap[locale] ||
+      sparseMap[String(locale || "").split("-")[0]] ||
+      {};
+    var transMap = resolveWidgetTranslations(root, campaign);
+    var langTrans = resolveLangTranslation(locale, transMap, root);
+    var sparseHeading = String(sparseLang.transHeading || "").trim();
+    var sparseCta = String(sparseLang.transCta || "").trim();
+    var sparseFootnote = String(sparseLang.transFootnote || "").trim();
+    var title = String(
+      sparseHeading ||
+        wd.widgetHeading ||
+        (!String(wd.widgetHeading || "").trim() && langTrans.transHeading
+          ? langTrans.transHeading
+          : "") ||
+        campaign.displayName ||
+        campaign.campaignName ||
+        "Buy X, Get Y",
+    ).trim();
+    var buysQty = Math.max(1, Number(bogo.buysQuantity) || 1);
+    var getsQty = Math.max(1, Number(bogo.getsQuantity) || 1);
+    var productId = root.getAttribute("data-product-id");
+    var sameDeal = bogoSameProductQuantityDeal(campaign, productId);
+    var buyLine =
+      bogo.buysRequirement === "amount"
+        ? "Spend $" + String(bogo.buysAmount || "0")
+        : "Buy " + buysQty;
+    var getLine =
+      bogo.getsValueType === "percentage"
+        ? "Get " + getsQty + " at " + String(bogo.getsValue || "0") + "% off"
+        : bogo.getsValueType === "amount"
+          ? "Get " + getsQty + " with $" + String(bogo.getsValue || "0") + " off each"
+          : "Get " + getsQty + " free";
+    var uses =
+      bogo.usesPerOrderLimit != null && Number(bogo.usesPerOrderLimit) > 0
+        ? "Max " + String(bogo.usesPerOrderLimit) + " use(s) per order"
+        : "";
+    var getTitleHint =
+      bogo.getsLines && bogo.getsLines[0] && bogo.getsLines[0].title
+        ? String(bogo.getsLines[0].title)
+        : "";
+    var noteDefault = sameDeal
+      ? "Add " +
+        sameDeal.needQty +
+        " to your cart to unlock this offer. Discount applies automatically."
+      : getTitleHint
+        ? "Buy " +
+          buysQty +
+          " qualifying item(s) — tap the button to add “" +
+          getTitleHint +
+          "” free. If you add more Buy qty in the cart, tap the button again to unlock more free items."
+        : "Buy " +
+          buysQty +
+          " qualifying item(s). Tap the button to add free Get items (tap again after adding more Buy qty).";
+    var note =
+      sparseFootnote ||
+      String(wd.footnote || "").trim() ||
+      (langTrans.transFootnote && String(langTrans.transFootnote).trim()) ||
+      noteDefault;
+
+    var onBuyProduct =
+      bogoProductIdInList(productId, bogo.buysProductIds || []) ||
+      (sameDeal ? true : false) ||
+      (!(bogo.buysProductIds || []).length &&
+        bogoProductIdInList(productId, campaign.productIds || []));
+    var showCta = Boolean(sameDeal || onBuyProduct);
+    var ctaFromWd = String(
+      sparseCta ||
+        wd.ctaLabel ||
+        (!String(wd.ctaLabel || "").trim() && langTrans.transCta
+          ? langTrans.transCta
+          : "") ||
+        "",
+    ).trim();
+    var ctaLabel = ctaFromWd
+      ? ctaFromWd
+      : sameDeal
+        ? "Add " + sameDeal.needQty + " to cart"
+        : "Add " + buysQty + " + unlock offer";
+
+    try {
+      if (wd.primaryColor) root.style.setProperty("--vd-primary", String(wd.primaryColor));
+      if (wd.primaryHoverColor) {
+        root.style.setProperty("--vd-primary-hover", String(wd.primaryHoverColor));
+      }
+      if (wd.selectedBgColor) {
+        root.style.setProperty("--vd-selected-bg", String(wd.selectedBgColor));
+      }
+      if (wd.cardBorderColor) {
+        root.style.setProperty("--vd-card-border", String(wd.cardBorderColor));
+      }
+    } catch (eWd) {
+      void eWd;
+    }
+    var liquidFormId = root.getAttribute("data-offrefy-product-form-id") || "";
+    var targetBuyQty = sameDeal
+      ? sameDeal.needQty
+      : Math.max(1, Number(bogo.buysQuantity) || 1);
+
+    var pageTitle =
+      String(root.getAttribute("data-product-title") || "").trim() ||
+      "Product";
+    var pageImage = String(root.getAttribute("data-product-image") || "").trim();
+    if (!pageImage) {
+      try {
+        var og = document.querySelector('meta[property="og:image"]');
+        if (og && og.getAttribute("content")) {
+          pageImage = String(og.getAttribute("content")).trim();
+        }
+      } catch (eOg) {
+        void eOg;
+      }
+    }
+    var pageCents = Number(root.getAttribute("data-unit-price-cents")) || 0;
+    var currency = String(root.getAttribute("data-currency") || "USD");
+    var buysLines = Array.isArray(bogo.buysLines) ? bogo.buysLines : [];
+    var getsLines = Array.isArray(bogo.getsLines) ? bogo.getsLines : [];
+    var buyLineMatch = null;
+    for (var bli = 0; bli < buysLines.length; bli++) {
+      if (
+        buysLines[bli] &&
+        bogoProductIdInList(productId, [buysLines[bli].productId])
+      ) {
+        buyLineMatch = buysLines[bli];
+        break;
+      }
+    }
+    var buysLine0 = buyLineMatch || buysLines[0] || null;
+    var getsLine0 = getsLines[0] || null;
+    /*
+     * On a Buy product page, always show THIS product as Buy (not buysLines[0]).
+     * Matches merchant expectation: Buy 5 of qualifying items from the pool.
+     */
+    var buyTitle = String(
+      (onBuyProduct ? pageTitle : null) ||
+        (buysLine0 && buysLine0.title) ||
+        pageTitle ||
+        "Product",
+    ).trim();
+    var buyImage = String(
+      (onBuyProduct ? pageImage : null) ||
+        (buysLine0 && buysLine0.imageUrl) ||
+        pageImage ||
+        "",
+    ).trim();
+    var buyCents =
+      onBuyProduct && pageCents > 0
+        ? pageCents
+        : buysLine0 && Number(buysLine0.priceCents) > 0
+          ? Number(buysLine0.priceCents)
+          : pageCents;
+    var buyPrice = buyCents > 0 ? fmtMoney(buyCents, currency) : "";
+    var getPoolCount = getsLines.length;
+    var bogoCopy =
+      wd.bogoCopy && typeof wd.bogoCopy === "object" ? wd.bogoCopy : {};
+    function bogoLabel(transKey, copyKey, fallback) {
+      var fromLang = String(sparseLang[transKey] || "").trim();
+      if (fromLang) return fromLang;
+      var fromCopy = String(bogoCopy[copyKey] || "").trim();
+      return fromCopy || fallback;
+    }
+    function fillBogoTpl(template, vars) {
+      var out = String(template || "");
+      var key;
+      for (key in vars) {
+        if (!Object.prototype.hasOwnProperty.call(vars, key)) continue;
+        var val = String(vars[key]);
+        out = out.split("{{" + key + "}}").join(val).split("{" + key + "}").join(val);
+      }
+      return out;
+    }
+    var labelBadge = bogoLabel("transBogoBadge", "badgeLabel", "Special Offer");
+    var labelBuy = bogoLabel("transBogoBuy", "buyLabel", "BUY");
+    var labelGetFree = bogoLabel("transBogoGetFree", "getFreeLabel", "GET FREE");
+    var labelGet = bogoLabel("transBogoGet", "getLabel", "GET");
+    var labelFree = bogoLabel("transBogoFree", "freeLabel", "FREE");
+    var pickTpl =
+      getsQty === 1
+        ? bogoLabel("transBogoPick", "pickLabel", "Pick {{qty}} free gift")
+        : bogoLabel(
+            "transBogoPickPlural",
+            "pickLabelPlural",
+            "Pick {{qty}} free gifts",
+          );
+    var availableTpl = bogoLabel(
+      "transBogoAvailable",
+      "availableLabel",
+      "{{count}} products available",
+    );
+    var getTitle = String(
+      getPoolCount > 1
+        ? fillBogoTpl(pickTpl, { qty: getsQty })
+        : (getsLine0 && getsLine0.title) ||
+            getTitleHint ||
+            (sameDeal ? buyTitle : "Get item"),
+    ).trim();
+    var getHint =
+      getPoolCount > 1
+        ? fillBogoTpl(availableTpl, { count: getPoolCount })
+        : "";
+    var getImages = [];
+    if (getPoolCount > 1) {
+      for (var gi = 0; gi < getsLines.length && getImages.length < 3; gi++) {
+        var gImg = String((getsLines[gi] && getsLines[gi].imageUrl) || "").trim();
+        if (gImg) getImages.push(gImg);
+      }
+    }
+    var getImage = String(
+      (getsLine0 && getsLine0.imageUrl) ||
+        (sameDeal ? buyImage : "") ||
+        "",
+    ).trim();
+    if (!getImages.length && getImage) getImages = [getImage];
+    if (!getImages.length && sameDeal && buyImage) getImages = [buyImage];
+    var getCents =
+      getsLine0 && Number(getsLine0.priceCents) > 0
+        ? Number(getsLine0.priceCents)
+        : sameDeal
+          ? buyCents
+          : 0;
+    /* Never fall back Get → Buy price (causes refresh flash when remote price arrives). */
+    var getPrice =
+      getPoolCount > 1
+        ? ""
+        : getCents > 0
+          ? fmtMoney(getCents, currency)
+          : "";
+    var isFreeGet =
+      bogo.getsValueType !== "percentage" && bogo.getsValueType !== "amount";
+    var heroTitle =
+      String(wd.widgetHeading || "").trim() ||
+      (bogo.buysRequirement === "amount"
+        ? title
+        : "Buy " + buysQty + " Get " + getsQty + (isFreeGet ? " Free" : ""));
+    var stockFoot =
+      "Discount applies automatically when Buy and Get quantities are in your cart.";
+    var footRaw = String(wd.footnote || "").trim();
+    var heroSub =
+      (footRaw && footRaw !== stockFoot ? footRaw : "") ||
+      (bogo.buysRequirement === "amount"
+        ? note
+        : "Buy " +
+          buyTitle +
+          (isFreeGet
+            ? getPoolCount > 1
+              ? " and get a free gift of your choice."
+              : " and get " + getsQty + " free."
+            : " and unlock this offer."));
+
+    var svgCart =
+      '<svg class="offrefy-bogo__ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="m1 1c-.55228475 0-1 .44771525-1 1s.44771525 1 1 1h1.7792969a.69367162.69367162 35.784145 0 1 .65808707.47435058l3.2969911 9.8928369c.14641172.43923517.16502704.91215746.05273437 1.3613281l-.27148437 1.0878906c-.39834445 1.5933778.84195876 3.1835938 2.484375 3.1835938h12c.55228475 0 1-.44771525 1-1s-.44771525-1-1-1h-12c-.38938619 0-.6393619-.31950554-.54492188-.69726562l.20473297-.81770594a.64062109.64062109 142.02823 0 1 .6214389-.48502844h10.71875c.43057012.00022511.81295428-.27515444.94921875-.68359375l2.6660156-8c.21596464-.64778704-.26638007-1.3167178-.94921876-1.3164062h-16.111328a.69371294.69371294 35.782526 0 1 -.65811388-.47434165l-.94735487-2.8420646c-.13626447-.40843931-.51864863-.68381886-.94921875-.68359375zm7 19c-1.1045695 0-2 .8954305-2 2s.8954305 2 2 2 2-.8954305 2-2-.8954305-2-2-2zm12 0c-1.1045695 0-2 .8954305-2 2s.8954305 2 2 2 2-.8954305 2-2-.8954305-2-2-2z"/></svg>';
+    var svgGift =
+      '<svg class="offrefy-bogo__ico" viewBox="0 0 512 512" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M32 271.692v192c0 17.664 14.368 32 32 32h160v-224H32z"/><path fill="currentColor" d="M480 143.692H378.752c7.264-4.96 13.504-9.888 17.856-14.304 25.824-25.952 25.824-68.192 0-94.144-25.088-25.28-68.8-25.216-93.856 0-13.888 13.92-50.688 70.592-45.6 108.448h-2.304c5.056-37.856-31.744-94.528-45.6-108.448-25.088-25.216-68.8-25.216-93.856 0C89.6 61.196 89.6 103.436 115.36 129.388c4.384 4.416 10.624 9.344 17.888 14.304H32c-17.632 0-32 14.368-32 32v48c0 8.832 7.168 16 16 16h208v-64h64v64h208c8.832 0 16-7.168 16-16v-48c0-17.632-14.336-32-32-32zM222.112 142.636s-1.344 1.056-5.92 1.056c-22.112 0-64.32-22.976-78.112-36.864-13.408-13.504-13.408-35.52 0-49.024 6.496-6.528 15.104-10.112 24.256-10.112 9.12 0 17.728 3.584 24.224 10.112 21.568 21.696 43.008 77.12 35.552 84.832zM295.776 143.692c-4.544 0-5.888-1.024-5.888-1.056-7.456-7.712 13.984-63.136 35.552-84.832 12.896-13.024 35.456-13.088 48.48 0 13.44 13.504 13.44 35.52 0 49.024-13.792 13.888-56 36.864-78.144 36.864z"/><path fill="currentColor" d="M288 271.692v224h160c17.664 0 32-14.336 32-32v-192H288z"/></svg>';
+    var svgEquals =
+      '<svg class="offrefy-bogo__op-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M11 4.5h2a.5.5 0 0 1 .5.5v5.5H19a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5h-5.5V19a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1-.5-.5v-5.5H5a.5.5 0 0 1-.5-.5v-2a.5.5 0 0 1 .5-.5h5.5V5a.5.5 0 0 1 .5-.5z"/></svg>';
+    var svgCheck =
+      '<svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M7.5 12L10.5 15L16.5 9M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    function bogoImgHtml(src, name, extraClass) {
+      if (src) {
+        return (
+          '<img class="offrefy-bogo__img' +
+          (extraClass ? " " + extraClass : "") +
+          '" src="' +
+          esc(src) +
+          '" alt="' +
+          esc(name || "") +
+          '" loading="lazy" width="160" height="160" />'
+        );
+      }
+      return (
+        '<div class="offrefy-bogo__img offrefy-bogo__img--ph' +
+        (extraClass ? " " + extraClass : "") +
+        '" aria-hidden="true"></div>'
+      );
+    }
+
+    function bogoGiftPickerHtml() {
+      var firstLine = getsLines[0] || {};
+      var firstSrc =
+        String(firstLine.imageUrl || "").trim() || getImage || buyImage;
+      var firstName = String(firstLine.title || getTitle || "Gift").trim();
+      if (getPoolCount < 2) {
+        return (
+          '<div class="offrefy-bogo__media">' +
+          bogoImgHtml(firstSrc, firstName) +
+          "</div>"
+        );
+      }
+      var cards = "";
+      var cols = Math.min(3, getsLines.length);
+      for (var gi = 0; gi < getsLines.length; gi++) {
+        var gl = getsLines[gi] || {};
+        var gSrc = String(gl.imageUrl || "").trim();
+        var gName = String(gl.title || "Gift " + (gi + 1)).trim();
+        cards +=
+          '<button type="button" class="offrefy-bogo__choice' +
+          (gi === 0 ? " is-selected" : "") +
+          '" data-offrefy-bogo-gift-idx="' +
+          String(gi) +
+          '" aria-pressed="' +
+          (gi === 0 ? "true" : "false") +
+          '" aria-label="' +
+          esc(gName) +
+          '">' +
+          '<span class="offrefy-bogo__choice-card">' +
+          '<span class="offrefy-bogo__check" aria-hidden="true">' +
+          svgCheck +
+          "</span>" +
+          bogoImgHtml(gSrc, gName, "offrefy-bogo__img--choice") +
+          '<span class="offrefy-bogo__choice-name">' +
+          esc(gName) +
+          "</span></span></button>";
+      }
+      var choicesHtml =
+        '<div class="offrefy-bogo__choices" style="--ob-choices:' +
+        String(cols) +
+        '" role="listbox" aria-label="Choose free gift">' +
+        cards +
+        "</div>";
+      var viewportHtml =
+        getPoolCount > 3
+          ? '<div class="offrefy-bogo__viewport" data-offrefy-bogo-embla>' +
+            choicesHtml +
+            "</div>"
+          : choicesHtml;
+      return '<div class="offrefy-bogo__slider">' + viewportHtml + "</div>";
+    }
+
+    function bogoPickerNavHtml() {
+      if (getPoolCount < 4) return "";
+      return (
+        '<div class="offrefy-bogo__navs">' +
+        '<button type="button" class="offrefy-bogo__picker-nav" data-offrefy-bogo-gift-prev aria-label="Previous gifts">' +
+        '<svg viewBox="0 0 20 20" aria-hidden="true"><path fill="currentColor" d="M12.7 15.3 7.4 10l5.3-5.3 1.1 1.1L9.6 10l4.2 4.2z"/></svg></button>' +
+        '<button type="button" class="offrefy-bogo__picker-nav" data-offrefy-bogo-gift-next aria-label="Next gifts">' +
+        '<svg viewBox="0 0 20 20" aria-hidden="true"><path fill="currentColor" d="M7.3 4.7 12.6 10l-5.3 5.3-1.1-1.1L10.4 10 6.2 5.8z"/></svg></button>' +
+        "</div>"
+      );
+    }
+
+    function bogoBuyTileHtml() {
+      var qtyBadge =
+        buysQty > 1
+          ? '<span class="offrefy-bogo__qty">' + esc("×" + buysQty) + "</span>"
+          : "";
+      return (
+        '<div class="offrefy-bogo__tile offrefy-bogo__tile--buy">' +
+        '<div class="offrefy-bogo__head">' +
+        '<div class="offrefy-bogo__ribbon offrefy-bogo__ribbon--buy">' +
+        svgCart +
+        "<span>" +
+        esc(labelBuy) +
+        "</span></div></div>" +
+        '<div class="offrefy-bogo__media">' +
+        bogoImgHtml(buyImage, buyTitle) +
+        "</div>" +
+        '<div class="offrefy-bogo__name">' +
+        esc(buyTitle || "Product") +
+        "</div>" +
+        '<div class="offrefy-bogo__buy-meta">' +
+        (buyPrice
+          ? '<div class="offrefy-bogo__price offrefy-bogo__price--buy">' +
+            esc(buyPrice) +
+            "</div>"
+          : "") +
+        qtyBadge +
+        "</div></div>"
+      );
+    }
+
+    function bogoGetTileHtml() {
+      var ribbonLabel = isFreeGet ? labelGetFree : labelGet;
+      var priceHtml = isFreeGet
+        ? '<div class="offrefy-bogo__price offrefy-bogo__price--free">' +
+          (getPoolCount < 2 && getPrice
+            ? '<span class="offrefy-bogo__price-was">' +
+              esc(getPrice) +
+              "</span>"
+            : "") +
+          '<span class="offrefy-bogo__price-now">' +
+          (getPoolCount < 2 && getPrice
+            ? esc(fmtMoney(0, currency))
+            : esc(labelFree)) +
+          "</span></div>"
+        : getPrice
+          ? '<div class="offrefy-bogo__price">' + esc(getPrice) + "</div>"
+          : "";
+      return (
+        '<div class="offrefy-bogo__tile offrefy-bogo__tile--get' +
+        (isFreeGet ? " offrefy-bogo__tile--free" : "") +
+        (getPoolCount > 1 ? " offrefy-bogo__tile--multi" : "") +
+        '">' +
+        '<div class="offrefy-bogo__head">' +
+        '<div class="offrefy-bogo__ribbon offrefy-bogo__ribbon--get">' +
+        svgGift +
+        "<span>" +
+        esc(ribbonLabel) +
+        "</span></div>" +
+        bogoPickerNavHtml() +
+        "</div>" +
+        bogoGiftPickerHtml() +
+        '<div class="offrefy-bogo__foot">' +
+        '<div class="offrefy-bogo__foot-copy">' +
+        '<div class="offrefy-bogo__name" data-offrefy-bogo-get-name>' +
+        (getPoolCount > 1 ? svgGift : "") +
+        "<span>" +
+        esc(getTitle || "Get item") +
+        "</span></div>" +
+        (getHint
+          ? '<div class="offrefy-bogo__hint">' + esc(getHint) + "</div>"
+          : "") +
+        "</div>" +
+        priceHtml +
+        "</div></div>"
+      );
+    }
+
+    var equationHtml =
+      bogoBuyTileHtml() +
+      '<span class="offrefy-bogo__op" aria-hidden="true">' +
+      svgEquals +
+      "</span>" +
+      bogoGetTileHtml();
+
+    var ctaAct = String(wd.ctaButtonAction || "add_to_cart");
+    if (
+      ctaAct !== "add_to_cart" &&
+      ctaAct !== "add_to_cart_open_drawer" &&
+      ctaAct !== "go_to_checkout" &&
+      ctaAct !== "go_to_page"
+    ) {
+      ctaAct = "add_to_cart";
+    }
+    var ctaPageUrl = String(wd.ctaButtonPageUrl || "").trim();
+    var needsCrossGet =
+      !sameDeal && Array.isArray(bogo.getsLines) && bogo.getsLines.length > 0;
+    /* Controlled button — honors Display → Button action (not native form-only). */
+    var useNativeThemeAtc =
+      ctaAct === "add_to_cart" || ctaAct === "add_to_cart_open_drawer";
+
+    try {
+      if (root && root.classList) root.classList.add("offrefy-bogo-host");
+    } catch (eHost) {}
+
+    var cardHtml =
+      '<div class="offrefy-bogo">' +
+      '<div class="offrefy-bogo__hero">' +
+      '<div class="offrefy-bogo__hero-copy">' +
+      '<div class="offrefy-bogo__title"></div>' +
+      '<div class="offrefy-bogo__badge">' +
+      '<span class="offrefy-bogo__hero-icon" aria-hidden="true">' +
+      svgGift +
+      "</span>" +
+      "<span>" +
+      esc(labelBadge) +
+      "</span>" +
+      "</div>" +
+      "</div>" +
+      '<p class="offrefy-bogo__sub"></p>' +
+      "</div>" +
+      '<div class="offrefy-bogo__equation">' +
+      equationHtml +
+      "</div>" +
+      (uses ? '<div class="offrefy-bogo__limit"></div>' : "") +
+      (showCta
+        ? '<div class="offrefy-bogo__cta-row"><button type="button" class="offrefy-bogo__cta" data-offrefy-bogo-cta>' +
+          '<span class="offrefy-bogo__cta-label"></span>' +
+          "</button></div>"
+        : "") +
+      "</div>";
+
+    var scope = openBogoScope(mountEl, cardHtml);
+
+    var titleEl = scope.querySelector(".offrefy-bogo__title");
+    var subEl = scope.querySelector(".offrefy-bogo__sub");
+    var limitEl = scope.querySelector(".offrefy-bogo__limit");
+    var ctaEl = scope.querySelector("[data-offrefy-bogo-cta]");
+    var ctaLabelEl = scope.querySelector(".offrefy-bogo__cta-label");
+    var cardEl = scope.querySelector(".offrefy-bogo");
+    if (cardEl) {
+      var buyColor = String(bogoCopy.buyColor || "#177245");
+      var getColor = String(bogoCopy.getColor || "#9f2d55");
+      var buyBg = String(bogoCopy.buyBg || "#f6faf7");
+      var getBg = String(bogoCopy.getBg || "#fbf7f9");
+      var surface = String(bogoCopy.surfaceColor || "#ffffff");
+      var border = String(bogoCopy.borderColor || "#e8e8ea");
+      var ink = String(bogoCopy.textColor || "#18181b");
+      var muted = String(bogoCopy.mutedColor || "#71717a");
+      var badgeBg = String(bogoCopy.badgeBg || "#f4f4f5");
+      var badgeText = String(bogoCopy.badgeText || "#52525b");
+      cardEl.style.setProperty("--ob-buy", buyColor);
+      cardEl.style.setProperty("--ob-buy-soft", buyBg);
+      cardEl.style.setProperty(
+        "--ob-buy-line",
+        "color-mix(in srgb, " + buyColor + " 22%, " + border + ")",
+      );
+      cardEl.style.setProperty("--ob-get", getColor);
+      cardEl.style.setProperty("--ob-get-soft", getBg);
+      cardEl.style.setProperty(
+        "--ob-get-line",
+        "color-mix(in srgb, " + getColor + " 22%, " + border + ")",
+      );
+      cardEl.style.setProperty("--ob-surface", surface);
+      cardEl.style.setProperty("--ob-line", border);
+      cardEl.style.setProperty("--ob-ink", ink);
+      cardEl.style.setProperty("--ob-muted", muted);
+      cardEl.style.setProperty("--ob-badge-bg", badgeBg);
+      cardEl.style.setProperty("--ob-badge-text", badgeText);
+      if (wd.primaryColor) {
+        cardEl.style.setProperty("--ob-cta", String(wd.primaryColor));
+      }
+    }
+    var bogoCss = String(wd.customCss || "")
+      .replace(/<\/style/gi, "")
+      .trim();
+    if (bogoCss && scope) {
+      var bogoCssEl = document.createElement("style");
+      bogoCssEl.setAttribute("data-offrefy-bogo-custom-css", "");
+      bogoCssEl.textContent = bogoCss.slice(0, 32000);
+      scope.insertBefore(bogoCssEl, scope.firstChild);
+    }
+
+    if (titleEl) {
+      var dealTitle = heroTitle;
+      if (!dealTitle || /^special offer$/i.test(dealTitle)) {
+        dealTitle =
+          "Buy " +
+          buysQty +
+          ", get " +
+          getsQty +
+          (isFreeGet ? " free" : "");
+      }
+      titleEl.textContent = dealTitle;
+    }
+    if (subEl) subEl.textContent = heroSub;
+    if (limitEl) limitEl.textContent = uses;
+    if (ctaLabelEl) ctaLabelEl.textContent = ctaLabel;
+
+    root._offrefyBogoSelectedGetIndex = 0;
+
+    function syncBogoGiftSelection(idx, opts) {
+      var lines = getsLines;
+      if (!lines.length) return;
+      var len = lines.length;
+      var raw = Number(idx);
+      if (!Number.isFinite(raw)) raw = 0;
+      var prev = Number(root._offrefyBogoSelectedGetIndex) || 0;
+      /* Wrap around so arrows always feel interactive. */
+      var next = ((Math.floor(raw) % len) + len) % len;
+      var wrapJump =
+        (prev === 0 && next === len - 1) || (prev === len - 1 && next === 0);
+      var instant = Boolean(opts && opts.instant) || wrapJump;
+      root._offrefyBogoSelectedGetIndex = next;
+
+      var track = scope.querySelector("[data-offrefy-bogo-gift-track]");
+      if (track) {
+        if (instant) track.classList.add("is-instant");
+        else track.classList.remove("is-instant");
+        track.style.transform =
+          "translate3d(-" + String(next * 100) + "%,0,0)";
+        if (instant) {
+          void track.offsetWidth;
+          track.classList.remove("is-instant");
+        }
+      }
+
+      var slides = scope.querySelectorAll("[data-offrefy-bogo-gift-slide]");
+      for (var si = 0; si < slides.length; si++) {
+        slides[si].setAttribute(
+          "aria-hidden",
+          si === next ? "false" : "true",
+        );
+      }
+
+      var choices = scope.querySelectorAll("[data-offrefy-bogo-gift-idx]");
+      for (var di = 0; di < choices.length; di++) {
+        var on = di === next;
+        choices[di].classList.toggle("is-selected", on);
+        choices[di].setAttribute("aria-pressed", on ? "true" : "false");
+      }
+    }
+
+    var bogoEmbla = null;
+
+    function syncBogoGiftArrows() {
+      var prevBtn = scope.querySelector("[data-offrefy-bogo-gift-prev]");
+      var nextBtn = scope.querySelector("[data-offrefy-bogo-gift-next]");
+      if (!prevBtn || !nextBtn || !bogoEmbla) return;
+      prevBtn.disabled = !bogoEmbla.canScrollPrev();
+      nextBtn.disabled = !bogoEmbla.canScrollNext();
+    }
+
+    if (getPoolCount > 1) {
+      var emblaRoot = scope.querySelector("[data-offrefy-bogo-embla]");
+      if (emblaRoot && getPoolCount > 3) {
+        try {
+          bogoEmbla = EmblaCarousel(emblaRoot, {
+            align: "start",
+            containScroll: "trimSnaps",
+            slidesToScroll: 1,
+            dragFree: false,
+          });
+          bogoEmbla.on("select", syncBogoGiftArrows);
+          bogoEmbla.on("reInit", syncBogoGiftArrows);
+          bogoEmbla.on("init", syncBogoGiftArrows);
+          syncBogoGiftArrows();
+        } catch (eEmbla) {
+          void eEmbla;
+        }
+      }
+      scope.addEventListener("click", function (ev) {
+        var t = ev && ev.target;
+        if (!t || !t.closest) return;
+        var opt = t.closest("[data-offrefy-bogo-gift-idx]");
+        if (opt) {
+          ev.preventDefault();
+          syncBogoGiftSelection(opt.getAttribute("data-offrefy-bogo-gift-idx"));
+          return;
+        }
+        if (t.closest("[data-offrefy-bogo-gift-prev]")) {
+          ev.preventDefault();
+          if (bogoEmbla) bogoEmbla.scrollPrev();
+          return;
+        }
+        if (t.closest("[data-offrefy-bogo-gift-next]")) {
+          ev.preventDefault();
+          if (bogoEmbla) bogoEmbla.scrollNext();
+        }
+      });
+      syncBogoGiftSelection(0, { instant: true });
+    }
+
+    bindBogoAtcAssist(root, campaign);
+
+    if (ctaEl) {
+      ctaEl.addEventListener("click", function (ev) {
+        if (ev) {
+          try {
+            ev.preventDefault();
+            ev.stopPropagation();
+          } catch (ePrev) {
+            void ePrev;
+          }
+        }
+        if (ctaEl.disabled) return;
+
+        var liquidForm =
+          findVdLiquidProductForm(root) ||
+          (liquidFormId ? document.getElementById(liquidFormId) : null);
+        var themeForm = findThemeProductCartForm();
+        var variantId =
+          root.getAttribute("data-variant-id") ||
+          readFormVariantId(themeForm) ||
+          readFormVariantId(liquidForm) ||
+          "";
+        if (!variantId || !/^\d+$/.test(String(variantId))) return;
+
+        var attribution = {
+          campaignId: campaign && campaign.id ? String(campaign.id) : "",
+          productId: productId ? String(productId) : "",
+        };
+        var bogoUi = {
+          ctaButtonAction: ctaAct,
+          ctaButtonPageUrl: ctaPageUrl,
+        };
+
+        ctaEl.disabled = true;
+
+        /*
+         * Same call as quantity break: addVariantToCart → theme product form
+         * → completeAfterCartAdd. The selected gift is folded into that
+         * /cart/add request (Shopify `items`), not a second add after the drawer.
+         */
+        var selectedGetId = "";
+        if (needsCrossGet) {
+          var selectedLine = resolveBogoSelectedGetLine(campaign);
+          selectedGetId = selectedLine
+            ? bogoIdNumericTail(selectedLine.variantId)
+            : "";
+        }
+        var addSelectedGift =
+          selectedGetId &&
+          /^\d+$/.test(selectedGetId) &&
+          selectedGetId !== String(variantId);
+
+        installBogoGiftOnCartAdd();
+        var giftToken = "";
+        if (addSelectedGift && ctaAct !== "go_to_checkout") {
+          giftToken = String(Date.now()) + ":" + selectedGetId;
+          offrefyNs()._offrefyBogoPendingGift = {
+            id: selectedGetId,
+            qty: getsQty,
+            token: giftToken,
+          };
+          setTimeout(function () {
+            var pending = offrefyNs()._offrefyBogoPendingGift;
+            if (pending && pending.token === giftToken) {
+              offrefyNs()._offrefyBogoPendingGift = null;
+            }
+          }, 5000);
+        }
+
+        var prepare = Promise.resolve();
+        if (addSelectedGift && ctaAct === "go_to_checkout") {
+          prepare = addBogoPlainCartAdd(selectedGetId, getsQty);
+        }
+
+        prepare
+          .then(function () {
+            if (liquidForm && useNativeThemeAtc && ctaAct !== "go_to_checkout") {
+              syncVdLiquidProductForm(
+                liquidForm,
+                variantId,
+                targetBuyQty,
+                attribution,
+              );
+            }
+            return addVariantToCart(
+              variantId,
+              targetBuyQty,
+              ctaAct,
+              attribution,
+            );
+          })
+          .then(function (addResult) {
+            try {
+              trackAddToCart(
+                campaign,
+                productId,
+                variantId,
+                targetBuyQty,
+                0,
+              );
+            } catch (eTrack) {
+              void eTrack;
+            }
+            ctaEl.disabled = false;
+            return completeAfterCartAdd(bogoUi, addResult);
+          })
+          .catch(function () {
+            var pending = offrefyNs()._offrefyBogoPendingGift;
+            if (pending && pending.token === giftToken) {
+              offrefyNs()._offrefyBogoPendingGift = null;
+              if (addSelectedGift) {
+                addBogoItemsWithSections(
+                  [
+                    { id: variantId, quantity: targetBuyQty },
+                    { id: selectedGetId, quantity: getsQty },
+                  ],
+                  false,
+                ).then(
+                  function () {
+                    ctaEl.disabled = false;
+                    return completeAfterCartAdd(bogoUi, {
+                      redirectHref:
+                        ctaAct === "go_to_checkout" ? checkoutUrlHref() : "",
+                    });
+                  },
+                  function () {
+                    ctaEl.disabled = false;
+                  },
+                );
+                return;
+              }
+            }
+            ctaEl.disabled = false;
+          });
+      });
+    }
+
+    root.removeAttribute("hidden");
+    root.style.display = "";
+    root.style.margin = "";
+    root.style.padding = "";
+    root.style.minHeight = "";
+    root.setAttribute("data-offrefy-ready", "1");
+    root.setAttribute("data-offrefy-inited", "1");
+    mountEl.hidden = false;
   }
 
   function tierUnitCents(unitCents, tier) {
@@ -911,72 +3252,21 @@
     });
   }
 
-  var vdLockedSyncFromEventsTimer = 0;
+  /**
+   * DISABLED on purpose for cart/drawer qty UX.
+   * Fetching /cart.js (or any cart mutation) after theme qty +/- made Valor
+   * keep the line-item loading spinner spinning. Locked products sync only
+   * on initial scan — never on cart:updated / qty change.
+   */
   function scheduleLockedProductsSyncFromCartEvent() {
-    /* Interceptor already owns locked sync after fetch mutations — avoid triple cart.js. */
-    if (vdCartAttrSyncBusy || vdLockedSyncInFlight) return;
-    if (vdLockedSyncFromEventsTimer) return;
-    vdLockedSyncFromEventsTimer = setTimeout(function () {
-      vdLockedSyncFromEventsTimer = 0;
-      if (vdCartAttrSyncBusy || vdLockedSyncInFlight) return;
-      syncCartLockedProductsAttribute(null);
-    }, 120);
+    return;
   }
 
   function bindCartDrawerDiscountLabelPatching() {
+    /* Disabled: cart:updated / drawer observers ran on every qty +/- and
+       competed with theme loading UI. Volume/BOGO badges stay as Shopify paints. */
     if (offrefyNs().cartBadgePatchBound) return;
     offrefyNs().cartBadgePatchBound = true;
-    ["cart:updated", "cart:change", "cart:refresh"].forEach(function (evt) {
-      document.documentElement.addEventListener(evt, scheduleCartDrawerDiscountLabelPatch);
-    });
-    /* One debounced locked sync fallback — never re-dispatch cart events (avoids feedback loops). */
-    document.documentElement.addEventListener(
-      "cart:updated",
-      scheduleLockedProductsSyncFromCartEvent,
-    );
-    if (typeof MutationObserver !== "undefined") {
-      var drawerObserver = null;
-      var openWatchObserver = null;
-      var observeDrawer = function () {
-        var drawer = document.querySelector("cart-drawer");
-        if (!drawer) return;
-        if (drawerObserver) {
-          try {
-            drawerObserver.disconnect();
-          } catch (e) {
-            void e;
-          }
-        }
-        drawerObserver = new MutationObserver(function () {
-          scheduleCartDrawerDiscountLabelPatch();
-        });
-        drawerObserver.observe(drawer, { childList: true, subtree: true });
-        if (drawer.getAttribute("data-offrefy-open-watch") === "1") return;
-        drawer.setAttribute("data-offrefy-open-watch", "1");
-        if (openWatchObserver) {
-          try {
-            openWatchObserver.disconnect();
-          } catch (e2) {
-            void e2;
-          }
-        }
-        openWatchObserver = new MutationObserver(function () {
-          var isOpen =
-            drawer.hasAttribute("open") ||
-            drawer.classList.contains("is-open") ||
-            drawer.classList.contains("active");
-          if (!isOpen) return;
-          scheduleCartDrawerDiscountLabelPatch();
-          setTimeout(scheduleCartDrawerDiscountLabelPatch, 120);
-        });
-        openWatchObserver.observe(drawer, {
-          attributes: true,
-          attributeFilter: ["open", "class"],
-        });
-      };
-      observeDrawer();
-      document.addEventListener("shopify:section:load", observeDrawer);
-    }
   }
 
   var vdLastKnownStorefrontLocale = "";
@@ -1289,6 +3579,9 @@
   var vdLegacyCartAttrsCleared = false;
   var vdLegacyLinePropsStripInFlight = null;
   var vdLegacyLinePropsStripped = false;
+  /** Suppress cart-event re-entry while we run our own cart/update (attr cleanup). */
+  var vdOwnCartQuietUntil = 0;
+  var vdLegacyCleanupStarted = false;
   var VD_ORDER_VISIBLE_LINE_PROPS = [
     OFFREFY_LINE_PROP,
     OFFREFY_CAMPAIGN_PROP,
@@ -1365,178 +3658,38 @@
     return changed ? next : null;
   }
 
-  /** Remove leftover _offrefy* line props from cart lines (admin order UI). */
+  /**
+   * Legacy line-prop cleanup MUST NOT call cart/change.js.
+   * Sequential property strips (one request per line) race theme cart/drawer
+   * remove + qty UI and leave the page stuck on loading spinners.
+   * New add-to-cart paths no longer attach Offrefy line properties.
+   */
   function stripOffrefyLinePropertiesFromCart(cart) {
-    if (vdLegacyLinePropsStripped) return Promise.resolve(cart || null);
-    if (vdLegacyLinePropsStripInFlight) {
-      return vdLegacyLinePropsStripInFlight.then(function () {
-        return cart || null;
-      });
-    }
-
-    var work = (
-      cart
-        ? Promise.resolve(cart)
-        : fetch(cartJsUrl(), {
-            credentials: "same-origin",
-            headers: { Accept: "application/json" },
-          })
-            .then(function (r) {
-              return r.ok ? r.json() : null;
-            })
-            .catch(function () {
-              return null;
-            })
-    ).then(function (c) {
-      if (!c || !Array.isArray(c.items) || !c.items.length) {
-        vdLegacyLinePropsStripped = true;
-        return c;
-      }
-      var chain = Promise.resolve();
-      var any = false;
-      for (var i = 0; i < c.items.length; i++) {
-        (function (item) {
-          var props = linePropertiesObject(item && item.properties);
-          if (!lineHasOffrefyVisibleProps(props)) return;
-          var cleaned = stripOffrefyKeysFromProps(props);
-          if (!cleaned) return;
-          any = true;
-          var lineKey = item.key || item.id;
-          var qty = item.quantity | 0;
-          chain = chain.then(function () {
-            return fetch(shopifyRoutesRoot() + "cart/change.js", {
-              method: "POST",
-              credentials: "same-origin",
-              headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-              },
-              body: JSON.stringify({
-                id: lineKey,
-                quantity: qty,
-                properties: cleaned,
-              }),
-            }).catch(function () {});
-          });
-        })(c.items[i]);
-      }
-      if (!any) {
-        vdLegacyLinePropsStripped = true;
-        return c;
-      }
-      return chain.then(function () {
-        vdLegacyLinePropsStripped = true;
-        return c;
-      });
-    });
-
-    vdLegacyLinePropsStripInFlight = work.then(
-      function (result) {
-        if (vdLegacyLinePropsStripInFlight === work) {
-          vdLegacyLinePropsStripInFlight = null;
-        }
-        return result;
-      },
-      function (err) {
-        if (vdLegacyLinePropsStripInFlight === work) {
-          vdLegacyLinePropsStripInFlight = null;
-        }
-        throw err;
-      },
-    );
-    return vdLegacyLinePropsStripInFlight;
+    vdLegacyLinePropsStripped = true;
+    vdLegacyLinePropsStripInFlight = null;
+    return Promise.resolve(cart || null);
   }
 
-  /** Strip app cart attributes so they never copy onto new orders. */
+  /**
+   * Migrate legacy locked-products attr → sessionStorage only.
+   * Never POST cart/update.js here — that kept drawer qty spinners alive.
+   */
   function clearOrderVisibleVdCartAttributes(cart) {
-    if (vdLegacyCartAttrsCleared && vdLegacyLinePropsStripped) {
-      return Promise.resolve(cart || null);
-    }
-    if (vdLegacyCartAttrClearInFlight) {
-      return vdLegacyCartAttrClearInFlight.then(function () {
-        return cart || null;
-      });
-    }
-
-    function hasLegacy(attrs) {
-      if (!attrs || typeof attrs !== "object") return false;
-      for (var i = 0; i < VD_ORDER_VISIBLE_CART_ATTRS.length; i++) {
-        var key = VD_ORDER_VISIBLE_CART_ATTRS[i];
-        if (attrs[key] != null && String(attrs[key]).length) return true;
+    vdLegacyLinePropsStripped = true;
+    vdLegacyCartAttrsCleared = true;
+    vdLegacyCartAttrClearInFlight = null;
+    try {
+      if (cart && cart.attributes && cart.attributes[VD_LOCKED_PRODUCTS_ATTR]) {
+        var legacyLocked = String(cart.attributes[VD_LOCKED_PRODUCTS_ATTR] || "");
+        if (legacyLocked && !readLockedProductsSession()) {
+          writeLockedProductsSession(legacyLocked);
+          vdLastSyncedLockedProducts = legacyLocked;
+        }
       }
-      return false;
+    } catch (eMig) {
+      void eMig;
     }
-
-    var work = (
-      cart
-        ? Promise.resolve(cart)
-        : fetch(cartJsUrl(), {
-            credentials: "same-origin",
-            headers: { Accept: "application/json" },
-          })
-            .then(function (r) {
-              return r.ok ? r.json() : null;
-            })
-            .catch(function () {
-              return null;
-            })
-    ).then(function (c) {
-      var attrWork = Promise.resolve(c);
-      if (c && hasLegacy(c.attributes)) {
-        try {
-          var legacyLocked = String(
-            (c.attributes && c.attributes[VD_LOCKED_PRODUCTS_ATTR]) || "",
-          );
-          if (legacyLocked && !readLockedProductsSession()) {
-            writeLockedProductsSession(legacyLocked);
-            vdLastSyncedLockedProducts = legacyLocked;
-          }
-        } catch (eMig) {
-          void eMig;
-        }
-        var attrs = {};
-        for (var j = 0; j < VD_ORDER_VISIBLE_CART_ATTRS.length; j++) {
-          attrs[VD_ORDER_VISIBLE_CART_ATTRS[j]] = "";
-        }
-        attrWork = fetch(shopifyRoutesRoot() + "cart/update.js", {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({ attributes: attrs }),
-        })
-          .then(function () {
-            vdLegacyCartAttrsCleared = true;
-            return c;
-          })
-          .catch(function () {
-            return c;
-          });
-      } else {
-        vdLegacyCartAttrsCleared = true;
-      }
-      return attrWork.then(function (cartAfterAttrs) {
-        return stripOffrefyLinePropertiesFromCart(cartAfterAttrs || c);
-      });
-    });
-
-    vdLegacyCartAttrClearInFlight = work.then(
-      function (result) {
-        if (vdLegacyCartAttrClearInFlight === work) {
-          vdLegacyCartAttrClearInFlight = null;
-        }
-        return result;
-      },
-      function (err) {
-        if (vdLegacyCartAttrClearInFlight === work) {
-          vdLegacyCartAttrClearInFlight = null;
-        }
-        throw err;
-      },
-    );
-    return vdLegacyCartAttrClearInFlight;
+    return Promise.resolve(cart || null);
   }
 
   function resolveMaxDiscountProducts(cfg) {
@@ -1630,7 +3783,14 @@
 
   /** Keep discount slots stable in sessionStorage (not cart — avoids order Additional details). */
   var vdLockedSyncInFlight = null;
-  function syncCartLockedProductsAttribute(cart) {
+  /**
+   * @param {object|null} cart
+   * @param {{ fetch?: boolean }} [opts] — fetch cart.js only when explicitly allowed
+   *   (initial page scan). Never fetch after drawer qty +/- (theme loading spinner).
+   */
+  function syncCartLockedProductsAttribute(cart, opts) {
+    var allowFetch = !!(opts && opts.fetch);
+    if (!cart && !allowFetch) return Promise.resolve(null);
     if (!cart && vdLockedSyncInFlight) return vdLockedSyncInFlight;
 
     var work = cart
@@ -1657,9 +3817,7 @@
         vdLastSyncedLockedProducts = nextStr;
         writeLockedProductsSession(nextStr);
       }
-      return clearOrderVisibleVdCartAttributes(c).then(function () {
-        return c;
-      });
+      return c;
     });
 
     function clearLockedInFlight() {
@@ -1667,7 +3825,7 @@
     }
     promise.then(clearLockedInFlight, clearLockedInFlight);
 
-    if (!cart) vdLockedSyncInFlight = promise;
+    if (!cart && allowFetch) vdLockedSyncInFlight = promise;
     return promise;
   }
 
@@ -1719,7 +3877,18 @@
     } catch (e) {
       void e;
     }
-    return clearOrderVisibleVdCartAttributes(null).then(function () {});
+    return Promise.resolve();
+  }
+
+  /** One-shot legacy cart attribute cleanup (not on every cart:updated). */
+  function runLegacyCartCleanupOnce() {
+    if (vdLegacyCleanupStarted) return;
+    if (vdLegacyCartAttrsCleared && vdLegacyLinePropsStripped) {
+      vdLegacyCleanupStarted = true;
+      return;
+    }
+    vdLegacyCleanupStarted = true;
+    clearOrderVisibleVdCartAttributes(null).catch(function () {});
   }
 
   function cartJsUrl() {
@@ -1730,18 +3899,390 @@
     return window.location.origin + "/checkout";
   }
 
-  function dispatchCartRefresh(cart) {
+  function collectCartDrawerSectionIds() {
+    var ids = [];
+    var seen = {};
+    function add(id) {
+      var s = String(id || "").trim();
+      if (!s || seen[s]) return;
+      seen[s] = true;
+      ids.push(s);
+    }
     try {
-      var detail = { cart: cart };
-      /* One primary event — themes listen to cart:updated; avoid triple fan-out storms. */
-      document.documentElement.dispatchEvent(
-        new CustomEvent("cart:updated", { bubbles: true, detail: detail }),
-      );
-      window.dispatchEvent(new CustomEvent("cart:updated", { detail: cart }));
+      var drawer = document.querySelector("cart-drawer");
+      if (drawer && typeof drawer.getSectionsToRender === "function") {
+        var sections = drawer.getSectionsToRender() || [];
+        for (var i = 0; i < sections.length; i++) {
+          add(sections[i] && (sections[i].id || sections[i].section));
+        }
+      }
+      if (drawer) {
+        add(drawer.getAttribute("data-section-id"));
+        add(drawer.dataset && drawer.dataset.sectionId);
+      }
+    } catch (eDawn) {
+      void eDawn;
+    }
+    try {
+      var valor = document.querySelector("valor-cart-drawer");
+      if (valor) {
+        add(valor.getAttribute("data-section-id"));
+        add(valor.getAttribute("section-id"));
+        add(valor.dataset && valor.dataset.sectionId);
+      }
+    } catch (eValor) {
+      void eValor;
+    }
+    add("cart-drawer");
+    add("cart-icon-bubble");
+    add("cart-notification");
+    return ids;
+  }
+
+  function findCartDrawerHost() {
+    return (
+      document.querySelector("valor-cart-drawer") ||
+      document.querySelector("cart-drawer") ||
+      document.querySelector("#CartDrawer") ||
+      document.querySelector("[id*='CartDrawer']") ||
+      document.querySelector("[id*='cart-drawer']")
+    );
+  }
+
+  function resolveCartDrawerSectionId(host) {
+    var el = host || findCartDrawerHost();
+    if (!el) return "";
+    var sid =
+      el.getAttribute("data-section-id") ||
+      el.getAttribute("section-id") ||
+      (el.dataset && (el.dataset.sectionId || el.dataset.section)) ||
+      "";
+    if (sid) return String(sid);
+    var section = el.closest(".shopify-section");
+    if (section && section.id) {
+      var m = String(section.id).match(/^shopify-section-(.+)$/i);
+      if (m && m[1]) return m[1];
+    }
+    var candidates = collectCartDrawerSectionIds();
+    return candidates.length ? candidates[0] : "cart-drawer";
+  }
+
+  /** Prefer section that actually wraps the live cart drawer in the DOM. */
+  function discoverLiveCartSectionIds() {
+    var ids = [];
+    var seen = {};
+    function add(id) {
+      var s = String(id || "").trim();
+      if (!s || seen[s]) return;
+      seen[s] = true;
+      ids.push(s);
+    }
+    try {
+      var sections = document.querySelectorAll(".shopify-section");
+      for (var i = 0; i < sections.length; i++) {
+        var sec = sections[i];
+        if (
+          !sec.querySelector(
+            "valor-cart-drawer, cart-drawer, #CartDrawer, [id*='CartDrawer'], [id*='cart-drawer']",
+          )
+        ) {
+          continue;
+        }
+        var m = String(sec.id || "").match(/^shopify-section-(.+)$/i);
+        if (m && m[1]) add(m[1]);
+        add(sec.getAttribute("data-section-id"));
+      }
+    } catch (eWalk) {
+      void eWalk;
+    }
+    var collected = getCartSectionsToRequest();
+    for (var c = 0; c < collected.length; c++) add(collected[c]);
+    return ids.slice(0, 5);
+  }
+
+  function openCartDrawerHost(host) {
+    var el = host || findCartDrawerHost();
+    if (!el) return;
+    try {
+      /* Valor uses data-open + body.valor-cart-drawer-open (not Dawn's open attr). */
+      if (
+        el.tagName &&
+        String(el.tagName).toLowerCase() === "valor-cart-drawer"
+      ) {
+        openValorCartDrawer(el);
+        return;
+      }
+      el.classList.remove("is-empty");
+      el.removeAttribute("data-empty");
+      el.setAttribute("open", "");
+      el.classList.add("active", "is-open", "open");
+      document.documentElement.classList.add("overflow-hidden");
+      document.body.classList.add("overflow-hidden");
+      if (typeof el.show === "function") el.show();
+      else if (typeof el.open === "function" && el.open.length === 0) {
+        try {
+          el.open();
+        } catch (eOpen) {
+          void eOpen;
+        }
+      }
     } catch (e) {
       void e;
     }
+  }
+
+  function clickThemeCartIcon() {
+    var sels = [
+      ".valor-header__cart",
+      "a.valor-header__cart",
+      "#cart-icon-bubble a",
+      "#cart-icon-bubble",
+      "a.header__icon--cart",
+      'a[href="/cart"]',
+      'a[href$="/cart"]',
+      "[data-cart-toggle]",
+      '[data-action="toggle-cart"]',
+      'button[aria-controls*="cart" i]',
+      'button[aria-controls*="Cart"]',
+    ];
+    for (var i = 0; i < sels.length; i++) {
+      try {
+        var el = document.querySelector(sels[i]);
+        if (!el) continue;
+        el.click();
+        return true;
+      } catch (eClick) {
+        void eClick;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Apply fresh section HTML onto the live cart drawer (Valor/Dawn).
+   * Replaces the wrapping .shopify-section when possible (empty-state lives there).
+   */
+  function applyCartDrawerSectionHtml(html, cart) {
+    if (!html) return false;
+    var tmp = document.createElement("div");
+    tmp.innerHTML = html;
+    var nextSection = tmp.querySelector(".shopify-section");
+    var next =
+      tmp.querySelector("valor-cart-drawer") ||
+      tmp.querySelector("cart-drawer") ||
+      tmp.querySelector("#CartDrawer") ||
+      tmp.querySelector("[id*='CartDrawer']") ||
+      tmp.querySelector("[id*='cart-drawer']") ||
+      (nextSection && nextSection.firstElementChild) ||
+      tmp.firstElementChild;
+    if (!next && !nextSection) return false;
+
+    try {
+      var host = findCartDrawerHost();
+      var liveSection = host && host.closest(".shopify-section");
+      if (liveSection && nextSection) {
+        liveSection.innerHTML = nextSection.innerHTML;
+        host = findCartDrawerHost() || host;
+      } else if (host && next) {
+        host.className = next.className || host.className;
+        host.classList.remove("is-empty");
+        host.innerHTML = next.innerHTML;
+      } else {
+        return false;
+      }
+
+      host = findCartDrawerHost() || host;
+      if (host) {
+        host.classList.remove("is-empty");
+        if (cart && (cart.item_count | 0) > 0) {
+          host.classList.remove("is-empty");
+          host.setAttribute("open", "");
+        }
+      }
+      openCartDrawerHost(host);
+      scheduleCartDrawerDiscountLabelPatch();
+      updateCartCountBubbles(cart);
+      return true;
+    } catch (eApply) {
+      void eApply;
+      return false;
+    }
+  }
+
+  function htmlLooksLikeCartDrawer(html) {
+    var s = String(html || "");
+    return /valor-cart-drawer|cart-drawer|CartDrawer|cart__items|cart-item|is-empty/i.test(
+      s,
+    );
+  }
+
+  function fetchCartDrawerSectionHtml() {
+    var ids = discoverLiveCartSectionIds();
+    if (!ids.length) return Promise.resolve("");
+    var root = shopifyRoutesRoot();
+
+    function pickFromSections(sections) {
+      if (!sections || typeof sections !== "object") return "";
+      for (var i = 0; i < ids.length; i++) {
+        var html = sections[ids[i]];
+        if (html && htmlLooksLikeCartDrawer(html)) return String(html);
+      }
+      var keys = Object.keys(sections);
+      for (var k = 0; k < keys.length; k++) {
+        if (htmlLooksLikeCartDrawer(sections[keys[k]])) {
+          return String(sections[keys[k]]);
+        }
+      }
+      return "";
+    }
+
+    return fetch(root + "?sections=" + encodeURIComponent(ids.join(",")), {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (r) {
+        return r.ok ? r.json() : null;
+      })
+      .then(function (sections) {
+        var picked = pickFromSections(sections);
+        if (picked) return picked;
+        /* Fallback: section_id on first candidate (Valor). */
+        return fetch(root + "?section_id=" + encodeURIComponent(ids[0]), {
+          credentials: "same-origin",
+        }).then(function (r2) {
+          return r2.ok ? r2.text() : "";
+        });
+      })
+      .catch(function () {
+        return fetch(root + "?section_id=" + encodeURIComponent(ids[0]), {
+          credentials: "same-origin",
+        })
+          .then(function (r3) {
+            return r3.ok ? r3.text() : "";
+          })
+          .catch(function () {
+            return "";
+          });
+      });
+  }
+
+  /**
+   * Realtime drawer after BOGO CTA: Liquid section HTML + theme cart icon click.
+   * Valor often only paints lines when the header cart control opens the drawer.
+   */
+  function refreshThemeCartUi(cart) {
+    var ns = offrefyNs();
+    ns._bogoUiRefreshQuietUntil = Date.now() + 2000;
+    var valor = document.querySelector("valor-cart-drawer");
+    if (valor && typeof valor.refresh === "function") {
+      /* Theme owns drawer HTML. Our section swap races its refresh and
+         leaves the empty-state markup on screen until a full reload. */
+      return Promise.resolve(valor.refresh())
+        .then(function () {
+          scheduleCartDrawerDiscountLabelPatch();
+          return cart;
+        })
+        .catch(function () {
+          scheduleCartDrawerDiscountLabelPatch();
+          return cart;
+        });
+    }
+    publishThemeCartUpdate(cart);
     scheduleCartDrawerDiscountLabelPatch();
+    updateCartCountBubbles(cart);
+
+    try {
+      var dawnDrawer = document.querySelector("cart-drawer");
+      if (dawnDrawer) {
+        if (typeof dawnDrawer.onCartUpdate === "function") {
+          Promise.resolve(dawnDrawer.onCartUpdate()).catch(function () {});
+        }
+        if (
+          typeof dawnDrawer.renderContents === "function" &&
+          typeof dawnDrawer.getSectionsToRender === "function"
+        ) {
+          var sectionIds = discoverLiveCartSectionIds();
+          if (sectionIds.length) {
+            fetch(
+              shopifyRoutesRoot() +
+                "?sections=" +
+                encodeURIComponent(sectionIds.join(",")),
+              {
+                credentials: "same-origin",
+                headers: { Accept: "application/json" },
+              },
+            )
+              .then(function (r) {
+                return r.ok ? r.json() : null;
+              })
+              .then(function (sections) {
+                if (!sections || typeof sections !== "object") return;
+                try {
+                  dawnDrawer.renderContents({ sections: sections });
+                } catch (eRender) {
+                  void eRender;
+                }
+                openCartDrawerHost(dawnDrawer);
+                scheduleCartDrawerDiscountLabelPatch();
+              })
+              .catch(function () {});
+          }
+        }
+      }
+    } catch (eD) {
+      void eD;
+    }
+
+    try {
+      var valor = document.querySelector("valor-cart-drawer");
+      if (valor) {
+        if (typeof valor.refresh === "function") valor.refresh();
+        else if (typeof valor.updateCart === "function") valor.updateCart(cart);
+        else if (typeof valor.renderCart === "function") valor.renderCart(cart);
+        else if (typeof valor.fetchAndRender === "function") {
+          valor.fetchAndRender();
+        } else if (typeof valor.getCart === "function") {
+          Promise.resolve(valor.getCart()).catch(function () {});
+        }
+        if (typeof valor.updateCartCount === "function" && cart) {
+          valor.updateCartCount({ item_count: cart.item_count | 0 });
+        }
+      }
+    } catch (eV) {
+      void eV;
+    }
+
+    return fetchCartDrawerSectionHtml()
+      .then(function (html) {
+        var painted = html ? applyCartDrawerSectionHtml(html, cart) : false;
+        openCartDrawerHost(findCartDrawerHost());
+        /*
+         * One cart-icon open only when drawer still empty after paint.
+         * Never double-click — that stacked Valor qty handlers.
+         */
+        var host = findCartDrawerHost();
+        var empty =
+          !painted ||
+          (host &&
+            (host.classList.contains("is-empty") ||
+              /your cart is empty/i.test(String(host.textContent || ""))));
+        if (empty) {
+          clickThemeCartIcon();
+          openCartDrawerHost(findCartDrawerHost());
+        }
+        scheduleCartDrawerDiscountLabelPatch();
+        setTimeout(scheduleCartDrawerDiscountLabelPatch, 250);
+        return cart;
+      })
+      .catch(function () {
+        openCartDrawerHost(findCartDrawerHost());
+        clickThemeCartIcon();
+        return cart;
+      });
+  }
+
+  function dispatchCartRefresh(cart) {
+    return refreshThemeCartUi(cart);
   }
 
   function fetchCartAndRefresh() {
@@ -1756,8 +4297,11 @@
         .then(function (cart) {
           if (!cart) return null;
           return syncCartLockedProductsAttribute(cart).then(function () {
-            dispatchCartRefresh(cart);
-            return cart;
+            return Promise.resolve(dispatchCartRefresh(cart)).then(
+              function () {
+                return cart;
+              },
+            );
           });
         })
         .catch(function () {
@@ -3624,9 +6168,21 @@
               title: v.title || "Variant",
               price: v.price,
               available: v.available !== false,
+              option1: v.option1 != null ? v.option1 : null,
+              option2: v.option2 != null ? v.option2 : null,
+              option3: v.option3 != null ? v.option3 : null,
             };
           }),
         );
+        var optNames = Array.isArray(pj.options) ? pj.options : [];
+        var optionsScript = root.querySelector("script[data-offrefy-options-json]");
+        if (!optionsScript) {
+          optionsScript = document.createElement("script");
+          optionsScript.type = "application/json";
+          optionsScript.setAttribute("data-offrefy-options-json", "");
+          root.insertBefore(optionsScript, root.firstChild);
+        }
+        optionsScript.textContent = JSON.stringify(optNames);
         return true;
       })
       .catch(function () {
@@ -4168,13 +6724,12 @@
 
     function resolveActiveVariantIdForCart() {
       if (vdShowVariant) {
-        var selAdd = mountEl.querySelector(
-          ".offrefy-card--selected [data-offrefy-vd-vsel-input]",
-        );
-        if (!selAdd) {
-          selAdd = mountEl.querySelector("[data-offrefy-vd-vsel-input]");
-        }
-        if (selAdd) return String(selAdd.value || "");
+        var scope =
+          mountEl.querySelector(".offrefy-card--selected") || mountEl;
+        var hid = scope.querySelector("[data-offrefy-variant]");
+        if (hid && hid.value) return String(hid.value);
+        var selAdd = scope.querySelector("select[data-offrefy-variant]");
+        if (selAdd && selAdd.value) return String(selAdd.value);
       }
       return String(root.getAttribute("data-variant-id") || "");
     }
@@ -4219,60 +6774,174 @@
       return currentUnitCents;
     }
 
-    function variantOptionsHtml(selId) {
-      var o = [];
-      var label = "";
-      for (var vi = 0; vi < variants.length; vi++) {
-        var v = variants[vi];
-        var id = String(v.id);
-        var pr = parseInt(String(v.price), 10) || 0;
-        var title = String(v.title || "Variant");
-        var isSel = id === String(selId);
-        if (isSel) label = title;
-        var dis = v.available === false;
-        o.push(
-          '<button type="button" class="offrefy-vd-vsel__opt' +
-            (isSel ? " is-selected" : "") +
-            (dis ? " is-disabled" : "") +
-            '" role="option" data-offrefy-vd-vid="' +
-            id +
-            '" data-offrefy-vd-price="' +
-            pr +
-            '" aria-selected="' +
-            (isSel ? "true" : "false") +
-            '"' +
-            (dis ? " disabled aria-disabled=\"true\"" : "") +
-            ">" +
-            esc(title) +
-            "</button>",
-        );
+    function parseProductOptionNames() {
+      var el = root.querySelector("script[data-offrefy-options-json]");
+      if (el && el.textContent) {
+        try {
+          var arr = JSON.parse(el.textContent.trim());
+          if (Array.isArray(arr) && arr.length) {
+            return arr.map(function (n) {
+              return String(n || "").trim();
+            }).filter(Boolean);
+          }
+        } catch (eOpt) {
+          void eOpt;
+        }
       }
-      if (!label && variants[0]) label = String(variants[0].title || "Variant");
-      return {
-        options: o.join(""),
-        label: label,
-        value: String(selId || (variants[0] && variants[0].id) || ""),
-      };
+      var names = [];
+      if (variants.some(function (v) { return v && v.option1; })) names.push("Option 1");
+      if (variants.some(function (v) { return v && v.option2; })) names.push("Option 2");
+      if (variants.some(function (v) { return v && v.option3; })) names.push("Option 3");
+      return names;
+    }
+
+    function variantOptionKey(index) {
+      return index === 0 ? "option1" : index === 1 ? "option2" : "option3";
+    }
+
+    function uniqueOptionValues(optIndex) {
+      var key = variantOptionKey(optIndex);
+      var seen = {};
+      var out = [];
+      for (var i = 0; i < variants.length; i++) {
+        var raw = variants[i] && variants[i][key];
+        var val = raw != null ? String(raw) : "";
+        if (!val || seen[val]) continue;
+        seen[val] = true;
+        out.push(val);
+      }
+      return out;
+    }
+
+    function findVariantByOptions(o1, o2, o3) {
+      for (var i = 0; i < variants.length; i++) {
+        var v = variants[i];
+        if (!v) continue;
+        if (o1 != null && String(v.option1 || "") !== String(o1)) continue;
+        if (o2 != null && String(v.option2 || "") !== String(o2)) continue;
+        if (o3 != null && String(v.option3 || "") !== String(o3)) continue;
+        return v;
+      }
+      return null;
+    }
+
+    function findVariantById(vid) {
+      var id = String(vid || "");
+      for (var i = 0; i < variants.length; i++) {
+        if (String(variants[i].id) === id) return variants[i];
+      }
+      return null;
+    }
+
+    /**
+     * System-default <select>s only.
+     * Multi-option products → one short select per option (Size / Color / …)
+     * so the OS menu stays small and does not cover the whole product form.
+     * Single-axis / legacy → one native select of variant titles.
+     */
+    function nativeVariantSelectHtml(selId) {
+      if (!vdShowVariant) return "";
+      var want = String(selId || firstAvailableVariantIdInList(variants) || "");
+      var selected = findVariantById(want) || variants[0];
+      var optionNames = parseProductOptionNames();
+      var useAxes =
+        optionNames.length > 0 &&
+        selected &&
+        (selected.option1 != null || selected.option2 != null || selected.option3 != null);
+
+      if (!useAxes) {
+        var html =
+          '<select data-offrefy-variant data-offrefy-isolate="1" aria-label="Variant" autocomplete="off">';
+        for (var vi = 0; vi < variants.length; vi++) {
+          var v = variants[vi];
+          var id = String(v.id);
+          html +=
+            '<option value="' +
+            esc(id) +
+            '"' +
+            (id === want ? " selected" : "") +
+            (v.available === false ? " disabled" : "") +
+            ">" +
+            esc(String(v.title || "Variant")) +
+            "</option>";
+        }
+        html += "</select>";
+        return html;
+      }
+
+      var optionCount = 0;
+      var labelsHtml = "";
+      for (var oi = 0; oi < optionNames.length; oi++) {
+        var values = uniqueOptionValues(oi);
+        if (!values.length) continue;
+        optionCount += 1;
+        var key = variantOptionKey(oi);
+        var cur = selected && selected[key] != null ? String(selected[key]) : values[0];
+        var label = optionNames[oi] || "Option";
+        labelsHtml +=
+          '<label class="offrefy-variant-options__label">' +
+          '<span class="offrefy-variant-options__name">' +
+          esc(label) +
+          "</span>" +
+          '<select data-offrefy-option-index="' +
+          String(oi) +
+          '" data-offrefy-isolate="1" aria-label="' +
+          esc(label) +
+          '" autocomplete="off">';
+        for (var uj = 0; uj < values.length; uj++) {
+          var ov = values[uj];
+          labelsHtml +=
+            '<option value="' +
+            esc(ov) +
+            '"' +
+            (ov === cur ? " selected" : "") +
+            ">" +
+            esc(ov) +
+            "</option>";
+        }
+        labelsHtml += "</select></label>";
+      }
+      var block =
+        '<div class="offrefy-variant-options" data-offrefy-variant-options data-offrefy-option-count="' +
+        String(optionCount) +
+        '" data-offrefy-isolate="1">' +
+        labelsHtml +
+        '<input type="hidden" data-offrefy-variant value="' +
+        esc(want) +
+        '" />' +
+        "</div>";
+      return block;
+    }
+
+    function readOptionsFromBlock(block) {
+      var o1 = null;
+      var o2 = null;
+      var o3 = null;
+      var sels = block.querySelectorAll("select[data-offrefy-option-index]");
+      for (var i = 0; i < sels.length; i++) {
+        var idx = parseInt(String(sels[i].getAttribute("data-offrefy-option-index") || ""), 10);
+        var val = String(sels[i].value || "");
+        if (idx === 0) o1 = val;
+        else if (idx === 1) o2 = val;
+        else if (idx === 2) o3 = val;
+      }
+      return { option1: o1, option2: o2, option3: o3 };
+    }
+
+    function applyVariantIdEverywhere(vid) {
+      var id = String(vid || "");
+      if (!id) return;
+      currentUnitCents = readPriceForVariant(id);
+      syncAllVariantSelects(id);
+      updateAllPrices();
+      updateQtyDisplay();
+      syncFormVariant(id);
+      root.setAttribute("data-variant-id", id);
+      updatePurchaseControlsAvailability();
     }
 
     function expandHtml(c, selId) {
-      var picker = vdShowVariant ? variantOptionsHtml(selId) : null;
-      var selectBlock = picker
-        ? '<div class="offrefy-vd-vsel" data-offrefy-vd-vsel>' +
-          '<button type="button" class="offrefy-vd-vsel__trigger" data-offrefy-vd-vsel-trigger aria-haspopup="listbox" aria-expanded="false">' +
-          '<span class="offrefy-vd-vsel__label" data-offrefy-vd-vsel-label>' +
-          esc(picker.label) +
-          "</span>" +
-          '<span class="offrefy-vd-vsel__chev" aria-hidden="true"></span>' +
-          "</button>" +
-          '<div class="offrefy-vd-vsel__panel" data-offrefy-vd-vsel-panel role="listbox" hidden>' +
-          picker.options +
-          "</div>" +
-          '<input type="hidden" class="offrefy-vd-vsel__input" data-offrefy-vd-vsel-input value="' +
-          esc(picker.value) +
-          '" />' +
-          "</div>"
-        : "";
+      var selectBlock = nativeVariantSelectHtml(selId);
       var qtyBlock = ui.hideWidgetQuantitySelector
         ? ""
         : '<div class="offrefy-qty-group" role="group" aria-label="Quantity">' +
@@ -4539,210 +7208,38 @@
     function syncAllVariantSelects(vid) {
       if (!vdShowVariant) return;
       var id = String(vid);
-      var title = "";
-      for (var ti = 0; ti < variants.length; ti++) {
-        if (String(variants[ti].id) === id) {
-          title = String(variants[ti].title || "Variant");
-          break;
-        }
+      var row = findVariantById(id);
+      var hiddens = mountEl.querySelectorAll("[data-offrefy-variant]");
+      for (var hi = 0; hi < hiddens.length; hi++) {
+        if (String(hiddens[hi].value) !== id) hiddens[hi].value = id;
       }
-      var pickers = mountEl.querySelectorAll("[data-offrefy-vd-vsel]");
-      for (var si = 0; si < pickers.length; si++) {
-        var box = pickers[si];
-        var inp = box.querySelector("[data-offrefy-vd-vsel-input]");
-        var lab = box.querySelector("[data-offrefy-vd-vsel-label]");
-        if (inp) inp.value = id;
-        if (lab && title) lab.textContent = title;
-        var opts = box.querySelectorAll("[data-offrefy-vd-vid]");
-        for (var oi = 0; oi < opts.length; oi++) {
-          var isSel = String(opts[oi].getAttribute("data-offrefy-vd-vid")) === id;
-          opts[oi].classList.toggle("is-selected", isSel);
-          opts[oi].setAttribute("aria-selected", isSel ? "true" : "false");
-        }
+      var titleSelects = mountEl.querySelectorAll("select[data-offrefy-variant]");
+      for (var si = 0; si < titleSelects.length; si++) {
+        if (String(titleSelects[si].value) !== id) titleSelects[si].value = id;
       }
-    }
-
-    function unportalVdVariantPanel(panel) {
-      if (!panel || !panel.classList.contains("is-portaled")) return;
-      var home = panel._offrefyPortalHome;
-      panel.classList.remove("is-portaled", "is-dropup");
-      panel.style.removeProperty("top");
-      panel.style.removeProperty("left");
-      panel.style.removeProperty("right");
-      panel.style.removeProperty("width");
-      panel.style.removeProperty("bottom");
-      panel.style.removeProperty("max-height");
-      panel.style.removeProperty("--offrefy-maroon");
-      panel.style.removeProperty("--offrefy-card-border");
-      panel.style.removeProperty("--offrefy-text");
-      panel.style.removeProperty("--offrefy-surface-muted");
-      panel.style.removeProperty("--offrefy-selected-bg");
-      panel.style.removeProperty("--offrefy-radius-control");
-      panel.style.removeProperty("--offrefy-fs-buy");
-      panel.style.removeProperty("--offrefy-fw-body");
-      panel.style.removeProperty("--offrefy-fw-strong");
-      panel._offrefyOnPick = null;
-      panel._offrefyClose = null;
-      panel._offrefyOwnerBox = null;
-      panel._offrefyOwnerMount = null;
-      panel._offrefyPortalHome = null;
-      if (home && home.parent) {
-        if (home.nextSibling && home.nextSibling.parentNode === home.parent) {
-          home.parent.insertBefore(panel, home.nextSibling);
-        } else {
-          home.parent.appendChild(panel);
-        }
-      }
-    }
-
-    function copyOffrefyVarsToPanel(panel) {
-      if (!panel || !root) return;
-      var cs = window.getComputedStyle(root);
-      var keys = [
-        "--offrefy-maroon",
-        "--offrefy-card-border",
-        "--offrefy-text",
-        "--offrefy-surface-muted",
-        "--offrefy-selected-bg",
-        "--offrefy-radius-control",
-        "--offrefy-fs-buy",
-        "--offrefy-fw-body",
-        "--offrefy-fw-strong",
-      ];
-      for (var i = 0; i < keys.length; i++) {
-        var v = cs.getPropertyValue(keys[i]);
-        if (v && String(v).trim()) panel.style.setProperty(keys[i], String(v).trim());
-      }
-    }
-
-    function positionPortaledVdPanel(panel, trigger) {
-      if (!panel || !trigger) return;
-      var rect = trigger.getBoundingClientRect();
-      var gap = 6;
-      var edge = 8;
-      var maxH = Math.min(260, Math.round(window.innerHeight * 0.45));
-      var spaceBelow = window.innerHeight - rect.bottom - gap - edge;
-      var spaceAbove = rect.top - gap - edge;
-      var dropUp =
-        spaceBelow < Math.min(160, maxH) && spaceAbove > spaceBelow;
-      var avail = dropUp ? spaceAbove : spaceBelow;
-      var height = Math.min(maxH, Math.max(96, avail));
-      var left = Math.max(edge, Math.round(rect.left));
-      var width = Math.round(rect.width);
-      panel.style.setProperty("left", left + "px", "important");
-      panel.style.setProperty("right", "auto", "important");
-      panel.style.setProperty("width", width + "px", "important");
-      panel.style.setProperty("max-height", Math.round(height) + "px", "important");
-      if (dropUp) {
-        panel.classList.add("is-dropup");
-        panel.style.setProperty("top", "auto", "important");
-        panel.style.setProperty(
-          "bottom",
-          Math.round(window.innerHeight - rect.top + gap) + "px",
-          "important",
-        );
-      } else {
-        panel.classList.remove("is-dropup");
-        panel.style.setProperty("bottom", "auto", "important");
-        panel.style.setProperty(
-          "top",
-          Math.round(rect.bottom + gap) + "px",
-          "important",
-        );
-      }
-    }
-
-    function portalVdVariantPanel(box, panel, trigger) {
-      if (!box || !panel || !trigger) return;
-      if (!panel.classList.contains("is-portaled")) {
-        panel._offrefyPortalHome = {
-          parent: panel.parentNode,
-          nextSibling: panel.nextSibling,
-        };
-        document.body.appendChild(panel);
-        panel.classList.add("is-portaled");
-      }
-      panel._offrefyOwnerBox = box;
-      panel._offrefyOwnerMount = mountEl;
-      copyOffrefyVarsToPanel(panel);
-      panel._offrefyOnPick = function (vid, node) {
-        applyVdVariantChoice(vid, node);
-      };
-      panel._offrefyClose = function () {
-        closeAllVdVariantPickers();
-      };
-      positionPortaledVdPanel(panel, trigger);
-    }
-
-    function closeAllVdVariantPickers() {
-      var pickers = mountEl.querySelectorAll("[data-offrefy-vd-vsel]");
-      for (var i = 0; i < pickers.length; i++) {
-        var panel = pickers[i].querySelector("[data-offrefy-vd-vsel-panel]");
-        /* Panel may already be portaled on body — also find by owner link. */
-        if (!panel) {
-          var portaled = document.querySelectorAll(
-            ".offrefy-vd-vsel__panel.is-portaled",
+      if (!row) return;
+      var blocks = mountEl.querySelectorAll("[data-offrefy-variant-options]");
+      for (var bi = 0; bi < blocks.length; bi++) {
+        var sels = blocks[bi].querySelectorAll("select[data-offrefy-option-index]");
+        for (var oi = 0; oi < sels.length; oi++) {
+          var idx = parseInt(
+            String(sels[oi].getAttribute("data-offrefy-option-index") || ""),
+            10,
           );
-          for (var pi = 0; pi < portaled.length; pi++) {
-            if (portaled[pi]._offrefyOwnerBox === pickers[i]) {
-              panel = portaled[pi];
-              break;
-            }
+          var key = variantOptionKey(idx);
+          var wantVal = row[key] != null ? String(row[key]) : "";
+          if (wantVal && String(sels[oi].value) !== wantVal) {
+            sels[oi].value = wantVal;
           }
         }
-        var trig = pickers[i].querySelector("[data-offrefy-vd-vsel-trigger]");
-        if (panel) {
-          panel.setAttribute("hidden", "");
-          unportalVdVariantPanel(panel);
-        }
-        if (trig) trig.setAttribute("aria-expanded", "false");
-        pickers[i].classList.remove("is-open");
       }
-      /* Safety: any orphaned portaled panels for this mount. */
-      var orphans = document.querySelectorAll(".offrefy-vd-vsel__panel.is-portaled");
-      for (var oi = 0; oi < orphans.length; oi++) {
-        if (orphans[oi]._offrefyOwnerMount === mountEl) {
-          orphans[oi].setAttribute("hidden", "");
-          unportalVdVariantPanel(orphans[oi]);
-        }
-      }
-      var cardsWrap = mountEl.querySelector(".offrefy-cards");
-      if (cardsWrap) cardsWrap.classList.remove("offrefy-cards--vsel-open");
-      if (root) root.classList.remove("offrefy-theme--vsel-open");
-    }
-
-    function setupVdPortalListeners() {
-      if (offrefyNs()._offrefyVdPortalScrollClose) return;
-      offrefyNs()._offrefyVdPortalScrollClose = true;
-      /* Page scroll/resize: close menu so it never floats away from the trigger.
-         Keep open when the user scrolls inside the portaled options list. */
-      var onScrollOrResize = function (ev) {
-        var t = ev && ev.target;
-        if (
-          t &&
-          t.nodeType === 1 &&
-          t.closest &&
-          t.closest(".offrefy-vd-vsel__panel.is-portaled")
-        ) {
-          return;
-        }
-        var panels = document.querySelectorAll(
-          ".offrefy-vd-vsel__panel.is-portaled",
-        );
-        for (var i = 0; i < panels.length; i++) {
-          var closeFn = panels[i]._offrefyClose;
-          if (typeof closeFn === "function") closeFn();
-        }
-      };
-      window.addEventListener("scroll", onScrollOrResize, true);
-      window.addEventListener("resize", onScrollOrResize);
     }
 
     function scrollToAtc() {
       clampQty();
       syncQtyToForm(false);
       var sel = mountEl.querySelector(
-        ".offrefy-card--selected [data-offrefy-vd-vsel-input]",
+        ".offrefy-card--selected [data-offrefy-variant]",
       );
       if (sel) {
         syncFormVariant(sel.value);
@@ -5171,6 +7668,11 @@
     if (liquidBridge) {
       mountEl.insertBefore(liquidBridge, mountEl.firstChild);
     }
+    mountEl.hidden = false;
+    if (root) {
+      root.removeAttribute("hidden");
+      root.hidden = false;
+    }
 
     var cdEl = mountEl.querySelector("[data-offrefy-cd]");
     if (cdEl && cdLive) {
@@ -5224,6 +7726,7 @@
         t.tagName === "INPUT"
       ) {
         /* Commit typed qty; selectCard only snaps when the tier actually changes. */
+        if (ev.stopPropagation) ev.stopPropagation();
         ensureCardSelectedFromNode(t);
         applyQtyFromInput(t);
         return;
@@ -5231,20 +7734,39 @@
       if (
         vdShowVariant &&
         t &&
+        t.tagName === "SELECT" &&
         t.getAttribute &&
-        t.getAttribute("data-offrefy-vd-vsel-input") != null
+        (t.getAttribute("data-offrefy-variant") != null ||
+          t.getAttribute("data-offrefy-option-index") != null)
       ) {
+        /* Keep theme product-form JS from reacting to our isolated select. */
+        if (ev.stopPropagation) ev.stopPropagation();
         if (ensureCardSelectedFromNode(t)) {
           stateQty = getTierMinQty();
         }
-        var v = t.value;
-        currentUnitCents = readPriceForVariant(v);
-        syncAllVariantSelects(v);
-        updateAllPrices();
-        updateQtyDisplay();
-        syncFormVariant(v);
-        root.setAttribute("data-variant-id", String(v));
-        updatePurchaseControlsAvailability();
+        var nextId = "";
+        if (t.getAttribute("data-offrefy-option-index") != null) {
+          var block = t.closest("[data-offrefy-variant-options]");
+          if (!block) return;
+          var picked = readOptionsFromBlock(block);
+          var match = findVariantByOptions(
+            picked.option1,
+            picked.option2,
+            picked.option3,
+          );
+          if (!match) {
+            /* Soft fallback: keep first option match even if later axes conflict. */
+            match = findVariantByOptions(picked.option1, null, null);
+          }
+          if (!match) return;
+          nextId = String(match.id);
+          var hid = block.querySelector("[data-offrefy-variant]");
+          if (hid) hid.value = nextId;
+        } else {
+          nextId = String(t.value || "");
+        }
+        if (!nextId) return;
+        applyVariantIdEverywhere(nextId);
         return;
       }
       if (t && t.name === rn && !isVolumeTable) {
@@ -5290,26 +7812,24 @@
         t &&
         t.closest &&
         t.closest(
-          "[data-offrefy-vd-vsel], .offrefy-vd-vsel, [data-offrefy-qty-dec], [data-offrefy-qty-inc], [data-offrefy-tier-add], [data-offrefy-qty-display], .offrefy-qty-group, .offrefy-qty-btn, .offrefy-add-outline",
+          "select[data-offrefy-variant], select[data-offrefy-option-index], [data-offrefy-variant-options], [data-offrefy-qty-dec], [data-offrefy-qty-inc], [data-offrefy-tier-add], [data-offrefy-qty-display], .offrefy-qty-group, .offrefy-qty-btn, .offrefy-add-outline",
         )
       );
     }
 
-    function applyVdVariantChoice(vid, fromNode) {
-      var v = String(vid || "");
-      if (!v) return;
-      if (fromNode && ensureCardSelectedFromNode(fromNode)) {
-        stateQty = getTierMinQty();
-      }
-      currentUnitCents = readPriceForVariant(v);
-      syncAllVariantSelects(v);
-      closeAllVdVariantPickers();
-      updateAllPrices();
-      updateQtyDisplay();
-      syncFormVariant(v);
-      root.setAttribute("data-variant-id", v);
-      updatePurchaseControlsAvailability();
-    }
+    /**
+     * Theme-safe: after the control handles the event, stop bubbling so theme
+     * product-form listeners (document/body) do not react. Capture must NOT
+     * stopPropagation — that would block the native <select> / buttons.
+     */
+    mountEl.addEventListener("pointerdown", function (ev) {
+      if (!isExpandControlTarget(ev.target)) return;
+      if (ev.stopPropagation) ev.stopPropagation();
+    });
+    mountEl.addEventListener("click", function (ev) {
+      if (!isExpandControlTarget(ev.target)) return;
+      if (ev.stopPropagation) ev.stopPropagation();
+    });
 
     mountEl.addEventListener(
       "pointerdown",
@@ -5322,7 +7842,6 @@
             ? ev.target.closest(".offrefy-card")
             : null;
         if (!card || !mountEl.contains(card)) return;
-        closeAllVdVariantPickers();
         /* Select immediately on press so text-drag / theme handlers cannot steal tier 2/3 clicks. */
         selectCard(card, true);
       },
@@ -5343,43 +7862,12 @@
     });
 
     mountEl.addEventListener("click", function (ev) {
-      var t = ev.target;
-      if (vdShowVariant && t && t.closest) {
-        var trigger = t.closest("[data-offrefy-vd-vsel-trigger]");
-        if (trigger && mountEl.contains(trigger)) {
-          ev.preventDefault();
-          ev.stopPropagation();
-          var box = trigger.closest("[data-offrefy-vd-vsel]");
-          if (!box) return;
-          var panel = box.querySelector("[data-offrefy-vd-vsel-panel]");
-          var open = box.classList.contains("is-open");
-          closeAllVdVariantPickers();
-          if (!open && panel) {
-            trigger.setAttribute("aria-expanded", "true");
-            box.classList.add("is-open");
-            portalVdVariantPanel(box, panel, trigger);
-            panel.removeAttribute("hidden");
-            setupVdPortalListeners();
-          }
-          ensureCardSelectedFromNode(trigger);
-          return;
-        }
-        var opt = t.closest("[data-offrefy-vd-vid]");
-        if (opt && mountEl.contains(opt) && !opt.disabled) {
-          ev.preventDefault();
-          ev.stopPropagation();
-          applyVdVariantChoice(opt.getAttribute("data-offrefy-vd-vid"), opt);
-          return;
-        }
-      }
-
       if (!isVolumeTable && !isExpandControlTarget(ev.target)) {
         var clickCard =
           ev.target && ev.target.closest
             ? ev.target.closest(".offrefy-card")
             : null;
         if (clickCard) {
-          closeAllVdVariantPickers();
           selectCard(clickCard, false);
         }
       }
@@ -5437,106 +7925,6 @@
           });
       }
     });
-
-    if (!offrefyNs()._offrefyVdVselOutsideClose) {
-      offrefyNs()._offrefyVdVselOutsideClose = true;
-      document.addEventListener(
-        "pointerdown",
-        function (ev) {
-          var open = document.querySelector(
-            "[data-offrefy-root] [data-offrefy-vd-vsel].is-open",
-          );
-          if (!open) return;
-          if (
-            ev.target &&
-            ev.target.closest &&
-            (ev.target.closest("[data-offrefy-vd-vsel]") ||
-              ev.target.closest(".offrefy-vd-vsel__panel.is-portaled"))
-          ) {
-            return;
-          }
-          var roots = document.querySelectorAll(
-            "[data-offrefy-root] [data-offrefy-mount]",
-          );
-          for (var ri = 0; ri < roots.length; ri++) {
-            var boxes = roots[ri].querySelectorAll(
-              "[data-offrefy-vd-vsel].is-open",
-            );
-            for (var bi = 0; bi < boxes.length; bi++) {
-              var panel = boxes[bi].querySelector("[data-offrefy-vd-vsel-panel]");
-              if (!panel) {
-                var portaled = document.querySelectorAll(
-                  ".offrefy-vd-vsel__panel.is-portaled",
-                );
-                for (var pi = 0; pi < portaled.length; pi++) {
-                  if (portaled[pi]._offrefyOwnerBox === boxes[bi]) {
-                    panel = portaled[pi];
-                    break;
-                  }
-                }
-              }
-              var trig = boxes[bi].querySelector(
-                "[data-offrefy-vd-vsel-trigger]",
-              );
-              if (panel) {
-                panel.setAttribute("hidden", "");
-                if (panel.classList.contains("is-portaled")) {
-                  var home = panel._offrefyPortalHome;
-                  panel.classList.remove("is-portaled", "is-dropup");
-                  panel.style.removeProperty("top");
-                  panel.style.removeProperty("left");
-                  panel.style.removeProperty("right");
-                  panel.style.removeProperty("width");
-                  panel.style.removeProperty("bottom");
-                  panel.style.removeProperty("max-height");
-                  panel._offrefyOnPick = null;
-                  panel._offrefyClose = null;
-                  panel._offrefyOwnerBox = null;
-                  panel._offrefyOwnerMount = null;
-                  panel._offrefyPortalHome = null;
-                  if (home && home.parent) {
-                    if (
-                      home.nextSibling &&
-                      home.nextSibling.parentNode === home.parent
-                    ) {
-                      home.parent.insertBefore(panel, home.nextSibling);
-                    } else {
-                      home.parent.appendChild(panel);
-                    }
-                  }
-                }
-              }
-              if (trig) trig.setAttribute("aria-expanded", "false");
-              boxes[bi].classList.remove("is-open");
-            }
-            var cardsWrap = roots[ri].querySelector(".offrefy-cards");
-            if (cardsWrap) cardsWrap.classList.remove("offrefy-cards--vsel-open");
-            var rootEl = roots[ri].closest("[data-offrefy-root]");
-            if (rootEl) rootEl.classList.remove("offrefy-theme--vsel-open");
-          }
-        },
-        true,
-      );
-      document.addEventListener(
-        "click",
-        function (ev) {
-          var panel =
-            ev.target &&
-            ev.target.closest &&
-            ev.target.closest(".offrefy-vd-vsel__panel.is-portaled");
-          if (!panel) return;
-          var opt =
-            ev.target.closest && ev.target.closest("[data-offrefy-vd-vid]");
-          if (!opt || opt.disabled) return;
-          ev.preventDefault();
-          ev.stopPropagation();
-          if (typeof panel._offrefyOnPick === "function") {
-            panel._offrefyOnPick(opt.getAttribute("data-offrefy-vd-vid"), opt);
-          }
-        },
-        true,
-      );
-    }
 
     var cta = mountEl.querySelector("[data-offrefy-cta]");
     if (cta) {
@@ -5627,7 +8015,7 @@
     }, 2500);
     trackImpression(campaign, root.getAttribute("data-product-id"));
     offrefyNs().embed = offrefyNs().embed || {};
-    offrefyNs().embed.version = "1.31.13";
+    offrefyNs().embed.version = "1.31.90";
 
   }
   /**
@@ -5797,16 +8185,28 @@
       }
     }
 
+    var collectionGids = readCollectionGidsFromRoot(root);
+
     function applyConfig(cfg) {
-      var camp = pickCampaign(cfg, productId, variantId, productGid, variantGid);
+      var camp = pickCampaign(
+        cfg,
+        productId,
+        variantId,
+        productGid,
+        variantGid,
+        collectionGids,
+      );
       if (
-        (!camp || !camp.tiers || !camp.tiers.length) &&
+        (!camp || (!isBogoCampaign(camp) && (!camp.tiers || !camp.tiers.length))) &&
         productRuleCampaign &&
         campaignUsableOnStorefront(productRuleCampaign)
       ) {
         camp = productRuleCampaign;
       }
-      if ((!camp || !camp.tiers || !camp.tiers.length) && designMode) {
+      if (
+        (!camp || (!isBogoCampaign(camp) && (!camp.tiers || !camp.tiers.length))) &&
+        designMode
+      ) {
         camp = {
           id: "_preview",
           campaignName: "Preview",
@@ -5819,7 +8219,7 @@
           widgetDisplay: WD_DEFAULT,
         };
       }
-      if (!camp || !camp.tiers || !camp.tiers.length) {
+      if (!camp || (!isBogoCampaign(camp) && (!camp.tiers || !camp.tiers.length))) {
         root.setAttribute("hidden", "");
         root.style.display = "none";
         root.style.margin = "0";
@@ -5829,8 +8229,20 @@
         mount.hidden = true;
         return;
       }
+      /* Matching offer found — unhide before paint so empty-block CSS cannot stick. */
+      root.removeAttribute("hidden");
+      root.hidden = false;
+      root.style.display = "";
+      root.style.removeProperty("margin");
+      root.style.removeProperty("padding");
+      root.style.removeProperty("min-height");
+      mount.hidden = false;
       if (cfg && cfg.translations) {
         camp.translations = cfg.translations;
+      }
+      if (isBogoCampaign(camp)) {
+        mountBogoBundle(root, mount, camp);
+        return;
       }
       mountBundle(
         root,
@@ -5858,9 +8270,14 @@
       variantId,
       productGid,
       variantGid,
+      collectionGids,
     );
 
-    if (designMode && (!matched || !matched.tiers || !matched.tiers.length)) {
+    if (
+      designMode &&
+      (!matched ||
+        (!isBogoCampaign(matched) && (!matched.tiers || !matched.tiers.length)))
+    ) {
       matched = {
         id: "_preview",
         campaignName: "Preview",
@@ -5875,20 +8292,37 @@
     }
 
     if (
-      (!matched || !matched.tiers || !matched.tiers.length) &&
+      (!matched ||
+        (!isBogoCampaign(matched) && (!matched.tiers || !matched.tiers.length))) &&
       productRuleCampaign &&
       campaignUsableOnStorefront(productRuleCampaign)
     ) {
       matched = productRuleCampaign;
     }
 
-    if (matched && matched.tiers && matched.tiers.length) {
+    if (
+      matched &&
+      (isBogoCampaign(matched) || (matched.tiers && matched.tiers.length))
+    ) {
       if (inline && inline.translations) {
         matched.translations = inline.translations;
       }
-      // Product-rule early paint lacks full widgetDisplay — still fetch /widget-config
-      // so countdown + appearance from the offer are applied.
-      if (!matched._fromProductRule) {
+      if (isBogoCampaign(matched)) {
+        /*
+         * Only early-paint when Get/Buy media is complete. Incomplete metafield
+         * JSON + later /widget-config remount was flashing wrong qty/price.
+         */
+        if (bogoCampaignHasStableTileMedia(matched, productId)) {
+          mountBogoBundle(root, mount, matched);
+        } else {
+          root.removeAttribute("hidden");
+          root.style.display = "";
+          paintBogoPendingSkeleton(mount);
+        }
+        /* Still fetch /widget-config so enriched media can paint once. */
+      } else if (!matched._fromProductRule) {
+        // Product-rule early paint lacks full widgetDisplay — still fetch /widget-config
+        // so countdown + appearance from the offer are applied.
         mountBundle(
           root,
           mount,
@@ -5900,19 +8334,19 @@
           sectionHeading,
           variants,
         );
-        return;
+      } else {
+        mountBundle(
+          root,
+          mount,
+          matched,
+          String(configId || "vd"),
+          unitCents,
+          currency,
+          heading,
+          sectionHeading,
+          variants,
+        );
       }
-      mountBundle(
-        root,
-        mount,
-        matched,
-        String(configId || "vd"),
-        unitCents,
-        currency,
-        heading,
-        sectionHeading,
-        variants,
-      );
     }
 
     function finishFetch(remote) {
@@ -5920,7 +8354,14 @@
       var hadProductRulePaint =
         root.getAttribute("data-offrefy-inited") === "1" &&
         productRuleCampaign;
-      if (root.getAttribute("data-offrefy-inited") === "1" && !hadProductRulePaint) {
+      var waitingBogoEnrichment =
+        root.getAttribute("data-offrefy-inited") !== "1" &&
+        mount.querySelector(".offrefy-bogo--pending");
+      if (
+        root.getAttribute("data-offrefy-inited") === "1" &&
+        !hadProductRulePaint &&
+        !waitingBogoEnrichment
+      ) {
         return;
       }
       if (hadProductRulePaint) {
@@ -5934,6 +8375,20 @@
       if (remote && remote.translations) {
         cfg.translations = remote.translations;
         rememberStorefrontTranslations(remote.translations);
+      }
+      /* Prefetch/remote empty → keep inline BOGO so we don't blank the offer. */
+      if (
+        (!cfg.campaigns || !cfg.campaigns.length) &&
+        matched &&
+        isBogoCampaign(matched)
+      ) {
+        cfg = sanitizeWidgetConfig(
+          { version: 1, campaigns: [matched] },
+          designMode,
+        );
+        if (inline && inline.translations) {
+          cfg.translations = inline.translations;
+        }
       }
       if (scriptEl && cfg && cfg.campaigns) {
         try {
@@ -6012,16 +8467,35 @@
     var opts = options || {};
     var syncCartSideEffects = opts.syncCart !== false;
 
-    /* App embed off → never mount (block markup alone must not show the widget). */
+    /*
+     * Enable when App Embed is on, OR when the Quantity breaks block is on
+     * the page (block script arms appEmbedActive). Presence of widget host
+     * markup is enough — don’t leave the product page blank on Horizon.
+     */
+    var hasWidgetHost = !!document.querySelector(
+      ".offrefy-root[data-offrefy-widget-host], .offrefy-root[data-offrefy-root]",
+    );
     if (!offrefyNs().appEmbedActive) {
-      hideAllWidgetRoots();
-      return;
+      if (hasWidgetHost) {
+        offrefyNs().appEmbedActive = true;
+      } else {
+        hideAllWidgetRoots();
+        return;
+      }
     }
 
     /* Widget first — never wait on cart network before mounting. */
     document.querySelectorAll(".offrefy-root").forEach(function (el) {
-      runWidget(el);
+      try {
+        runWidget(el);
+      } catch (eRun) {
+        if (typeof console !== "undefined" && console.error) {
+          console.error("[Offrefy] widget mount failed", eRun);
+        }
+      }
     });
+
+    /* BOGO: no cart drawer/page assist — free Get only via widget CTA. */
 
     bindCartDrawerDiscountLabelPatching();
     bindStorefrontLocaleWatcher();
@@ -6038,33 +8512,32 @@
     }
 
     function runCartSideEffects() {
-      if (syncCartSideEffects) {
-        syncCartLocaleAttribute(false)
-          .then(function () {
-            return syncCartLockedProductsAttribute(null);
-          })
-          .then(function () {
-            scheduleCartDrawerDiscountLabelPatch();
-          });
-      } else {
-        scheduleCartDrawerDiscountLabelPatch();
-      }
+      /* No cart.js / cart/update on boot — avoids racing drawer qty spinner. */
+      void syncCartSideEffects;
+      syncCartLocaleAttribute(false).catch(function () {});
     }
 
     if (typeof requestIdleCallback === "function") {
-      requestIdleCallback(runCartSideEffects, { timeout: 2000 });
+      requestIdleCallback(runCartSideEffects, { timeout: 2500 });
     } else {
-      setTimeout(runCartSideEffects, syncCartSideEffects ? 400 : 0);
+      setTimeout(runCartSideEffects, 500);
     }
   }
 
-  /* Defer script runs after parse — mount immediately when roots exist. */
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () {
-      scan({ syncCart: true });
-    });
-  } else {
+  /*
+   * Mount ASAP — don’t wait for full DOMContentLoaded when widget roots
+   * are already in the document (kills refresh delay).
+   */
+  function bootScan() {
     scan({ syncCart: true });
+  }
+  if (
+    document.querySelector(".offrefy-root[data-offrefy-root]") ||
+    document.readyState !== "loading"
+  ) {
+    bootScan();
+  } else {
+    document.addEventListener("DOMContentLoaded", bootScan);
   }
   /* Section remounts only need widget roots — avoid cart/update storm on every variant section swap. */
   document.addEventListener("shopify:section:load", function () {

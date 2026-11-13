@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Button, ButtonGroup, Text } from "@shopify/polaris";
+import { Text } from "@shopify/polaris";
+import { Button, ButtonGroup } from "./AppButton";
 
 import { useAdminI18n } from "./AdminI18nProvider";
 import { PricingCard } from "./PricingCard";
@@ -36,7 +37,7 @@ const PLAN_DESCRIPTION_KEY: Record<PricingPlanId, AdminUiMessageKey> = {
 
 const PLAN_FEATURE_KEYS: Record<PricingPlanId, AdminUiMessageKey[]> = {
   free: [
-    "pricing.feature.campaigns5",
+    "pricing.feature.campaigns2",
     "pricing.feature.quantityBreaks",
     "pricing.feature.volumeDiscount",
     "pricing.feature.allAppearanceTemplates",
@@ -164,14 +165,15 @@ export function PricingTable({
           const plan = PLANS[planId];
           const display = getPlanDisplayPrice(planId, interval);
           const isCurrent = currentPlan === planId;
+          const isFreePlan = planId === "free";
           return (
             <div key={planId} style={{ display: "flex", minHeight: "100%" }}>
               <PricingCard
                 title={t(PLAN_TITLE_KEY[planId])}
                 description={t(PLAN_DESCRIPTION_KEY[planId])}
-                price={display.price}
-                comparePrice={display.comparePrice}
-                frequency={t("pricing.frequency.month")}
+                price={isFreePlan ? t("pricing.priceFree") : display.price}
+                comparePrice={isFreePlan ? undefined : display.comparePrice}
+                frequency={isFreePlan ? "" : t("pricing.frequency.month")}
                 features={PLAN_FEATURE_KEYS[planId].map((key) => t(key))}
                 featuredText={
                   plan.featuredText

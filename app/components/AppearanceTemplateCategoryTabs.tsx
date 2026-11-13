@@ -1,13 +1,8 @@
-import { useCallback, useMemo, useState } from "react";
-import {
-  ActionList,
-  Button,
-  ButtonGroup,
-  InlineStack,
-  Popover,
-} from "@shopify/polaris";
+import { useMemo } from "react";
+import { Button, ButtonGroup } from "./AppButton";
 import {
   APPEARANCE_TEMPLATE_CATEGORY_OPTIONS,
+  isAppearanceTemplateCategory,
   type AppearanceTemplateCategory,
 } from "../utils/widgetDisplay";
 import createStyles from "../styles/volume-discount-create.module.css";
@@ -39,12 +34,14 @@ type AppearanceTemplateCategoryTabsProps = {
   onChange: (category: AppearanceTemplateCategory) => void;
 };
 
+/**
+ * Category tabs (Polaris s-button group) + overflow via Polaris s-select.
+ */
 export function AppearanceTemplateCategoryTabs({
   value,
   onChange,
 }: AppearanceTemplateCategoryTabsProps) {
   const { t } = useAdminI18n();
-  const [moreOpen, setMoreOpen] = useState(false);
 
   const primaryOptions = useMemo(
     () =>
@@ -63,17 +60,18 @@ export function AppearanceTemplateCategoryTabs({
   );
 
   const selectedInMore = moreOptions.some((o) => o.value === value);
-  const moreLabel = selectedInMore
-    ? (moreOptions.find((o) => o.value === value)?.label ??
-      t("offerEditor.appearance.category.more"))
-    : t("offerEditor.appearance.category.more");
+  const moreSelectValue = selectedInMore ? value : "";
+  const moreLabel = t("offerEditor.appearance.category.more");
 
-  const closeMore = useCallback(() => setMoreOpen(false), []);
-  const toggleMore = useCallback(() => setMoreOpen((open) => !open), []);
+  const handleMoreChange = (raw: string) => {
+    if (!raw || !isAppearanceTemplateCategory(raw)) return;
+    if (PRIMARY_CATEGORY_VALUES.includes(raw)) return;
+    onChange(raw);
+  };
 
   return (
     <div className={createStyles.appearanceTemplateCategoryBar}>
-      <InlineStack gap="200" blockAlign="center" wrap={false}>
+      <s-stack direction="inline" gap="small-200" alignItems="center">
         <ButtonGroup variant="segmented" noWrap>
           {primaryOptions.map((opt) => (
             <Button
@@ -86,35 +84,29 @@ export function AppearanceTemplateCategoryTabs({
             </Button>
           ))}
         </ButtonGroup>
-        <Popover
-          active={moreOpen}
-          autofocusTarget="first-node"
-          preferredAlignment="right"
-          onClose={closeMore}
-          activator={
-            <Button
-              size="slim"
-              pressed={selectedInMore}
-              disclosure={moreOpen ? "up" : "down"}
-              onClick={toggleMore}
-            >
-              {moreLabel}
-            </Button>
-          }
-        >
-          <ActionList
-            actionRole="menuitem"
-            items={moreOptions.map((opt) => ({
-              content: opt.label,
-              active: value === opt.value,
-              onAction: () => {
-                onChange(opt.value);
-                closeMore();
-              },
-            }))}
-          />
-        </Popover>
-      </InlineStack>
+        {/* Polaris web: s-select — overflow categories (“More”) */}
+        <div className={createStyles.appearanceCategoryMoreSelect}>
+          <s-select
+            label={moreLabel}
+            labelAccessibilityVisibility="exclusive"
+            icon="select"
+            placeholder={moreLabel}
+            value={moreSelectValue}
+            onChange={(e) =>
+              handleMoreChange(String(e.currentTarget.value || ""))
+            }
+            onInput={(e) =>
+              handleMoreChange(String(e.currentTarget.value || ""))
+            }
+          >
+            {moreOptions.map((opt) => (
+              <s-option key={opt.value} value={opt.value}>
+                {opt.label}
+              </s-option>
+            ))}
+          </s-select>
+        </div>
+      </s-stack>
     </div>
   );
 }

@@ -11,6 +11,7 @@ export type OffersListRow = {
   updatedAt: Date | string;
   productScope?: string;
   widgetPresentation?: string;
+  offerKind?: "volume" | "bogo";
 };
 
 function rowTime(value: Date | string): number {
@@ -38,7 +39,11 @@ function compareByModified(
   return desc ? cb - ca : ca - cb;
 }
 
-function campaignTypeSortKey(presentation?: string): string {
+function campaignTypeSortKey(
+  presentation?: string,
+  offerKind?: "volume" | "bogo",
+): string {
+  if (offerKind === "bogo") return "BOGO";
   return presentation === "volume_table" ? "Volume discount" : "Quantity breaks";
 }
 
@@ -103,8 +108,8 @@ export function filterSortOffersForListView<T extends OffersListRow>(
     case "type":
       return [...list].sort((a, b) => {
         const cmp = compareText(
-          campaignTypeSortKey(a.widgetPresentation),
-          campaignTypeSortKey(b.widgetPresentation),
+          campaignTypeSortKey(a.widgetPresentation, a.offerKind),
+          campaignTypeSortKey(b.widgetPresentation, b.offerKind),
           desc,
         );
         return cmp || compareText(a.campaignName, b.campaignName, false);

@@ -68,9 +68,8 @@
 }
 
 /*
- * Keep Active / Draft / Delete beside "N selected" (Polaris defaults right-align).
- * OuterLayout must keep width:100% / flex grow so BulkActionsMeasurer can measure
- * space — width:auto collapses measurement and hides all promoted actions.
+ * Keep Active / Draft / Delete beside "N selected" in IndexTable bulk overlay.
+ * OuterLayout must keep width:100% so BulkActionsMeasurer can measure space.
  */
 .tableWrap :global(.Polaris-BulkActions__BulkActionsLayout) {
   justify-content: flex-start;
@@ -119,3 +118,4 @@
 .nameSortArrowDesc :global(.Polaris-Icon) {
   transform: rotate(180deg);
 }
+

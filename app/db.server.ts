@@ -4,7 +4,10 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import pg from "pg";
 
-/** Generated client — typings follow `@prisma/client`. */
+/**
+ * Generated client typings (includes BogoCampaign).
+ * tsconfig paths map `@prisma/client` → `.prisma/client` so IDE + tsc stay in sync after `prisma generate`.
+ */
 export type AppPrismaClient = PrismaClient;
 
 declare global {
@@ -24,13 +27,15 @@ function clientHasExpectedModels(client: AppPrismaClient | undefined): boolean {
     volumeDiscountShopState?: unknown;
     volumeDiscountStorefrontPayload?: unknown;
     discountRule?: unknown;
+    bogoCampaign?: unknown;
   };
   return (
     client != null &&
     typeof c.volumeDiscountCampaign !== "undefined" &&
     typeof c.volumeDiscountShopState !== "undefined" &&
     typeof c.volumeDiscountStorefrontPayload !== "undefined" &&
-    typeof c.discountRule !== "undefined"
+    typeof c.discountRule !== "undefined" &&
+    typeof c.bogoCampaign !== "undefined"
   );
 }
 
@@ -142,9 +147,13 @@ function createPrismaClient(): AppPrismaClient {
 function getPrisma(): AppPrismaClient {
   if (usingHyperdrive()) {
     const fromAls = hyperdrivePrismaAls.getStore();
-    if (fromAls) return fromAls;
-    // A new client here used to run on every property read and opened a Pool each time.
-    hyperdriveFallbackClient ??= createPrismaClient();
+    if (fromAls && clientHasExpectedModels(fromAls)) return fromAls;
+    if (clientHasExpectedModels(hyperdriveFallbackClient)) {
+      return hyperdriveFallbackClient!;
+    }
+    // Stale client (e.g. before BogoCampaign generate) — drop and recreate.
+    void hyperdriveFallbackClient?.$disconnect().catch(() => {});
+    hyperdriveFallbackClient = createPrismaClient();
     return hyperdriveFallbackClient;
   }
 

@@ -1,31 +1,12 @@
 import { SaveBar, useAppBridge } from "@shopify/app-bridge-react";
-import {
-  Badge,
-  BlockStack,
-  Box,
-  Button,
-  ButtonGroup,
-  Card,
-  Checkbox,
-  ChoiceList,
-  Divider,
-  FormLayout,
-  Icon,
-  InlineStack,
-  RangeSlider,
-  Select,
-  Tag,
-  Tabs,
-  Text,
-  TextField,
-} from "@shopify/polaris";
+import { Box, InlineStack, RangeSlider, Tabs } from "@shopify/polaris";
+import { Button, ButtonGroup } from "./AppButton";
 import {
   DesktopIcon,
   MobileIcon,
   AutomationIcon,
   RedoIcon,
   ResetIcon,
-  SearchIcon,
   UndoIcon,
 } from "@shopify/polaris-icons";
 import {
@@ -173,11 +154,10 @@ const QuantityBreaksTailwindPreview = lazy(() =>
 
 function PreviewPanelFallback() {
   return (
-    <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-      <Text as="p" tone="subdued">
-        Loading preview…
-      </Text>
-    </Box>
+    /* Polaris web: s-box / s-text — preview Suspense fallback */
+    <s-box padding="base" background="subdued" borderRadius="base">
+      <s-text color="subdued">Loading preview…</s-text>
+    </s-box>
   );
 }
 
@@ -627,7 +607,10 @@ export function VolumeDiscountCreateView({
         : FALLBACK_OFFER_SHOP_LANGUAGES,
     [shopLanguagesProp],
   );
-  const shopTranslations = shopTranslationsProp ?? {};
+  const shopTranslations = useMemo(
+    () => shopTranslationsProp ?? {},
+    [shopTranslationsProp],
+  );
   const primaryLang = useMemo(() => {
     const primary = shopLanguages.find((l) => l.primary);
     return primary?.value ?? shopLanguages[0]?.value ?? "en";
@@ -2179,23 +2162,29 @@ export function VolumeDiscountCreateView({
                     </s-stack>
                   </s-box>
 
-                  <Card padding="400">
-                    <BlockStack gap="400">
-                      <BlockStack gap="200">
-                        <Text as="h2" variant="headingMd">
+                  {/* Polaris web: s-box card — Discounted products (same productScope handlers) */}
+                  <s-box
+                    padding="large-200"
+                    borderWidth="base"
+                    borderRadius="large"
+                    background="base"
+                  >
+                    <s-stack direction="block" gap="base">
+                      <s-stack direction="block" gap="small-200">
+                        <s-heading>
                           {t("offerEditor.discountedProducts")}
-                        </Text>
-                        <Text as="p" variant="bodyMd" tone="subdued">
+                        </s-heading>
+                        <s-paragraph color="subdued">
                           {t("offerEditor.discountedProductsHelp")}
-                        </Text>
-                      </BlockStack>
-                      <ChoiceList
-                        title={t("offerEditor.productScope")}
+                        </s-paragraph>
+                      </s-stack>
+                      {/* Polaris web: s-choice-list — same productScope selection + clears */}
+                      <s-choice-list
+                        label={t("offerEditor.productScope")}
                         name="product-scope"
-                        choices={productScopeChoices}
-                        selected={[productScope]}
-                        onChange={(selected) => {
-                          const v = selected[0];
+                        values={[productScope]}
+                        onChange={(event) => {
+                          const v = event.currentTarget.values?.[0];
                           if (!v || !isVolumeDiscountProductScope(v)) return;
                           setProductScope(v);
                           setProductIds([]);
@@ -2203,32 +2192,46 @@ export function VolumeDiscountCreateView({
                           setProductQuery("");
                           setCollectionQuery("");
                         }}
-                      />
+                      >
+                        {productScopeChoices.map((choice) => (
+                          <s-choice key={choice.value} value={choice.value}>
+                            {choice.label}
+                          </s-choice>
+                        ))}
+                      </s-choice-list>
 
                       {productScope === "all" ? (
-                        <Text as="p" variant="bodyMd" tone="subdued">
+                        <s-paragraph color="subdued">
                           The discount applies to every product in your store.
-                        </Text>
+                        </s-paragraph>
                       ) : null}
 
                       {productScope === "specific-products" ||
                       productScope === "group-products" ? (
-                        <BlockStack gap="300">
-                          <Text as="p" variant="bodyMd" tone="subdued">
+                        <s-stack direction="block" gap="small">
+                          <s-paragraph color="subdued">
                             {productScope === "group-products"
                               ? "Select products in this offer group. With “Total quantity of all products”, qty is summed across the group (not the whole cart)."
                               : "Select individual products."}
-                          </Text>
-                          <InlineStack gap="200" wrap blockAlign="end">
+                          </s-paragraph>
+                          <s-stack
+                            direction="inline"
+                            gap="small-200"
+                            alignItems="end"
+                           
+                          >
                             <div style={{ flex: "1 1 16rem", minWidth: 0 }}>
-                              <TextField
+                              {/* Polaris web: s-search-field — same productQuery state */}
+                              <s-search-field
                                 label="Search products"
                                 name="productSearch"
                                 placeholder="Search products"
                                 value={productQuery}
-                                onChange={setProductQuery}
-                                autoComplete="off"
-                                prefix={<Icon source={SearchIcon} tone="base" />}
+                                onInput={(event) =>
+                                  setProductQuery(
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
                               />
                             </div>
                             <Button
@@ -2237,36 +2240,49 @@ export function VolumeDiscountCreateView({
                             >
                               Browse
                             </Button>
-                          </InlineStack>
+                          </s-stack>
                           {productIds.length > 0 ? (
-                            <InlineStack gap="200" blockAlign="center" wrap>
-                              <Text as="span" variant="bodyMd" tone="subdued">
+                            <s-stack
+                              direction="inline"
+                              gap="small-200"
+                              alignItems="center"
+                             
+                            >
+                              <s-text color="subdued">
                                 {productIds.length} product
                                 {productIds.length === 1 ? "" : "s"} selected
-                              </Text>
+                              </s-text>
                               <Button
                                 variant="plain"
                                 onClick={() => setProductIds([])}
                               >
                                 Clear
                               </Button>
-                            </InlineStack>
+                            </s-stack>
                           ) : null}
-                        </BlockStack>
+                        </s-stack>
                       ) : null}
 
                       {productScope === "variants" ? (
-                        <BlockStack gap="300">
-                          <InlineStack gap="200" wrap blockAlign="end">
+                        <s-stack direction="block" gap="small">
+                          <s-stack
+                            direction="inline"
+                            gap="small-200"
+                            alignItems="end"
+                           
+                          >
                             <div style={{ flex: "1 1 16rem", minWidth: 0 }}>
-                              <TextField
+                              {/* Polaris web: s-search-field — same productQuery state */}
+                              <s-search-field
                                 label="Search variants"
                                 name="variantSearch"
                                 placeholder="Search variants"
                                 value={productQuery}
-                                onChange={setProductQuery}
-                                autoComplete="off"
-                                prefix={<Icon source={SearchIcon} tone="base" />}
+                                onInput={(event) =>
+                                  setProductQuery(
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
                               />
                             </div>
                             <Button
@@ -2275,36 +2291,49 @@ export function VolumeDiscountCreateView({
                             >
                               Browse
                             </Button>
-                          </InlineStack>
+                          </s-stack>
                           {productIds.length > 0 ? (
-                            <InlineStack gap="200" blockAlign="center" wrap>
-                              <Text as="span" variant="bodyMd" tone="subdued">
+                            <s-stack
+                              direction="inline"
+                              gap="small-200"
+                              alignItems="center"
+                             
+                            >
+                              <s-text color="subdued">
                                 {productIds.length} variant
                                 {productIds.length === 1 ? "" : "s"} selected
-                              </Text>
+                              </s-text>
                               <Button
                                 variant="plain"
                                 onClick={() => setProductIds([])}
                               >
                                 Clear
                               </Button>
-                            </InlineStack>
+                            </s-stack>
                           ) : null}
-                        </BlockStack>
+                        </s-stack>
                       ) : null}
 
                       {productScope === "collections" ? (
-                        <BlockStack gap="300">
-                          <InlineStack gap="200" wrap blockAlign="end">
+                        <s-stack direction="block" gap="small">
+                          <s-stack
+                            direction="inline"
+                            gap="small-200"
+                            alignItems="end"
+                           
+                          >
                             <div style={{ flex: "1 1 16rem", minWidth: 0 }}>
-                              <TextField
+                              {/* Polaris web: s-search-field — same collectionQuery state */}
+                              <s-search-field
                                 label="Search collections"
                                 name="collectionSearch"
                                 placeholder="Search collections"
                                 value={collectionQuery}
-                                onChange={setCollectionQuery}
-                                autoComplete="off"
-                                prefix={<Icon source={SearchIcon} tone="base" />}
+                                onInput={(event) =>
+                                  setCollectionQuery(
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
                               />
                             </div>
                             <Button
@@ -2313,51 +2342,72 @@ export function VolumeDiscountCreateView({
                             >
                               Browse
                             </Button>
-                          </InlineStack>
+                          </s-stack>
                           {collectionIds.length > 0 ? (
-                            <InlineStack gap="200" blockAlign="center" wrap>
-                              <Text as="span" variant="bodyMd" tone="subdued">
+                            <s-stack
+                              direction="inline"
+                              gap="small-200"
+                              alignItems="center"
+                             
+                            >
+                              <s-text color="subdued">
                                 {collectionIds.length} collection
                                 {collectionIds.length === 1 ? "" : "s"}{" "}
                                 selected
-                              </Text>
+                              </s-text>
                               <Button
                                 variant="plain"
                                 onClick={() => setCollectionIds([])}
                               >
                                 Clear
                               </Button>
-                            </InlineStack>
+                            </s-stack>
                           ) : null}
-                        </BlockStack>
+                        </s-stack>
                       ) : null}
-                    </BlockStack>
-                  </Card>
+                    </s-stack>
+                  </s-box>
 
-                  <Card padding="400">
-                    <BlockStack gap="400">
-                      <BlockStack gap="200">
-                        <Text as="h2" variant="headingMd">
+                  {/* Polaris web: s-box card — Quantity conditions (same quantityCondition handlers) */}
+                  <s-box
+                    padding="large-200"
+                    borderWidth="base"
+                    borderRadius="large"
+                    background="base"
+                  >
+                    <s-stack direction="block" gap="base">
+                      <s-stack direction="block" gap="small-200">
+                        <s-heading>
                           {t("offerEditor.quantityConditions")}
-                        </Text>
-                        <Text as="p" variant="bodyMd" tone="subdued">
+                        </s-heading>
+                        <s-paragraph color="subdued">
                           {t("offerEditor.quantityConditionsHelp")}
-                        </Text>
-                      </BlockStack>
-                      <ChoiceList
-                        title={t("offerEditor.quantityBasis")}
+                        </s-paragraph>
+                      </s-stack>
+                      {/* Polaris web: s-choice-list — same quantityCondition selection */}
+                      <s-choice-list
+                        label={t("offerEditor.quantityBasis")}
                         name="quantity-condition"
-                        choices={quantityBasisChoices}
-                        selected={[quantityCondition]}
-                        onChange={(selected) => {
-                          const v = selected[0];
+                        values={[quantityCondition]}
+                        onChange={(event) => {
+                          const v = event.currentTarget.values?.[0];
                           if (!v || !isVolumeDiscountQuantityCondition(v))
                             return;
                           setQuantityCondition(v);
                         }}
-                      />
-                    </BlockStack>
-                  </Card>
+                      >
+                        {quantityBasisChoices.map((choice) => (
+                          <s-choice
+                            key={choice.value}
+                            value={choice.value}
+                            disabled={choice.disabled || undefined}
+                          >
+                            {choice.label}
+                          </s-choice>
+                        ))}
+                      </s-choice-list>
+                    </s-stack>
+                  </s-box>
 
                   <div id="vd-offer-schedule">
                     <CampaignStatusScheduleCard
@@ -2460,19 +2510,26 @@ export function VolumeDiscountCreateView({
                     />
                   </div>
 
-                  <Card padding="400">
-                    <BlockStack gap="300">
-                      <BlockStack gap="100">
-                        <Text as="h2" variant="headingSm">
+                  {/* Polaris web: s-box card — Target customer (same customerType handlers) */}
+                  <s-box
+                    padding="large-200"
+                    borderWidth="base"
+                    borderRadius="large"
+                    background="base"
+                  >
+                    <s-stack direction="block" gap="small">
+                      <s-stack direction="block" gap="small-100">
+                        <s-heading>
                           {t("offerEditor.targetCustomer")}
-                        </Text>
-                        <Text as="p" variant="bodySm" tone="subdued">
+                        </s-heading>
+                        <s-paragraph color="subdued">
                           {t("offerEditor.targetCustomerHelp")}
-                        </Text>
-                      </BlockStack>
+                        </s-paragraph>
+                      </s-stack>
                       {!planCaps.customerTargeting ? (
                         <PlanUpgradeHint feature="customerTargeting" />
                       ) : null}
+                      {/* Polaris web: s-select via AdminLanguageDropdown — same customerType */}
                       <AdminLanguageDropdown
                         label={t("offerEditor.customerType")}
                         disabled={!planCaps.customerTargeting}
@@ -2502,22 +2559,25 @@ export function VolumeDiscountCreateView({
                       {(planCaps.customerTargeting
                         ? customerType === "logged-in-tag-any"
                         : true) ? (
-                        <BlockStack gap="300">
-                          <Text as="p" variant="bodyMd" tone="subdued">
+                        <s-stack direction="block" gap="small">
+                          <s-paragraph color="subdued">
                             Match spelling to customer tags in Shopify admin
                             (Customers). Add one tag per chip; remove with ×.
-                          </Text>
+                          </s-paragraph>
                           {planCaps.customerTargeting ? (
-                            <InlineStack gap="200" wrap>
+                            <s-stack direction="inline" gap="small">
                               {customerTags.map((tag) => (
-                                <Tag
+                                // Polaris web: s-clickable-chip — same removeCustomerTag
+                                <s-clickable-chip
                                   key={tag}
+                                  removable
+                                  accessibilityLabel={`Remove ${tag}`}
                                   onRemove={() => removeCustomerTag(tag)}
                                 >
                                   {tag}
-                                </Tag>
+                                </s-clickable-chip>
                               ))}
-                            </InlineStack>
+                            </s-stack>
                           ) : null}
                           <form
                             onSubmit={(e) => {
@@ -2526,19 +2586,36 @@ export function VolumeDiscountCreateView({
                               addCustomerTag();
                             }}
                           >
-                            <InlineStack gap="200" wrap blockAlign="end">
+                            <s-stack
+                              direction="inline"
+                              gap="small-200"
+                              alignItems="end"
+                             
+                            >
                               <div style={{ flex: "1 1 12rem", minWidth: 0 }}>
-                                <TextField
+                                {/* Polaris web: s-text-field — same customerTagInput */}
+                                <s-text-field
                                   label="Add customer tag"
                                   value={
                                     planCaps.customerTargeting
                                       ? customerTagInput
                                       : ""
                                   }
-                                  onChange={(v) => setCustomerTagInput(v)}
-                                  autoComplete="off"
+                                  autocomplete="off"
                                   placeholder="e.g. Wholesale"
-                                  disabled={!planCaps.customerTargeting}
+                                  disabled={
+                                    !planCaps.customerTargeting || undefined
+                                  }
+                                  onChange={(event) =>
+                                    setCustomerTagInput(
+                                      sTextFieldValue(event.currentTarget),
+                                    )
+                                  }
+                                  onInput={(event) =>
+                                    setCustomerTagInput(
+                                      sTextFieldValue(event.currentTarget),
+                                    )
+                                  }
                                 />
                               </div>
                               <Button
@@ -2548,62 +2625,87 @@ export function VolumeDiscountCreateView({
                               >
                                 Add
                               </Button>
-                            </InlineStack>
+                            </s-stack>
                           </form>
-                        </BlockStack>
+                        </s-stack>
                       ) : null}
-                    </BlockStack>
-                  </Card>
+                    </s-stack>
+                  </s-box>
                       </s-stack>
                     ) : settingsTab === 1 ? (
-                      <BlockStack gap="400">
-                        <Card padding="400">
-                          <BlockStack gap="300">
-                            <Text as="h2" variant="headingSm">
+                      // Polaris web: Display tab — same displayName / widgetDisplay handlers
+                      <s-stack direction="block" gap="base">
+                        {/* Polaris web: s-box — Cart & checkout */}
+                        <s-box
+                          padding="large-200"
+                          borderWidth="base"
+                          borderRadius="large"
+                          background="base"
+                        >
+                          <s-stack direction="block" gap="small">
+                            <s-heading>
                               {t("offerEditor.cartCheckout")}
-                            </Text>
-                            <TextField
+                            </s-heading>
+                            <s-text-area
                               label={t("offerEditor.displayName")}
                               name="displayName"
                               value={displayName}
-                              onChange={setDisplayName}
-                              multiline={2}
-                              autoComplete="off"
-                              helpText={t("offerEditor.displayNameHelp")}
+                              rows={2}
+                              autocomplete="off"
+                              details={t("offerEditor.displayNameHelp")}
+                              onChange={(event) =>
+                                setDisplayName(
+                                  sTextFieldValue(event.currentTarget),
+                                )
+                              }
+                              onInput={(event) =>
+                                setDisplayName(
+                                  sTextFieldValue(event.currentTarget),
+                                )
+                              }
                             />
-                          </BlockStack>
-                        </Card>
+                          </s-stack>
+                        </s-box>
 
-                        <Card padding="400">
-                          <BlockStack gap="300">
-                            <Text as="h2" variant="headingSm">
+                        {/* Polaris web: s-box — Button settings */}
+                        <s-box
+                          padding="large-200"
+                          borderWidth="base"
+                          borderRadius="large"
+                          background="base"
+                        >
+                          <s-stack direction="block" gap="small">
+                            <s-heading>
                               {t("offerEditor.buttonSettings")}
-                            </Text>
-                            <TextField
+                            </s-heading>
+                            <s-text-area
                               label={t("offerEditor.textButton")}
                               name="ctaLabel"
                               value={widgetDisplay.ctaLabel}
-                              onChange={(v) =>
-                                patchWidgetDisplay({ ctaLabel: v })
+                              rows={2}
+                              autocomplete="off"
+                              onChange={(event) =>
+                                patchWidgetDisplay({
+                                  ctaLabel: sTextFieldValue(event.currentTarget),
+                                })
                               }
-                              autoComplete="off"
-                              multiline={2}
+                              onInput={(event) =>
+                                patchWidgetDisplay({
+                                  ctaLabel: sTextFieldValue(event.currentTarget),
+                                })
+                              }
                             />
-                            <Select
+                            {/* Polaris web: s-select — same ctaButtonAction */}
+                            <s-select
                               label={t("offerEditor.buttonAction")}
-                              helpText={
+                              details={
                                 isVolumeTableOffer
                                   ? t("offerEditor.buttonAction.helpVolume")
                                   : t("offerEditor.buttonAction.help")
                               }
-                              options={CTA_BUTTON_ACTION_OPTIONS.map((o) => ({
-                                value: o.value,
-                                label: t(
-                                  `offerEditor.ctaAction.${o.value}` as AdminUiMessageKey,
-                                ),
-                              }))}
                               value={widgetDisplay.ctaButtonAction}
-                              onChange={(v) => {
+                              onChange={(event) => {
+                                const v = String(event.currentTarget.value || "");
                                 if (
                                   v === "add_to_cart" ||
                                   v === "add_to_cart_open_drawer" ||
@@ -2615,261 +2717,358 @@ export function VolumeDiscountCreateView({
                                   });
                                 }
                               }}
-                            />
+                              onInput={(event) => {
+                                const v = String(event.currentTarget.value || "");
+                                if (
+                                  v === "add_to_cart" ||
+                                  v === "add_to_cart_open_drawer" ||
+                                  v === "go_to_checkout" ||
+                                  v === "go_to_page"
+                                ) {
+                                  patchWidgetDisplay({
+                                    ctaButtonAction: v,
+                                  });
+                                }
+                              }}
+                            >
+                              {CTA_BUTTON_ACTION_OPTIONS.map((o) => (
+                                <s-option key={o.value} value={o.value}>
+                                  {t(
+                                    `offerEditor.ctaAction.${o.value}` as AdminUiMessageKey,
+                                  )}
+                                </s-option>
+                              ))}
+                            </s-select>
                             {widgetDisplay.ctaButtonAction === "go_to_page" ? (
-                              <TextField
+                              <s-url-field
                                 label={t("offerEditor.pageUrl")}
                                 value={widgetDisplay.ctaButtonPageUrl}
-                                onChange={(v) =>
+                                autocomplete="off"
+                                details={t("offerEditor.pageUrlHelp")}
+                                onChange={(event) =>
                                   patchWidgetDisplay({
-                                    ctaButtonPageUrl: v,
+                                    ctaButtonPageUrl: sTextFieldValue(
+                                      event.currentTarget,
+                                    ),
                                   })
                                 }
-                                autoComplete="off"
-                                helpText={t("offerEditor.pageUrlHelp")}
+                                onInput={(event) =>
+                                  patchWidgetDisplay({
+                                    ctaButtonPageUrl: sTextFieldValue(
+                                      event.currentTarget,
+                                    ),
+                                  })
+                                }
                               />
                             ) : null}
-                          </BlockStack>
-                        </Card>
+                          </s-stack>
+                        </s-box>
 
-                        <Card padding="400">
-                          <BlockStack gap="300">
-                            <Text as="h2" variant="headingSm">
+                        {/* Polaris web: s-box — Theme product form */}
+                        <s-box
+                          padding="large-200"
+                          borderWidth="base"
+                          borderRadius="large"
+                          background="base"
+                        >
+                          <s-stack direction="block" gap="small">
+                            <s-heading>
                               {t("offerEditor.advanced.themeSection")}
-                            </Text>
-                            <Text as="p" variant="bodySm" tone="subdued">
+                            </s-heading>
+                            <s-paragraph color="subdued">
                               {t("offerEditor.advanced.themeIntro")}
-                            </Text>
-                            <BlockStack gap="200">
-                              <Checkbox
-                                label={t("offerEditor.advanced.hideThemeAddToCart")}
-                                helpText={t(
+                            </s-paragraph>
+                            <s-stack direction="block" gap="small-200">
+                              <s-checkbox
+                                label={t(
+                                  "offerEditor.advanced.hideThemeAddToCart",
+                                )}
+                                details={t(
                                   "offerEditor.advanced.hideThemeAddToCartHelp",
                                 )}
                                 checked={widgetDisplay.hideThemeAddToCart}
-                                onChange={(checked) =>
+                                onChange={(event) =>
                                   patchWidgetDisplay({
-                                    hideThemeAddToCart: checked,
+                                    hideThemeAddToCart: Boolean(
+                                      event.currentTarget.checked,
+                                    ),
                                   })
                                 }
                               />
-                              <Checkbox
-                                label={t("offerEditor.advanced.hideThemeBuyItNow")}
-                                helpText={t(
+                              <s-checkbox
+                                label={t(
+                                  "offerEditor.advanced.hideThemeBuyItNow",
+                                )}
+                                details={t(
                                   "offerEditor.advanced.hideThemeBuyItNowHelp",
                                 )}
                                 checked={widgetDisplay.hideThemeBuyItNow}
-                                onChange={(checked) =>
+                                onChange={(event) =>
                                   patchWidgetDisplay({
-                                    hideThemeBuyItNow: checked,
+                                    hideThemeBuyItNow: Boolean(
+                                      event.currentTarget.checked,
+                                    ),
                                   })
                                 }
                               />
-                              <Checkbox
+                              <s-checkbox
                                 label={t(
                                   "offerEditor.advanced.hideThemeVariantPicker",
                                 )}
-                                helpText={t(
+                                details={t(
                                   "offerEditor.advanced.hideThemeVariantPickerHelp",
                                 )}
-                                checked={widgetDisplay.hideThemeVariantSelector}
-                                onChange={(checked) =>
+                                checked={
+                                  widgetDisplay.hideThemeVariantSelector
+                                }
+                                onChange={(event) =>
                                   patchWidgetDisplay({
-                                    hideThemeVariantSelector: checked,
+                                    hideThemeVariantSelector: Boolean(
+                                      event.currentTarget.checked,
+                                    ),
                                   })
                                 }
                               />
-                              <Checkbox
-                                label={t("offerEditor.advanced.hideThemeQuantity")}
-                                helpText={t(
+                              <s-checkbox
+                                label={t(
+                                  "offerEditor.advanced.hideThemeQuantity",
+                                )}
+                                details={t(
                                   "offerEditor.advanced.hideThemeQuantityHelp",
                                 )}
-                                checked={widgetDisplay.hideThemeQuantitySelector}
-                                onChange={(checked) =>
+                                checked={
+                                  widgetDisplay.hideThemeQuantitySelector
+                                }
+                                onChange={(event) =>
                                   patchWidgetDisplay({
-                                    hideThemeQuantitySelector: checked,
+                                    hideThemeQuantitySelector: Boolean(
+                                      event.currentTarget.checked,
+                                    ),
                                   })
                                 }
                               />
-                              <Checkbox
-                                label={t("offerEditor.advanced.hideThemePrice")}
-                                helpText={t(
+                              <s-checkbox
+                                label={t(
+                                  "offerEditor.advanced.hideThemePrice",
+                                )}
+                                details={t(
                                   "offerEditor.advanced.hideThemePriceHelp",
                                 )}
                                 checked={widgetDisplay.hideThemePrice}
-                                onChange={(checked) =>
+                                onChange={(event) =>
                                   patchWidgetDisplay({
-                                    hideThemePrice: checked,
+                                    hideThemePrice: Boolean(
+                                      event.currentTarget.checked,
+                                    ),
                                   })
                                 }
                               />
-                            </BlockStack>
-                          </BlockStack>
-                        </Card>
+                            </s-stack>
+                          </s-stack>
+                        </s-box>
 
-                        <Card padding="400">
-                          <BlockStack gap="300">
-                            <Text as="h2" variant="headingSm">
+                        {/* Polaris web: s-box — Widget & tier cards */}
+                        <s-box
+                          padding="large-200"
+                          borderWidth="base"
+                          borderRadius="large"
+                          background="base"
+                        >
+                          <s-stack direction="block" gap="small">
+                            <s-heading>
                               {t("offerEditor.advanced.widgetSection")}
-                            </Text>
-                            <Text as="p" variant="bodySm" tone="subdued">
+                            </s-heading>
+                            <s-paragraph color="subdued">
                               {isVolumeTableOffer
                                 ? t("offerEditor.advanced.introVolume")
                                 : t("offerEditor.advanced.widgetIntro")}
-                            </Text>
-                            <BlockStack gap="200">
+                            </s-paragraph>
+                            <s-stack direction="block" gap="small-200">
                               {isVolumeTableOffer ? (
-                                <Checkbox
+                                <s-checkbox
                                   label={t(
                                     "offerEditor.advanced.hideWidgetMainCta",
                                   )}
-                                  helpText={t(
+                                  details={t(
                                     "offerEditor.advanced.hideWidgetMainCtaHelp",
                                   )}
                                   checked={widgetDisplay.hideWidgetMainCta}
-                                  onChange={(checked) =>
+                                  onChange={(event) =>
                                     patchWidgetDisplay({
-                                      hideWidgetMainCta: checked,
+                                      hideWidgetMainCta: Boolean(
+                                        event.currentTarget.checked,
+                                      ),
                                     })
                                   }
                                 />
                               ) : null}
                               {!isVolumeTableOffer ? (
                                 <>
-                                  <Checkbox
+                                  <s-checkbox
                                     label={t(
                                       "offerEditor.advanced.hideWidgetVariantDropdown",
                                     )}
-                                    helpText={t(
+                                    details={t(
                                       "offerEditor.advanced.hideWidgetVariantDropdownHelp",
                                     )}
                                     checked={
                                       widgetDisplay.hideWidgetVariantSelector
                                     }
-                                    onChange={(checked) =>
+                                    onChange={(event) =>
                                       patchWidgetDisplay({
-                                        hideWidgetVariantSelector: checked,
+                                        hideWidgetVariantSelector: Boolean(
+                                          event.currentTarget.checked,
+                                        ),
                                       })
                                     }
                                   />
-                                  <Checkbox
+                                  <s-checkbox
                                     label={t(
                                       "offerEditor.advanced.hideOutOfStockVariants",
                                     )}
-                                    helpText={t(
+                                    details={t(
                                       "offerEditor.advanced.hideOutOfStockVariantsHelp",
                                     )}
                                     checked={
                                       widgetDisplay.hideOutOfStockVariants
                                     }
-                                    onChange={(checked) =>
+                                    onChange={(event) =>
                                       patchWidgetDisplay({
-                                        hideOutOfStockVariants: checked,
+                                        hideOutOfStockVariants: Boolean(
+                                          event.currentTarget.checked,
+                                        ),
                                       })
                                     }
                                   />
-                                  <Checkbox
+                                  <s-checkbox
                                     label={t(
                                       "offerEditor.advanced.hideWidgetQuantity",
                                     )}
-                                    helpText={t(
+                                    details={t(
                                       "offerEditor.advanced.hideWidgetQuantityHelp",
                                     )}
                                     checked={
                                       widgetDisplay.hideWidgetQuantitySelector
                                     }
-                                    onChange={(checked) =>
+                                    onChange={(event) =>
                                       patchWidgetDisplay({
-                                        hideWidgetQuantitySelector: checked,
+                                        hideWidgetQuantitySelector: Boolean(
+                                          event.currentTarget.checked,
+                                        ),
                                       })
                                     }
                                   />
-                                  <Checkbox
+                                  <s-checkbox
                                     label={t(
                                       "offerEditor.advanced.hideWidgetLineTotal",
                                     )}
-                                    helpText={t(
+                                    details={t(
                                       "offerEditor.advanced.hideWidgetLineTotalHelp",
                                     )}
                                     checked={widgetDisplay.hideWidgetLineTotal}
-                                    onChange={(checked) =>
+                                    onChange={(event) =>
                                       patchWidgetDisplay({
-                                        hideWidgetLineTotal: checked,
+                                        hideWidgetLineTotal: Boolean(
+                                          event.currentTarget.checked,
+                                        ),
                                       })
                                     }
                                   />
-                                  <Checkbox
+                                  <s-checkbox
                                     label={t(
                                       "offerEditor.advanced.hideTierAddButtons",
                                     )}
-                                    helpText={t(
+                                    details={t(
                                       "offerEditor.advanced.hideTierAddButtonsHelp",
                                     )}
                                     checked={
                                       widgetDisplay.hideWidgetTierAddButton
                                     }
-                                    onChange={(checked) =>
+                                    onChange={(event) =>
                                       patchWidgetDisplay({
-                                        hideWidgetTierAddButton: checked,
+                                        hideWidgetTierAddButton: Boolean(
+                                          event.currentTarget.checked,
+                                        ),
                                       })
                                     }
                                   />
-                                  <Checkbox
+                                  <s-checkbox
                                     label={t(
                                       "offerEditor.advanced.showPerItemPrice",
                                     )}
-                                    helpText={t(
+                                    details={t(
                                       "offerEditor.advanced.showPerItemPriceHelp",
                                     )}
                                     checked={widgetDisplay.cardPriceShowsUnit}
-                                    onChange={(checked) =>
+                                    onChange={(event) =>
                                       patchWidgetDisplay({
-                                        cardPriceShowsUnit: checked,
+                                        cardPriceShowsUnit: Boolean(
+                                          event.currentTarget.checked,
+                                        ),
                                       })
                                     }
                                   />
-                                  <Checkbox
+                                  <s-checkbox
                                     label={t(
                                       "offerEditor.advanced.hideCompareAtPrice",
                                     )}
-                                    helpText={t(
+                                    details={t(
                                       "offerEditor.advanced.hideCompareAtPriceHelp",
                                     )}
                                     checked={
                                       widgetDisplay.hideWidgetComparePrice
                                     }
-                                    onChange={(checked) =>
+                                    onChange={(event) =>
                                       patchWidgetDisplay({
-                                        hideWidgetComparePrice: checked,
+                                        hideWidgetComparePrice: Boolean(
+                                          event.currentTarget.checked,
+                                        ),
                                       })
                                     }
                                   />
                                 </>
                               ) : null}
-                            </BlockStack>
-                          </BlockStack>
-                        </Card>
+                            </s-stack>
+                          </s-stack>
+                        </s-box>
 
-                        <Card padding="400">
-                          <BlockStack gap="300">
-                            <Text as="h2" variant="headingSm">
+                        {/* Polaris web: s-box — Widget text (storefront) */}
+                        <s-box
+                          padding="large-200"
+                          borderWidth="base"
+                          borderRadius="large"
+                          background="base"
+                        >
+                          <s-stack direction="block" gap="small">
+                            <s-heading>
                               {t("offerEditor.widgetText")}
-                            </Text>
-                            <Text as="p" variant="bodySm" tone="subdued">
+                            </s-heading>
+                            <s-paragraph color="subdued">
                               {t("offerEditor.widgetTextHelp")}
-                            </Text>
-                            <TextField
+                            </s-paragraph>
+                            <s-text-area
                               label={t("offerEditor.widget.headingLabel")}
                               name="widgetHeading"
                               value={widgetDisplay.widgetHeading}
-                              onChange={(v) =>
-                                patchWidgetDisplay({ widgetHeading: v })
-                              }
-                              autoComplete="off"
-                              multiline={2}
+                              rows={2}
+                              autocomplete="off"
                               placeholder={t(
                                 "offerEditor.widget.headingPlaceholder",
                               )}
+                              onChange={(event) =>
+                                patchWidgetDisplay({
+                                  widgetHeading: sTextFieldValue(
+                                    event.currentTarget,
+                                  ),
+                                })
+                              }
+                              onInput={(event) =>
+                                patchWidgetDisplay({
+                                  widgetHeading: sTextFieldValue(
+                                    event.currentTarget,
+                                  ),
+                                })
+                              }
                             />
                             {!isVolumeTableOffer ? (
                               <WidgetHeaderAlignFields
@@ -2890,36 +3089,51 @@ export function VolumeDiscountCreateView({
                                 patchWidgetDisplay={patchWidgetDisplay}
                               />
                             ) : (
-                              <Text as="p" variant="bodySm" tone="subdued">
+                              <s-paragraph color="subdued">
                                 {t("offerEditor.widget.titleAlignmentNote")}
-                              </Text>
+                              </s-paragraph>
                             )}
-                            <TextField
+                            <s-text-area
                               label={t("offerEditor.widget.footnoteLabel")}
                               name="footnote"
                               value={widgetDisplay.footnote}
-                              onChange={(v) =>
-                                patchWidgetDisplay({ footnote: v })
+                              rows={3}
+                              autocomplete="off"
+                              onChange={(event) =>
+                                patchWidgetDisplay({
+                                  footnote: sTextFieldValue(event.currentTarget),
+                                })
                               }
-                              autoComplete="off"
-                              multiline={3}
+                              onInput={(event) =>
+                                patchWidgetDisplay({
+                                  footnote: sTextFieldValue(event.currentTarget),
+                                })
+                              }
                             />
-                          </BlockStack>
-                        </Card>
-                      </BlockStack>
+                          </s-stack>
+                        </s-box>
+                      </s-stack>
                     ) : settingsTab === 2 ? (
-                      <BlockStack gap="400">
-                        <Card padding="400">
-                          <BlockStack gap="300">
-                            <InlineStack
-                              align="space-between"
-                              blockAlign="center"
-                              gap="300"
-                              wrap
+                      // Polaris web: Appearance tab — same widgetDisplay handlers
+                      <s-stack direction="block" gap="base">
+                        {/* Polaris web: s-box — Widget appearance header */}
+                        <s-box
+                          padding="large-200"
+                          borderWidth="base"
+                          borderRadius="large"
+                          background="base"
+                        >
+                          <s-stack direction="block" gap="small">
+                            <s-stack
+                              direction="inline"
+                              gap="small"
+                              justifyContent="space-between"
+                              alignItems="center"
+                             
                             >
-                              <Text as="h2" variant="headingSm">
+                              <s-heading>
                                 {t("offerEditor.widgetAppearance")}
-                              </Text>
+                              </s-heading>
                               <Button
                                 variant="tertiary"
                                 onClick={() =>
@@ -2934,34 +3148,38 @@ export function VolumeDiscountCreateView({
                               >
                                 {t("offerEditor.appearance.resetStyles")}
                               </Button>
-                            </InlineStack>
-                            <Text as="p" variant="bodySm" tone="subdued">
+                            </s-stack>
+                            <s-paragraph color="subdued">
                               {isVolumeTableOffer
                                 ? t("offerEditor.appearance.introVolume")
                                 : t("offerEditor.appearance.intro")}
-                            </Text>
-                          </BlockStack>
-                        </Card>
+                            </s-paragraph>
+                          </s-stack>
+                        </s-box>
 
                         {isVolumeTableOffer ? (
-                          <Card padding="400">
-                            <BlockStack gap="400">
-                              <BlockStack gap="200">
-                                <Text as="h2" variant="headingSm">
+                          <s-box
+                            padding="large-200"
+                            borderWidth="base"
+                            borderRadius="large"
+                            background="base"
+                          >
+                            <s-stack direction="block" gap="base">
+                              <s-stack direction="block" gap="small-200">
+                                <s-heading>
                                   {t("offerEditor.widget.titleCountdown")}
-                                </Text>
-                                <Text as="p" variant="bodySm" tone="subdued">
+                                </s-heading>
+                                <s-paragraph color="subdued">
                                   {t("offerEditor.widget.titleCountdownHelp")}
-                                </Text>
-                              </BlockStack>
-
-                              <BlockStack gap="300">
-                                <Text as="h3" variant="headingSm">
+                                </s-paragraph>
+                              </s-stack>
+                              <s-stack direction="block" gap="small">
+                                <s-heading>
                                   {t("offerEditor.widget.titleCountdown")}
-                                </Text>
-                                <Text as="p" variant="bodySm" tone="subdued">
+                                </s-heading>
+                                <s-paragraph color="subdued">
                                   {t("offerEditor.widget.titleCountdownSubHelp")}
-                                </Text>
+                                </s-paragraph>
                                 <WidgetHeaderAlignFields
                                   idPrefix="vd-volume"
                                   layoutOptionsVariant="volume_table"
@@ -2987,321 +3205,66 @@ export function VolumeDiscountCreateView({
                                     "offerEditor.widget.timerAlignHelp",
                                   )}
                                 />
-                              </BlockStack>
-                            </BlockStack>
-                          </Card>
+                              </s-stack>
+                            </s-stack>
+                          </s-box>
                         ) : null}
 
-                        {isVolumeTableOffer ? (
-                          <Card padding="400">
-                            <BlockStack gap="300">
-                              <BlockStack gap="200">
-                                <Text as="h3" variant="headingSm">
-                                  {t("offerEditor.appearance.templates")}
-                                </Text>
-                                <AppearanceTemplateCategoryTabs
-                                  value={appearanceTemplateCategory}
-                                  onChange={setAppearanceTemplateCategory}
-                                />
-                              </BlockStack>
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                {t("offerEditor.appearance.templatesHelpVolume")}
-                              </Text>
-                              {showAppearanceTemplateUpgrade ||
-                              selectedAppearanceTemplateLocked ? (
-                                <PlanUpgradeBanner feature="appearanceTemplates" />
-                              ) : null}
-                              <AppearanceTemplateGrid
-                                presets={appearanceTemplatesInCategory}
-                                widgetDisplay={widgetDisplay}
-                                setWidgetDisplay={setWidgetDisplay}
-                                patchWidgetDisplay={patchWidgetDisplay}
-                                appearanceTemplates={planCaps.appearanceTemplates}
-                                forVolumeTable
-                                ariaLabel={t(
-                                  "offerEditor.appearance.templatesAriaVolume",
-                                )}
+                        {/* Polaris web: s-box — Appearance templates */}
+                        <s-box
+                          padding="large-200"
+                          borderWidth="base"
+                          borderRadius="large"
+                          background="base"
+                        >
+                          <s-stack direction="block" gap="small">
+                            <s-stack direction="block" gap="small-200">
+                              <s-heading>
+                                {t("offerEditor.appearance.templates")}
+                              </s-heading>
+                              <AppearanceTemplateCategoryTabs
+                                value={appearanceTemplateCategory}
+                                onChange={setAppearanceTemplateCategory}
                               />
-                            </BlockStack>
-                          </Card>
-                        ) : (
-                          <Card padding="400">
-                            <BlockStack gap="300">
-                              <BlockStack gap="200">
-                                <Text as="h3" variant="headingSm">
-                                  {t("offerEditor.appearance.templates")}
-                                </Text>
-                                <AppearanceTemplateCategoryTabs
-                                  value={appearanceTemplateCategory}
-                                  onChange={setAppearanceTemplateCategory}
-                                />
-                              </BlockStack>
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                {t("offerEditor.appearance.templatesHelp")}
-                              </Text>
-                              {showAppearanceTemplateUpgrade ||
-                              selectedAppearanceTemplateLocked ? (
-                                <PlanUpgradeBanner feature="appearanceTemplates" />
-                              ) : null}
-                              <AppearanceTemplateGrid
-                                presets={appearanceTemplatesInCategory}
-                                widgetDisplay={widgetDisplay}
-                                setWidgetDisplay={setWidgetDisplay}
-                                patchWidgetDisplay={patchWidgetDisplay}
-                                appearanceTemplates={planCaps.appearanceTemplates}
-                                forVolumeTable={false}
-                                ariaLabel={t(
-                                  "offerEditor.appearance.templatesAria",
-                                )}
-                              />
-                            </BlockStack>
-                          </Card>
-                        )}
+                            </s-stack>
+                            <s-paragraph color="subdued">
+                              {isVolumeTableOffer
+                                ? t("offerEditor.appearance.templatesHelpVolume")
+                                : t("offerEditor.appearance.templatesHelp")}
+                            </s-paragraph>
+                            {showAppearanceTemplateUpgrade ||
+                            selectedAppearanceTemplateLocked ? (
+                              <PlanUpgradeBanner feature="appearanceTemplates" />
+                            ) : null}
+                            <AppearanceTemplateGrid
+                              presets={appearanceTemplatesInCategory}
+                              widgetDisplay={widgetDisplay}
+                              setWidgetDisplay={setWidgetDisplay}
+                              patchWidgetDisplay={patchWidgetDisplay}
+                              appearanceTemplates={planCaps.appearanceTemplates}
+                              forVolumeTable={isVolumeTableOffer}
+                              ariaLabel={
+                                isVolumeTableOffer
+                                  ? t(
+                                      "offerEditor.appearance.templatesAriaVolume",
+                                    )
+                                  : t("offerEditor.appearance.templatesAria")
+                              }
+                            />
+                          </s-stack>
+                        </s-box>
 
-                        <Card padding="400">
-                          <BlockStack gap="300">
-                              <Text as="h3" variant="headingSm">
-                                {t("offerEditor.font.type")}
-                              </Text>
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                {t("offerEditor.font.typeHelp")}
-                              </Text>
-                              <FormLayout>
-                                <FormLayout.Group>
-                                  <BlockStack gap="200">
-                                    <Select
-                                      id="vd-widget-font-scale"
-                                      label={t("offerEditor.font.sizePreset")}
-                                      options={WIDGET_FONT_SCALE_OPTIONS.map(
-                                        (o) => ({
-                                          value: o.value,
-                                          label: t(
-                                            `offerEditor.font.scalePreset.${o.value}` as AdminUiMessageKey,
-                                          ),
-                                        }),
-                                      )}
-                                      value={widgetDisplay.fontScale}
-                                      onChange={(v) => {
-                                        if (
-                                          v === "compact" ||
-                                          v === "default" ||
-                                          v === "comfortable"
-                                        ) {
-                                          patchWidgetDisplay({
-                                            fontScale: v,
-                                            ...widgetDisplayFontSizesFromScale(v),
-                                          });
-                                        }
-                                      }}
-                                    />
-                                    <InlineStack gap="200">
-                                      <Button
-                                        size="slim"
-                                        onClick={() =>
-                                          patchWidgetDisplay(
-                                            widgetDisplayFontSizesFromScale(
-                                              widgetDisplay.fontScale,
-                                            ),
-                                          )
-                                        }
-                                      >
-                                        {t("offerEditor.font.resetToPreset")}
-                                      </Button>
-                                    </InlineStack>
-                                  </BlockStack>
-                                  <RangeSlider
-                                    id="vd-widget-font-scale-percent"
-                                    label={t("offerEditor.font.overallScale")}
-                                    helpText={t(
-                                      "offerEditor.font.overallScaleHelp",
-                                    )}
-                                    min={FONT_SIZE_SCALE_PERCENT_MIN}
-                                    max={FONT_SIZE_SCALE_PERCENT_MAX}
-                                    step={1}
-                                    value={widgetDisplay.fontSizeScalePercent}
-                                    output
-                                    suffix="%"
-                                    onChange={(value) => {
-                                      if (typeof value === "number") {
-                                        patchWidgetDisplay({
-                                          fontSizeScalePercent:
-                                            clampFontSizeScalePercent(value),
-                                        });
-                                      }
-                                    }}
-                                  />
-                                </FormLayout.Group>
-                              </FormLayout>
-                          </BlockStack>
-                        </Card>
-
-                        <Card padding="400">
-                          <BlockStack gap="300">
-                              <Text as="h3" variant="headingSm">
-                                {t("offerEditor.font.sizePx")}
-                              </Text>
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                {isVolumeTableOffer
-                                  ? t("offerEditor.font.sizePxHelpVolume", {
-                                      min: WIDGET_FONT_PX_MIN,
-                                      max: WIDGET_FONT_PX_MAX,
-                                    })
-                                  : t("offerEditor.font.sizePxHelp", {
-                                      min: WIDGET_FONT_PX_MIN,
-                                      max: WIDGET_FONT_PX_MAX,
-                                    })}
-                              </Text>
-                            <div className={createStyles.widgetFontSizeGrid}>
-                              {appearanceFontSizeFields.map((row) => (
-                                <div
-                                  key={row.key}
-                                  className={createStyles.widgetFontSizeRow}
-                                >
-                                  <Text as="p" variant="bodySm">
-                                    {fontRoleLabel(row.key)}
-                                  </Text>
-                                  <div
-                                    className={createStyles.widgetFontSizeControlRow}
-                                  >
-                                    <div
-                                      className={createStyles.widgetFontSizeSliderWrap}
-                                    >
-                                      <RangeSlider
-                                        id={`vd-widget-font-${row.key}`}
-                                        label={fontRoleLabel(row.key)}
-                                        labelHidden
-                                        min={WIDGET_FONT_PX_MIN}
-                                        max={WIDGET_FONT_PX_MAX}
-                                        step={1}
-                                        value={widgetDisplay[row.key]}
-                                        onChange={(value) => {
-                                          if (typeof value === "number") {
-                                            patchWidgetDisplay({
-                                              [row.key]:
-                                                clampWidgetFontPx(value),
-                                            } as Partial<VolumeDiscountWidgetDisplay>);
-                                          }
-                                        }}
-                                      />
-                                    </div>
-                                    <Text
-                                      as="span"
-                                      variant="bodySm"
-                                      tone="subdued"
-                                    >
-                                      px
-                                    </Text>
-                                    <div
-                                      className={
-                                        createStyles.widgetFontSizeInputWrap
-                                      }
-                                    >
-                                      <TextField
-                                        id={`vd-widget-font-field-${row.key}`}
-                                        label={fontRoleLabel(row.key)}
-                                        labelHidden
-                                        type="number"
-                                        autoComplete="off"
-                                        min={WIDGET_FONT_PX_MIN}
-                                        max={WIDGET_FONT_PX_MAX}
-                                        value={String(widgetDisplay[row.key])}
-                                        suffix="px"
-                                        onChange={(v) => {
-                                          if (v === "") return;
-                                          const n = parseInt(v, 10);
-                                          if (!Number.isNaN(n)) {
-                                            patchWidgetDisplay({
-                                              [row.key]: clampWidgetFontPx(n),
-                                            } as Partial<VolumeDiscountWidgetDisplay>);
-                                          }
-                                        }}
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </BlockStack>
-                        </Card>
-
-                        <Card padding="400">
-                          <BlockStack gap="300">
-                              <Text as="h3" variant="headingSm">
-                                {t("offerEditor.font.weights")}
-                              </Text>
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                {isVolumeTableOffer
-                                  ? t("offerEditor.font.weightsHelpVolume")
-                                  : t("offerEditor.font.weightsHelp")}
-                              </Text>
-                              <div className={createStyles.widgetFontWeightGrid}>
-                                <Select
-                                  id="vd-widget-fw-strong"
-                                  label={t("offerEditor.font.weightStrong")}
-                                  options={WIDGET_FONT_WEIGHT_SELECT_OPTIONS}
-                                  value={String(widgetDisplay.fontWeightStrong)}
-                                  onChange={(v) => {
-                                    const n = parseInt(String(v), 10);
-                                    if (!Number.isNaN(n)) {
-                                      patchWidgetDisplay({
-                                        fontWeightStrong: clampWidgetFontWeight(n),
-                                      });
-                                    }
-                                  }}
-                                />
-                                <Select
-                                  id="vd-widget-fw-accent"
-                                  label={t("offerEditor.font.weightAccent")}
-                                  options={WIDGET_FONT_WEIGHT_SELECT_OPTIONS}
-                                  value={String(widgetDisplay.fontWeightAccent)}
-                                  onChange={(v) => {
-                                    const n = parseInt(String(v), 10);
-                                    if (!Number.isNaN(n)) {
-                                      patchWidgetDisplay({
-                                        fontWeightAccent: clampWidgetFontWeight(n),
-                                      });
-                                    }
-                                  }}
-                                />
-                                {!isVolumeTableOffer ? (
-                                  <Select
-                                    id="vd-widget-fw-body"
-                                    label={t("offerEditor.font.weightBody")}
-                                    options={WIDGET_FONT_WEIGHT_SELECT_OPTIONS}
-                                    value={String(widgetDisplay.fontWeightBody)}
-                                    onChange={(v) => {
-                                      const n = parseInt(String(v), 10);
-                                      if (!Number.isNaN(n)) {
-                                        patchWidgetDisplay({
-                                          fontWeightBody: clampWidgetFontWeight(n),
-                                        });
-                                      }
-                                    }}
-                                  />
-                                ) : null}
-                                <Select
-                                  id="vd-widget-fw-normal"
-                                  label={t("offerEditor.font.weightNormal")}
-                                  options={WIDGET_FONT_WEIGHT_SELECT_OPTIONS}
-                                  value={String(widgetDisplay.fontWeightNormal)}
-                                  onChange={(v) => {
-                                    const n = parseInt(String(v), 10);
-                                    if (!Number.isNaN(n)) {
-                                      patchWidgetDisplay({
-                                        fontWeightNormal: clampWidgetFontWeight(n),
-                                      });
-                                    }
-                                  }}
-                                />
-                              </div>
-                          </BlockStack>
-                        </Card>
-
-                        <Card padding="400">
-                          <BlockStack gap="400">
-                              <Text as="h3" variant="headingSm">
+                        {/* Polaris web: s-box — Layout (RangeSlider kept; selects → s-select) */}
+                        <s-box
+                          padding="large-200"
+                          borderWidth="base"
+                          borderRadius="large"
+                          background="base"
+                        >
+                          <s-stack direction="block" gap="base">
+                              <s-heading>
                                 {t("offerEditor.layout.heading")}
-                              </Text>
+                              </s-heading>
                               {isVolumeTableOffer ? (
                                 <>
                                   <RangeSlider
@@ -3346,34 +3309,47 @@ export function VolumeDiscountCreateView({
                                       }
                                     }}
                                   />
-                                  <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                  <s-text type="strong">
                                     {t("offerEditor.layout.tableColumns")}
-                                  </Text>
-                                  <Text as="p" variant="bodySm" tone="subdued">
+                                  </s-text>
+                                  <s-paragraph color="subdued">
                                     {t("offerEditor.layout.tableColumnsHelp")}
-                                  </Text>
-                                  <BlockStack gap="300">
-                                    <Text as="p" variant="bodySm" fontWeight="semibold">
+                                  </s-paragraph>
+                                  <s-stack direction="block" gap="small">
+                                    <s-text type="strong">
                                       {t("offerEditor.layout.columnQuantity")}
-                                    </Text>
-                                    <Select
+                                    </s-text>
+                                    <s-select
                                       id="vd-vt-col-qty-align"
                                       label={t("offerEditor.layout.textAlign")}
-                                      options={WIDGET_HEADER_TEXT_ALIGN_OPTIONS.map(
-                                        (o) => ({
-                                          value: o.value,
-                                          label: t(ALIGN_OPTION_LABEL_KEYS[o.value]),
-                                        }),
-                                      )}
                                       value={widgetDisplay.volumeTableQuantityColumnAlign}
-                                      onChange={(v) => {
+                                      onChange={(event) => {
+                                        const v = String(
+                                          event.currentTarget.value || "",
+                                        );
                                         if (isVolumeDiscountWidgetHeaderTextAlign(v)) {
                                           patchWidgetDisplay({
                                             volumeTableQuantityColumnAlign: v,
                                           });
                                         }
                                       }}
-                                    />
+                                      onInput={(event) => {
+                                        const v = String(
+                                          event.currentTarget.value || "",
+                                        );
+                                        if (isVolumeDiscountWidgetHeaderTextAlign(v)) {
+                                          patchWidgetDisplay({
+                                            volumeTableQuantityColumnAlign: v,
+                                          });
+                                        }
+                                      }}
+                                    >
+                                      {WIDGET_HEADER_TEXT_ALIGN_OPTIONS.map((o) => (
+                                        <s-option key={o.value} value={o.value}>
+                                          {t(ALIGN_OPTION_LABEL_KEYS[o.value])}
+                                        </s-option>
+                                      ))}
+                                    </s-select>
                                     <RangeSlider
                                       id="vd-vt-col-qty-pad-start"
                                       label={t("offerEditor.layout.leftPadding")}
@@ -3414,29 +3390,42 @@ export function VolumeDiscountCreateView({
                                         }
                                       }}
                                     />
-                                  </BlockStack>
-                                  <BlockStack gap="300">
-                                    <Text as="p" variant="bodySm" fontWeight="semibold">
+                                  </s-stack>
+                                  <s-stack direction="block" gap="small">
+                                    <s-text type="strong">
                                       {t("offerEditor.layout.columnDiscount")}
-                                    </Text>
-                                    <Select
+                                    </s-text>
+                                    <s-select
                                       id="vd-vt-col-discount-align"
                                       label={t("offerEditor.layout.textAlign")}
-                                      options={WIDGET_HEADER_TEXT_ALIGN_OPTIONS.map(
-                                        (o) => ({
-                                          value: o.value,
-                                          label: t(ALIGN_OPTION_LABEL_KEYS[o.value]),
-                                        }),
-                                      )}
                                       value={widgetDisplay.volumeTableDiscountColumnAlign}
-                                      onChange={(v) => {
+                                      onChange={(event) => {
+                                        const v = String(
+                                          event.currentTarget.value || "",
+                                        );
                                         if (isVolumeDiscountWidgetHeaderTextAlign(v)) {
                                           patchWidgetDisplay({
                                             volumeTableDiscountColumnAlign: v,
                                           });
                                         }
                                       }}
-                                    />
+                                      onInput={(event) => {
+                                        const v = String(
+                                          event.currentTarget.value || "",
+                                        );
+                                        if (isVolumeDiscountWidgetHeaderTextAlign(v)) {
+                                          patchWidgetDisplay({
+                                            volumeTableDiscountColumnAlign: v,
+                                          });
+                                        }
+                                      }}
+                                    >
+                                      {WIDGET_HEADER_TEXT_ALIGN_OPTIONS.map((o) => (
+                                        <s-option key={o.value} value={o.value}>
+                                          {t(ALIGN_OPTION_LABEL_KEYS[o.value])}
+                                        </s-option>
+                                      ))}
+                                    </s-select>
                                     <RangeSlider
                                       id="vd-vt-col-discount-pad-start"
                                       label={t("offerEditor.layout.leftPadding")}
@@ -3477,29 +3466,42 @@ export function VolumeDiscountCreateView({
                                         }
                                       }}
                                     />
-                                  </BlockStack>
-                                  <BlockStack gap="300">
-                                    <Text as="p" variant="bodySm" fontWeight="semibold">
+                                  </s-stack>
+                                  <s-stack direction="block" gap="small">
+                                    <s-text type="strong">
                                       {t("offerEditor.layout.columnPricePerItem")}
-                                    </Text>
-                                    <Select
+                                    </s-text>
+                                    <s-select
                                       id="vd-vt-col-price-align"
                                       label={t("offerEditor.layout.textAlign")}
-                                      options={WIDGET_HEADER_TEXT_ALIGN_OPTIONS.map(
-                                        (o) => ({
-                                          value: o.value,
-                                          label: t(ALIGN_OPTION_LABEL_KEYS[o.value]),
-                                        }),
-                                      )}
                                       value={widgetDisplay.volumeTablePriceColumnAlign}
-                                      onChange={(v) => {
+                                      onChange={(event) => {
+                                        const v = String(
+                                          event.currentTarget.value || "",
+                                        );
                                         if (isVolumeDiscountWidgetHeaderTextAlign(v)) {
                                           patchWidgetDisplay({
                                             volumeTablePriceColumnAlign: v,
                                           });
                                         }
                                       }}
-                                    />
+                                      onInput={(event) => {
+                                        const v = String(
+                                          event.currentTarget.value || "",
+                                        );
+                                        if (isVolumeDiscountWidgetHeaderTextAlign(v)) {
+                                          patchWidgetDisplay({
+                                            volumeTablePriceColumnAlign: v,
+                                          });
+                                        }
+                                      }}
+                                    >
+                                      {WIDGET_HEADER_TEXT_ALIGN_OPTIONS.map((o) => (
+                                        <s-option key={o.value} value={o.value}>
+                                          {t(ALIGN_OPTION_LABEL_KEYS[o.value])}
+                                        </s-option>
+                                      ))}
+                                    </s-select>
                                     <RangeSlider
                                       id="vd-vt-col-price-pad-start"
                                       label={t("offerEditor.layout.leftPadding")}
@@ -3536,7 +3538,7 @@ export function VolumeDiscountCreateView({
                                         }
                                       }}
                                     />
-                                  </BlockStack>
+                                  </s-stack>
                                   <RangeSlider
                                     id="vd-widget-cta-border-radius"
                                     label={t("offerEditor.layout.mainButtonRadius")}
@@ -3560,23 +3562,41 @@ export function VolumeDiscountCreateView({
                                   />
                                 </>
                               ) : (
-                                <FormLayout>
-                                  <FormLayout.Group>
-                                    <Select
+                                <s-stack direction="block" gap="base">
+                                  <s-grid
+                                    gap="base"
+                                    alignItems="end"
+                                    gridTemplateColumns="repeat(auto-fit, minmax(12rem, 1fr))"
+                                  >
+                                    {/* Polaris web: s-select — same badgePosition */}
+                                    <s-select
                                       id="vd-badge-position"
                                       label={t("offerEditor.badge.position")}
-                                      helpText={t("offerEditor.badge.positionHelp")}
-                                      options={BADGE_POSITION_OPTIONS.map((o) => ({
-                                        value: o.value,
-                                        label: t(BADGE_POSITION_LABEL_KEYS[o.value]),
-                                      }))}
+                                      details={t("offerEditor.badge.positionHelp")}
                                       value={widgetDisplay.badgePosition}
-                                      onChange={(v) => {
+                                      onChange={(event) => {
+                                        const v = String(
+                                          event.currentTarget.value || "",
+                                        );
                                         if (isVolumeDiscountBadgePosition(v)) {
                                           patchWidgetDisplay({ badgePosition: v });
                                         }
                                       }}
-                                    />
+                                      onInput={(event) => {
+                                        const v = String(
+                                          event.currentTarget.value || "",
+                                        );
+                                        if (isVolumeDiscountBadgePosition(v)) {
+                                          patchWidgetDisplay({ badgePosition: v });
+                                        }
+                                      }}
+                                    >
+                                      {BADGE_POSITION_OPTIONS.map((o) => (
+                                        <s-option key={o.value} value={o.value}>
+                                          {t(BADGE_POSITION_LABEL_KEYS[o.value])}
+                                        </s-option>
+                                      ))}
+                                    </s-select>
                                     <RangeSlider
                                       id="vd-badge-size-scale"
                                       label={t("offerEditor.badge.size")}
@@ -3596,14 +3616,14 @@ export function VolumeDiscountCreateView({
                                         }
                                       }}
                                     />
-                                  </FormLayout.Group>
-                                  <BlockStack gap="200">
-                                    <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                  </s-grid>
+                                  <s-stack direction="block" gap="small-200">
+                                    <s-text type="strong">
                                       {t("offerEditor.badge.design")}
-                                    </Text>
-                                    <Text as="p" variant="bodySm" tone="subdued">
+                                    </s-text>
+                                    <s-paragraph color="subdued">
                                       {t("offerEditor.badge.designHelp")}
-                                    </Text>
+                                    </s-paragraph>
                                     <div
                                       className={createStyles.badgeDesignGrid}
                                       style={
@@ -3665,8 +3685,13 @@ export function VolumeDiscountCreateView({
                                         );
                                       })}
                                     </div>
-                                  </BlockStack>
-                                  <FormLayout.Group>
+                                  </s-stack>
+                                  {/* Two fixed rows so labels/sliders stay on the same line */}
+                                  <s-grid
+                                    gap="base"
+                                    alignItems="start"
+                                    gridTemplateColumns="repeat(2, minmax(0, 1fr))"
+                                  >
                                     <RangeSlider
                                       id="vd-widget-card-border-radius"
                                       label={t("offerEditor.layout.tierCardRadius")}
@@ -3709,8 +3734,12 @@ export function VolumeDiscountCreateView({
                                         }
                                       }}
                                     />
-                                  </FormLayout.Group>
-                                  <FormLayout.Group>
+                                  </s-grid>
+                                  <s-grid
+                                    gap="base"
+                                    alignItems="start"
+                                    gridTemplateColumns="repeat(2, minmax(0, 1fr))"
+                                  >
                                     <RangeSlider
                                       id="vd-widget-control-border-radius"
                                       label={t("offerEditor.layout.qtyAddRadius")}
@@ -3753,21 +3782,355 @@ export function VolumeDiscountCreateView({
                                         }
                                       }}
                                     />
-                                  </FormLayout.Group>
-                                </FormLayout>
+                                  </s-grid>
+                                </s-stack>
                               )}
-                          </BlockStack>
-                        </Card>
+                          </s-stack>
+                        </s-box>
 
-                        <Card padding="400">
-                          <BlockStack gap="400">
-                              <Text as="h3" variant="headingSm">
+                        {/* Polaris web: s-box — Type (RangeSlider kept; no web equivalent) */}
+                        <s-box
+                          padding="large-200"
+                          borderWidth="base"
+                          borderRadius="large"
+                          background="base"
+                        >
+                          <s-stack direction="block" gap="small">
+                            <s-heading>{t("offerEditor.font.type")}</s-heading>
+                            <s-paragraph color="subdued">
+                              {t("offerEditor.font.typeHelp")}
+                            </s-paragraph>
+                            <s-grid
+                              gap="base"
+                              alignItems="end"
+                              gridTemplateColumns="repeat(auto-fit, minmax(12rem, 1fr))"
+                            >
+                              <s-stack direction="block" gap="small-200">
+                                {/* Polaris web: s-select — same fontScale */}
+                                <s-select
+                                  id="vd-widget-font-scale"
+                                  label={t("offerEditor.font.sizePreset")}
+                                  value={widgetDisplay.fontScale}
+                                  onChange={(event) => {
+                                    const v = String(
+                                      event.currentTarget.value || "",
+                                    );
+                                    if (
+                                      v === "compact" ||
+                                      v === "default" ||
+                                      v === "comfortable"
+                                    ) {
+                                      patchWidgetDisplay({
+                                        fontScale: v,
+                                        ...widgetDisplayFontSizesFromScale(v),
+                                      });
+                                    }
+                                  }}
+                                  onInput={(event) => {
+                                    const v = String(
+                                      event.currentTarget.value || "",
+                                    );
+                                    if (
+                                      v === "compact" ||
+                                      v === "default" ||
+                                      v === "comfortable"
+                                    ) {
+                                      patchWidgetDisplay({
+                                        fontScale: v,
+                                        ...widgetDisplayFontSizesFromScale(v),
+                                      });
+                                    }
+                                  }}
+                                >
+                                  {WIDGET_FONT_SCALE_OPTIONS.map((o) => (
+                                    <s-option key={o.value} value={o.value}>
+                                      {t(
+                                        `offerEditor.font.scalePreset.${o.value}` as AdminUiMessageKey,
+                                      )}
+                                    </s-option>
+                                  ))}
+                                </s-select>
+                                <Button
+                                  size="slim"
+                                  onClick={() =>
+                                    patchWidgetDisplay(
+                                      widgetDisplayFontSizesFromScale(
+                                        widgetDisplay.fontScale,
+                                      ),
+                                    )
+                                  }
+                                >
+                                  {t("offerEditor.font.resetToPreset")}
+                                </Button>
+                              </s-stack>
+                              {/* No Polaris web RangeSlider — keep Polaris React slider, same clamp */}
+                              <RangeSlider
+                                id="vd-widget-font-scale-percent"
+                                label={t("offerEditor.font.overallScale")}
+                                helpText={t(
+                                  "offerEditor.font.overallScaleHelp",
+                                )}
+                                min={FONT_SIZE_SCALE_PERCENT_MIN}
+                                max={FONT_SIZE_SCALE_PERCENT_MAX}
+                                step={1}
+                                value={widgetDisplay.fontSizeScalePercent}
+                                output
+                                suffix="%"
+                                onChange={(value) => {
+                                  if (typeof value === "number") {
+                                    patchWidgetDisplay({
+                                      fontSizeScalePercent:
+                                        clampFontSizeScalePercent(value),
+                                    });
+                                  }
+                                }}
+                              />
+                            </s-grid>
+                          </s-stack>
+                        </s-box>
+
+                        {/* Polaris web: s-box — Font size (px) */}
+                        <s-box
+                          padding="large-200"
+                          borderWidth="base"
+                          borderRadius="large"
+                          background="base"
+                        >
+                          <s-stack direction="block" gap="small">
+                            <s-heading>
+                              {t("offerEditor.font.sizePx")}
+                            </s-heading>
+                            <s-paragraph color="subdued">
+                              {isVolumeTableOffer
+                                ? t("offerEditor.font.sizePxHelpVolume", {
+                                    min: WIDGET_FONT_PX_MIN,
+                                    max: WIDGET_FONT_PX_MAX,
+                                  })
+                                : t("offerEditor.font.sizePxHelp", {
+                                    min: WIDGET_FONT_PX_MIN,
+                                    max: WIDGET_FONT_PX_MAX,
+                                  })}
+                            </s-paragraph>
+                            <div className={createStyles.widgetFontSizeGrid}>
+                              {appearanceFontSizeFields.map((row) => (
+                                <div
+                                  key={row.key}
+                                  className={createStyles.widgetFontSizeRow}
+                                >
+                                  <s-text>{fontRoleLabel(row.key)}</s-text>
+                                  <div
+                                    className={createStyles.widgetFontSizeControlRow}
+                                  >
+                                    <div
+                                      className={createStyles.widgetFontSizeSliderWrap}
+                                    >
+                                      <RangeSlider
+                                        id={`vd-widget-font-${row.key}`}
+                                        label={fontRoleLabel(row.key)}
+                                        labelHidden
+                                        min={WIDGET_FONT_PX_MIN}
+                                        max={WIDGET_FONT_PX_MAX}
+                                        step={1}
+                                        value={widgetDisplay[row.key]}
+                                        output
+                                        onChange={(value) => {
+                                          if (typeof value === "number") {
+                                            patchWidgetDisplay({
+                                              [row.key]:
+                                                clampWidgetFontPx(value),
+                                            } as Partial<VolumeDiscountWidgetDisplay>);
+                                          }
+                                        }}
+                                      />
+                                    </div>
+                                    <s-text color="subdued">px</s-text>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </s-stack>
+                        </s-box>
+
+                        {/* Polaris web: s-box — Font weights */}
+                        <s-box
+                          padding="large-200"
+                          borderWidth="base"
+                          borderRadius="large"
+                          background="base"
+                        >
+                          <s-stack direction="block" gap="small">
+                            <s-heading>
+                              {t("offerEditor.font.weights")}
+                            </s-heading>
+                            <s-paragraph color="subdued">
+                              {isVolumeTableOffer
+                                ? t("offerEditor.font.weightsHelpVolume")
+                                : t("offerEditor.font.weightsHelp")}
+                            </s-paragraph>
+                            <div className={createStyles.widgetFontWeightGrid}>
+                              <s-select
+                                id="vd-widget-fw-strong"
+                                label={t("offerEditor.font.weightStrong")}
+                                value={String(widgetDisplay.fontWeightStrong)}
+                                onChange={(event) => {
+                                  const n = parseInt(
+                                    String(event.currentTarget.value),
+                                    10,
+                                  );
+                                  if (!Number.isNaN(n)) {
+                                    patchWidgetDisplay({
+                                      fontWeightStrong:
+                                        clampWidgetFontWeight(n),
+                                    });
+                                  }
+                                }}
+                                onInput={(event) => {
+                                  const n = parseInt(
+                                    String(event.currentTarget.value),
+                                    10,
+                                  );
+                                  if (!Number.isNaN(n)) {
+                                    patchWidgetDisplay({
+                                      fontWeightStrong:
+                                        clampWidgetFontWeight(n),
+                                    });
+                                  }
+                                }}
+                              >
+                                {WIDGET_FONT_WEIGHT_SELECT_OPTIONS.map((o) => (
+                                  <s-option key={o.value} value={o.value}>
+                                    {o.label}
+                                  </s-option>
+                                ))}
+                              </s-select>
+                              <s-select
+                                id="vd-widget-fw-accent"
+                                label={t("offerEditor.font.weightAccent")}
+                                value={String(widgetDisplay.fontWeightAccent)}
+                                onChange={(event) => {
+                                  const n = parseInt(
+                                    String(event.currentTarget.value),
+                                    10,
+                                  );
+                                  if (!Number.isNaN(n)) {
+                                    patchWidgetDisplay({
+                                      fontWeightAccent:
+                                        clampWidgetFontWeight(n),
+                                    });
+                                  }
+                                }}
+                                onInput={(event) => {
+                                  const n = parseInt(
+                                    String(event.currentTarget.value),
+                                    10,
+                                  );
+                                  if (!Number.isNaN(n)) {
+                                    patchWidgetDisplay({
+                                      fontWeightAccent:
+                                        clampWidgetFontWeight(n),
+                                    });
+                                  }
+                                }}
+                              >
+                                {WIDGET_FONT_WEIGHT_SELECT_OPTIONS.map((o) => (
+                                  <s-option key={o.value} value={o.value}>
+                                    {o.label}
+                                  </s-option>
+                                ))}
+                              </s-select>
+                              {!isVolumeTableOffer ? (
+                                <s-select
+                                  id="vd-widget-fw-body"
+                                  label={t("offerEditor.font.weightBody")}
+                                  value={String(widgetDisplay.fontWeightBody)}
+                                  onChange={(event) => {
+                                    const n = parseInt(
+                                      String(event.currentTarget.value),
+                                      10,
+                                    );
+                                    if (!Number.isNaN(n)) {
+                                      patchWidgetDisplay({
+                                        fontWeightBody:
+                                          clampWidgetFontWeight(n),
+                                      });
+                                    }
+                                  }}
+                                  onInput={(event) => {
+                                    const n = parseInt(
+                                      String(event.currentTarget.value),
+                                      10,
+                                    );
+                                    if (!Number.isNaN(n)) {
+                                      patchWidgetDisplay({
+                                        fontWeightBody:
+                                          clampWidgetFontWeight(n),
+                                      });
+                                    }
+                                  }}
+                                >
+                                  {WIDGET_FONT_WEIGHT_SELECT_OPTIONS.map(
+                                    (o) => (
+                                      <s-option key={o.value} value={o.value}>
+                                        {o.label}
+                                      </s-option>
+                                    ),
+                                  )}
+                                </s-select>
+                              ) : null}
+                              <s-select
+                                id="vd-widget-fw-normal"
+                                label={t("offerEditor.font.weightNormal")}
+                                value={String(widgetDisplay.fontWeightNormal)}
+                                onChange={(event) => {
+                                  const n = parseInt(
+                                    String(event.currentTarget.value),
+                                    10,
+                                  );
+                                  if (!Number.isNaN(n)) {
+                                    patchWidgetDisplay({
+                                      fontWeightNormal:
+                                        clampWidgetFontWeight(n),
+                                    });
+                                  }
+                                }}
+                                onInput={(event) => {
+                                  const n = parseInt(
+                                    String(event.currentTarget.value),
+                                    10,
+                                  );
+                                  if (!Number.isNaN(n)) {
+                                    patchWidgetDisplay({
+                                      fontWeightNormal:
+                                        clampWidgetFontWeight(n),
+                                    });
+                                  }
+                                }}
+                              >
+                                {WIDGET_FONT_WEIGHT_SELECT_OPTIONS.map((o) => (
+                                  <s-option key={o.value} value={o.value}>
+                                    {o.label}
+                                  </s-option>
+                                ))}
+                              </s-select>
+                            </div>
+                          </s-stack>
+                        </s-box>
+
+                        {/* Polaris web: s-box — Colors (s-color-field via WidgetDisplayColorField) */}
+                        <s-box
+                          padding="large-200"
+                          borderWidth="base"
+                          borderRadius="large"
+                          background="base"
+                        >
+                          <s-stack direction="block" gap="base">
+                              <s-heading>
                                 {t("offerEditor.colors.title")}
-                              </Text>
-                              <Text as="p" variant="bodySm" tone="subdued">
+                              </s-heading>
+                              <s-paragraph color="subdued">
                                 {t("offerEditor.colors.help")}
-                              </Text>
-                            <InlineStack gap="300" wrap>
+                              </s-paragraph>
+                            <s-stack direction="inline" gap="small">
                               <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                                 <WidgetDisplayColorField
                                   label={t("offerEditor.colors.primary")}
@@ -3788,9 +4151,9 @@ export function VolumeDiscountCreateView({
                                   }
                                 />
                               </div>
-                            </InlineStack>
+                            </s-stack>
                             {!isVolumeTableOffer ? (
-                              <InlineStack gap="300" wrap>
+                              <s-stack direction="inline" gap="small">
                                 <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                                   <WidgetDisplayColorField
                                     label={t("offerEditor.colors.badgeBackground")}
@@ -3813,9 +4176,9 @@ export function VolumeDiscountCreateView({
                                     }
                                   />
                                 </div>
-                              </InlineStack>
+                              </s-stack>
                             ) : null}
-                            <InlineStack gap="300" wrap>
+                            <s-stack direction="inline" gap="small">
                               <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                                 <WidgetDisplayColorField
                                   label={
@@ -3846,9 +4209,9 @@ export function VolumeDiscountCreateView({
                                   }
                                 />
                               </div>
-                            </InlineStack>
+                            </s-stack>
                             {!isVolumeTableOffer ? (
-                              <InlineStack gap="300" wrap>
+                              <s-stack direction="inline" gap="small">
                                 <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                                   <WidgetDisplayColorField
                                     label={t("offerEditor.colors.radioBorder")}
@@ -3871,9 +4234,9 @@ export function VolumeDiscountCreateView({
                                     }
                                   />
                                 </div>
-                              </InlineStack>
+                              </s-stack>
                             ) : null}
-                            <InlineStack gap="300" wrap>
+                            <s-stack direction="inline" gap="small">
                               <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                                 <WidgetDisplayColorField
                                   label={t("offerEditor.colors.countdownBackground")}
@@ -3896,9 +4259,9 @@ export function VolumeDiscountCreateView({
                                   }
                                 />
                               </div>
-                            </InlineStack>
+                            </s-stack>
                             {isVolumeTableOffer ? (
-                              <InlineStack gap="300" wrap>
+                              <s-stack direction="inline" gap="small">
                                 <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                                   <WidgetDisplayColorField
                                     label={t("offerEditor.colors.discountColumn")}
@@ -3910,10 +4273,10 @@ export function VolumeDiscountCreateView({
                                     }
                                   />
                                 </div>
-                              </InlineStack>
+                              </s-stack>
                             ) : null}
                             {!isVolumeTableOffer ? (
-                              <InlineStack gap="300" wrap>
+                              <s-stack direction="inline" gap="small">
                                 <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                                   <WidgetDisplayColorField
                                     label={t("offerEditor.colors.savingsLine")}
@@ -3934,9 +4297,9 @@ export function VolumeDiscountCreateView({
                                     }
                                   />
                                 </div>
-                              </InlineStack>
+                              </s-stack>
                             ) : null}
-                            <InlineStack gap="300" wrap>
+                            <s-stack direction="inline" gap="small">
                               <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                                 <WidgetDisplayColorField
                                   label={t("offerEditor.colors.mutedText")}
@@ -3946,31 +4309,44 @@ export function VolumeDiscountCreateView({
                                   }
                                 />
                               </div>
-                            </InlineStack>
-                          </BlockStack>
-                        </Card>
+                            </s-stack>
+                          
+                          </s-stack>
+                        </s-box>
 
-                        <Card padding="400">
-                          <BlockStack gap="300">
-                            <InlineStack gap="200" blockAlign="center" wrap>
-                              <Text as="h3" variant="headingSm">
+                        {/* Polaris web: s-box — Custom CSS */}
+                        <s-box
+                          padding="large-200"
+                          borderWidth="base"
+                          borderRadius="large"
+                          background="base"
+                        >
+                          <s-stack direction="block" gap="small">
+                            <s-stack direction="inline" gap="small-200" alignItems="center">
+                              <s-heading>
                                 {t("offerEditor.customCss.title")}
-                              </Text>
+                              </s-heading>
                               {!planCaps.customCss ? <PlanUpgradeBadge /> : null}
-                            </InlineStack>
+                            </s-stack>
                             {!planCaps.customCss ? (
                               <PlanUpgradeBanner feature="customCss" />
                             ) : (
                               <>
-                            <Text as="p" variant="bodySm" tone="subdued">
+                            <s-paragraph color="subdued">
                               {isVolumeTableOffer
                                 ? t("offerEditor.customCss.helpVolumeTable")
                                 : t("offerEditor.customCss.helpTierCard")}
-                            </Text>
-                            <TextField
+                            </s-paragraph>
+                            <s-text-area
                               label={t("offerEditor.customCss.fieldLabel")}
                               value={widgetDisplay.customCss}
-                              onChange={(v) =>
+                              rows={10}
+                              autocomplete="off"
+                              details={t("offerEditor.customCss.maxChars", {
+                                n: WIDGET_DISPLAY_CUSTOM_CSS_MAX_CHARS.toLocaleString(),
+                              })}
+                              onChange={(event) => {
+                                const v = sTextFieldValue(event.currentTarget);
                                 patchWidgetDisplay({
                                   customCss:
                                     v.length > WIDGET_DISPLAY_CUSTOM_CSS_MAX_CHARS
@@ -3979,34 +4355,47 @@ export function VolumeDiscountCreateView({
                                           WIDGET_DISPLAY_CUSTOM_CSS_MAX_CHARS,
                                         )
                                       : v,
-                                })
-                              }
-                              multiline={10}
-                              autoComplete="off"
-                              monospaced
-                              helpText={t("offerEditor.customCss.maxChars", {
-                                n: WIDGET_DISPLAY_CUSTOM_CSS_MAX_CHARS.toLocaleString(),
-                              })}
+                                });
+                              }}
+                              onInput={(event) => {
+                                const v = sTextFieldValue(event.currentTarget);
+                                patchWidgetDisplay({
+                                  customCss:
+                                    v.length > WIDGET_DISPLAY_CUSTOM_CSS_MAX_CHARS
+                                      ? v.slice(
+                                          0,
+                                          WIDGET_DISPLAY_CUSTOM_CSS_MAX_CHARS,
+                                        )
+                                      : v,
+                                });
+                              }}
                             />
                               </>
                             )}
-                          </BlockStack>
-                        </Card>
-                      </BlockStack>
+                          </s-stack>
+                        </s-box>
+                      </s-stack>
                     ) : (
-                      <BlockStack gap="400">
-                        <Card padding="400">
-                          <BlockStack gap="400">
-                            <Text as="h2" variant="headingSm">
+                      // Polaris web: Translations tab — same translation handlers
+                      <s-stack direction="block" gap="base">
+                        <s-box
+                          padding="large-200"
+                          borderWidth="base"
+                          borderRadius="large"
+                          background="base"
+                        >
+                          <s-stack direction="block" gap="base">
+                            <s-heading>
                               {t("offerEditor.translations.title")}
-                            </Text>
+                            </s-heading>
                             {!canEditTranslations ? (
                               <PlanUpgradeBanner feature="translations" />
                             ) : null}
-                            <Text as="p" tone="subdued">
+                            <s-paragraph color="subdued">
                               {t("offerEditor.translations.help")}
-                            </Text>
-                            <Divider />
+                            </s-paragraph>
+                            <s-divider />
+                            {/* Polaris web: s-select via AdminLanguageDropdown */}
                             <AdminLanguageDropdown
                               label={t("settings.language")}
                               options={shopLanguages.map((opt) => ({
@@ -4024,7 +4413,7 @@ export function VolumeDiscountCreateView({
                                   : t("settings.languageHelpLocked")
                               }
                             />
-                            <InlineStack gap="200" wrap>
+                            <s-stack direction="inline" gap="small-200">
                               <Button
                                 icon={AutomationIcon}
                                 onClick={handleAutoTranslateCampaignLanguage}
@@ -4045,333 +4434,470 @@ export function VolumeDiscountCreateView({
                               >
                                 {t("settings.reset")}
                               </Button>
-                            </InlineStack>
-                            <Text as="p" variant="bodySm" tone="subdued">
+                            </s-stack>
+                            <s-paragraph color="subdued">
                               {t("settings.autoTranslateHelp")}
-                            </Text>
-                            <Divider />
-                            <FormLayout>
-                              <FormLayout.Group>
-                                <TextField
-                                  label={t("settings.widgetHeading")}
-                                  value={translationFieldValue("transHeading")}
-                                  onChange={(v) =>
-                                    handleCampaignTranslationFieldChange(
-                                      "transHeading",
-                                      v,
-                                    )
-                                  }
-                                  autoComplete="off"
-                                  placeholder={translationFieldPlaceholder(
+                            </s-paragraph>
+                            <s-divider />
+                            {/* Polaris web: s-text-field / s-text-area — same translationFieldValue handlers */}
+                            <s-grid
+                              gap="base"
+                              alignItems="start"
+                              gridTemplateColumns="repeat(2, minmax(0, 1fr))"
+                            >
+                              <s-text-field
+                                label={t("settings.widgetHeading")}
+                                value={translationFieldValue("transHeading")}
+                                autocomplete="off"
+                                placeholder={translationFieldPlaceholder(
+                                  "transHeading",
+                                )}
+                                disabled={!canEditTranslations || undefined}
+                                onChange={(event) =>
+                                  handleCampaignTranslationFieldChange(
                                     "transHeading",
-                                  )}
-                                  disabled={!canEditTranslations}
-                                />
-                                <TextField
-                                  label={t("settings.ctaText")}
-                                  value={translationFieldValue("transCta")}
-                                  onChange={(v) =>
-                                    handleCampaignTranslationFieldChange(
-                                      "transCta",
-                                      v,
-                                    )
-                                  }
-                                  autoComplete="off"
-                                  placeholder={translationFieldPlaceholder(
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
+                                onInput={(event) =>
+                                  handleCampaignTranslationFieldChange(
+                                    "transHeading",
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
+                              />
+                              <s-text-field
+                                label={t("settings.ctaText")}
+                                value={translationFieldValue("transCta")}
+                                autocomplete="off"
+                                placeholder={translationFieldPlaceholder(
+                                  "transCta",
+                                )}
+                                disabled={!canEditTranslations || undefined}
+                                onChange={(event) =>
+                                  handleCampaignTranslationFieldChange(
                                     "transCta",
-                                  )}
-                                  disabled={!canEditTranslations}
-                                />
-                              </FormLayout.Group>
-                              <FormLayout.Group>
-                                <TextField
-                                  label={t("settings.qtyColumn")}
-                                  value={translationFieldValue("transQty")}
-                                  onChange={(v) =>
-                                    handleCampaignTranslationFieldChange(
-                                      "transQty",
-                                      v,
-                                    )
-                                  }
-                                  autoComplete="off"
-                                  placeholder={translationFieldPlaceholder(
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
+                                onInput={(event) =>
+                                  handleCampaignTranslationFieldChange(
+                                    "transCta",
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
+                              />
+                              <s-text-field
+                                label={t("settings.qtyColumn")}
+                                value={translationFieldValue("transQty")}
+                                autocomplete="off"
+                                placeholder={translationFieldPlaceholder(
+                                  "transQty",
+                                )}
+                                disabled={!canEditTranslations || undefined}
+                                onChange={(event) =>
+                                  handleCampaignTranslationFieldChange(
                                     "transQty",
-                                  )}
-                                  disabled={!canEditTranslations}
-                                />
-                                <TextField
-                                  label={t("settings.discountColumn")}
-                                  value={translationFieldValue("transDiscount")}
-                                  onChange={(v) =>
-                                    handleCampaignTranslationFieldChange(
-                                      "transDiscount",
-                                      v,
-                                    )
-                                  }
-                                  autoComplete="off"
-                                  placeholder={translationFieldPlaceholder(
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
+                                onInput={(event) =>
+                                  handleCampaignTranslationFieldChange(
+                                    "transQty",
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
+                              />
+                              <s-text-field
+                                label={t("settings.discountColumn")}
+                                value={translationFieldValue("transDiscount")}
+                                autocomplete="off"
+                                placeholder={translationFieldPlaceholder(
+                                  "transDiscount",
+                                )}
+                                disabled={!canEditTranslations || undefined}
+                                onChange={(event) =>
+                                  handleCampaignTranslationFieldChange(
                                     "transDiscount",
-                                  )}
-                                  disabled={!canEditTranslations}
-                                />
-                              </FormLayout.Group>
-                              <FormLayout.Group>
-                                <TextField
-                                  label={t("settings.priceColumn")}
-                                  value={translationFieldValue("transPrice")}
-                                  onChange={(v) =>
-                                    handleCampaignTranslationFieldChange(
-                                      "transPrice",
-                                      v,
-                                    )
-                                  }
-                                  autoComplete="off"
-                                  placeholder={translationFieldPlaceholder(
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
+                                onInput={(event) =>
+                                  handleCampaignTranslationFieldChange(
+                                    "transDiscount",
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
+                              />
+                              <s-text-field
+                                label={t("settings.priceColumn")}
+                                value={translationFieldValue("transPrice")}
+                                autocomplete="off"
+                                placeholder={translationFieldPlaceholder(
+                                  "transPrice",
+                                )}
+                                disabled={!canEditTranslations || undefined}
+                                onChange={(event) =>
+                                  handleCampaignTranslationFieldChange(
                                     "transPrice",
-                                  )}
-                                  disabled={!canEditTranslations}
-                                />
-                                <TextField
-                                  label={t("settings.buyPrefix")}
-                                  value={translationFieldValue("transBuy")}
-                                  onChange={(v) =>
-                                    handleCampaignTranslationFieldChange(
-                                      "transBuy",
-                                      v,
-                                    )
-                                  }
-                                  autoComplete="off"
-                                  placeholder={translationFieldPlaceholder(
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
+                                onInput={(event) =>
+                                  handleCampaignTranslationFieldChange(
+                                    "transPrice",
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
+                              />
+                              <s-text-field
+                                label={t("settings.buyPrefix")}
+                                value={translationFieldValue("transBuy")}
+                                autocomplete="off"
+                                placeholder={translationFieldPlaceholder(
+                                  "transBuy",
+                                )}
+                                disabled={!canEditTranslations || undefined}
+                                onChange={(event) =>
+                                  handleCampaignTranslationFieldChange(
                                     "transBuy",
-                                  )}
-                                  disabled={!canEditTranslations}
-                                />
-                              </FormLayout.Group>
-                              <FormLayout.Group>
-                                <TextField
-                                  label={t("settings.youSave")}
-                                  value={translationFieldValue("transYouSave")}
-                                  onChange={(v) =>
-                                    handleCampaignTranslationFieldChange(
-                                      "transYouSave",
-                                      v,
-                                    )
-                                  }
-                                  autoComplete="off"
-                                  placeholder={translationFieldPlaceholder(
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
+                                onInput={(event) =>
+                                  handleCampaignTranslationFieldChange(
+                                    "transBuy",
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
+                              />
+                              <s-text-field
+                                label={t("settings.youSave")}
+                                value={translationFieldValue("transYouSave")}
+                                autocomplete="off"
+                                placeholder={translationFieldPlaceholder(
+                                  "transYouSave",
+                                )}
+                                disabled={!canEditTranslations || undefined}
+                                onChange={(event) =>
+                                  handleCampaignTranslationFieldChange(
                                     "transYouSave",
-                                  )}
-                                  disabled={!canEditTranslations}
-                                />
-                                <TextField
-                                  label={t("settings.addLabel")}
-                                  value={translationFieldValue("transAdd")}
-                                  onChange={(v) =>
-                                    handleCampaignTranslationFieldChange(
-                                      "transAdd",
-                                      v,
-                                    )
-                                  }
-                                  autoComplete="off"
-                                  placeholder={translationFieldPlaceholder(
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
+                                onInput={(event) =>
+                                  handleCampaignTranslationFieldChange(
+                                    "transYouSave",
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
+                              />
+                              <s-text-field
+                                label={t("settings.addLabel")}
+                                value={translationFieldValue("transAdd")}
+                                autocomplete="off"
+                                placeholder={translationFieldPlaceholder(
+                                  "transAdd",
+                                )}
+                                disabled={!canEditTranslations || undefined}
+                                onChange={(event) =>
+                                  handleCampaignTranslationFieldChange(
                                     "transAdd",
-                                  )}
-                                  disabled={!canEditTranslations}
-                                />
-                              </FormLayout.Group>
-                              <FormLayout.Group>
-                                <TextField
-                                  label={t("settings.cartDiscount")}
-                                  value={translationFieldValue(
-                                    "transCartDiscount",
-                                  )}
-                                  onChange={(v) =>
-                                    handleCampaignTranslationFieldChange(
-                                      "transCartDiscount",
-                                      v,
-                                    )
-                                  }
-                                  autoComplete="off"
-                                  placeholder={translationFieldPlaceholder(
-                                    "transCartDiscount",
-                                  )}
-                                  disabled={!canEditTranslations}
-                                  helpText={t(
-                                    "offerEditor.translations.cartBadgeHelp",
-                                  )}
-                                />
-                                <TextField
-                                  label={t("settings.cartDiscountQty")}
-                                  value={translationFieldValue(
-                                    "transCartDiscountQty",
-                                  )}
-                                  onChange={(v) =>
-                                    handleCampaignTranslationFieldChange(
-                                      "transCartDiscountQty",
-                                      v,
-                                    )
-                                  }
-                                  autoComplete="off"
-                                  placeholder={translationFieldPlaceholder(
-                                    "transCartDiscountQty",
-                                  )}
-                                  disabled={!canEditTranslations}
-                                />
-                              </FormLayout.Group>
-                              <TextField
-                                label={t("settings.countdown")}
-                                value={translationFieldValue("transCountdown")}
-                                onChange={(v) =>
-                                  handleCampaignTranslationFieldChange(
-                                    "transCountdown",
-                                    v,
+                                    sTextFieldValue(event.currentTarget),
                                   )
                                 }
-                                autoComplete="off"
+                                onInput={(event) =>
+                                  handleCampaignTranslationFieldChange(
+                                    "transAdd",
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
+                              />
+                            </s-grid>
+                            {/* Same-line pair: help text on badge must not drop qty field */}
+                            <s-grid
+                              gap="base"
+                              alignItems="start"
+                              gridTemplateColumns="repeat(2, minmax(0, 1fr))"
+                            >
+                              <s-text-field
+                                label={t("settings.cartDiscount")}
+                                value={translationFieldValue(
+                                  "transCartDiscount",
+                                )}
+                                autocomplete="off"
                                 placeholder={translationFieldPlaceholder(
+                                  "transCartDiscount",
+                                )}
+                                disabled={!canEditTranslations || undefined}
+                                details={t(
+                                  "offerEditor.translations.cartBadgeHelp",
+                                )}
+                                onChange={(event) =>
+                                  handleCampaignTranslationFieldChange(
+                                    "transCartDiscount",
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
+                                onInput={(event) =>
+                                  handleCampaignTranslationFieldChange(
+                                    "transCartDiscount",
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
+                              />
+                              <s-text-field
+                                label={t("settings.cartDiscountQty")}
+                                value={translationFieldValue(
+                                  "transCartDiscountQty",
+                                )}
+                                autocomplete="off"
+                                placeholder={translationFieldPlaceholder(
+                                  "transCartDiscountQty",
+                                )}
+                                disabled={!canEditTranslations || undefined}
+                                onChange={(event) =>
+                                  handleCampaignTranslationFieldChange(
+                                    "transCartDiscountQty",
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
+                                onInput={(event) =>
+                                  handleCampaignTranslationFieldChange(
+                                    "transCartDiscountQty",
+                                    sTextFieldValue(event.currentTarget),
+                                  )
+                                }
+                              />
+                            </s-grid>
+                            <s-text-field
+                              label={t("settings.countdown")}
+                              value={translationFieldValue("transCountdown")}
+                              autocomplete="off"
+                              placeholder={translationFieldPlaceholder(
+                                "transCountdown",
+                              )}
+                              disabled={!canEditTranslations || undefined}
+                              onChange={(event) =>
+                                handleCampaignTranslationFieldChange(
                                   "transCountdown",
-                                )}
-                                disabled={!canEditTranslations}
-                              />
-                              <TextField
-                                label={t("settings.footnote")}
-                                value={translationFieldValue("transFootnote")}
-                                onChange={(v) =>
-                                  handleCampaignTranslationFieldChange(
-                                    "transFootnote",
-                                    v,
-                                  )
-                                }
-                                autoComplete="off"
-                                multiline={3}
-                                placeholder={translationFieldPlaceholder(
+                                  sTextFieldValue(event.currentTarget),
+                                )
+                              }
+                              onInput={(event) =>
+                                handleCampaignTranslationFieldChange(
+                                  "transCountdown",
+                                  sTextFieldValue(event.currentTarget),
+                                )
+                              }
+                            />
+                            <s-text-area
+                              label={t("settings.footnote")}
+                              value={translationFieldValue("transFootnote")}
+                              rows={3}
+                              autocomplete="off"
+                              placeholder={translationFieldPlaceholder(
+                                "transFootnote",
+                              )}
+                              disabled={!canEditTranslations || undefined}
+                              onChange={(event) =>
+                                handleCampaignTranslationFieldChange(
                                   "transFootnote",
-                                )}
-                                disabled={!canEditTranslations}
-                              />
-                              <Divider />
-                              <Text as="h3" variant="headingSm">
-                                {t("offerEditor.translations.tierCopyTitle")}
-                              </Text>
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                {t("offerEditor.translations.tierCopyHelp")}
-                              </Text>
-                              {tiers.map((tier, tierIndex) => {
-                                const row =
-                                  activeTierCopyRows[tierIndex] ??
-                                  emptyTierCopyFields();
-                                return (
-                                  <BlockStack key={`tier-copy-${tierIndex}`} gap="200">
-                                    <Text as="p" variant="bodyMd" fontWeight="semibold">
-                                      {t("offerEditor.translations.tierN", {
-                                        n: String(tierIndex + 1),
-                                      })}
-                                    </Text>
-                                    <TextField
-                                      label={t("offerEditor.tier.optionLabel")}
-                                      value={row.buyLabelText}
-                                      onChange={(v) =>
-                                        handleCampaignTierCopyFieldChange(
-                                          tierIndex,
-                                          "buyLabelText",
-                                          v,
-                                        )
-                                      }
-                                      autoComplete="off"
-                                      placeholder={
-                                        tier.buyLabelText.trim() ||
-                                        t(
-                                          "offerEditor.tier.optionLabelPlaceholder",
-                                        )
-                                      }
-                                      disabled={!canEditTranslations}
-                                    />
-                                    {!isVolumeTableOffer ? (
-                                      <>
-                                        <TextField
-                                          label={t(
-                                            "offerEditor.tier.optionSubtext",
-                                          )}
-                                          value={row.optionSubtext}
-                                          onChange={(v) =>
-                                            handleCampaignTierCopyFieldChange(
-                                              tierIndex,
-                                              "optionSubtext",
-                                              v,
-                                            )
-                                          }
-                                          autoComplete="off"
-                                          placeholder={
-                                            tier.optionSubtext.trim() ||
-                                            t(
-                                              "offerEditor.tier.optionSubtextPlaceholder",
-                                            )
-                                          }
-                                          disabled={!canEditTranslations}
-                                        />
-                                        <TextField
-                                          label={t("offerEditor.tier.badge")}
-                                          value={row.badge}
-                                          onChange={(v) =>
-                                            handleCampaignTierCopyFieldChange(
-                                              tierIndex,
-                                              "badge",
-                                              v,
-                                            )
-                                          }
-                                          autoComplete="off"
-                                          placeholder={
-                                            tier.badge.trim() ||
-                                            t(
-                                              "offerEditor.tier.badgePlaceholder",
-                                            )
-                                          }
-                                          disabled={!canEditTranslations}
-                                        />
-                                      </>
-                                    ) : null}
-                                  </BlockStack>
-                                );
-                              })}
-                            </FormLayout>
-                          </BlockStack>
-                        </Card>
-                      </BlockStack>
+                                  sTextFieldValue(event.currentTarget),
+                                )
+                              }
+                              onInput={(event) =>
+                                handleCampaignTranslationFieldChange(
+                                  "transFootnote",
+                                  sTextFieldValue(event.currentTarget),
+                                )
+                              }
+                            />
+                            <s-divider />
+                            <s-heading>
+                              {t("offerEditor.translations.tierCopyTitle")}
+                            </s-heading>
+                            <s-paragraph color="subdued">
+                              {t("offerEditor.translations.tierCopyHelp")}
+                            </s-paragraph>
+                            {tiers.map((tier, tierIndex) => {
+                              const row =
+                                activeTierCopyRows[tierIndex] ??
+                                emptyTierCopyFields();
+                              return (
+                                <s-stack
+                                  key={`tier-copy-${tierIndex}`}
+                                  direction="block"
+                                  gap="small-200"
+                                >
+                                  <s-text type="strong">
+                                    {t("offerEditor.translations.tierN", {
+                                      n: String(tierIndex + 1),
+                                    })}
+                                  </s-text>
+                                  <s-text-field
+                                    label={t("offerEditor.tier.optionLabel")}
+                                    value={row.buyLabelText}
+                                    autocomplete="off"
+                                    placeholder={
+                                      tier.buyLabelText.trim() ||
+                                      t(
+                                        "offerEditor.tier.optionLabelPlaceholder",
+                                      )
+                                    }
+                                    disabled={!canEditTranslations || undefined}
+                                    onChange={(event) =>
+                                      handleCampaignTierCopyFieldChange(
+                                        tierIndex,
+                                        "buyLabelText",
+                                        sTextFieldValue(event.currentTarget),
+                                      )
+                                    }
+                                    onInput={(event) =>
+                                      handleCampaignTierCopyFieldChange(
+                                        tierIndex,
+                                        "buyLabelText",
+                                        sTextFieldValue(event.currentTarget),
+                                      )
+                                    }
+                                  />
+                                  {!isVolumeTableOffer ? (
+                                    <>
+                                      <s-text-field
+                                        label={t(
+                                          "offerEditor.tier.optionSubtext",
+                                        )}
+                                        value={row.optionSubtext}
+                                        autocomplete="off"
+                                        placeholder={
+                                          tier.optionSubtext.trim() ||
+                                          t(
+                                            "offerEditor.tier.optionSubtextPlaceholder",
+                                          )
+                                        }
+                                        disabled={
+                                          !canEditTranslations || undefined
+                                        }
+                                        onChange={(event) =>
+                                          handleCampaignTierCopyFieldChange(
+                                            tierIndex,
+                                            "optionSubtext",
+                                            sTextFieldValue(
+                                              event.currentTarget,
+                                            ),
+                                          )
+                                        }
+                                        onInput={(event) =>
+                                          handleCampaignTierCopyFieldChange(
+                                            tierIndex,
+                                            "optionSubtext",
+                                            sTextFieldValue(
+                                              event.currentTarget,
+                                            ),
+                                          )
+                                        }
+                                      />
+                                      <s-text-field
+                                        label={t("offerEditor.tier.badge")}
+                                        value={row.badge}
+                                        autocomplete="off"
+                                        placeholder={
+                                          tier.badge.trim() ||
+                                          t(
+                                            "offerEditor.tier.badgePlaceholder",
+                                          )
+                                        }
+                                        disabled={
+                                          !canEditTranslations || undefined
+                                        }
+                                        onChange={(event) =>
+                                          handleCampaignTierCopyFieldChange(
+                                            tierIndex,
+                                            "badge",
+                                            sTextFieldValue(
+                                              event.currentTarget,
+                                            ),
+                                          )
+                                        }
+                                        onInput={(event) =>
+                                          handleCampaignTierCopyFieldChange(
+                                            tierIndex,
+                                            "badge",
+                                            sTextFieldValue(
+                                              event.currentTarget,
+                                            ),
+                                          )
+                                        }
+                                      />
+                                    </>
+                                  ) : null}
+                                </s-stack>
+                              );
+                            })}
+                          </s-stack>
+                        </s-box>
+                      </s-stack>
                     )}
                   </Tabs>
                   </div>
                 </Box>
               </div>
               <aside className={createStyles.previewColumn}>
-                <BlockStack gap="400">
-                  <Card padding="400">
-                    <BlockStack gap="200">
-                      <InlineStack
-                        align="space-between"
-                        blockAlign="center"
-                        gap="300"
-                        wrap
+                {/* Polaris web: preview column — Campaign status + Product page preview */}
+                <s-stack direction="block" gap="base">
+                  {/* Polaris web: s-box card — Campaign status (same turn on/off handlers) */}
+                  <s-box
+                    padding="large-200"
+                    borderWidth="base"
+                    borderRadius="large"
+                    background="base"
+                  >
+                    <s-stack direction="block" gap="small-200">
+                      <s-stack
+                        direction="inline"
+                        gap="small"
+                        justifyContent="space-between"
+                        alignItems="center"
                       >
-                        <InlineStack gap="200" blockAlign="center" wrap>
-                          <Text as="h3" variant="headingSm">
+                        <s-stack
+                          direction="inline"
+                          gap="small-200"
+                          alignItems="center"
+                        >
+                          <s-heading>
                             {t("offerEditor.campaignStatus")}
-                          </Text>
-                          <Badge tone={statusBadgeTone(editorCampaignStatus)}>
+                          </s-heading>
+                          {/* Polaris web: s-badge — same statusBadgeTone mapping */}
+                          <s-badge
+                            tone={(() => {
+                              const tone = statusBadgeTone(editorCampaignStatus);
+                              if (tone === "success") return "success";
+                              if (tone === "critical") return "critical";
+                              if (tone === "info") return "info";
+                              /* attention / warning → warning */
+                              return "warning";
+                            })()}
+                          >
                             {(() => {
                               const key =
                                 CAMPAIGN_STATUS_LABEL_KEYS[
                                   editorCampaignStatus.toLowerCase()
                                 ];
-                              return key ? t(key) : statusLabel(editorCampaignStatus);
+                              return key
+                                ? t(key)
+                                : statusLabel(editorCampaignStatus);
                             })()}
-                          </Badge>
-                        </InlineStack>
-                        <Button
+                          </s-badge>
+                        </s-stack>
+                        {/* Polaris web: s-button — same previewCampaignOn toggle */}
+                        <s-button
                           variant="tertiary"
-                          disabled={Boolean(
-                            turnOnBlockedReason &&
-                              editorCampaignStatus !== "active",
-                          )}
+                          disabled={
+                            Boolean(
+                              turnOnBlockedReason &&
+                                editorCampaignStatus !== "active",
+                            ) || undefined
+                          }
                           onClick={() => {
                             setPreviewCampaignOn((v) => {
                               if (v || editorCampaignStatus === "scheduled") {
@@ -4390,13 +4916,17 @@ export function VolumeDiscountCreateView({
                           {editorCampaignStatus === "active"
                             ? t("offerEditor.turnOff")
                             : t("offerEditor.turnOn")}
-                        </Button>
-                      </InlineStack>
+                        </s-button>
+                      </s-stack>
                       {turnOnBlockedReason === "expired" ? (
-                        <InlineStack gap="100" blockAlign="center" wrap>
-                          <Text as="p" variant="bodySm" tone="critical">
+                        <s-stack
+                          direction="inline"
+                          gap="small-200"
+                          alignItems="center"
+                        >
+                          <s-text tone="critical">
                             {t("offerEditor.expiredHint")}
-                          </Text>
+                          </s-text>
                           <button
                             type="button"
                             className={createStyles.scheduleJumpLink}
@@ -4404,31 +4934,38 @@ export function VolumeDiscountCreateView({
                           >
                             {t("offerEditor.schedule")}
                           </button>
-                        </InlineStack>
+                        </s-stack>
                       ) : editorCampaignStatus === "scheduled" ? (
-                        <Text as="p" variant="bodySm" tone="subdued">
+                        <s-text color="subdued">
                           {t("offerEditor.waitingForStart")}
                           {formatDatetimeLocalDisplay(countdownStartsAtLocal)
                             ? ` (${formatDatetimeLocalDisplay(countdownStartsAtLocal)})`
                             : ""}
                           .
-                        </Text>
+                        </s-text>
                       ) : null}
-                    </BlockStack>
-                  </Card>
+                    </s-stack>
+                  </s-box>
 
-                  <Card padding="400">
-                    <BlockStack gap="400">
-                      <InlineStack
-                        align="space-between"
-                        blockAlign="start"
-                        gap="300"
-                        wrap
+                  {/* Polaris web: s-box card — Product page preview shell */}
+                  <s-box
+                    padding="large-200"
+                    borderWidth="base"
+                    borderRadius="large"
+                    background="base"
+                  >
+                    <s-stack direction="block" gap="base">
+                      <s-stack
+                        direction="inline"
+                        gap="small"
+                        justifyContent="space-between"
+                        alignItems="start"
                       >
-                        <Text as="h2" variant="headingMd">
+                        <s-heading>
                           {t("offerEditor.productPagePreview")}
-                        </Text>
-                        <ButtonGroup variant="segmented" noWrap>
+                        </s-heading>
+                        {/* Polaris web: s-button pressed — same previewDevice state */}
+                        <s-stack direction="inline" gap="small-200" alignItems="center">
                           <Button
                             pressed={previewDevice === "desktop"}
                             icon={DesktopIcon}
@@ -4441,21 +4978,20 @@ export function VolumeDiscountCreateView({
                             accessibilityLabel={t("offerEditor.mobilePreview")}
                             onClick={() => setPreviewDevice("mobile")}
                           />
-                        </ButtonGroup>
-                      </InlineStack>
-                      <Text as="p" variant="headingLg" alignment="center">
-                        {widgetDisplay.widgetPresentation === "volume_table"
-                          ? t("offerEditor.volumeDiscount")
-                          : t("offerEditor.quantityBreaks")}
-                      </Text>
-                      <Box
-                        padding="0"
-                        background="bg-surface-secondary"
-                        borderRadius="200"
-                        overflowX="hidden"
-                        opacity={
-                          editorCampaignStatus === "active" ? undefined : "0.5"
-                        }
+                        </s-stack>
+                      </s-stack>
+                      <s-stack direction="block" alignItems="center">
+                        <s-heading>
+                          {widgetDisplay.widgetPresentation === "volume_table"
+                            ? t("offerEditor.volumeDiscount")
+                            : t("offerEditor.quantityBreaks")}
+                        </s-heading>
+                      </s-stack>
+                      <s-box
+                        padding="none"
+                        background="subdued"
+                        borderRadius="base"
+                        overflow="hidden"
                       >
                         <div
                           className={
@@ -4466,13 +5002,14 @@ export function VolumeDiscountCreateView({
                           style={
                             editorCampaignStatus === "active"
                               ? undefined
-                              : { pointerEvents: "none" as const }
+                              : {
+                                  pointerEvents: "none" as const,
+                                  opacity: 0.5,
+                                }
                           }
                         >
-                          <Box
-                            padding={{ xs: "300", sm: "400" }}
-                            background="bg-surface"
-                          >
+                          {/* Polaris web: s-box — preview surface */}
+                          <s-box padding="base" background="base">
                             <Suspense fallback={<PreviewPanelFallback />}>
                               <QuantityBreaksTailwindPreview
                                 rows={productPagePreviewRows}
@@ -4483,7 +5020,10 @@ export function VolumeDiscountCreateView({
                                 countdownEndsAtIso={
                                   scheduleEndEnabled &&
                                   countdownEndsAtLocal.trim()
-                                    ? datetimeLocalToIsoUtc(countdownEndsAtLocal, shopTimezone)
+                                    ? datetimeLocalToIsoUtc(
+                                        countdownEndsAtLocal,
+                                        shopTimezone,
+                                      )
                                     : null
                                 }
                                 countdownStartsAtIso={
@@ -4497,16 +5037,16 @@ export function VolumeDiscountCreateView({
                                 }
                               />
                             </Suspense>
-                          </Box>
+                          </s-box>
                         </div>
-                      </Box>
-                      <Text as="p" variant="bodyXs" tone="subdued">
+                      </s-box>
+                      <s-text color="subdued">
                         Live preview uses Display + Appearance settings and a
                         sample $98 unit price.
-                      </Text>
-                    </BlockStack>
-                  </Card>
-                </BlockStack>
+                      </s-text>
+                    </s-stack>
+                  </s-box>
+                </s-stack>
               </aside>
             </div>
           </s-box>

@@ -673,7 +673,6 @@ const OFFREFY_PUBLIC_CAMPAIGN_PROP = "offrefy_campaign";
 const OFFREFY_PUBLIC_PRODUCT_PROP = "offrefy_product";
 const OFFREFY_CART_CAMPAIGN_ATTR = "offrefy_campaign";
 const OFFREFY_CART_PRODUCT_ATTR = "offrefy_product";
-const OFFREFY_CART_FLAG_ATTR = "offrefy";
 const ATC_MATCH_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 type ShopifyOrderAttribute = {

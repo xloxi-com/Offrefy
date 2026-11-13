@@ -7,6 +7,11 @@ import {
   parseWidgetFontPx,
 } from "./widgetFontSizes";
 import { parseWidgetFontWeight } from "./widgetFontWeights";
+import {
+  DEFAULT_BOGO_WIDGET_COPY,
+  normalizeBogoWidgetCopy,
+  type BogoWidgetCopy,
+} from "./bogoWidgetCopy";
 
 export type { VolumeDiscountFontScale, WidgetFontRole } from "./widgetFontSizes";
 
@@ -835,6 +840,8 @@ export type VolumeDiscountWidgetDisplay = {
    * picker to `custom`. Empty when the merchant picks Custom explicitly.
    */
   appearanceDecorThemeId: VolumeDiscountAppearancePresetId | "";
+  /** Buy X Get Y card labels and panel colors. Unused by quantity breaks. */
+  bogoCopy: BogoWidgetCopy;
 };
 
 /**
@@ -1222,7 +1229,7 @@ export const VOLUME_DISCOUNT_APPEARANCE_PRESETS: VolumeDiscountAppearancePresetR
         buttonBorderRadiusPx: 14,
         controlBorderRadiusPx: 10,
         badgePosition: "after_label",
-        badgeDesign: "pill",
+        badgeDesign: "flag",
         widgetHeaderLayout: "split",
         widgetHeadingAlign: "center",
         countdownAlign: "center",
@@ -4441,6 +4448,7 @@ export const DEFAULT_WIDGET_DISPLAY: VolumeDiscountWidgetDisplay = {
   customCss: "",
   appearanceTemplateId: "classic_burgundy",
   appearanceDecorThemeId: "classic_burgundy",
+  bogoCopy: DEFAULT_BOGO_WIDGET_COPY,
 };
 
 /** Merge DB / API values with defaults and validate colors. */
@@ -4718,6 +4726,7 @@ export function normalizeVolumeDiscountWidgetDisplay(
       const tid = pickAppearanceTemplateId(o.appearanceTemplateId);
       return tid === "custom" ? "" : tid;
     })(),
+    bogoCopy: normalizeBogoWidgetCopy(o.bogoCopy),
   };
 }
 

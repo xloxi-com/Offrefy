@@ -116,7 +116,7 @@ export function PricingCard({
           <h3 style={{ fontSize: "28px", fontWeight: "bold", margin: 0 }}>
             {price}
           </h3>
-          <s-text>/ {frequency}</s-text>
+          {frequency.trim() ? <s-text>/ {frequency}</s-text> : null}
         </div>
         {trialText ? (
           <div style={{ marginTop: "0.35rem" }}>

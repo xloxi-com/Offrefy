@@ -2,6 +2,13 @@
   "mcpServers": {
     "cloudflare": {
       "url": "https://mcp.cloudflare.com/mcp"
+    },
+    "shopify-dev-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@shopify/dev-mcp@latest"
+      ]
     }
   }
 }

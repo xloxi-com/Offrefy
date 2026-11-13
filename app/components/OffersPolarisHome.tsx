@@ -9,10 +9,9 @@ import {
 } from "react";
 import { Link, useFetcher, useLocation } from "react-router";
 import {
-  Badge,
   BlockStack,
   Box,
-  Button,
+  Button as PolarisHeaderButton,
   Card,
   Checkbox,
   DropZone,
@@ -24,26 +23,16 @@ import {
   InlineStack,
   LegacyCard,
   Modal,
-  Page,
-  Pagination,
   Text,
   useSetIndexFiltersMode,
 } from "@shopify/polaris";
-import type {
-  IndexFiltersProps,
-  TabProps,
-} from "@shopify/polaris";
+import type { IndexFiltersProps, TabProps } from "@shopify/polaris";
+import { Button } from "./AppButton";
 import {
   PlanUpgradeBadge,
   planLockedActionContent,
 } from "./PlanUpgradeBadge";
-import {
-  ArrowUpIcon,
-  DeleteIcon,
-  DiscountIcon,
-  DuplicateIcon,
-  EditIcon,
-} from "@shopify/polaris-icons";
+import { ArrowUpIcon, DiscountIcon } from "@shopify/polaris-icons";
 
 import styles from "../styles/offers-dashboard.module.css";
 import {
@@ -53,7 +42,7 @@ import {
 import {
   formatCreatedAt,
   productScopeLabel,
-  statusBadgeTone,
+  statusBadgeToneWeb,
   truncateCampaignDisplayName,
 } from "../utils/offers-display";
 import type { VolumeDiscountWidgetPresentation } from "../utils/widgetDisplay";
@@ -77,6 +66,8 @@ export type OfferCampaignRow = {
   countdownStartsAt?: string | null;
   countdownEndsAt?: string | null;
   widgetPresentation: VolumeDiscountWidgetPresentation;
+  /** volume = Quantity breaks / Volume discount; bogo = Buy X Get Y */
+  offerKind?: "volume" | "bogo";
 };
 
 type OfferListActionData =
@@ -125,7 +116,7 @@ export type OffersPolarisHomeProps = {
   exportSearchQuery: string;
   setScreen: (s: "home" | "select") => void;
   /** Used with React Router prefetch so edit opens faster after hover/focus. */
-  offerEditTo: (id: string) => string;
+  offerEditTo: (id: string, offerKind?: "volume" | "bogo") => string;
   onCampaignsMutated: () => void;
   notify: (message: string) => void;
   /** Plan gates for import/export and campaign cap messaging. */
@@ -157,6 +148,7 @@ const SCOPE_KEYS: Record<string, AdminUiMessageKey> = {
   "group-products": "offers.scope.groupProducts",
 };
 
+/** Same sortSelected / onSort toggle (IndexTable headings) */
 function SortableColumnHeader({
   columnKey,
   label,
@@ -200,7 +192,7 @@ function SortableColumnHeader({
       <span
         className={`${styles.nameSortArrowWrap}${isDesc ? ` ${styles.nameSortArrowDesc}` : ""}`}
       >
-        <Button
+        <PolarisHeaderButton
           variant="plain"
           size="micro"
           icon={ArrowUpIcon}
@@ -213,20 +205,6 @@ function SortableColumnHeader({
       </span>
     </InlineStack>
   );
-}
-
-function tabIndex(offerTab: OfferTab): number {
-  if (offerTab === "active") return 1;
-  if (offerTab === "scheduled") return 2;
-  if (offerTab === "draft") return 3;
-  return 0;
-}
-
-function tabFromIndex(index: number): OfferTab {
-  if (index === 1) return "active";
-  if (index === 2) return "scheduled";
-  if (index === 3) return "draft";
-  return "all";
 }
 
 export const OffersPolarisHome = memo(function OffersPolarisHome({
@@ -245,7 +223,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
   notify,
   canImportExport = false,
   activeCount = 0,
-  maxActiveCampaigns = 5,
+  maxActiveCampaigns = 2,
   atOfferCap = false,
   createOfferBlockedMessage = "You’ve reached your plan’s offer limit. Upgrade to create more.",
   onCreateOffer,
@@ -265,9 +243,10 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
   );
   const [importModalOpen, setImportModalOpen] = useState(false);
 
-  const { mode, setMode } = useSetIndexFiltersMode(IndexFiltersMode.Default);
+  const { mode, setMode } = useSetIndexFiltersMode(IndexFiltersMode.Filtering);
   const [pageIndex, setPageIndex] = useState(0);
 
+  /** Polaris IndexFilters tabs — same setOfferTab */
   const offerTabs: TabProps[] = useMemo(
     () => [
       { id: "all", content: t("offers.tab.all"), isLocked: true },
@@ -278,30 +257,60 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     [t],
   );
 
+  /** Polaris IndexFilters sortOptions — column headers still sort too */
   const sortOptions: NonNullable<IndexFiltersProps["sortOptions"]> = useMemo(
     () => [
-      { label: t("offers.col.campaignName"), value: "name asc", directionLabel: t("offers.sort.az") },
-      { label: t("offers.col.campaignName"), value: "name desc", directionLabel: t("offers.sort.za") },
-      { label: t("offers.col.discountType"), value: "discount asc", directionLabel: t("offers.sort.az") },
-      { label: t("offers.col.discountType"), value: "discount desc", directionLabel: t("offers.sort.za") },
-      { label: t("offers.col.campaignType"), value: "type asc", directionLabel: t("offers.sort.az") },
-      { label: t("offers.col.campaignType"), value: "type desc", directionLabel: t("offers.sort.za") },
-      { label: t("offers.col.applyTo"), value: "apply asc", directionLabel: t("offers.sort.az") },
-      { label: t("offers.col.applyTo"), value: "apply desc", directionLabel: t("offers.sort.za") },
-      { label: t("offers.col.impression"), value: "impression asc", directionLabel: t("offers.sort.lowHigh") },
-      { label: t("offers.col.impression"), value: "impression desc", directionLabel: t("offers.sort.highLow") },
-      { label: t("offers.col.cr"), value: "cr asc", directionLabel: t("offers.sort.lowHigh") },
-      { label: t("offers.col.cr"), value: "cr desc", directionLabel: t("offers.sort.highLow") },
-      { label: t("offers.col.orderApplied"), value: "orders asc", directionLabel: t("offers.sort.lowHigh") },
-      { label: t("offers.col.orderApplied"), value: "orders desc", directionLabel: t("offers.sort.highLow") },
-      { label: t("offers.col.lastModified"), value: "modified desc", directionLabel: t("offers.sort.newest") },
-      { label: t("offers.col.lastModified"), value: "modified asc", directionLabel: t("offers.sort.oldest") },
-      { label: t("offers.col.createdAt"), value: "created desc", directionLabel: t("offers.sort.newest") },
-      { label: t("offers.col.createdAt"), value: "created asc", directionLabel: t("offers.sort.oldest") },
-      { label: t("offers.col.status"), value: "status asc", directionLabel: t("offers.sort.az") },
-      { label: t("offers.col.status"), value: "status desc", directionLabel: t("offers.sort.za") },
+      {
+        label: t("offers.col.lastModified"),
+        value: "modified desc",
+        directionLabel: t("offers.sort.newest"),
+      },
+      {
+        label: t("offers.col.lastModified"),
+        value: "modified asc",
+        directionLabel: t("offers.sort.oldest"),
+      },
+      {
+        label: t("offers.col.createdAt"),
+        value: "created desc",
+        directionLabel: t("offers.sort.newest"),
+      },
+      {
+        label: t("offers.col.createdAt"),
+        value: "created asc",
+        directionLabel: t("offers.sort.oldest"),
+      },
+      {
+        label: t("offers.col.campaignName"),
+        value: "name asc",
+        directionLabel: t("offers.sort.az"),
+      },
+      {
+        label: t("offers.col.campaignName"),
+        value: "name desc",
+        directionLabel: t("offers.sort.za"),
+      },
+      {
+        label: t("offers.col.status"),
+        value: "status asc",
+        directionLabel: t("offers.sort.az"),
+      },
+      {
+        label: t("offers.col.status"),
+        value: "status desc",
+        directionLabel: t("offers.sort.za"),
+      },
     ],
     [t],
+  );
+
+  const indexFiltersCancelAction = useMemo(
+    () => ({
+      onAction: () => setMode(IndexFiltersMode.Default),
+      disabled: false,
+      loading: false,
+    }),
+    [setMode],
   );
 
   const sortAria = useCallback(
@@ -326,7 +335,11 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
   );
 
   const translateCampaignType = useCallback(
-    (presentation?: VolumeDiscountWidgetPresentation) => {
+    (
+      presentation?: VolumeDiscountWidgetPresentation,
+      offerKind?: "volume" | "bogo",
+    ) => {
+      if (offerKind === "bogo") return t("offers.type.bogo");
       if (presentation === "volume_table") return t("offers.type.volumeDiscount");
       return t("offers.type.quantityBreaks");
     },
@@ -637,16 +650,6 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     listFetcher.submit(fd, { method: "post", action: listIndexAction });
   };
 
-  const submitBulkStatus = (bulkIntent: "bulkActivate" | "bulkDeactivate") => {
-    if (selectedResources.length === 0) return;
-    const fd = new FormData();
-    fd.set("_action", bulkIntent);
-    for (const id of selectedResources) {
-      fd.append("campaignIds", id);
-    }
-    listFetcher.submit(fd, { method: "post", action: listIndexAction });
-  };
-
   const atCampaignCap =
     maxActiveCampaigns != null && activeCount >= maxActiveCampaigns;
 
@@ -687,9 +690,32 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
     setPendingDeleteIds([...selectedResources]);
   }, [selectedResources]);
 
-  const offerBulkActions = useMemo(
-    () => [
-      {
+  const selectedCampaignStatuses = useMemo(() => {
+    const byId = new Map(
+      campaigns.map((c) => [c.id, String(c.status).toLowerCase()] as const),
+    );
+    return selectedResources
+      .map((id) => byId.get(id))
+      .filter((s): s is string => Boolean(s));
+  }, [campaigns, selectedResources]);
+
+  const allSelectedAlreadyActive =
+    selectedCampaignStatuses.length > 0 &&
+    selectedCampaignStatuses.every((s) => s === "active");
+  const allSelectedAlreadyDraft =
+    selectedCampaignStatuses.length > 0 &&
+    selectedCampaignStatuses.every((s) => s === "draft");
+
+  /** IndexTable header bulk overlay (Polaris) — Active / Draft / Delete */
+  const offerBulkActions = useMemo(() => {
+    const actions: {
+      content: string;
+      onAction: () => void;
+      disabled?: boolean;
+      destructive?: boolean;
+    }[] = [];
+    if (!allSelectedAlreadyActive) {
+      actions.push({
         content: planLockedActionContent(
           t("offers.bulk.active"),
           atCampaignCap,
@@ -697,29 +723,33 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
         ),
         onAction: runBulkActivate,
         disabled: listMutationPending || atCampaignCap,
-      },
-      {
+      });
+    }
+    if (!allSelectedAlreadyDraft) {
+      actions.push({
         content: t("offers.bulk.draft"),
         onAction: runBulkDraft,
         disabled: listMutationPending,
-      },
-      {
-        content: t("offers.bulk.delete"),
-        onAction: runBulkDelete,
-        disabled: listMutationPending,
-        destructive: true,
-      },
-    ],
-    [
-      atCampaignCap,
-      listMutationPending,
-      runBulkActivate,
-      runBulkDelete,
-      runBulkDraft,
-      t,
-      upgradeLabel,
-    ],
-  );
+      });
+    }
+    actions.push({
+      content: t("offers.bulk.delete"),
+      onAction: runBulkDelete,
+      disabled: listMutationPending,
+      destructive: true,
+    });
+    return actions;
+  }, [
+    allSelectedAlreadyActive,
+    allSelectedAlreadyDraft,
+    atCampaignCap,
+    listMutationPending,
+    runBulkActivate,
+    runBulkDelete,
+    runBulkDraft,
+    t,
+    upgradeLabel,
+  ]);
 
   const csvImportAction = adminEmbeddedPath("/app/offers/import", search);
   const csvImportPending = csvImportFetcher.state !== "idle";
@@ -817,85 +847,32 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
 
   const deleteCount = pendingDeleteIds?.length ?? 0;
 
-  const indexFiltersCancelAction = useMemo(
-    () => ({
-      onAction: () => setMode(IndexFiltersMode.Default),
-      disabled: false,
-      loading: false,
-    }),
-    [setMode],
-  );
+  const handleCreateOffer = useCallback(() => {
+    if (atOfferCap) {
+      showOfferLimitReached();
+      return;
+    }
+    if (onCreateOffer) {
+      onCreateOffer();
+      return;
+    }
+    warmEditorChunk();
+    setScreen("select");
+  }, [
+    atOfferCap,
+    onCreateOffer,
+    setScreen,
+    showOfferLimitReached,
+    warmEditorChunk,
+  ]);
 
-  const pagePrimaryAction = useMemo(
-    () => ({
-      content: planLockedActionContent(
-        t("offers.createOffer"),
-        atOfferCap,
-        upgradeLabel,
-      ),
-      disabled: atOfferCap,
-      onAction: () => {
-        if (atOfferCap) {
-          showOfferLimitReached();
-          return;
-        }
-        if (onCreateOffer) {
-          onCreateOffer();
-          return;
-        }
-        warmEditorChunk();
-        setScreen("select");
-      },
-    }),
-    [
-      atOfferCap,
-      onCreateOffer,
-      setScreen,
-      showOfferLimitReached,
-      t,
-      upgradeLabel,
-      warmEditorChunk,
-    ],
-  );
-
-  const pageSecondaryActions = useMemo(
-    () => [
-      {
-        content: planLockedActionContent(
-          t("common.export"),
-          !canImportExport,
-          upgradeLabel,
-        ),
-        loading: csvExportPending,
-        disabled: csvExportPending || !canExportOffers,
-        onAction: submitExportCsv,
-      },
-      {
-        content: planLockedActionContent(
-          t("common.import"),
-          !canImportExport,
-          upgradeLabel,
-        ),
-        onAction: () => {
-          if (!canImportExport) {
-            notify(t("offers.toast.importPremium"));
-            return;
-          }
-          setImportModalOpen(true);
-        },
-        disabled: !canImportExport,
-      },
-    ],
-    [
-      canExportOffers,
-      canImportExport,
-      csvExportPending,
-      notify,
-      submitExportCsv,
-      t,
-      upgradeLabel,
-    ],
-  );
+  const handleImportClick = useCallback(() => {
+    if (!canImportExport) {
+      notify(t("offers.toast.importPremium"));
+      return;
+    }
+    setImportModalOpen(true);
+  }, [canImportExport, notify, t]);
 
   const emptyStateCard = (
     <Card>
@@ -938,6 +915,7 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
 
   const tableCard =
     campaigns.length === 0 ? null : (
+      /* Polaris resource index: IndexFilters + IndexTable + Pagination */
       <LegacyCard>
         <IndexFilters
           sortOptions={sortOptions}
@@ -949,8 +927,21 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
           onSort={setSortSelected}
           cancelAction={indexFiltersCancelAction}
           tabs={offerTabs}
-          selected={tabIndex(offerTab)}
-          onSelect={(index) => setOfferTab(tabFromIndex(index))}
+          selected={
+            offerTab === "active"
+              ? 1
+              : offerTab === "scheduled"
+                ? 2
+                : offerTab === "draft"
+                  ? 3
+                  : 0
+          }
+          onSelect={(index) => {
+            if (index === 1) setOfferTab("active");
+            else if (index === 2) setOfferTab("scheduled");
+            else if (index === 3) setOfferTab("draft");
+            else setOfferTab("all");
+          }}
           canCreateNewView={false}
           filters={[]}
           appliedFilters={[]}
@@ -967,290 +958,337 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
           </Box>
         ) : (
           <Fragment>
-          <div className={styles.tableWrap}>
-            <IndexTable
-              resourceName={{
-                singular: t("offers.resource.singular"),
-                plural: t("offers.resource.plural"),
-              }}
-              itemCount={filteredCampaigns.length}
-              hasMoreItems={false}
-              selectedItemsCount={selectedItemsCountForTable}
-              onSelectionChange={handleOffersSelectionChange}
-              selectable
-              promotedBulkActions={offerBulkActions}
-              bulkActions={offerBulkActions}
-              headings={[
-                {
-                  id: "campaign-name",
-                  title: (
-                    <SortableColumnHeader
-                      columnKey="name"
-                      label={t("offers.col.campaignName")}
-                      sortSelected={sortSelected}
-                      onSort={setSortSelected}
-                      ascLabel={t("offers.sort.az")}
-                      descLabel={t("offers.sort.za")}
-                      sortAria={sortAria}
-                    />
-                  ),
-                },
-                {
-                  id: "discount-type",
-                  title: (
-                    <SortableColumnHeader
-                      columnKey="discount"
-                      label={t("offers.col.discountType")}
-                      sortSelected={sortSelected}
-                      onSort={setSortSelected}
-                      ascLabel={t("offers.sort.az")}
-                      descLabel={t("offers.sort.za")}
-                      sortAria={sortAria}
-                    />
-                  ),
-                },
-                {
-                  id: "campaign-type",
-                  title: (
-                    <SortableColumnHeader
-                      columnKey="type"
-                      label={t("offers.col.campaignType")}
-                      sortSelected={sortSelected}
-                      onSort={setSortSelected}
-                      ascLabel={t("offers.sort.az")}
-                      descLabel={t("offers.sort.za")}
-                      sortAria={sortAria}
-                    />
-                  ),
-                },
-                {
-                  id: "apply-to",
-                  title: (
-                    <SortableColumnHeader
-                      columnKey="apply"
-                      label={t("offers.col.applyTo")}
-                      sortSelected={sortSelected}
-                      onSort={setSortSelected}
-                      ascLabel={t("offers.sort.az")}
-                      descLabel={t("offers.sort.za")}
-                      sortAria={sortAria}
-                    />
-                  ),
-                },
-                {
-                  id: "impression",
-                  title: (
-                    <SortableColumnHeader
-                      columnKey="impression"
-                      label={t("offers.col.impression")}
-                      sortSelected={sortSelected}
-                      onSort={setSortSelected}
-                      ascLabel={t("offers.sort.lowHigh")}
-                      descLabel={t("offers.sort.highLow")}
-                      sortAria={sortAria}
-                    />
-                  ),
-                },
-                {
-                  id: "cr",
-                  title: (
-                    <SortableColumnHeader
-                      columnKey="cr"
-                      label={t("offers.col.cr")}
-                      sortSelected={sortSelected}
-                      onSort={setSortSelected}
-                      ascLabel={t("offers.sort.lowHigh")}
-                      descLabel={t("offers.sort.highLow")}
-                      sortAria={sortAria}
-                    />
-                  ),
-                },
-                {
-                  id: "order-applied",
-                  title: (
-                    <SortableColumnHeader
-                      columnKey="orders"
-                      label={t("offers.col.orderApplied")}
-                      sortSelected={sortSelected}
-                      onSort={setSortSelected}
-                      ascLabel={t("offers.sort.lowHigh")}
-                      descLabel={t("offers.sort.highLow")}
-                      sortAria={sortAria}
-                    />
-                  ),
-                },
-                {
-                  id: "last-modified",
-                  title: (
-                    <SortableColumnHeader
-                      columnKey="modified"
-                      label={t("offers.col.lastModified")}
-                      sortSelected={sortSelected}
-                      onSort={setSortSelected}
-                      defaultDir="desc"
-                      ascLabel={t("offers.sort.oldest")}
-                      descLabel={t("offers.sort.newest")}
-                      sortAria={sortAria}
-                    />
-                  ),
-                },
-                {
-                  id: "created-at",
-                  title: (
-                    <SortableColumnHeader
-                      columnKey="created"
-                      label={t("offers.col.createdAt")}
-                      sortSelected={sortSelected}
-                      onSort={setSortSelected}
-                      defaultDir="desc"
-                      ascLabel={t("offers.sort.oldest")}
-                      descLabel={t("offers.sort.newest")}
-                      sortAria={sortAria}
-                    />
-                  ),
-                },
-                {
-                  id: "status",
-                  title: (
-                    <SortableColumnHeader
-                      columnKey="status"
-                      label={t("offers.col.status")}
-                      sortSelected={sortSelected}
-                      onSort={setSortSelected}
-                      ascLabel={t("offers.sort.az")}
-                      descLabel={t("offers.sort.za")}
-                      sortAria={sortAria}
-                    />
-                  ),
-                },
-                { title: t("offers.col.actions"), id: "offers-actions-col" },
-              ]}
-              lastColumnSticky
-            >
-              {pageRows.map((c, index) => (
-                <IndexTable.Row
-                  id={c.id}
-                  key={c.id}
-                  position={index}
-                  selected={selectedResources.includes(c.id)}
-                  onClick={() => {}}
-                >
-                  <IndexTable.Cell>
-                    <Link
-                      to={offerEditTo(c.id)}
-                      prefetch="intent"
-                      className={styles.nameEditButton}
-                      title={c.campaignName}
-                      aria-label={t("offers.editAria", { name: c.campaignName })}
-                      onMouseEnter={warmEditorChunk}
-                      onFocus={warmEditorChunk}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (listMutationPending) e.preventDefault();
-                      }}
-                    >
-                      {truncateCampaignDisplayName(c.campaignName)}
-                    </Link>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Text as="span">{t("offers.discountType.product")}</Text>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Text as="span">
-                      {translateCampaignType(c.widgetPresentation)}
-                    </Text>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Text as="span">{translateScope(c.productScope)}</Text>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Text tone="subdued" as="span">
-                      —
-                    </Text>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Text tone="subdued" as="span">
-                      —
-                    </Text>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Text tone="subdued" as="span">
-                      —
-                    </Text>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Text as="span">{formatCreatedAt(c.updatedAt)}</Text>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Text as="span">{formatCreatedAt(c.createdAt)}</Text>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Badge tone={statusBadgeTone(c.status)}>
-                      {translateStatus(c.status)}
-                    </Badge>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <InlineStack gap="0" blockAlign="center" wrap={false}>
+            <div className={styles.tableWrap}>
+              <IndexTable
+                resourceName={{
+                  singular: t("offers.resource.singular"),
+                  plural: t("offers.resource.plural"),
+                }}
+                itemCount={filteredCampaigns.length}
+                hasMoreItems={false}
+                selectedItemsCount={selectedItemsCountForTable}
+                onSelectionChange={handleOffersSelectionChange}
+                selectable
+                promotedBulkActions={offerBulkActions}
+                bulkActions={offerBulkActions}
+                headings={[
+                  {
+                    id: "campaign-name",
+                    title: (
+                      <SortableColumnHeader
+                        columnKey="name"
+                        label={t("offers.col.campaignName")}
+                        sortSelected={sortSelected}
+                        onSort={setSortSelected}
+                        ascLabel={t("offers.sort.az")}
+                        descLabel={t("offers.sort.za")}
+                        sortAria={sortAria}
+                      />
+                    ),
+                  },
+                  {
+                    id: "discount-type",
+                    title: (
+                      <SortableColumnHeader
+                        columnKey="discount"
+                        label={t("offers.col.discountType")}
+                        sortSelected={sortSelected}
+                        onSort={setSortSelected}
+                        ascLabel={t("offers.sort.az")}
+                        descLabel={t("offers.sort.za")}
+                        sortAria={sortAria}
+                      />
+                    ),
+                  },
+                  {
+                    id: "campaign-type",
+                    title: (
+                      <SortableColumnHeader
+                        columnKey="type"
+                        label={t("offers.col.campaignType")}
+                        sortSelected={sortSelected}
+                        onSort={setSortSelected}
+                        ascLabel={t("offers.sort.az")}
+                        descLabel={t("offers.sort.za")}
+                        sortAria={sortAria}
+                      />
+                    ),
+                  },
+                  {
+                    id: "apply-to",
+                    title: (
+                      <SortableColumnHeader
+                        columnKey="apply"
+                        label={t("offers.col.applyTo")}
+                        sortSelected={sortSelected}
+                        onSort={setSortSelected}
+                        ascLabel={t("offers.sort.az")}
+                        descLabel={t("offers.sort.za")}
+                        sortAria={sortAria}
+                      />
+                    ),
+                  },
+                  {
+                    id: "impression",
+                    title: (
+                      <SortableColumnHeader
+                        columnKey="impression"
+                        label={t("offers.col.impression")}
+                        sortSelected={sortSelected}
+                        onSort={setSortSelected}
+                        ascLabel={t("offers.sort.lowHigh")}
+                        descLabel={t("offers.sort.highLow")}
+                        sortAria={sortAria}
+                      />
+                    ),
+                  },
+                  {
+                    id: "cr",
+                    title: (
+                      <SortableColumnHeader
+                        columnKey="cr"
+                        label={t("offers.col.cr")}
+                        sortSelected={sortSelected}
+                        onSort={setSortSelected}
+                        ascLabel={t("offers.sort.lowHigh")}
+                        descLabel={t("offers.sort.highLow")}
+                        sortAria={sortAria}
+                      />
+                    ),
+                  },
+                  {
+                    id: "order-applied",
+                    title: (
+                      <SortableColumnHeader
+                        columnKey="orders"
+                        label={t("offers.col.orderApplied")}
+                        sortSelected={sortSelected}
+                        onSort={setSortSelected}
+                        ascLabel={t("offers.sort.lowHigh")}
+                        descLabel={t("offers.sort.highLow")}
+                        sortAria={sortAria}
+                      />
+                    ),
+                  },
+                  {
+                    id: "last-modified",
+                    title: (
+                      <SortableColumnHeader
+                        columnKey="modified"
+                        label={t("offers.col.lastModified")}
+                        sortSelected={sortSelected}
+                        onSort={setSortSelected}
+                        defaultDir="desc"
+                        ascLabel={t("offers.sort.oldest")}
+                        descLabel={t("offers.sort.newest")}
+                        sortAria={sortAria}
+                      />
+                    ),
+                  },
+                  {
+                    id: "created-at",
+                    title: (
+                      <SortableColumnHeader
+                        columnKey="created"
+                        label={t("offers.col.createdAt")}
+                        sortSelected={sortSelected}
+                        onSort={setSortSelected}
+                        defaultDir="desc"
+                        ascLabel={t("offers.sort.oldest")}
+                        descLabel={t("offers.sort.newest")}
+                        sortAria={sortAria}
+                      />
+                    ),
+                  },
+                  {
+                    id: "status",
+                    title: (
+                      <SortableColumnHeader
+                        columnKey="status"
+                        label={t("offers.col.status")}
+                        sortSelected={sortSelected}
+                        onSort={setSortSelected}
+                        ascLabel={t("offers.sort.az")}
+                        descLabel={t("offers.sort.za")}
+                        sortAria={sortAria}
+                      />
+                    ),
+                  },
+                  { title: t("offers.col.actions"), id: "offers-actions-col" },
+                ]}
+                lastColumnSticky
+              >
+                {pageRows.map((c, index) => (
+                  <IndexTable.Row
+                    id={c.id}
+                    key={c.id}
+                    position={index}
+                    selected={selectedResources.includes(c.id)}
+                    onClick={() => {}}
+                  >
+                    <IndexTable.Cell>
                       <Link
-                        to={offerEditTo(c.id)}
+                        to={offerEditTo(c.id, c.offerKind)}
                         prefetch="intent"
-                        className={styles.editIconLink}
-                        aria-label={t("common.edit")}
-                        onMouseEnter={warmEditorChunk}
-                        onFocus={warmEditorChunk}
+                        className={styles.nameEditButton}
+                        title={c.campaignName}
+                        aria-label={t("offers.editAria", {
+                          name: c.campaignName,
+                        })}
+                        onMouseEnter={
+                          c.offerKind === "bogo" ? undefined : warmEditorChunk
+                        }
+                        onFocus={
+                          c.offerKind === "bogo" ? undefined : warmEditorChunk
+                        }
                         onClick={(e) => {
                           e.stopPropagation();
                           if (listMutationPending) e.preventDefault();
                         }}
                       >
-                        <Icon source={EditIcon} tone="base" />
+                        {truncateCampaignDisplayName(c.campaignName)}
                       </Link>
-                      <Button
-                        variant="tertiary"
-                        icon={DuplicateIcon}
-                        accessibilityLabel={
-                          atOfferCap
-                            ? `${t("common.duplicate")} — ${t("common.upgradePlan")}`
-                            : t("common.duplicate")
-                        }
-                        disabled={listMutationPending || atOfferCap}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={() => submitDuplicate(c.id)}
-                      />
-                      <Button
-                        variant="tertiary"
-                        tone="critical"
-                        icon={DeleteIcon}
-                        accessibilityLabel={t("common.delete")}
-                        disabled={listMutationPending}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={() => setPendingDeleteIds([c.id])}
-                      />
-                    </InlineStack>
-                  </IndexTable.Cell>
-                </IndexTable.Row>
-              ))}
-            </IndexTable>
-          </div>
-          <Box
-            padding="300"
-            borderColor="border"
-            borderBlockStartWidth="025"
-            background="bg-surface-secondary"
-          >
-            <Pagination
-              type="table"
-              hasPrevious={hasPrevious}
-              hasNext={hasNext}
-              onPrevious={() => setPageIndex((p) => Math.max(0, p - 1))}
-              onNext={() => setPageIndex((p) => p + 1)}
-              label={t("offers.pagination", {
-                start: rangeStart,
-                end: rangeEnd,
-                total: total.toLocaleString(),
-              })}
-            />
-          </Box>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <Text as="span">
+                        {c.offerKind === "bogo"
+                          ? t("offers.discountType.bxgy")
+                          : t("offers.discountType.product")}
+                      </Text>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <Text as="span">
+                        {translateCampaignType(
+                          c.widgetPresentation,
+                          c.offerKind,
+                        )}
+                      </Text>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <Text as="span">{translateScope(c.productScope)}</Text>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <Text tone="subdued" as="span">
+                        —
+                      </Text>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <Text tone="subdued" as="span">
+                        —
+                      </Text>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <Text tone="subdued" as="span">
+                        —
+                      </Text>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <Text as="span">{formatCreatedAt(c.updatedAt)}</Text>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <Text as="span">{formatCreatedAt(c.createdAt)}</Text>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      {/* Polaris web: s-badge — Active / Draft / Scheduled */}
+                      <s-badge tone={statusBadgeToneWeb(c.status)}>
+                        {translateStatus(c.status)}
+                      </s-badge>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      {/* Polaris web: s-stack + s-button — row actions */}
+                      <s-stack
+                        direction="inline"
+                        gap="none"
+                        alignItems="center"
+                      >
+                        <span
+                          onMouseEnter={
+                            c.offerKind === "bogo"
+                              ? undefined
+                              : warmEditorChunk
+                          }
+                          onFocus={
+                            c.offerKind === "bogo"
+                              ? undefined
+                              : warmEditorChunk
+                          }
+                        >
+                          <s-button
+                            variant="tertiary"
+                            icon="edit"
+                            href={offerEditTo(c.id, c.offerKind)}
+                            accessibilityLabel={t("common.edit")}
+                            disabled={listMutationPending || undefined}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (listMutationPending) e.preventDefault();
+                            }}
+                          />
+                        </span>
+                        <s-button
+                          variant="tertiary"
+                          icon="duplicate"
+                          accessibilityLabel={
+                            atOfferCap
+                              ? `${t("common.duplicate")} — ${t("common.upgradePlan")}`
+                              : t("common.duplicate")
+                          }
+                          disabled={
+                            listMutationPending || atOfferCap || undefined
+                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            submitDuplicate(c.id);
+                          }}
+                        />
+                        <s-button
+                          variant="tertiary"
+                          tone="critical"
+                          icon="delete"
+                          accessibilityLabel={t("common.delete")}
+                          disabled={listMutationPending || undefined}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingDeleteIds([c.id]);
+                          }}
+                        />
+                      </s-stack>
+                    </IndexTable.Cell>
+                  </IndexTable.Row>
+                ))}
+              </IndexTable>
+            </div>
+            {/* Polaris web pagination — same pageIndex handlers */}
+            <s-box padding="small" background="subdued">
+              <s-stack
+                direction="inline"
+                gap="small"
+                alignItems="center"
+                justifyContent="center"
+              >
+                <s-button
+                  variant="secondary"
+                  icon="chevron-left"
+                  accessibilityLabel="Previous"
+                  disabled={!hasPrevious || undefined}
+                  onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
+                />
+                <s-text color="subdued">
+                  {t("offers.pagination", {
+                    start: rangeStart,
+                    end: rangeEnd,
+                    total: total.toLocaleString(),
+                  })}
+                </s-text>
+                <s-button
+                  variant="secondary"
+                  icon="chevron-right"
+                  accessibilityLabel="Next"
+                  disabled={!hasNext || undefined}
+                  onClick={() => setPageIndex((p) => p + 1)}
+                />
+              </s-stack>
+            </s-box>
           </Fragment>
         )}
       </LegacyCard>
@@ -1259,18 +1297,50 @@ export const OffersPolarisHome = memo(function OffersPolarisHome({
   return (
     <>
     <div className={styles.offersPageShell}>
-    <Page
-      fullWidth
-      title={t("offers.title")}
-      primaryAction={pagePrimaryAction}
-      secondaryActions={pageSecondaryActions}
-    >
+    <s-page heading={t("offers.title")} inlineSize="large">
+      <s-button
+        slot="secondary-actions"
+        variant="secondary"
+        loading={csvExportPending || undefined}
+        disabled={csvExportPending || !canExportOffers || undefined}
+        onClick={submitExportCsv}
+      >
+        {planLockedActionContent(
+          t("common.export"),
+          !canImportExport,
+          upgradeLabel,
+        )}
+      </s-button>
+      <s-button
+        slot="secondary-actions"
+        variant="secondary"
+        disabled={!canImportExport || undefined}
+        onClick={handleImportClick}
+      >
+        {planLockedActionContent(
+          t("common.import"),
+          !canImportExport,
+          upgradeLabel,
+        )}
+      </s-button>
+      <s-button
+        slot="primary-action"
+        variant="primary"
+        disabled={atOfferCap || undefined}
+        onClick={handleCreateOffer}
+      >
+        {planLockedActionContent(
+          t("offers.createOffer"),
+          atOfferCap,
+          upgradeLabel,
+        )}
+      </s-button>
       <Box maxWidth="100%" minWidth="0">
         <BlockStack gap="400">
           {campaigns.length === 0 ? emptyStateCard : tableCard}
         </BlockStack>
       </Box>
-    </Page>
+    </s-page>
     </div>
 
       <Modal

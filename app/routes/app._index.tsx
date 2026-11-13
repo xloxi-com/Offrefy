@@ -9,18 +9,6 @@ import {
 } from "react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Prisma } from "@prisma/client";
-import {
-  Page,
-  Layout,
-  Card,
-  Text,
-  BlockStack,
-  InlineStack,
-  Button,
-  Banner,
-  Divider,
-} from "@shopify/polaris";
-import { SettingsIcon } from "@shopify/polaris-icons";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { APP_DISPLAY_NAME } from "../branding";
 import { prisma } from "../db.server";
@@ -380,7 +368,6 @@ export default function AppHomePage() {
     selectType: "1",
   });
   const settingsHref = adminEmbeddedPath("/app/settings", search);
-  const analyticsHref = adminEmbeddedPath("/app/analytics", search);
 
   const [adminLanguageDraft, setAdminLanguageDraft] =
     useState<AdminLanguageCode>(() =>
@@ -769,173 +756,154 @@ export default function AppHomePage() {
     [t],
   );
 
+  const lastSyncedLabel = lastSyncedAt
+    ? formatSyncedAt(lastSyncedAt, localeKey, t("settings.neverSynced"))
+    : t("settings.neverSynced");
+
   return (
-    <Page
-      title={APP_DISPLAY_NAME}
-      subtitle={t("home.subtitle")}
-      compactTitle
-      primaryAction={{
-        content: t("home.createOffer"),
-        url: newOfferHref,
-      }}
-      secondaryActions={[
-        {
-          content: t("home.settings"),
-          url: settingsHref,
-          icon: SettingsIcon,
-        },
-      ]}
-    >
-      <BlockStack gap="500">
-        {!setupComplete && showGuide && !dismissedSetupBanner ? (
-          <Banner
-            tone="info"
-            title={t("home.bannerCompleteSetupTitle")}
-            onDismiss={() => setDismissedSetupBanner(true)}
+    /* Polaris homepage — same create / sync / language / setup handlers */
+    <s-page heading={APP_DISPLAY_NAME} inlineSize="base">
+      <s-button slot="primary-action" variant="primary" href={newOfferHref}>
+        {t("home.createOffer")}
+      </s-button>
+      <s-button slot="secondary-actions" href={settingsHref} icon="settings">
+        {t("home.settings")}
+      </s-button>
+
+      <s-paragraph color="subdued">{t("home.subtitle")}</s-paragraph>
+
+      {!setupComplete && showGuide && !dismissedSetupBanner ? (
+        <s-banner
+          tone="info"
+          heading={t("home.bannerCompleteSetupTitle")}
+          dismissible
+          onDismiss={() => setDismissedSetupBanner(true)}
+        >
+          {t("home.bannerCompleteSetupBody")}
+        </s-banner>
+      ) : null}
+
+      {/*
+        Clean two-column home layout (Polaris web):
+        main = setup + quick links · side = language / sync / promo cards
+      */}
+      <s-grid
+        gap="base"
+        alignItems="start"
+        gridTemplateColumns="@container (inline-size <= 56rem) 1fr, minmax(0, 2fr) minmax(17rem, 1fr)"
+      >
+        <s-stack direction="block" gap="base">
+          {showGuide ? (
+            <SetupGuide
+              onDismiss={dismissGuide}
+              onRefresh={requestSetupRefresh}
+              refreshing={setupRefreshing}
+              items={setupItems}
+              title={t("home.setupGuideTitle")}
+              description={t("home.setupGuideDescription")}
+            />
+          ) : (
+            <s-section heading={t("home.setupGuideTitle")}>
+              <s-stack
+                direction="inline"
+                gap="base"
+                alignItems="center"
+                justifyContent="space-between"
+              >
+                <s-paragraph color="subdued">
+                  {t("home.setupDismissed")}
+                </s-paragraph>
+                <s-button onClick={restoreGuide}>
+                  {t("home.showSetupGuide")}
+                </s-button>
+              </s-stack>
+            </s-section>
+          )}
+
+        </s-stack>
+
+        <s-stack direction="block" gap="base">
+          {/* Language card */}
+          <s-box
+            padding="base"
+            background="base"
+            border="base"
+            borderRadius="base"
           >
-            <p>{t("home.bannerCompleteSetupBody")}</p>
-          </Banner>
-        ) : null}
+            <s-stack direction="block" gap="base">
+              <s-heading>{t("home.adminLanguage")}</s-heading>
+              <AdminLanguageDropdown
+                label={t("common.language")}
+                options={languageOptions}
+                value={adminLanguageDraft}
+                onChange={onAdminLanguageSelect}
+                helpText={t("home.adminLanguageHelp")}
+              />
+              <s-stack direction="inline" justifyContent="end">
+                <s-button
+                  variant="primary"
+                  loading={savingAdminLanguage || undefined}
+                  disabled={
+                    adminLanguageDraft ===
+                      normalizeAdminLanguage(liveAdminLanguage) || undefined
+                  }
+                  onClick={saveAdminLanguagePreference}
+                >
+                  {t("common.save")}
+                </s-button>
+              </s-stack>
+            </s-stack>
+          </s-box>
 
-        <Layout>
-          <Layout.Section>
-            <BlockStack gap="400">
-              {showGuide ? (
-                <SetupGuide
-                  onDismiss={dismissGuide}
-                  onRefresh={requestSetupRefresh}
-                  refreshing={setupRefreshing}
-                  items={setupItems}
-                  title={t("home.setupGuideTitle")}
-                  description={t("home.setupGuideDescription")}
-                />
-              ) : (
-                <Card>
-                  <InlineStack align="space-between" blockAlign="center">
-                    <Text as="p" variant="bodyMd">
-                      {t("home.setupDismissed")}
-                    </Text>
-                    <Button onClick={restoreGuide}>
-                      {t("home.showSetupGuide")}
-                    </Button>
-                  </InlineStack>
-                </Card>
-              )}
+          {/* Sync card */}
+          <s-box
+            padding="base"
+            background="base"
+            border="base"
+            borderRadius="base"
+          >
+            <s-stack direction="block" gap="base">
+              <s-stack direction="block" gap="small-200">
+                <s-heading>{t("settings.manualActions")}</s-heading>
+                <s-paragraph color="subdued">
+                  {t("settings.manualActionsHelp")}
+                </s-paragraph>
+              </s-stack>
+              {fetcher.data &&
+              "intent" in fetcher.data &&
+              fetcher.data.intent === "syncStorefront" &&
+              !fetcher.data.ok ? (
+                <s-banner tone="critical" heading={t("settings.syncFailed")}>
+                  {"error" in fetcher.data && fetcher.data.error
+                    ? String(fetcher.data.error)
+                    : t("common.unknownError")}
+                </s-banner>
+              ) : null}
+              <s-button
+                variant="primary"
+                loading={syncingStorefront || undefined}
+                disabled={syncingStorefront || undefined}
+                onClick={syncStorefront}
+              >
+                {t("settings.syncNow")}
+              </s-button>
+              <s-text color="subdued">
+                {t("settings.lastSynced")} {lastSyncedLabel}
+              </s-text>
+            </s-stack>
+          </s-box>
 
-              <Card>
-                <BlockStack gap="300">
-                  <Text as="h2" variant="headingMd">
-                    {t("home.quickLinks")}
-                  </Text>
-                  <InlineStack gap="200" wrap>
-                    <Button url={offersHref} size="slim">
-                      {t("home.offers")}
-                    </Button>
-                    <Button url={analyticsHref} size="slim">
-                      {t("home.analytics")}
-                    </Button>
-                    <Button url={settingsHref} size="slim">
-                      {t("home.settings")}
-                    </Button>
-                  </InlineStack>
-                </BlockStack>
-              </Card>
-            </BlockStack>
-          </Layout.Section>
-
-          <Layout.Section variant="oneThird">
-            <BlockStack gap="400">
-              <Card>
-                <BlockStack gap="300">
-                  <Text as="h2" variant="headingMd">
-                    {t("home.adminLanguage")}
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    {t("home.adminLanguageHelp")}
-                  </Text>
-                  <AdminLanguageDropdown
-                    label={t("common.language")}
-                    options={languageOptions}
-                    value={adminLanguageDraft}
-                    onChange={onAdminLanguageSelect}
-                  />
-                  <InlineStack align="end">
-                    <Button
-                      variant="primary"
-                      onClick={saveAdminLanguagePreference}
-                      loading={savingAdminLanguage}
-                      disabled={
-                        adminLanguageDraft ===
-                        normalizeAdminLanguage(liveAdminLanguage)
-                      }
-                    >
-                      {t("common.save")}
-                    </Button>
-                  </InlineStack>
-                </BlockStack>
-              </Card>
-
-              <Card>
-                <BlockStack gap="400">
-                  <Text as="h2" variant="headingMd">
-                    {t("settings.manualActions")}
-                  </Text>
-                  <Text as="p" tone="subdued">
-                    {t("settings.manualActionsHelp")}
-                  </Text>
-                  <Divider />
-                  {fetcher.data &&
-                  "intent" in fetcher.data &&
-                  fetcher.data.intent === "syncStorefront" &&
-                  !fetcher.data.ok ? (
-                    <Banner title={t("settings.syncFailed")} tone="critical">
-                      <p>
-                        {"error" in fetcher.data && fetcher.data.error
-                          ? String(fetcher.data.error)
-                          : t("common.unknownError")}
-                      </p>
-                    </Banner>
-                  ) : null}
-                  <InlineStack align="space-between" blockAlign="center">
-                    <Button
-                      onClick={syncStorefront}
-                      loading={syncingStorefront}
-                      variant="primary"
-                    >
-                      {t("settings.syncNow")}
-                    </Button>
-                    <BlockStack gap="050">
-                      <Text
-                        as="p"
-                        variant="bodyMd"
-                        fontWeight="semibold"
-                        tone="subdued"
-                      >
-                        {t("settings.lastSynced")}
-                      </Text>
-                      <Text
-                        as="p"
-                        variant="bodyMd"
-                        tone={lastSyncedAt ? "success" : "subdued"}
-                      >
-                        {lastSyncedAt
-                          ? formatSyncedAt(
-                              lastSyncedAt,
-                              localeKey,
-                              t("settings.neverSynced"),
-                            )
-                          : t("settings.neverSynced")}
-                      </Text>
-                    </BlockStack>
-                  </InlineStack>
-                </BlockStack>
-              </Card>
-
-              <ApprovefyPromoCard />
-            </BlockStack>
-          </Layout.Section>
-        </Layout>
-      </BlockStack>
-    </Page>
+          {/* Promo card */}
+          <s-box
+            padding="base"
+            background="base"
+            border="base"
+            borderRadius="base"
+          >
+            <ApprovefyPromoCard />
+          </s-box>
+        </s-stack>
+      </s-grid>
+    </s-page>
   );
 }

@@ -16,7 +16,27 @@ export type StorefrontTranslationFields = {
   transCartDiscount: string;
   /** Quantity suffix on cart badge when qty is grouped, e.g. "(qty {{ qty }})". */
   transCartDiscountQty: string;
+  /** Buy X Get Y card only. Quantity breaks leave these empty. */
+  transBogoBadge?: string;
+  transBogoBuy?: string;
+  transBogoGetFree?: string;
+  transBogoGet?: string;
+  transBogoPick?: string;
+  transBogoPickPlural?: string;
+  transBogoAvailable?: string;
+  transBogoFree?: string;
 };
+
+export const BOGO_TRANSLATION_FIELD_KEYS = [
+  "transBogoBadge",
+  "transBogoBuy",
+  "transBogoGetFree",
+  "transBogoGet",
+  "transBogoPick",
+  "transBogoPickPlural",
+  "transBogoAvailable",
+  "transBogoFree",
+] as const satisfies readonly (keyof StorefrontTranslationFields)[];
 
 export type StorefrontTranslationsMap = Record<string, StorefrontTranslationFields>;
 
@@ -468,9 +488,15 @@ export const STOREFRONT_TRANSLATION_PRESETS: StorefrontTranslationsMap = {
   },
 };
 
+type RequiredStorefrontTranslationField = {
+  [K in keyof StorefrontTranslationFields]-?: undefined extends StorefrontTranslationFields[K]
+    ? never
+    : K;
+}[keyof StorefrontTranslationFields];
+
 export const STOREFRONT_TRANSLATION_FIELD_KEYS = Object.keys(
   ENGLISH_STOREFRONT_TRANSLATION,
-) as (keyof StorefrontTranslationFields)[];
+) as RequiredStorefrontTranslationField[];
 
 export function hasCuratedTranslationPreset(languageKey: string): boolean {
   const key = languageKey.trim().toLowerCase();
@@ -559,7 +585,8 @@ function fillEmptyTranslationFields(
       hasCuratedTranslationPreset(key) &&
       value === ENGLISH_STOREFRONT_TRANSLATION[field];
     if (empty || stillEnglish) {
-      merged[field] = preset[field];
+      const next = preset[field];
+      if (typeof next === "string") merged[field] = next;
     }
   }
   return merged;
@@ -614,7 +641,7 @@ export function compactTranslationsForDiscountFunction(
     if (!key) continue;
 
     const fieldCart = String(fields.transCartDiscount ?? "").trim();
-    let cartDiscount =
+    const cartDiscount =
       key === "en"
         ? englishTemplate
         : fieldCart
@@ -670,7 +697,10 @@ export function parseSparseStorefrontTranslations(
     const sparse: Partial<StorefrontTranslationFields> = {};
     let any = false;
     const fields = fieldsRaw as Record<string, unknown>;
-    for (const field of STOREFRONT_TRANSLATION_FIELD_KEYS) {
+    for (const field of [
+      ...STOREFRONT_TRANSLATION_FIELD_KEYS,
+      ...BOGO_TRANSLATION_FIELD_KEYS,
+    ]) {
       const value = fields[field];
       if (typeof value !== "string") continue;
       const trimmed = value.trim();
@@ -711,7 +741,10 @@ export function mergeShopAndCampaignTranslations(
     const base =
       result[lang] ?? translationPresetForLanguage(lang);
     const merged: StorefrontTranslationFields = { ...base };
-    for (const field of STOREFRONT_TRANSLATION_FIELD_KEYS) {
+    for (const field of [
+      ...STOREFRONT_TRANSLATION_FIELD_KEYS,
+      ...BOGO_TRANSLATION_FIELD_KEYS,
+    ]) {
       const value = override[field];
       if (typeof value === "string" && value.trim()) {
         merged[field] = value.trim();
@@ -798,6 +831,14 @@ export function resolveCampaignEnglishSourceForAutoTranslate(args: {
   footnote?: string | null;
   countdownLabel?: string | null;
   displayName?: string | null;
+  bogoBadge?: string | null;
+  bogoBuy?: string | null;
+  bogoGetFree?: string | null;
+  bogoGet?: string | null;
+  bogoPick?: string | null;
+  bogoPickPlural?: string | null;
+  bogoAvailable?: string | null;
+  bogoFree?: string | null;
 }): StorefrontTranslationFields {
   const primary =
     String(args.primaryLang ?? "en").trim().toLowerCase() || "en";
@@ -815,7 +856,8 @@ export function resolveCampaignEnglishSourceForAutoTranslate(args: {
 
   for (const field of STOREFRONT_TRANSLATION_FIELD_KEYS) {
     if (!String(merged[field] ?? "").trim()) {
-      merged[field] = basePreset[field];
+      const fallback = basePreset[field];
+      if (typeof fallback === "string") merged[field] = fallback;
     }
   }
 
@@ -834,6 +876,21 @@ export function resolveCampaignEnglishSourceForAutoTranslate(args: {
   const displayName = String(args.displayName ?? "").trim();
   if (displayName.includes("{{")) {
     merged.transCartDiscount = displayName;
+  }
+
+  const bogoPairs: Array<[keyof StorefrontTranslationFields, string | null | undefined]> = [
+    ["transBogoBadge", args.bogoBadge],
+    ["transBogoBuy", args.bogoBuy],
+    ["transBogoGetFree", args.bogoGetFree],
+    ["transBogoGet", args.bogoGet],
+    ["transBogoPick", args.bogoPick],
+    ["transBogoPickPlural", args.bogoPickPlural],
+    ["transBogoAvailable", args.bogoAvailable],
+    ["transBogoFree", args.bogoFree],
+  ];
+  for (const [field, value] of bogoPairs) {
+    const text = String(value ?? "").trim();
+    if (text) merged[field] = text;
   }
 
   return merged;

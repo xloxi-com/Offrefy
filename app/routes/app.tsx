@@ -21,8 +21,8 @@ import { useEffect, useState, type ReactNode, Fragment } from "react";
 import { AppProvider as PolarisAppProvider } from "@shopify/polaris";
 import en from "@shopify/polaris/locales/en.json";
 import { boundary } from "@shopify/shopify-app-react-router/server";
-import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { useAppBridge } from "@shopify/app-bridge-react";
+import { ShopifyAppProvider } from "../components/ShopifyAppProvider";
 
 import { APP_DISPLAY_NAME } from "../branding";
 import {
@@ -191,7 +191,7 @@ export default function App() {
   }, [navigate, pathname, search]);
 
   return (
-    <AppProvider embedded apiKey={apiKey}>
+    <ShopifyAppProvider embedded apiKey={apiKey}>
       <AdminI18nProvider initialAdminLanguage={adminLanguage}>
         <PolarisLocaleBridge fallbackAdminLanguage={adminLanguage}>
           <AppNav />
@@ -199,7 +199,7 @@ export default function App() {
           <TawkChat />
         </PolarisLocaleBridge>
       </AdminI18nProvider>
-    </AppProvider>
+    </ShopifyAppProvider>
   );
 }
 

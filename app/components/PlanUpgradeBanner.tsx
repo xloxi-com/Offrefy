@@ -1,4 +1,5 @@
-import { Banner, Button, InlineStack, Text } from "@shopify/polaris";
+import { Banner, InlineStack, Text } from "@shopify/polaris";
+import { Button } from "./AppButton";
 import { Link, useLocation } from "react-router";
 
 import { adminEmbeddedPath } from "../utils/adminEmbeddedPath";

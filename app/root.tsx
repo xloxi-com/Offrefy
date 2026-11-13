@@ -3,6 +3,8 @@ import polarisButtonPressedUrl from "./styles/polaris-button-pressed.css?url";
 import type { LinksFunction } from "react-router";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 
+import { POLARIS_CDN_URL } from "./components/ShopifyAppProvider";
+
 /**
  * Explicit stylesheet links + preload so Polaris CSS is in <head> early for SSR
  * and the browser fetches it before paint (reduces intermittent unstyled UI).
@@ -13,6 +15,7 @@ export const links: LinksFunction = () => [
     href: "https://cdn.shopify.com",
     crossOrigin: "anonymous",
   },
+  { rel: "preload", href: POLARIS_CDN_URL, as: "script" },
   { rel: "preload", href: polarisStylesUrl, as: "style" },
   { rel: "preload", href: polarisButtonPressedUrl, as: "style" },
   { rel: "stylesheet", href: polarisStylesUrl },

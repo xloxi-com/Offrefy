@@ -18,6 +18,7 @@ import {
   buildStorefrontTranslationsForLanguages,
   ENGLISH_STOREFRONT_TRANSLATION,
   hasCuratedTranslationPreset,
+  BOGO_TRANSLATION_FIELD_KEYS,
   STOREFRONT_TRANSLATION_FIELD_KEYS,
   sparsifyStorefrontTranslations,
   type StorefrontTranslationFields,
@@ -492,13 +493,16 @@ export async function runCampaignAutoTranslateFromForm(
     };
   }
 
-  let primarySource: StorefrontTranslationFields = {
+  const primarySource: StorefrontTranslationFields = {
     ...ENGLISH_STOREFRONT_TRANSLATION,
   };
   try {
     const parsed = JSON.parse(String(form.get("englishSource") ?? "{}"));
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      for (const field of STOREFRONT_TRANSLATION_FIELD_KEYS) {
+      for (const field of [
+        ...STOREFRONT_TRANSLATION_FIELD_KEYS,
+        ...BOGO_TRANSLATION_FIELD_KEYS,
+      ]) {
         const value = (parsed as Record<string, unknown>)[field];
         if (typeof value === "string" && value.trim()) {
           primarySource[field] = value.trim();

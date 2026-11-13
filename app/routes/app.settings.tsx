@@ -1,17 +1,6 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { data, useLoaderData, useFetcher, useRevalidator } from "react-router";
 import { useState, useCallback, useEffect, useMemo } from "react";
-import {
-  Page,
-  Layout,
-  Card,
-  Text,
-  BlockStack,
-  Button,
-  InlineStack,
-  Select,
-  Checkbox,
-} from "@shopify/polaris";
 import { ApprovefyPromoCard } from "../components/ApprovefyPromoCard";
 import { AdminLanguageDropdown } from "../components/AdminLanguageDropdown";
 import { useAdminI18n } from "../components/AdminI18nProvider";
@@ -282,19 +271,30 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       syncInterval,
       await readShopLastSyncedAt(session.shop),
     );
-    // Push discount combinesWith via Function sync
-    runAfterResponse(
-      (async () => {
-        try {
-          await syncVolumeDiscountShop(admin, session.shop, {
-            force: true,
-            purgeLegacy: false,
-          });
-        } catch (e) {
-          console.error("[volume-discount-settings] sync after stacking", e);
-        }
-      })(),
-    );
+    // Push Combinations to Shopify before returning so Save reflects truth.
+    try {
+      const { errors } = await syncVolumeDiscountShop(admin, session.shop, {
+        force: true,
+        purgeLegacy: false,
+      });
+      if (errors?.length) {
+        return {
+          ok: false,
+          error: errors.join(" "),
+          intent,
+        };
+      }
+    } catch (e) {
+      console.error("[volume-discount-settings] sync after stacking", e);
+      return {
+        ok: false,
+        error:
+          e instanceof Error
+            ? e.message
+            : "Failed to push Combinations to Shopify",
+        intent,
+      };
+    }
     return {
       ok: true,
       message: "Sync & stacking settings saved",
@@ -688,125 +688,137 @@ export default function SettingsPage() {
   }, [adminLangFetcher.data, adminLangFetcher.state, setAdminLanguage, shopify, t]);
 
   return (
-    <Page
-      title={t("settings.title")}
-      subtitle={t("settings.subtitle")}
-      compactTitle
-    >
-      <BlockStack gap="500">
-        <Layout>
-          <Layout.Section>
-            <BlockStack gap="500">
-              <Card>
-                <BlockStack gap="300">
-                  <Text as="h2" variant="headingMd">
-                    {t("settings.syncStacking")}
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    {settings.canUseSchedulingAutomation
-                      ? t("settings.syncStackingHelp")
-                      : t("settings.syncStackingHelpLocked")}
-                  </Text>
-                  <Select
-                    label={t("settings.autoSyncInterval")}
-                    options={[
-                      {
-                        label: t("settings.syncInterval.disabled"),
-                        value: "disabled",
-                      },
-                      { label: t("settings.syncInterval.5m"), value: "5m" },
-                      { label: t("settings.syncInterval.15m"), value: "15m" },
-                      { label: t("settings.syncInterval.30m"), value: "30m" },
-                      { label: t("settings.syncInterval.1h"), value: "1h" },
-                      { label: t("settings.syncInterval.6h"), value: "6h" },
-                      { label: t("settings.syncInterval.12h"), value: "12h" },
-                      { label: t("settings.syncInterval.24h"), value: "24h" },
-                    ]}
-                    value={
-                      settings.canUseSchedulingAutomation
-                        ? syncInterval
-                        : "disabled"
-                    }
-                    onChange={setSyncInterval}
-                    disabled={!settings.canUseSchedulingAutomation}
-                  />
-                  <BlockStack gap="050">
-                    <Text as="p" variant="bodyMd" fontWeight="semibold" tone="subdued">
-                      {t("settings.lastSynced")}
-                    </Text>
-                    <Text
-                      as="p"
-                      variant="bodyMd"
-                      tone={lastSynced ? "success" : "subdued"}
-                    >
-                      {formatSyncTime(lastSynced)}
-                    </Text>
-                  </BlockStack>
-                  <Text as="h3" variant="headingSm">
-                    {t("settings.combineWith")}
-                  </Text>
-                  <Checkbox
-                    label={t("settings.combineProduct")}
-                    checked={combineProduct}
-                    onChange={setCombineProduct}
-                  />
-                  <Checkbox
-                    label={t("settings.combineOrder")}
-                    checked={combineOrder}
-                    onChange={setCombineOrder}
-                  />
-                  <Checkbox
-                    label={t("settings.combineShipping")}
-                    checked={combineShipping}
-                    onChange={setCombineShipping}
-                  />
-                  <InlineStack align="end">
-                    <Button
-                      variant="primary"
-                      onClick={handleSaveSyncStacking}
-                      loading={syncStackFetcher.state !== "idle"}
-                    >
-                      {t("settings.saveSync")}
-                    </Button>
-                  </InlineStack>
-                </BlockStack>
-              </Card>
+    /* Polaris web: s-page — Settings shell (same save / language handlers) */
+    <s-page heading={t("settings.title")} inlineSize="base">
+      <s-paragraph color="subdued">{t("settings.subtitle")}</s-paragraph>
 
-              <Card>
-                <BlockStack gap="300">
-                  <Text as="h2" variant="headingMd">
-                    {t("settings.adminLanguage")}
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    {t("settings.adminLanguageHelp")}
-                  </Text>
-                  <AdminLanguageDropdown
-                    label={t("common.language")}
-                    options={adminLanguageOptions}
-                    value={adminLanguageDraft}
-                    onChange={onAdminLanguageSelect}
-                  />
-                  <InlineStack align="end">
-                    <Button
-                      variant="primary"
-                      onClick={saveAdminLanguagePreference}
-                      loading={savingAdminLanguage}
-                      disabled={
-                        adminLanguageDraft ===
-                        normalizeAdminLanguage(initialAdminLanguage)
-                      }
-                    >
-                      {t("common.save")}
-                    </Button>
-                  </InlineStack>
-                </BlockStack>
-              </Card>
+      {/* Polaris web: s-section — sync interval + last synced */}
+      <s-section heading={t("settings.syncStacking")}>
+        <s-stack direction="block" gap="base">
+          <s-paragraph color="subdued">
+            {settings.canUseSchedulingAutomation
+              ? t("settings.syncStackingHelp")
+              : t("settings.syncStackingHelpLocked")}
+          </s-paragraph>
+          {/* Polaris web: s-select — same syncInterval / setSyncInterval */}
+          <s-select
+            label={t("settings.autoSyncInterval")}
+            value={
+              settings.canUseSchedulingAutomation ? syncInterval : "disabled"
+            }
+            disabled={!settings.canUseSchedulingAutomation || undefined}
+            onChange={(event) =>
+              setSyncInterval(String(event.currentTarget.value ?? "disabled"))
+            }
+          >
+            <s-option value="disabled">
+              {t("settings.syncInterval.disabled")}
+            </s-option>
+            <s-option value="5m">{t("settings.syncInterval.5m")}</s-option>
+            <s-option value="15m">{t("settings.syncInterval.15m")}</s-option>
+            <s-option value="30m">{t("settings.syncInterval.30m")}</s-option>
+            <s-option value="1h">{t("settings.syncInterval.1h")}</s-option>
+            <s-option value="6h">{t("settings.syncInterval.6h")}</s-option>
+            <s-option value="12h">{t("settings.syncInterval.12h")}</s-option>
+            <s-option value="24h">{t("settings.syncInterval.24h")}</s-option>
+          </s-select>
+          <s-stack direction="block" gap="small-200">
+            <s-text type="strong" color="subdued">
+              {t("settings.lastSynced")}
+            </s-text>
+            <s-text color={lastSynced ? undefined : "subdued"}>
+              {formatSyncTime(lastSynced)}
+            </s-text>
+          </s-stack>
+          <s-stack direction="inline" justifyContent="end">
+            {/* Polaris web: s-button — same handleSaveSyncStacking */}
+            <s-button
+              variant="primary"
+              loading={syncStackFetcher.state !== "idle" || undefined}
+              onClick={handleSaveSyncStacking}
+            >
+              {t("settings.saveSync")}
+            </s-button>
+          </s-stack>
+        </s-stack>
+      </s-section>
 
-              <ApprovefyPromoCard />
-            </BlockStack>
-          </Layout.Section>
-        </Layout>
-      </BlockStack>
-    </Page>
+      {/* Polaris web: s-section — discount combinations */}
+      <s-section heading={t("settings.combinations")}>
+        <s-stack direction="block" gap="base">
+          <s-paragraph color="subdued">
+            {t("settings.combinationsHelp")}
+          </s-paragraph>
+          <s-stack direction="block" gap="small">
+            {/* Polaris web: s-checkbox — same combine* state */}
+            <s-checkbox
+              label={t("settings.combineProduct")}
+              details={t("settings.combineProductHelp")}
+              checked={combineProduct}
+              onChange={(event) =>
+                setCombineProduct(Boolean(event.currentTarget.checked))
+              }
+            />
+            <s-checkbox
+              label={t("settings.combineOrder")}
+              details={t("settings.combineOrderHelp")}
+              checked={combineOrder}
+              onChange={(event) =>
+                setCombineOrder(Boolean(event.currentTarget.checked))
+              }
+            />
+            <s-checkbox
+              label={t("settings.combineShipping")}
+              details={t("settings.combineShippingHelp")}
+              checked={combineShipping}
+              onChange={(event) =>
+                setCombineShipping(Boolean(event.currentTarget.checked))
+              }
+            />
+          </s-stack>
+          <s-stack direction="inline" justifyContent="end">
+            <s-button
+              variant="primary"
+              loading={syncStackFetcher.state !== "idle" || undefined}
+              onClick={handleSaveSyncStacking}
+            >
+              {t("settings.saveCombinations")}
+            </s-button>
+          </s-stack>
+        </s-stack>
+      </s-section>
+
+      {/* Polaris web: s-section — admin language (AdminLanguageDropdown = s-select) */}
+      <s-section heading={t("settings.adminLanguage")}>
+        <s-stack direction="block" gap="base">
+          <s-paragraph color="subdued">
+            {t("settings.adminLanguageHelp")}
+          </s-paragraph>
+          <AdminLanguageDropdown
+            label={t("common.language")}
+            options={adminLanguageOptions}
+            value={adminLanguageDraft}
+            onChange={onAdminLanguageSelect}
+          />
+          <s-stack direction="inline" justifyContent="end">
+            <s-button
+              variant="primary"
+              loading={savingAdminLanguage || undefined}
+              disabled={
+                adminLanguageDraft ===
+                  normalizeAdminLanguage(initialAdminLanguage) || undefined
+              }
+              onClick={saveAdminLanguagePreference}
+            >
+              {t("common.save")}
+            </s-button>
+          </s-stack>
+        </s-stack>
+      </s-section>
+
+      <s-section>
+        <ApprovefyPromoCard />
+      </s-section>
+    </s-page>
   );
 }

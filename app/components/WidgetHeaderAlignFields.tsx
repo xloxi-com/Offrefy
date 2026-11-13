@@ -1,5 +1,3 @@
-import { BlockStack, Checkbox, InlineStack, Select, Text } from "@shopify/polaris";
-
 import {
   isVolumeDiscountWidgetHeaderLayout,
   isVolumeDiscountWidgetHeaderTextAlign,
@@ -61,6 +59,8 @@ const LAYOUT_LABEL_KEYS_VOLUME_TABLE: Record<
 /**
  * Layout on top, then heading + timer alignment side by side.
  * Patches go through shared helpers in `widgetDisplay.ts`.
+ *
+ * Polaris web: s-select / s-checkbox — same patchWidgetDisplay handlers.
  */
 export function WidgetHeaderAlignFields({
   widgetHeaderLayout,
@@ -96,75 +96,122 @@ export function WidgetHeaderAlignFields({
   }));
 
   return (
-    <BlockStack gap="300">
-      <Select
+    <s-stack direction="block" gap="small">
+      {/* Polaris web: s-select — same widgetHeaderLayout patch */}
+      <s-select
         id={`${idPrefix}-widget-header-layout`}
         label={t("offerEditor.widget.layoutLabel")}
-        helpText={layoutHelpText}
-        options={layoutOptions}
+        details={layoutHelpText}
         value={widgetHeaderLayout}
-        onChange={(v) => {
+        onChange={(event) => {
+          const v = String(event.currentTarget.value || "");
           if (isVolumeDiscountWidgetHeaderLayout(v)) {
             patchWidgetDisplay(widgetHeaderLayoutPatch(v));
           }
         }}
-      />
+        onInput={(event) => {
+          const v = String(event.currentTarget.value || "");
+          if (isVolumeDiscountWidgetHeaderLayout(v)) {
+            patchWidgetDisplay(widgetHeaderLayoutPatch(v));
+          }
+        }}
+      >
+        {layoutOptions.map((option) => (
+          <s-option key={option.value} value={option.value}>
+            {option.label}
+          </s-option>
+        ))}
+      </s-select>
 
-      <InlineStack gap="300" wrap blockAlign="start">
+      <s-stack direction="inline" gap="small" alignItems="start">
         <div style={{ flex: "1 1 10rem", minWidth: "8rem" }}>
-          <Select
+          {/* Polaris web: s-select — same widgetHeadingAlign patch */}
+          <s-select
             id={`${idPrefix}-widget-heading-align`}
             label={t("offerEditor.widget.headingAlignLabel")}
-            helpText={headingHelpText}
-            options={textAlignOptions}
+            details={headingHelpText}
             value={widgetHeadingAlign}
-            onChange={(v) => {
+            onChange={(event) => {
+              const v = String(event.currentTarget.value || "");
               if (isVolumeDiscountWidgetHeaderTextAlign(v)) {
                 patchWidgetDisplay(
                   widgetHeaderAlignPatch("widgetHeadingAlign", v),
                 );
               }
             }}
-          />
+            onInput={(event) => {
+              const v = String(event.currentTarget.value || "");
+              if (isVolumeDiscountWidgetHeaderTextAlign(v)) {
+                patchWidgetDisplay(
+                  widgetHeaderAlignPatch("widgetHeadingAlign", v),
+                );
+              }
+            }}
+          >
+            {textAlignOptions.map((option) => (
+              <s-option key={option.value} value={option.value}>
+                {option.label}
+              </s-option>
+            ))}
+          </s-select>
         </div>
         <div style={{ flex: "1 1 10rem", minWidth: "8rem" }}>
-          <Select
+          {/* Polaris web: s-select — same countdownAlign patch */}
+          <s-select
             id={`${idPrefix}-widget-countdown-align`}
             label={t("offerEditor.widget.timerAlignLabel")}
-            helpText={timerHelpText}
-            options={textAlignOptions}
+            details={timerHelpText}
             value={countdownAlign}
-            onChange={(v) => {
+            onChange={(event) => {
+              const v = String(event.currentTarget.value || "");
               if (isVolumeDiscountWidgetHeaderTextAlign(v)) {
                 patchWidgetDisplay(widgetHeaderAlignPatch("countdownAlign", v));
               }
             }}
-          />
+            onInput={(event) => {
+              const v = String(event.currentTarget.value || "");
+              if (isVolumeDiscountWidgetHeaderTextAlign(v)) {
+                patchWidgetDisplay(widgetHeaderAlignPatch("countdownAlign", v));
+              }
+            }}
+          >
+            {textAlignOptions.map((option) => (
+              <s-option key={option.value} value={option.value}>
+                {option.label}
+              </s-option>
+            ))}
+          </s-select>
         </div>
-      </InlineStack>
+      </s-stack>
 
       {showOrderControls ? (
-        <BlockStack gap="200">
-          <Checkbox
+        <s-stack direction="block" gap="small-200">
+          {/* Polaris web: s-checkbox — same widgetHeaderMobileStack */}
+          <s-checkbox
             label={t("offerEditor.widget.stackMobile")}
             checked={widgetHeaderMobileStack}
-            onChange={(checked) =>
-              patchWidgetDisplay({ widgetHeaderMobileStack: checked })
+            onChange={(event) =>
+              patchWidgetDisplay({
+                widgetHeaderMobileStack: Boolean(event.currentTarget.checked),
+              })
             }
           />
-          <Checkbox
+          {/* Polaris web: s-checkbox — same widgetHeaderSwapOrder */}
+          <s-checkbox
             label={t("offerEditor.widget.timerBeforeHeading")}
             checked={widgetHeaderSwapOrder}
-            onChange={(checked) =>
-              patchWidgetDisplay({ widgetHeaderSwapOrder: checked })
+            onChange={(event) =>
+              patchWidgetDisplay({
+                widgetHeaderSwapOrder: Boolean(event.currentTarget.checked),
+              })
             }
           />
-        </BlockStack>
+        </s-stack>
       ) : null}
 
-      <Text as="p" variant="bodySm" tone="subdued">
+      <s-paragraph color="subdued">
         {t("offerEditor.widget.timerScheduleNotice")}
-      </Text>
-    </BlockStack>
+      </s-paragraph>
+    </s-stack>
   );
 }

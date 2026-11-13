@@ -19,7 +19,27 @@ module.exports = {
     commonjs: true,
     es6: true,
   },
-  ignorePatterns: ["!**/.server", "!**/.client"],
+  ignorePatterns: [
+    "!**/.server",
+    "!**/.client",
+    "node_modules/",
+    "build/",
+    "dist/",
+    "app/build/",
+    "public/build/",
+    "public/_dev/",
+    ".react-router/",
+    ".shopify/",
+    ".vercel/",
+    ".wrangler/",
+    ".wrangler-dry-run/",
+    "extensions/*/dist/",
+    "extensions/*/generated/",
+    // Built / browser IIFE storefront bundles (lint the app, not theme assets)
+    "extensions/*/assets/**/*.js",
+    "extensions/*/assets/**/*.min.js",
+    "eslint-report.json",
+  ],
 
   // Base config
   extends: ["eslint:recommended"],
@@ -50,6 +70,14 @@ module.exports = {
       },
       rules: {
         "react/no-unknown-property": ["error", { ignore: ["variant"] }],
+        "no-unused-vars": [
+          "error",
+          {
+            argsIgnorePattern: "^_",
+            varsIgnorePattern: "^_",
+            caughtErrorsIgnorePattern: "^_",
+          },
+        ],
       },
     },
 
@@ -74,6 +102,17 @@ module.exports = {
         "plugin:import/recommended",
         "plugin:import/typescript",
       ],
+      rules: {
+        "no-unused-vars": "off",
+        "@typescript-eslint/no-unused-vars": [
+          "error",
+          {
+            argsIgnorePattern: "^_",
+            varsIgnorePattern: "^_",
+            caughtErrorsIgnorePattern: "^_",
+          },
+        ],
+      },
     },
 
     // Node
@@ -84,13 +123,27 @@ module.exports = {
         ".graphqlrc.{js,ts}",
         "shopify.server.{js,ts}",
         "**/*.server.{js,ts}",
+        "workers/**/*.{js,ts}",
+        "scripts/**/*.{js,mjs,cjs,ts}",
+        "extensions/*/tests/**/*.{js,ts}",
       ],
       env: {
         node: true,
       },
     },
+
+    // Vite virtual modules (Cloudflare / React Router)
+    {
+      files: ["workers/app.ts"],
+      rules: {
+        "import/no-unresolved": [
+          "error",
+          { ignore: ["^virtual:"] },
+        ],
+      },
+    },
   ],
   globals: {
-    shopify: "readonly"
+    shopify: "readonly",
   },
 };

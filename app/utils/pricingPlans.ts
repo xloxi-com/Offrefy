@@ -48,12 +48,12 @@ export type PlanDisplayPrice = {
 export const PLANS: Record<PricingPlanId, PlanDefinition> = {
   free: {
     id: "free",
-    title: "Free",
+    title: "Basic",
     description: "Quantity breaks, volume discount, and templates.",
     monthlyCents: 0,
-    maxCampaigns: 5,
+    maxCampaigns: 2,
     cardFeatures: [
-      "5 active campaigns",
+      "2 active campaigns",
       "Quantity breaks (tier cards)",
       "Volume discount (pricing table)",
       "All appearance templates",
@@ -199,7 +199,7 @@ export function planCapabilities(planId: PricingPlanId): PlanCapabilities {
     case "free":
     default:
       return {
-        maxActiveCampaigns: 5,
+        maxActiveCampaigns: 2,
         customerTargeting: false,
         scheduling: false,
         countdown: false,
@@ -311,8 +311,8 @@ export function getPlanDisplayPrice(
 
   if (monthlyCents === 0) {
     return {
-      price: formatMoneyFromCents(0),
-      frequency: "month",
+      price: "Free",
+      frequency: "",
       displayCents: 0,
     };
   }
@@ -335,12 +335,12 @@ export function getPlanDisplayPrice(
   };
 }
 
-/** Comparison-table rows for Free / Standard / Premium. */
+/** Comparison-table rows for Basic / Standard / Premium. */
 export const FEATURE_COMPARE_ROWS: FeatureCompareRow[] = [
   {
     id: "activeCampaigns",
     feature: "Active campaigns",
-    free: "5",
+    free: "2",
     standard: "25",
     premium: "Unlimited",
   },

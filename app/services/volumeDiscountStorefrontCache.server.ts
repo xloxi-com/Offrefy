@@ -119,10 +119,15 @@ export async function rebuildAndPersistStorefrontPayload(
   rows: VolumeDiscountCampaignStorefrontRow[],
   admin: AdminGraphql,
 ): Promise<string> {
-  const raw =
+  const { mergeBogoIntoStorefrontWidgetJson } = await import(
+    "../utils/bogoStorefront.server"
+  );
+  const base =
     rows.length === 0
       ? EMPTY_PAYLOAD
       : await buildStorefrontWidgetValue(rows, admin, shop);
+  /* Never wipe BOGO-only shops: always merge live BOGO into the payload. */
+  const raw = await mergeBogoIntoStorefrontWidgetJson(shop, base, admin);
   const planCap = await resolveShopifyShopPlanCap(admin);
   const withCap = stampStorefrontMaxDiscountProducts(raw, planCap.maxTargets);
   const payload = stampStorefrontWidgetRev(withCap, Date.now());

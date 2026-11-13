@@ -1,33 +1,7 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, useRevalidator } from "react-router";
 import { useEffect, useMemo, useState } from "react";
-import {
-  Page,
-  Layout,
-  Card,
-  Text,
-  BlockStack,
-  InlineGrid,
-  Box,
-  Badge,
-  IndexTable,
-  TextField,
-  InlineStack,
-  Icon,
-  Divider,
-  Banner,
-  Button,
-  Pagination,
-} from "@shopify/polaris";
-import {
-  ArrowUpIcon,
-  ArrowDownIcon,
-  CartIcon,
-  ViewIcon,
-  DiscountIcon,
-  SearchIcon,
-  RefreshIcon,
-} from "@shopify/polaris-icons";
+import { Button } from "../components/AppButton";
 import { authenticate } from "../shopify.server";
 import { SHOPIFY_APP_SCOPES } from "../shopifyAppScopes";
 import { loadAnalyticsDashboard } from "../utils/volumeDiscountAnalytics.server";
@@ -75,11 +49,14 @@ function changeBadgeTone(change: string | null): "success" | "critical" | "info"
   return change.startsWith("-") ? "critical" : "success";
 }
 
-function changeIcon(change: string | null) {
+type MetricIconType = "view" | "cart" | "discount" | "arrow-up" | "arrow-down";
+
+function changeIconType(change: string | null): MetricIconType | null {
   if (!change || change === "0%") return null;
-  return change.startsWith("-") ? ArrowDownIcon : ArrowUpIcon;
+  return change.startsWith("-") ? "arrow-down" : "arrow-up";
 }
 
+/** Polaris web: s-box metric card — same props / change badge logic */
 function MetricCard({
   title,
   value,
@@ -93,49 +70,50 @@ function MetricCard({
   value: string;
   hint?: string;
   change?: string | null;
-  icon?: typeof ViewIcon;
+  icon?: MetricIconType;
   iconColor?: string;
   vsPreviousPeriod: string;
 }) {
   return (
-    <Card padding="400">
-      <BlockStack gap="200">
-        <InlineStack align="space-between" blockAlign="center">
-          <Text as="h3" variant="bodyMd" tone="subdued">
-            {title}
-          </Text>
+    <s-box
+      padding="base"
+      borderWidth="base"
+      borderRadius="large"
+      background="base"
+    >
+      <s-stack direction="block" gap="small-200">
+        <s-stack
+          direction="inline"
+          justifyContent="space-between"
+          alignItems="center"
+        >
+          <s-text color="subdued">{title}</s-text>
           {icon ? (
-            <div style={{ color: iconColor ?? "#5c5f62" }}>
-              <Icon source={icon} />
-            </div>
+            <span style={{ color: iconColor ?? "#5c5f62" }}>
+              <s-icon type={icon} />
+            </span>
           ) : change ? (
-            <div
+            <span
               style={{
                 color:
                   changeBadgeTone(change) === "critical" ? "#bf0711" : "#008060",
               }}
             >
-              <Icon source={changeIcon(change) ?? ArrowUpIcon} />
-            </div>
+              <s-icon type={changeIconType(change) ?? "arrow-up"} />
+            </span>
           ) : null}
-        </InlineStack>
-        <Text as="p" variant="headingLg">
-          {value}
-        </Text>
+        </s-stack>
+        <s-heading>{value}</s-heading>
         {change ? (
-          <InlineStack gap="100" blockAlign="center">
-            <Badge tone={changeBadgeTone(change)}>{change}</Badge>
-            <Text as="span" variant="bodyXs" tone="subdued">
-              {vsPreviousPeriod}
-            </Text>
-          </InlineStack>
+          <s-stack direction="inline" gap="small-200" alignItems="center">
+            <s-badge tone={changeBadgeTone(change)}>{change}</s-badge>
+            <s-text color="subdued">{vsPreviousPeriod}</s-text>
+          </s-stack>
         ) : hint ? (
-          <Text as="span" variant="bodyXs" tone="subdued">
-            {hint}
-          </Text>
+          <s-text color="subdued">{hint}</s-text>
         ) : null}
-      </BlockStack>
-    </Card>
+      </s-stack>
+    </s-box>
   );
 }
 
@@ -156,6 +134,7 @@ const CAMPAIGN_STATUS_KEYS: Record<string, AdminUiMessageKey> = {
   archived: "offers.status.archived",
 };
 
+/** Polaris web: s-stack funnel row — same width math */
 function FunnelBar({
   label,
   value,
@@ -171,16 +150,14 @@ function FunnelBar({
 }) {
   const width = max > 0 ? Math.max(4, Math.round((value / max) * 100)) : 0;
   return (
-    <BlockStack gap="100">
-      <InlineStack align="space-between">
-        <Text as="span" variant="bodySm">
-          {label}
-        </Text>
-        <Text as="span" variant="bodySm" tone="subdued">
+    <s-stack direction="block" gap="small-200">
+      <s-stack direction="inline" justifyContent="space-between">
+        <s-text>{label}</s-text>
+        <s-text color="subdued">
           {value.toLocaleString()}
           {suffix ? ` · ${suffix}` : ""}
-        </Text>
-      </InlineStack>
+        </s-text>
+      </s-stack>
       <div
         style={{
           height: 8,
@@ -198,7 +175,7 @@ function FunnelBar({
           }}
         />
       </div>
-    </BlockStack>
+    </s-stack>
   );
 }
 
@@ -414,593 +391,717 @@ export default function AnalyticsPage() {
   );
 
   return (
-    <Page fullWidth>
+    /* Polaris web: s-page — Analytics dashboard shell */
+    <s-page heading={t("analytics.title")} inlineSize="large">
       <div style={{ maxWidth: 1200, margin: "0 auto", width: "100%" }}>
-      <BlockStack gap="500">
-        {!analytics.hasTrackingData ? (
-          <Text as="p" variant="bodySm" tone="subdued">
-            {t("analytics.noActivity")}
-          </Text>
-        ) : null}
+        <s-stack direction="block" gap="base">
+          {!analytics.hasTrackingData ? (
+            <s-text color="subdued">{t("analytics.noActivity")}</s-text>
+          ) : null}
 
-        {analytics.ordersSync.needsReadOrdersScope ||
-        analytics.ordersSync.syncError ? (
-          <Banner
-            tone="warning"
-            title={t("analytics.ordersBannerTitle")}
+          {analytics.ordersSync.needsReadOrdersScope ||
+          analytics.ordersSync.syncError ? (
+            /* Polaris web: s-banner — same orders sync messaging */
+            <s-banner tone="warning" heading={t("analytics.ordersBannerTitle")}>
+              {analytics.ordersSync.syncError ??
+                t("analytics.ordersBannerBody", {
+                  scopes: SHOPIFY_APP_SCOPES.join(", "),
+                })}
+            </s-banner>
+          ) : null}
+
+          <s-stack
+            direction="inline"
+            gap="small-200"
+            justifyContent="end"
+            alignItems="center"
           >
-            {analytics.ordersSync.syncError ??
-              t("analytics.ordersBannerBody", {
-                scopes: SHOPIFY_APP_SCOPES.join(", "),
-              })}
-          </Banner>
-        ) : null}
+            {/* Polaris web: s-button — same revalidator.revalidate */}
+            <Button
+              icon="refresh"
+              accessibilityLabel={t("common.reload")}
+              onClick={() => revalidator.revalidate()}
+              loading={isRefreshing}
+              disabled={isRefreshing}
+            />
+            <AnalyticsDateRangeFilter selection={rangeSelection} />
+          </s-stack>
 
-        <InlineStack align="end" gap="200" blockAlign="center">
-          <Button
-            icon={RefreshIcon}
-            accessibilityLabel={t("common.reload")}
-            onClick={() => revalidator.revalidate()}
-            loading={isRefreshing}
-            disabled={isRefreshing}
-          />
-          <AnalyticsDateRangeFilter selection={rangeSelection} />
-        </InlineStack>
+          {/* Polaris web: s-grid — primary metric cards */}
+          <s-grid
+            gap="base"
+            gridTemplateColumns="repeat(auto-fit, minmax(14rem, 1fr))"
+          >
+            <MetricCard
+              title={t("analytics.metric.widgetSales")}
+              value={formatAnalyticsMoney(metrics.revenueCents)}
+              change={metrics.revenueChange}
+              hint={t("analytics.metric.widgetSalesHint")}
+              vsPreviousPeriod={vsPreviousPeriod}
+            />
+            <MetricCard
+              title={t("analytics.metric.offerImpressions")}
+              value={formatAnalyticsCount(metrics.impressions)}
+              change={metrics.impressionsChange}
+              icon="view"
+              iconColor="#2c6ecb"
+              hint={t("analytics.metric.offerImpressionsHint")}
+              vsPreviousPeriod={vsPreviousPeriod}
+            />
+            <MetricCard
+              title={t("analytics.metric.addToCart")}
+              value={formatAnalyticsCount(metrics.addToCart)}
+              change={metrics.addToCartChange}
+              icon="cart"
+              iconColor="#b98900"
+              hint={t("analytics.metric.addToCartHint")}
+              vsPreviousPeriod={vsPreviousPeriod}
+            />
+            <MetricCard
+              title={t("analytics.metric.conversionRate")}
+              value={metrics.conversionRate}
+              change={metrics.conversionChange}
+              hint={t("analytics.metric.conversionRateHint")}
+              vsPreviousPeriod={vsPreviousPeriod}
+            />
+          </s-grid>
 
-        <InlineGrid columns={{ xs: 1, sm: 2, md: 4 }} gap="400">
-          <MetricCard
-            title={t("analytics.metric.widgetSales")}
-            value={formatAnalyticsMoney(metrics.revenueCents)}
-            change={metrics.revenueChange}
-            hint={t("analytics.metric.widgetSalesHint")}
-            vsPreviousPeriod={vsPreviousPeriod}
-          />
-          <MetricCard
-            title={t("analytics.metric.offerImpressions")}
-            value={formatAnalyticsCount(metrics.impressions)}
-            change={metrics.impressionsChange}
-            icon={ViewIcon}
-            iconColor="#2c6ecb"
-            hint={t("analytics.metric.offerImpressionsHint")}
-            vsPreviousPeriod={vsPreviousPeriod}
-          />
-          <MetricCard
-            title={t("analytics.metric.addToCart")}
-            value={formatAnalyticsCount(metrics.addToCart)}
-            change={metrics.addToCartChange}
-            icon={CartIcon}
-            iconColor="#b98900"
-            hint={t("analytics.metric.addToCartHint")}
-            vsPreviousPeriod={vsPreviousPeriod}
-          />
-          <MetricCard
-            title={t("analytics.metric.conversionRate")}
-            value={metrics.conversionRate}
-            change={metrics.conversionChange}
-            hint={t("analytics.metric.conversionRateHint")}
-            vsPreviousPeriod={vsPreviousPeriod}
-          />
-        </InlineGrid>
+          {showStandardAnalytics ? (
+            <s-grid
+              gap="base"
+              gridTemplateColumns="repeat(auto-fit, minmax(14rem, 1fr))"
+            >
+              <MetricCard
+                title={t("analytics.metric.avgCartValue")}
+                value={formatAnalyticsMoney(metrics.avgCartValueCents)}
+                change={metrics.avgCartValueChange}
+                hint={t("analytics.metric.avgCartValueHint")}
+                vsPreviousPeriod={vsPreviousPeriod}
+              />
+              <MetricCard
+                title={t("analytics.metric.avgQuantity")}
+                value={metrics.avgQuantity}
+                hint={t("analytics.metric.avgQuantityHint")}
+                vsPreviousPeriod={vsPreviousPeriod}
+              />
+              <MetricCard
+                title={t("analytics.metric.revenuePerImpression")}
+                value={formatAnalyticsMoney(metrics.revenuePerImpressionCents)}
+                hint={t("analytics.metric.revenuePerImpressionHint")}
+                vsPreviousPeriod={vsPreviousPeriod}
+              />
+              <MetricCard
+                title={t("analytics.metric.activeCampaigns")}
+                value={metrics.activeCampaigns}
+                icon="discount"
+                iconColor="#bf0711"
+                hint={t("analytics.metric.activeCampaignsHint")}
+                vsPreviousPeriod={vsPreviousPeriod}
+              />
+            </s-grid>
+          ) : (
+            <PlanUpgradeBanner feature="analytics" />
+          )}
 
-        {showStandardAnalytics ? (
-        <InlineGrid columns={{ xs: 1, sm: 2, md: 4 }} gap="400">
-          <MetricCard
-            title={t("analytics.metric.avgCartValue")}
-            value={formatAnalyticsMoney(metrics.avgCartValueCents)}
-            change={metrics.avgCartValueChange}
-            hint={t("analytics.metric.avgCartValueHint")}
-            vsPreviousPeriod={vsPreviousPeriod}
-          />
-          <MetricCard
-            title={t("analytics.metric.avgQuantity")}
-            value={metrics.avgQuantity}
-            hint={t("analytics.metric.avgQuantityHint")}
-            vsPreviousPeriod={vsPreviousPeriod}
-          />
-          <MetricCard
-            title={t("analytics.metric.revenuePerImpression")}
-            value={formatAnalyticsMoney(metrics.revenuePerImpressionCents)}
-            hint={t("analytics.metric.revenuePerImpressionHint")}
-            vsPreviousPeriod={vsPreviousPeriod}
-          />
-          <MetricCard
-            title={t("analytics.metric.activeCampaigns")}
-            value={metrics.activeCampaigns}
-            icon={DiscountIcon}
-            iconColor="#bf0711"
-            hint={t("analytics.metric.activeCampaignsHint")}
-            vsPreviousPeriod={vsPreviousPeriod}
-          />
-        </InlineGrid>
-        ) : (
-          <PlanUpgradeBanner feature="analytics" />
-        )}
-
-        {showStandardAnalytics ? (
-        <Layout>
-          <Layout.Section variant="oneHalf">
-            <Card>
-              <BlockStack gap="400">
-                <InlineStack align="space-between" blockAlign="center">
-                  <Text as="h2" variant="headingMd">
-                    {t("analytics.chart.performanceOverTime")}
-                  </Text>
-                  <InlineStack gap="400">
-                    <InlineStack gap="150" blockAlign="center">
-                      <span
-                        style={{
-                          width: 12,
-                          height: 12,
-                          borderRadius: "50%",
-                          backgroundColor: "#008060",
-                          display: "inline-block",
-                        }}
-                      />
-                      <Text as="span" variant="bodySm" tone="subdued">
-                        {t("analytics.chart.legendWidgetSales")}
-                      </Text>
-                    </InlineStack>
-                    <InlineStack gap="150" blockAlign="center">
-                      <span
-                        style={{
-                          width: 12,
-                          height: 12,
-                          borderRadius: "50%",
-                          backgroundColor: "#2c6ecb",
-                          display: "inline-block",
-                        }}
-                      />
-                      <Text as="span" variant="bodySm" tone="subdued">
-                        {t("analytics.chart.legendImpressions")}
-                      </Text>
-                    </InlineStack>
-                    <InlineStack gap="150" blockAlign="center">
-                      <span
-                        style={{
-                          width: 12,
-                          height: 12,
-                          borderRadius: "50%",
-                          backgroundColor: "#b98900",
-                          display: "inline-block",
-                        }}
-                      />
-                      <Text as="span" variant="bodySm" tone="subdued">
-                        {t("analytics.chart.legendAddToCart")}
-                      </Text>
-                    </InlineStack>
-                  </InlineStack>
-                </InlineStack>
-
-                <Box width="100%">
-                  <div
-                    style={{
-                      width: "100%",
-                      overflowX: "auto",
-                      display: "flex",
-                      justifyContent: "center",
-                    }}
+          {showStandardAnalytics ? (
+            /* Polaris web: s-grid — charts row */
+            <s-grid
+              gap="base"
+              gridTemplateColumns="repeat(auto-fit, minmax(18rem, 1fr))"
+            >
+              <s-box
+                padding="base"
+                borderWidth="base"
+                borderRadius="large"
+                background="base"
+              >
+                <s-stack direction="block" gap="base">
+                  <s-stack
+                    direction="inline"
+                    justifyContent="space-between"
+                    alignItems="center"
                   >
-                    <svg
-                      width="100%"
-                      height={svgHeight}
-                      viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-                      style={{ maxWidth: "600px", overflow: "visible" }}
+                    <s-heading>
+                      {t("analytics.chart.performanceOverTime")}
+                    </s-heading>
+                    <s-stack direction="inline" gap="base" alignItems="center">
+                      <s-stack
+                        direction="inline"
+                        gap="small-200"
+                        alignItems="center"
+                      >
+                        <span
+                          style={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: "50%",
+                            backgroundColor: "#008060",
+                            display: "inline-block",
+                          }}
+                        />
+                        <s-text color="subdued">
+                          {t("analytics.chart.legendWidgetSales")}
+                        </s-text>
+                      </s-stack>
+                      <s-stack
+                        direction="inline"
+                        gap="small-200"
+                        alignItems="center"
+                      >
+                        <span
+                          style={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: "50%",
+                            backgroundColor: "#2c6ecb",
+                            display: "inline-block",
+                          }}
+                        />
+                        <s-text color="subdued">
+                          {t("analytics.chart.legendImpressions")}
+                        </s-text>
+                      </s-stack>
+                      <s-stack
+                        direction="inline"
+                        gap="small-200"
+                        alignItems="center"
+                      >
+                        <span
+                          style={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: "50%",
+                            backgroundColor: "#b98900",
+                            display: "inline-block",
+                          }}
+                        />
+                        <s-text color="subdued">
+                          {t("analytics.chart.legendAddToCart")}
+                        </s-text>
+                      </s-stack>
+                    </s-stack>
+                  </s-stack>
+
+                  <s-box inlineSize="100%">
+                    <div
+                      style={{
+                        width: "100%",
+                        overflowX: "auto",
+                        display: "flex",
+                        justifyContent: "center",
+                      }}
                     >
-                      <defs>
-                        <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#008060" stopOpacity="0.25" />
-                          <stop offset="100%" stopColor="#008060" stopOpacity="0.0" />
-                        </linearGradient>
-                        <linearGradient id="viewsGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#2c6ecb" stopOpacity="0.25" />
-                          <stop offset="100%" stopColor="#2c6ecb" stopOpacity="0.0" />
-                        </linearGradient>
-                      </defs>
-
-                      {[0, 1, 2, 3, 4].map((grid, idx) => {
-                        const yVal = padding + (idx / 4) * (svgHeight - padding * 2);
-                        return (
-                          <line
-                            key={idx}
-                            x1={padding}
-                            y1={yVal}
-                            x2={svgWidth - padding}
-                            y2={yVal}
-                            stroke="#f1f1f1"
-                            strokeWidth="1"
-                          />
-                        );
-                      })}
-
-                      {chartPaths.revenueFillPath ? (
-                        <path d={chartPaths.revenueFillPath} fill="url(#salesGrad)" />
-                      ) : null}
-                      {chartPaths.viewsFillPath ? (
-                        <path d={chartPaths.viewsFillPath} fill="url(#viewsGrad)" />
-                      ) : null}
-                      {chartPaths.revenuePath ? (
-                        <path
-                          d={chartPaths.revenuePath}
-                          fill="none"
-                          stroke="#008060"
-                          strokeWidth="3"
-                          strokeLinecap="round"
-                        />
-                      ) : null}
-                      {chartPaths.viewsPath ? (
-                        <path
-                          d={chartPaths.viewsPath}
-                          fill="none"
-                          stroke="#2c6ecb"
-                          strokeWidth="3"
-                          strokeLinecap="round"
-                        />
-                      ) : null}
-                      {chartPaths.addToCartPath ? (
-                        <path
-                          d={chartPaths.addToCartPath}
-                          fill="none"
-                          stroke="#b98900"
-                          strokeWidth="3"
-                          strokeLinecap="round"
-                          strokeDasharray="6 4"
-                        />
-                      ) : null}
-
-                      {chartPaths.revenuePoints.map((pt, idx) => (
-                        <circle
-                          key={`sales-${idx}`}
-                          cx={pt.x}
-                          cy={pt.y}
-                          r="4"
-                          fill="#ffffff"
-                          stroke="#008060"
-                          strokeWidth="2.5"
-                        />
-                      ))}
-
-                      {chartPaths.viewsPoints.map((pt, idx) => (
-                        <circle
-                          key={`views-${idx}`}
-                          cx={pt.x}
-                          cy={pt.y}
-                          r="4"
-                          fill="#ffffff"
-                          stroke="#2c6ecb"
-                          strokeWidth="2.5"
-                        />
-                      ))}
-
-                      {metrics.chartData.map((d, idx) => {
-                        const x =
-                          padding +
-                          (idx / Math.max(metrics.chartData.length - 1, 1)) *
-                            (svgWidth - padding * 2);
-                        return (
-                          <text
-                            key={idx}
-                            x={x}
-                            y={svgHeight - 12}
-                            textAnchor="middle"
-                            fill="#8c9196"
-                            fontSize="10"
-                            fontWeight="500"
+                      <svg
+                        width="100%"
+                        height={svgHeight}
+                        viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+                        style={{ maxWidth: "600px", overflow: "visible" }}
+                      >
+                        <defs>
+                          <linearGradient
+                            id="salesGrad"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
                           >
-                            {d.label}
-                          </text>
+                            <stop
+                              offset="0%"
+                              stopColor="#008060"
+                              stopOpacity="0.25"
+                            />
+                            <stop
+                              offset="100%"
+                              stopColor="#008060"
+                              stopOpacity="0.0"
+                            />
+                          </linearGradient>
+                          <linearGradient
+                            id="viewsGrad"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="0%"
+                              stopColor="#2c6ecb"
+                              stopOpacity="0.25"
+                            />
+                            <stop
+                              offset="100%"
+                              stopColor="#2c6ecb"
+                              stopOpacity="0.0"
+                            />
+                          </linearGradient>
+                        </defs>
+
+                        {[0, 1, 2, 3, 4].map((grid, idx) => {
+                          const yVal =
+                            padding + (idx / 4) * (svgHeight - padding * 2);
+                          return (
+                            <line
+                              key={idx}
+                              x1={padding}
+                              y1={yVal}
+                              x2={svgWidth - padding}
+                              y2={yVal}
+                              stroke="#f1f1f1"
+                              strokeWidth="1"
+                            />
+                          );
+                        })}
+
+                        {chartPaths.revenueFillPath ? (
+                          <path
+                            d={chartPaths.revenueFillPath}
+                            fill="url(#salesGrad)"
+                          />
+                        ) : null}
+                        {chartPaths.viewsFillPath ? (
+                          <path
+                            d={chartPaths.viewsFillPath}
+                            fill="url(#viewsGrad)"
+                          />
+                        ) : null}
+                        {chartPaths.revenuePath ? (
+                          <path
+                            d={chartPaths.revenuePath}
+                            fill="none"
+                            stroke="#008060"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                          />
+                        ) : null}
+                        {chartPaths.viewsPath ? (
+                          <path
+                            d={chartPaths.viewsPath}
+                            fill="none"
+                            stroke="#2c6ecb"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                          />
+                        ) : null}
+                        {chartPaths.addToCartPath ? (
+                          <path
+                            d={chartPaths.addToCartPath}
+                            fill="none"
+                            stroke="#b98900"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeDasharray="6 4"
+                          />
+                        ) : null}
+
+                        {chartPaths.revenuePoints.map((pt, idx) => (
+                          <circle
+                            key={`sales-${idx}`}
+                            cx={pt.x}
+                            cy={pt.y}
+                            r="4"
+                            fill="#ffffff"
+                            stroke="#008060"
+                            strokeWidth="2.5"
+                          />
+                        ))}
+
+                        {chartPaths.viewsPoints.map((pt, idx) => (
+                          <circle
+                            key={`views-${idx}`}
+                            cx={pt.x}
+                            cy={pt.y}
+                            r="4"
+                            fill="#ffffff"
+                            stroke="#2c6ecb"
+                            strokeWidth="2.5"
+                          />
+                        ))}
+
+                        {metrics.chartData.map((d, idx) => {
+                          const x =
+                            padding +
+                            (idx / Math.max(metrics.chartData.length - 1, 1)) *
+                              (svgWidth - padding * 2);
+                          return (
+                            <text
+                              key={idx}
+                              x={x}
+                              y={svgHeight - 12}
+                              textAnchor="middle"
+                              fill="#8c9196"
+                              fontSize="10"
+                              fontWeight="500"
+                            >
+                              {d.label}
+                            </text>
+                          );
+                        })}
+                      </svg>
+                    </div>
+                  </s-box>
+                </s-stack>
+              </s-box>
+
+              <s-stack direction="block" gap="base">
+                {/* Polaris web: s-box — conversion funnel */}
+                <s-box
+                  padding="base"
+                  borderWidth="base"
+                  borderRadius="large"
+                  background="base"
+                >
+                  <s-stack direction="block" gap="base">
+                    <s-heading>{t("analytics.funnel.title")}</s-heading>
+                    <s-text color="subdued">
+                      {t("analytics.funnel.subtitle")}
+                    </s-text>
+                    <FunnelBar
+                      label={t("analytics.funnel.impressions")}
+                      value={analytics.funnel.impressions}
+                      max={analytics.funnel.impressions || 1}
+                      tone="#2c6ecb"
+                    />
+                    <FunnelBar
+                      label={t("analytics.funnel.addToCart")}
+                      value={analytics.funnel.addToCart}
+                      max={analytics.funnel.impressions || 1}
+                      tone="#b98900"
+                      suffix={analytics.funnel.conversionRate}
+                    />
+                  </s-stack>
+                </s-box>
+
+                {/* Polaris web: s-box — activity by day of week */}
+                <s-box
+                  padding="base"
+                  borderWidth="base"
+                  borderRadius="large"
+                  background="base"
+                >
+                  <s-stack direction="block" gap="base">
+                    <s-heading>{t("analytics.dow.title")}</s-heading>
+                    <s-text color="subdued">
+                      {t("analytics.dow.subtitle")}
+                    </s-text>
+                    <s-grid
+                      gap="small-200"
+                      gridTemplateColumns="repeat(7, minmax(0, 1fr))"
+                    >
+                      {analytics.dayOfWeek.map((day) => {
+                        const total = day.impressions + day.addToCart;
+                        const height = Math.min(
+                          72,
+                          Math.max(8, Math.round((total / dayOfWeekMax) * 72)),
                         );
-                      })}
-                    </svg>
-                  </div>
-                </Box>
-              </BlockStack>
-            </Card>
-          </Layout.Section>
-
-          <Layout.Section variant="oneHalf">
-            <BlockStack gap="400">
-              <Card>
-                <BlockStack gap="400">
-                  <Text as="h2" variant="headingMd">
-                    {t("analytics.funnel.title")}
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    {t("analytics.funnel.subtitle")}
-                  </Text>
-                  <FunnelBar
-                    label={t("analytics.funnel.impressions")}
-                    value={analytics.funnel.impressions}
-                    max={analytics.funnel.impressions || 1}
-                    tone="#2c6ecb"
-                  />
-                  <FunnelBar
-                    label={t("analytics.funnel.addToCart")}
-                    value={analytics.funnel.addToCart}
-                    max={analytics.funnel.impressions || 1}
-                    tone="#b98900"
-                    suffix={analytics.funnel.conversionRate}
-                  />
-                </BlockStack>
-              </Card>
-
-              <Card>
-                <BlockStack gap="400">
-                  <Text as="h2" variant="headingMd">
-                    {t("analytics.dow.title")}
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    {t("analytics.dow.subtitle")}
-                  </Text>
-                  <InlineGrid columns={7} gap="200">
-                    {analytics.dayOfWeek.map((day) => {
-                      const total = day.impressions + day.addToCart;
-                      const height = Math.min(
-                        72,
-                        Math.max(8, Math.round((total / dayOfWeekMax) * 72)),
-                      );
-                      const dowKey = DOW_KEYS[day.label];
-                      const dowLabel = dowKey ? t(dowKey) : day.label;
-                      return (
-                        <BlockStack key={day.label} gap="150" inlineAlign="center">
-                          <div
-                            style={{
-                              width: "100%",
-                              height: 72,
-                              display: "flex",
-                              alignItems: "flex-end",
-                              justifyContent: "center",
-                              overflow: "hidden",
-                            }}
+                        const dowKey = DOW_KEYS[day.label];
+                        const dowLabel = dowKey ? t(dowKey) : day.label;
+                        return (
+                          <s-stack
+                            key={day.label}
+                            direction="block"
+                            gap="small-200"
+                            alignItems="center"
                           >
                             <div
                               style={{
-                                width: "70%",
-                                height,
-                                borderRadius: "4px 4px 0 0",
-                                background:
-                                  day.addToCart > 0
-                                    ? "linear-gradient(180deg, #b98900 0%, #2c6ecb 100%)"
-                                    : "#d2d5d8",
+                                width: "100%",
+                                height: 72,
+                                display: "flex",
+                                alignItems: "flex-end",
+                                justifyContent: "center",
+                                overflow: "hidden",
                               }}
-                              title={t("analytics.dow.barTitle", {
-                                views: day.impressions,
-                                atc: day.addToCart,
-                              })}
-                            />
-                          </div>
-                          <Text as="span" variant="bodyXs" tone="subdued">
-                            {dowLabel}
-                          </Text>
-                        </BlockStack>
-                      );
-                    })}
-                  </InlineGrid>
-                </BlockStack>
-              </Card>
-            </BlockStack>
-          </Layout.Section>
-        </Layout>
-        ) : null}
+                            >
+                              <div
+                                style={{
+                                  width: "70%",
+                                  height,
+                                  borderRadius: "4px 4px 0 0",
+                                  background:
+                                    day.addToCart > 0
+                                      ? "linear-gradient(180deg, #b98900 0%, #2c6ecb 100%)"
+                                      : "#d2d5d8",
+                                }}
+                                title={t("analytics.dow.barTitle", {
+                                  views: day.impressions,
+                                  atc: day.addToCart,
+                                })}
+                              />
+                            </div>
+                            <s-text color="subdued">{dowLabel}</s-text>
+                          </s-stack>
+                        );
+                      })}
+                    </s-grid>
+                  </s-stack>
+                </s-box>
+              </s-stack>
+            </s-grid>
+          ) : null}
 
-        {showAdvancedAnalytics ? (
-        <>
-        <Layout>
-          <Layout.Section>
-            <Card padding="0">
-              <Box padding="400">
-                <BlockStack gap="100">
-                  <Text as="h2" variant="headingMd">
-                    {t("analytics.topProducts.title")}
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    {t("analytics.topProducts.subtitle")}
-                  </Text>
-                </BlockStack>
-              </Box>
-              <Divider />
-              {analytics.topProducts.length === 0 ? (
-                <Box padding="800">
-                  <InlineStack align="center">
-                    <Text as="p" variant="bodyMd" tone="subdued">
-                      {t("analytics.topProducts.empty")}
-                    </Text>
-                  </InlineStack>
-                </Box>
-              ) : (
-                <IndexTable
-                  resourceName={{
-                    singular: t("analytics.resource.product"),
-                    plural: t("analytics.resource.products"),
-                  }}
-                  itemCount={analytics.topProducts.length}
-                  selectable={false}
-                  headings={[
-                    { title: t("analytics.col.product") },
-                    { title: t("analytics.col.impressions") },
-                    { title: t("analytics.col.addToCart") },
-                    { title: t("analytics.col.conversionRate") },
-                    { title: t("analytics.col.widgetSales"), alignment: "end" },
-                  ]}
-                >
-                  {analytics.topProducts.map((row, idx) => (
-                    <IndexTable.Row
-                      id={row.productId}
-                      key={row.productId}
-                      position={idx}
-                    >
-                      <IndexTable.Cell>
-                        <Text as="span" variant="bodyMd" fontWeight="semibold">
-                          {row.productTitle}
-                        </Text>
-                      </IndexTable.Cell>
-                      <IndexTable.Cell>
-                        {row.impressions.toLocaleString()}
-                      </IndexTable.Cell>
-                      <IndexTable.Cell>
-                        {row.addToCart.toLocaleString()}
-                      </IndexTable.Cell>
-                      <IndexTable.Cell>{row.conversionRate}</IndexTable.Cell>
-                      <IndexTable.Cell>
-                        <div style={{ textAlign: "right", fontWeight: "600" }}>
-                          {formatAnalyticsMoney(row.revenueCents)}
-                        </div>
-                      </IndexTable.Cell>
-                    </IndexTable.Row>
-                  ))}
-                </IndexTable>
-              )}
-            </Card>
-          </Layout.Section>
-        </Layout>
+          {showAdvancedAnalytics ? (
+            <>
+              {/* Polaris web: s-box + s-table — Top products */}
+              <s-box
+                padding="none"
+                borderWidth="base"
+                borderRadius="large"
+                background="base"
+                overflow="hidden"
+              >
+                <s-box padding="base">
+                  <s-stack direction="block" gap="small-200">
+                    <s-heading>{t("analytics.topProducts.title")}</s-heading>
+                    <s-text color="subdued">
+                      {t("analytics.topProducts.subtitle")}
+                    </s-text>
+                  </s-stack>
+                </s-box>
+                <s-divider />
+                {analytics.topProducts.length === 0 ? (
+                  <s-box padding="large">
+                    <s-stack direction="block" alignItems="center">
+                      <s-text color="subdued">
+                        {t("analytics.topProducts.empty")}
+                      </s-text>
+                    </s-stack>
+                  </s-box>
+                ) : (
+                  <s-table>
+                    <s-table-header-row>
+                      <s-table-header listSlot="primary">
+                        {t("analytics.col.product")}
+                      </s-table-header>
+                      <s-table-header>
+                        {t("analytics.col.impressions")}
+                      </s-table-header>
+                      <s-table-header>
+                        {t("analytics.col.addToCart")}
+                      </s-table-header>
+                      <s-table-header>
+                        {t("analytics.col.conversionRate")}
+                      </s-table-header>
+                      <s-table-header format="numeric">
+                        {t("analytics.col.widgetSales")}
+                      </s-table-header>
+                    </s-table-header-row>
+                    <s-table-body>
+                      {analytics.topProducts.map((row) => (
+                        <s-table-row key={row.productId}>
+                          <s-table-cell>
+                            <s-text type="strong">{row.productTitle}</s-text>
+                          </s-table-cell>
+                          <s-table-cell>
+                            {row.impressions.toLocaleString()}
+                          </s-table-cell>
+                          <s-table-cell>
+                            {row.addToCart.toLocaleString()}
+                          </s-table-cell>
+                          <s-table-cell>{row.conversionRate}</s-table-cell>
+                          <s-table-cell>
+                            {formatAnalyticsMoney(row.revenueCents)}
+                          </s-table-cell>
+                        </s-table-row>
+                      ))}
+                    </s-table-body>
+                  </s-table>
+                )}
+              </s-box>
 
-        <Layout>
-          <Layout.Section>
-            <Card padding="0">
-              <Box padding="400">
-                <BlockStack gap="100">
-                  <Text as="h2" variant="headingMd">
-                    {t("analytics.campaigns.title")}
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    {t("analytics.campaigns.subtitle")}
-                  </Text>
-                </BlockStack>
-              </Box>
-              <Divider />
-              {analytics.campaignRows.length === 0 ? (
-                <Box padding="800">
-                  <InlineStack align="center">
-                    <Text as="p" variant="bodyMd" tone="subdued">
-                      {t("analytics.campaigns.empty")}
-                    </Text>
-                  </InlineStack>
-                </Box>
-              ) : (
-                <>
-                  <Box paddingInline="400" paddingBlock="300">
-                    <InlineStack gap="300" wrap={false} blockAlign="center">
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <TextField
-                          label={t("analytics.campaigns.search")}
-                          labelHidden
-                          value={campaignSearch}
-                          onChange={setCampaignSearch}
-                          placeholder={t("analytics.campaigns.search")}
-                          autoComplete="off"
-                          clearButton
-                          onClearButtonClick={() => setCampaignSearch("")}
-                          prefix={<Icon source={SearchIcon} tone="subdued" />}
-                        />
-                      </div>
-                      <div style={{ width: "240px", flexShrink: 0 }}>
-                        <AnalyticsCampaignSortDropdown
-                          label={t("analytics.campaigns.sort")}
-                          value={sortBy}
-                          options={campaignSortSelectOptions}
-                          onChange={setSortBy}
-                        />
-                      </div>
-                    </InlineStack>
-                  </Box>
-                  <Divider />
-                  {filteredCampaignRows.length === 0 ? (
-                    <Box padding="600">
-                      <Text as="p" tone="subdued">
-                        {t("analytics.campaigns.noMatch")}
-                      </Text>
-                    </Box>
-                  ) : (
-                    <>
-                      <IndexTable
-                        resourceName={{
-                          singular: t("analytics.resource.campaign"),
-                          plural: t("analytics.resource.campaigns"),
-                        }}
-                        itemCount={campaignPagination.total}
-                        selectable={false}
-                        headings={[
-                          { title: t("analytics.col.campaignName") },
-                          { title: t("analytics.col.status") },
-                          { title: t("analytics.col.impressions") },
-                          { title: t("analytics.col.addToCart") },
-                          { title: t("analytics.col.conversionRate") },
-                          { title: t("analytics.col.widgetSales"), alignment: "end" },
-                        ]}
+              {/* Polaris web: s-box + s-table — Offer performance breakdown */}
+              <s-box
+                padding="none"
+                borderWidth="base"
+                borderRadius="large"
+                background="base"
+                overflow="hidden"
+              >
+                <s-box padding="base">
+                  <s-stack direction="block" gap="small-200">
+                    <s-heading>{t("analytics.campaigns.title")}</s-heading>
+                    <s-text color="subdued">
+                      {t("analytics.campaigns.subtitle")}
+                    </s-text>
+                  </s-stack>
+                </s-box>
+                <s-divider />
+                {analytics.campaignRows.length === 0 ? (
+                  <s-box padding="large">
+                    <s-stack direction="block" alignItems="center">
+                      <s-text color="subdued">
+                        {t("analytics.campaigns.empty")}
+                      </s-text>
+                    </s-stack>
+                  </s-box>
+                ) : (
+                  <>
+                    <s-box padding="base">
+                      <s-stack
+                        direction="inline"
+                        gap="small"
+                        alignItems="center"
                       >
-                        {campaignPagination.rows.map((row, idx) => (
-                          <IndexTable.Row id={row.id} key={row.id} position={idx}>
-                            <IndexTable.Cell>
-                              <Text as="span" variant="bodyMd" fontWeight="semibold">
-                                {row.campaignName}
-                              </Text>
-                            </IndexTable.Cell>
-                            <IndexTable.Cell>
-                              <Badge
-                                tone={
-                                  row.status.toLowerCase() === "active"
-                                    ? "success"
-                                    : "info"
-                                }
-                              >
-                                {CAMPAIGN_STATUS_KEYS[row.status.toLowerCase()]
-                                  ? t(CAMPAIGN_STATUS_KEYS[row.status.toLowerCase()]!)
-                                  : row.status}
-                              </Badge>
-                            </IndexTable.Cell>
-                            <IndexTable.Cell>
-                              {row.views.toLocaleString()}
-                            </IndexTable.Cell>
-                            <IndexTable.Cell>
-                              {row.addToCart.toLocaleString()}
-                            </IndexTable.Cell>
-                            <IndexTable.Cell>{row.conversionRate}</IndexTable.Cell>
-                            <IndexTable.Cell>
-                              <div style={{ textAlign: "right", fontWeight: "600" }}>
-                                {formatAnalyticsMoney(row.revenueCents)}
-                              </div>
-                            </IndexTable.Cell>
-                          </IndexTable.Row>
-                        ))}
-                      </IndexTable>
-                      {campaignPagination.total > CAMPAIGN_PAGE_SIZE ? (
-                        <Box
-                          padding="300"
-                          borderColor="border"
-                          borderBlockStartWidth="025"
-                          background="bg-surface-secondary"
-                        >
-                          <Pagination
-                            type="table"
-                            hasPrevious={campaignPagination.hasPrevious}
-                            hasNext={campaignPagination.hasNext}
-                            onPrevious={() =>
-                              setCampaignPageIndex((p) => Math.max(0, p - 1))
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          {/* Polaris web: s-search-field — same campaignSearch state */}
+                          <s-search-field
+                            label={t("analytics.campaigns.search")}
+                            labelAccessibilityVisibility="exclusive"
+                            value={campaignSearch}
+                            placeholder={t("analytics.campaigns.search")}
+                            onInput={(event) =>
+                              setCampaignSearch(
+                                String(event.currentTarget.value ?? ""),
+                              )
                             }
-                            onNext={() => setCampaignPageIndex((p) => p + 1)}
-                            label={t("analytics.campaigns.pagination", {
-                              start: campaignPagination.rangeStart,
-                              end: campaignPagination.rangeEnd,
-                              total: campaignPagination.total.toLocaleString(),
-                            })}
                           />
-                        </Box>
-                      ) : null}
-                    </>
-                  )}
-                </>
-              )}
-            </Card>
-          </Layout.Section>
-        </Layout>
-        </>
-        ) : showStandardAnalytics ? (
-          <PlanUpgradeBanner
-            feature="analytics"
-            message={t("analytics.upgrade.breakdown")}
-          />
-        ) : null}
-      </BlockStack>
+                        </div>
+                        <div style={{ width: "240px", flexShrink: 0 }}>
+                          <AnalyticsCampaignSortDropdown
+                            label={t("analytics.campaigns.sort")}
+                            value={sortBy}
+                            options={campaignSortSelectOptions}
+                            onChange={setSortBy}
+                          />
+                        </div>
+                      </s-stack>
+                    </s-box>
+                    <s-divider />
+                    {filteredCampaignRows.length === 0 ? (
+                      <s-box padding="base">
+                        <s-text color="subdued">
+                          {t("analytics.campaigns.noMatch")}
+                        </s-text>
+                      </s-box>
+                    ) : (
+                      <>
+                        <s-table>
+                          <s-table-header-row>
+                            <s-table-header listSlot="primary">
+                              {t("analytics.col.campaignName")}
+                            </s-table-header>
+                            <s-table-header>
+                              {t("analytics.col.status")}
+                            </s-table-header>
+                            <s-table-header>
+                              {t("analytics.col.impressions")}
+                            </s-table-header>
+                            <s-table-header>
+                              {t("analytics.col.addToCart")}
+                            </s-table-header>
+                            <s-table-header>
+                              {t("analytics.col.conversionRate")}
+                            </s-table-header>
+                            <s-table-header format="numeric">
+                              {t("analytics.col.widgetSales")}
+                            </s-table-header>
+                          </s-table-header-row>
+                          <s-table-body>
+                            {campaignPagination.rows.map((row) => (
+                              <s-table-row key={row.id}>
+                                <s-table-cell>
+                                  <s-text type="strong">
+                                    {row.campaignName}
+                                  </s-text>
+                                </s-table-cell>
+                                <s-table-cell>
+                                  <s-badge
+                                    tone={
+                                      row.status.toLowerCase() === "active"
+                                        ? "success"
+                                        : "info"
+                                    }
+                                  >
+                                    {CAMPAIGN_STATUS_KEYS[
+                                      row.status.toLowerCase()
+                                    ]
+                                      ? t(
+                                          CAMPAIGN_STATUS_KEYS[
+                                            row.status.toLowerCase()
+                                          ]!,
+                                        )
+                                      : row.status}
+                                  </s-badge>
+                                </s-table-cell>
+                                <s-table-cell>
+                                  {row.views.toLocaleString()}
+                                </s-table-cell>
+                                <s-table-cell>
+                                  {row.addToCart.toLocaleString()}
+                                </s-table-cell>
+                                <s-table-cell>
+                                  {row.conversionRate}
+                                </s-table-cell>
+                                <s-table-cell>
+                                  {formatAnalyticsMoney(row.revenueCents)}
+                                </s-table-cell>
+                              </s-table-row>
+                            ))}
+                          </s-table-body>
+                        </s-table>
+                        {campaignPagination.total > CAMPAIGN_PAGE_SIZE ? (
+                          /* Polaris web: s-stack pagination — same page index handlers */
+                          <s-box padding="small" background="subdued">
+                            <s-stack
+                              direction="inline"
+                              gap="small"
+                              justifyContent="space-between"
+                              alignItems="center"
+                            >
+                              <s-text color="subdued">
+                                {t("analytics.campaigns.pagination", {
+                                  start: campaignPagination.rangeStart,
+                                  end: campaignPagination.rangeEnd,
+                                  total:
+                                    campaignPagination.total.toLocaleString(),
+                                })}
+                              </s-text>
+                              <s-stack
+                                direction="inline"
+                                gap="small-200"
+                                alignItems="center"
+                              >
+                                <s-button
+                                  variant="secondary"
+                                  disabled={
+                                    !campaignPagination.hasPrevious || undefined
+                                  }
+                                  onClick={() =>
+                                    setCampaignPageIndex((p) =>
+                                      Math.max(0, p - 1),
+                                    )
+                                  }
+                                >
+                                  Previous
+                                </s-button>
+                                <s-button
+                                  variant="secondary"
+                                  disabled={
+                                    !campaignPagination.hasNext || undefined
+                                  }
+                                  onClick={() =>
+                                    setCampaignPageIndex((p) => p + 1)
+                                  }
+                                >
+                                  Next
+                                </s-button>
+                              </s-stack>
+                            </s-stack>
+                          </s-box>
+                        ) : null}
+                      </>
+                    )}
+                  </>
+                )}
+              </s-box>
+            </>
+          ) : showStandardAnalytics ? (
+            <PlanUpgradeBanner
+              feature="analytics"
+              message={t("analytics.upgrade.breakdown")}
+            />
+          ) : null}
+        </s-stack>
       </div>
-    </Page>
+    </s-page>
   );
 }

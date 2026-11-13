@@ -41,7 +41,7 @@
 %}
 <script>
 (function () {
-  var VD_ASSET_VERSION = "1.31.15";
+  var VD_ASSET_VERSION = "1.41.0";
   /* App host for rare hosted-asset fallback — not the merchant shop origin. */
   var APP_ORIGIN = "https://offrey.xloxi.com";
 
@@ -63,6 +63,60 @@
   o.storefrontLocale = {{ request.locale.iso_code | json }};
   o.assetVersion = VD_ASSET_VERSION;
   o.appOrigin = String(APP_ORIGIN).replace(/\/$/, "");
+  /*
+   * Liquid cart snapshot + drawer section id.
+   * Valor theme always renders sections/cart-drawer.liquid as id "cart-drawer"
+   * and refreshes via GET /?section_id=cart-drawer (Section Rendering API).
+   */
+  o.cartItemCount = {{ cart.item_count | default: 0 | json }};
+  o.cartDrawerSectionId = "cart-drawer";
+  o.cartSectionIds = ["cart-drawer", "cart-icon-bubble"];
+  (function discoverCartSectionIds() {
+    function run() {
+      try {
+        var ids = [];
+        var seen = {};
+        function add(id) {
+          var s = String(id || "").trim();
+          if (!s || seen[s]) return;
+          seen[s] = true;
+          ids.push(s);
+        }
+        /* Prefer Liquid-known Valor / Dawn drawer section first. */
+        add(o.cartDrawerSectionId || "cart-drawer");
+        var host =
+          document.querySelector("valor-cart-drawer") ||
+          document.querySelector("cart-drawer") ||
+          document.querySelector("#CartDrawer");
+        if (host) {
+          add(host.getAttribute("data-section-id"));
+          add(host.getAttribute("section-id"));
+          if (host.dataset) {
+            add(host.dataset.sectionId);
+            add(host.dataset.section);
+          }
+          if (typeof host.getSectionsToRender === "function") {
+            var list = host.getSectionsToRender() || [];
+            for (var i = 0; i < list.length; i++) {
+              add(list[i] && (list[i].id || list[i].section));
+            }
+          }
+          var section = host.closest(".shopify-section");
+          if (section && section.id) {
+            var m = String(section.id).match(/^shopify-section-(.+)$/i);
+            if (m) add(m[1]);
+          }
+        }
+        add("cart-icon-bubble");
+        if (ids.length) o.cartSectionIds = ids.slice(0, 5);
+      } catch (e) {}
+    }
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", run);
+    } else {
+      run();
+    }
+  })();
   {% if vd_widget and vd_widget.rev %}
   o.configRev = {{ vd_widget.rev | json }};
   {% else %}
@@ -208,10 +262,12 @@
 
   var s = document.createElement("script");
   s.src = scriptSrc;
-  s.defer = true;
   {% if vd_is_product %}
+  /* Product pages: execute as soon as downloaded (preload above). No defer delay. */
+  s.async = false;
   s.fetchPriority = "high";
   {% else %}
+  s.defer = true;
   s.fetchPriority = "low";
   {% endif %}
   s.setAttribute("data-vd-asset-version", VD_ASSET_VERSION);

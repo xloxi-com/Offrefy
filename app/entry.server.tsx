@@ -38,7 +38,7 @@ export default async function handleRequest(
       <ServerRouter context={reactRouterContext} url={request.url} />,
       {
         signal: controller.signal,
-        onError(error) {
+        onError(error: unknown) {
           shellErrored = true;
           console.error(error);
           responseStatusCode = 500;

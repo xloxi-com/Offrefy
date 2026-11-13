@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="720" viewBox="0 0 880 720" fill="none">
+  <rect width="880" height="720" fill="#F6F6F7"/>
+  <rect x="80" y="80" width="720" height="560" rx="24" fill="#FFFFFF" stroke="#E3E3E3"/>
+  <text x="440" y="150" text-anchor="middle" font-family="system-ui,sans-serif" font-size="28" font-weight="700" fill="#202223">Buy X, Get Y</text>
+  <rect x="160" y="200" width="560" height="100" rx="16" fill="#F1F2F3"/>
+  <text x="200" y="250" font-family="system-ui,sans-serif" font-size="22" font-weight="600" fill="#202223">Buy 2</text>
+  <text x="200" y="280" font-family="system-ui,sans-serif" font-size="16" fill="#6D7175">Qualifying products</text>
+  <rect x="160" y="320" width="560" height="100" rx="16" fill="#EAF7EE" stroke="#AEE9BB"/>
+  <text x="200" y="370" font-family="system-ui,sans-serif" font-size="22" font-weight="600" fill="#0B7A33">Get 1 Free</text>
+  <text x="200" y="400" font-family="system-ui,sans-serif" font-size="16" fill="#0B7A33">Automatic at checkout</text>
+  <rect x="160" y="460" width="560" height="72" rx="16" fill="#202223"/>
+  <text x="440" y="505" text-anchor="middle" font-family="system-ui,sans-serif" font-size="22" font-weight="600" fill="#FFFFFF">Add both to cart</text>
+</svg>

@@ -1,6 +1,3 @@
-import { useMemo, useState } from "react";
-import { ActionList, BlockStack, Button, Popover, Text } from "@shopify/polaris";
-
 export type AdminLanguageOption = {
   label: string;
   value: string;
@@ -16,7 +13,8 @@ export type AdminLanguageDropdownProps = {
 };
 
 /**
- * Polaris Popover + ActionList language picker (custom dropdown, not native Select).
+ * App Home `s-select` dropdown (Polaris web components Select).
+ * Used for admin language, customer type, and similar single-choice fields.
  */
 export function AdminLanguageDropdown({
   label,
@@ -26,56 +24,26 @@ export function AdminLanguageDropdown({
   disabled = false,
   helpText,
 }: AdminLanguageDropdownProps) {
-  const [active, setActive] = useState(false);
-
-  const selectedLabel = useMemo(
-    () => options.find((option) => option.value === value)?.label ?? label,
-    [label, options, value],
-  );
-
   return (
-    <BlockStack gap="100">
-      <Text as="p" variant="bodyMd">
-        {label}
-      </Text>
-      <Popover
-        active={active}
-        activator={
-          <Button
-            onClick={() => setActive((open) => !open)}
-            disclosure="select"
-            fullWidth
-            textAlign="left"
-            disabled={disabled}
-            accessibilityLabel={label}
-          >
-            {selectedLabel}
-          </Button>
-        }
-        onClose={() => setActive(false)}
-        preferredAlignment="left"
-        fullWidth
-        autofocusTarget="first-node"
-      >
-        <div style={{ maxHeight: 280, overflowY: "auto" }}>
-          <ActionList
-            actionRole="menuitemradio"
-            items={options.map((option) => ({
-              content: option.label,
-              active: option.value === value,
-              onAction: () => {
-                onChange(option.value);
-                setActive(false);
-              },
-            }))}
-          />
-        </div>
-      </Popover>
-      {helpText ? (
-        <Text as="p" variant="bodySm" tone="subdued">
-          {helpText}
-        </Text>
-      ) : null}
-    </BlockStack>
+    <s-select
+      label={label}
+      value={value}
+      disabled={disabled || undefined}
+      details={helpText}
+      onChange={(event) => {
+        const next = String(event.currentTarget.value || "");
+        if (next) onChange(next);
+      }}
+      onInput={(event) => {
+        const next = String(event.currentTarget.value || "");
+        if (next) onChange(next);
+      }}
+    >
+      {options.map((option) => (
+        <s-option key={option.value} value={option.value}>
+          {option.label}
+        </s-option>
+      ))}
+    </s-select>
   );
 }
