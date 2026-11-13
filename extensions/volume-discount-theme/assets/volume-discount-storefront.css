@@ -8050,10 +8050,11 @@ html[data-offrefy-hide-theme-price="1"]:has([data-offrefy-root][data-offrefy-rea
 [data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media,
 .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media {
   position: relative !important;
-  flex: 1 1 auto !important;
+  flex: 0 0 auto !important;
   align-self: stretch !important;
-  min-height: 148px !important;
-  height: auto !important;
+  min-height: 140px !important;
+  height: 140px !important;
+  max-height: 160px !important;
   margin: 0 0 6px !important;
   padding: 0 !important;
 }
@@ -8614,10 +8615,10 @@ html[data-offrefy-hide-theme-price="1"]:has([data-offrefy-root][data-offrefy-rea
   }
   [data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media,
   .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media {
-    flex: 1 1 auto !important;
-    height: auto !important;
-    min-height: 108px !important;
-    max-height: none !important;
+    flex: 0 0 auto !important;
+    height: 120px !important;
+    min-height: 120px !important;
+    max-height: 140px !important;
   }
   [data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media .offrefy-bogo__img,
   .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media .offrefy-bogo__img {
@@ -8625,7 +8626,7 @@ html[data-offrefy-hide-theme-price="1"]:has([data-offrefy-root][data-offrefy-rea
     height: 100% !important;
     max-width: none !important;
     max-height: none !important;
-    transform: scale(1.4) !important;
+    transform: scale(1.2) !important;
   }
   [data-offrefy-root] .offrefy-bogo .offrefy-bogo__choice .offrefy-bogo__img,
   .offrefy-bogo .offrefy-bogo__choice .offrefy-bogo__img {

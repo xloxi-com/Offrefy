@@ -81,10 +81,59 @@ const SAMPLE_GIFTS: BogoGiftOption[] = [
   },
 ];
 
-/** Wide enough to skip ≤560 compact rules — real desktop product column. */
+/** Wide enough to skip ≤560 compact / ≤400 stack rules — real desktop product column. */
 const DESKTOP_CANVAS = 680;
 /** Phone width — hits ≤400 stack rules. */
 const MOBILE_CANVAS = 360;
+
+/** Keep Buy | + | Get side-by-side in admin desktop preview (beats @container). */
+const DESKTOP_PREVIEW_CSS = `
+.offrefy-bogo .offrefy-bogo__equation {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 32px minmax(0, 1fr) !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+}
+.offrefy-bogo .offrefy-bogo__op {
+  display: inline-flex !important;
+  align-self: center !important;
+  justify-self: center !important;
+}
+.offrefy-bogo .offrefy-bogo__tile--buy,
+.offrefy-bogo .offrefy-bogo__tile--get {
+  min-width: 0 !important;
+  width: 100% !important;
+}
+.offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media {
+  flex: 0 0 auto !important;
+  height: 140px !important;
+  min-height: 140px !important;
+  max-height: 140px !important;
+}
+.offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media .offrefy-bogo__img {
+  transform: scale(1.15) !important;
+}
+.offrefy-bogo .offrefy-bogo__choice .offrefy-bogo__img {
+  height: 88px !important;
+  max-height: 88px !important;
+}
+.offrefy-bogo .offrefy-bogo__check {
+  width: 16px !important;
+  height: 16px !important;
+}
+`;
+
+const MOBILE_PREVIEW_CSS = `
+.offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media {
+  flex: 0 0 88px !important;
+  height: 88px !important;
+  min-height: 88px !important;
+  max-height: 88px !important;
+}
+.offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media .offrefy-bogo__img {
+  transform: scale(1.2) !important;
+}
+`;
 
 const STOCK_FOOTNOTE =
   "Discount applies automatically when Buy and Get quantities are in your cart.";
@@ -158,19 +207,21 @@ export function BogoLivePreview({
       ? `Max ${usesLimit} use(s) per order`
       : undefined;
   const isLive = status === "active";
+  // Preview sample gifts — use a single gift when none/one selected so the
+  // Buy tile doesn't stretch around a multi-choice picker (huge bottle bug).
   const gifts =
-    getPool === 1
+    getPool <= 1
       ? [
           {
             id: "one",
-            name: "Free gift",
+            name: SAMPLE_GIFTS[0]?.name ?? "Coca-Cola Original",
             tone: "classic" as const,
             image: SAMPLE_GIFTS[0]?.image,
           },
         ]
       : getPool === 2
         ? SAMPLE_GIFTS.slice(0, 2)
-        : SAMPLE_GIFTS;
+        : SAMPLE_GIFTS.slice(0, Math.min(getPool, 4));
   const copy = widgetDisplay?.bogoCopy ?? DEFAULT_BOGO_WIDGET_COPY;
   const pickLabel = isFreeGet
     ? fillBogoTemplate(
@@ -375,7 +426,14 @@ export function BogoLivePreview({
                     limitLabel={limitLabel}
                     buttonColor={primary}
                     panelStyle={bogoPanelColorStyle(copy, primary)}
-                    customCss={widgetDisplay?.customCss}
+                    customCss={[
+                      previewDevice === "desktop"
+                        ? DESKTOP_PREVIEW_CSS
+                        : MOBILE_PREVIEW_CSS,
+                      widgetDisplay?.customCss || "",
+                    ]
+                      .filter(Boolean)
+                      .join("\n")}
                   />
                 </div>
               </div>
