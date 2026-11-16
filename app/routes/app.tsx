@@ -12,6 +12,7 @@ import type {
 import {
   Outlet,
   data,
+  isRouteErrorResponse,
   redirect,
   useLoaderData,
   useLocation,
@@ -206,18 +207,18 @@ export default function App() {
   );
 }
 
-function isShopifyResponseError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  const name = error.constructor?.name;
-  return name === "ErrorResponse" || name === "ErrorResponseImpl";
-}
-
-// Shopify needs React Router to catch some thrown responses, so that their headers are included in the response.
-// `boundary.error` rethrows real exceptions, which becomes the default "Application Error" page.
+// Shopify throws a document Response (App Bridge reload / auth bounce).
+// `boundary.error` only detects it via constructor.name, which the production
+// bundle minifies, so the live app rendered the error page instead of booting.
 export function ErrorBoundary() {
   const error = useRouteError();
-  if (isShopifyResponseError(error)) {
-    return boundary.error(error);
+  if (isRouteErrorResponse(error)) {
+    const html = typeof error.data === "string" ? error.data : "";
+    return (
+      <div
+        dangerouslySetInnerHTML={{ __html: html || "Handling response" }}
+      />
+    );
   }
   return <AppErrorPage />;
 }
