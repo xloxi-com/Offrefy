@@ -23,6 +23,7 @@ import { AppProvider as PolarisAppProvider } from "@shopify/polaris";
 import en from "@shopify/polaris/locales/en.json";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { useAppBridge } from "@shopify/app-bridge-react";
+import { AppErrorPage } from "../components/AppErrorPage";
 import { ShopifyAppProvider } from "../components/ShopifyAppProvider";
 
 import { APP_DISPLAY_NAME } from "../branding";
@@ -205,9 +206,20 @@ export default function App() {
   );
 }
 
+function isShopifyResponseError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const name = error.constructor?.name;
+  return name === "ErrorResponse" || name === "ErrorResponseImpl";
+}
+
 // Shopify needs React Router to catch some thrown responses, so that their headers are included in the response.
+// `boundary.error` rethrows real exceptions, which becomes the default "Application Error" page.
 export function ErrorBoundary() {
-  return boundary.error(useRouteError());
+  const error = useRouteError();
+  if (isShopifyResponseError(error)) {
+    return boundary.error(error);
+  }
+  return <AppErrorPage />;
 }
 
 export const headers: HeadersFunction = (headersArgs) => {
