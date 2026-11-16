@@ -14,8 +14,7 @@ description = "One automatic Product Discount reads unlimited campaigns from pro
 
   # No network_access / fetch target — Discount Function network access is
   # enterprise/Plus-limited; on Basic it errors and wipes all Remise discounts.
-  # Checkout rules come from discount metafield volume_discount.rule_source.
-  # Product volume_discount.tiers metafields are for the storefront widget only.
+  # Rules come from product volume_discount.tiers metafields (written on sync).
 
   # Feeds $customerSegmentTags in input.graphql from sync-written metafield.
   [extensions.input.variables]

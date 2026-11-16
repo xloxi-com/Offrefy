@@ -9,13 +9,11 @@ import {
  */
 
 /**
- * Prefer a successful partial discount over a Function RuntimeError (fuel ~11M).
- * Per-line product metafields are not in the input. Only the first 39 cart
- * lines are discounted; later lines are skipped so a 40th product cannot
- * fail the run.
+ * Prefer partial discounts over Function RuntimeError (fuel ~11M).
+ * Cap high enough for ~50 distinct cart products with light messaging.
  */
 const MAX_TARGETS = 50;
-const MAX_DISCOUNT_LINES = 39;
+const MAX_LINES_SCAN = 55;
 const MAX_TIERS_SCAN = 8;
 
 /** @param {unknown} gid */
@@ -281,21 +279,6 @@ function wildcardFromRuleSource(ruleSource) {
 }
 
 /**
- * Product-specific rule from discount metafield `rule_source.p`.
- * Direct key lookup — do not walk the map (fuel).
- * @param {unknown} ruleSource
- * @param {string} pid
- */
-function productRuleFromSource(ruleSource, pid) {
-  if (!ruleSource || typeof ruleSource !== "object" || !pid) return null;
-  const map = /** @type {{ p?: unknown }} */ (ruleSource).p;
-  if (!map || typeof map !== "object") return null;
-  return compactFromMetafield(
-    /** @type {Record<string, unknown>} */ (map)[pid],
-  );
-}
-
-/**
  * @param {unknown} compact
  * @param {boolean} isAuthenticated
  * @param {Record<string, 1>|null} customerTagSet
@@ -389,7 +372,7 @@ function runMetafieldDiscounts(input) {
   const wildcard = wildcardFromRuleSource(ruleSource);
 
   const lineLimit =
-    lines.length < MAX_DISCOUNT_LINES ? lines.length : MAX_DISCOUNT_LINES;
+    lines.length < MAX_LINES_SCAN ? lines.length : MAX_LINES_SCAN;
 
   /**
    * @type {{ lineIndex: number, pid: string, vid: string, qty: number, compact: object }[]}
@@ -407,7 +390,9 @@ function runMetafieldDiscounts(input) {
     const qty = line.quantity | 0;
     cartQtyAll += qty;
 
-    const compact = productRuleFromSource(ruleSource, pid) || wildcard;
+    const compact =
+      compactFromMetafield(merch?.product?.tiersMetafield?.jsonValue) ||
+      wildcard;
     if (!compact) continue;
     if (!customerAllows(compact, isAuthenticated, customerTagSet)) continue;
     if (!variantAllows(compact, vid)) continue;

@@ -31,12 +31,9 @@ import {
 } from "../utils/discountRules.server";
 import {
   buildCompactRuleForProduct,
-  buildFunctionProductRuleMap,
   buildProductRuleIndex,
   compactRuleMessageField,
-  slimRuleForFunction,
   splitProductRuleIndexIntoMetafieldChunks,
-  type CompactProductRule,
   type ProductRuleCampaignInput,
 } from "../utils/productRuleIndex.server";
 import { normalizeVolumeDiscountWidgetDisplay } from "../utils/widgetDisplay";
@@ -680,8 +677,8 @@ async function syncVolumeDiscountShopImpl(
 
   const rowFp = rowSyncFingerprint(activeRows, {
     maxDiscountProducts,
-    // v9: rule_source.p (product map) + slim w. Function no longer reads per-line tiers.
-    ruleSourceVersion: 9,
+    // v8: slim rule_source (w only) + omit empty display m — less Function parse fuel
+    ruleSourceVersion: 8,
   });
 
   if (!force && !incrementalIds?.length && recursionDepth === 0) {
@@ -809,7 +806,6 @@ async function syncVolumeDiscountShopImpl(
   let campaignMfEntries: { key: string; value: string }[];
   let widgetJsonFull: string;
   let wildcardCompact: Record<string, unknown> | undefined;
-  let productRuleMap: Record<string, CompactProductRule> | undefined;
   let discountFunctionTranslations: ReturnType<
     typeof compactTranslationsForDiscountFunction
   > = {};
@@ -1195,7 +1191,6 @@ async function syncVolumeDiscountShopImpl(
         return {
           ...split,
           wildcard: productIndex["*"],
-          productRuleMap: buildFunctionProductRuleMap(productIndex),
         };
       }),
       (() => {
@@ -1222,9 +1217,8 @@ async function syncVolumeDiscountShopImpl(
 
     campaignMfEntries = built.chunks;
     wildcardCompact = built.wildcard
-      ? (slimRuleForFunction(built.wildcard) as unknown as Record<string, unknown>)
+      ? (built.wildcard as unknown as Record<string, unknown>)
       : undefined;
-    productRuleMap = built.productRuleMap;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { discountIds: [], errors: [msg] };
@@ -1240,9 +1234,9 @@ async function syncVolumeDiscountShopImpl(
     customerSegmentTags: collectCustomerSegmentTags(activeRows),
   });
   const ruleSourcePayload = {
-    // `w` = all-products. `p` = specific products, parsed once (not once per cart line).
+    // Function only reads `w`. Extra keys (tr/ctr/apiPath/…) were parsed every
+    // cart eval and burned instruction fuel without being used after fetch disable.
     ...(wildcardCompact ? { w: wildcardCompact } : {}),
-    ...(productRuleMap ? { p: productRuleMap } : {}),
   };
   const metafields = [
     ...campaignMfEntries.map((entry) => ({

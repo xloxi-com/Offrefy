@@ -1,7 +1,5 @@
-# Slim cart lines (no per-product metafield). Copying tiers JSON onto every
-# line burned the ~11M instruction budget around 40 lines and failed the run.
-# Rules are one discount metafield: rule_source.w (all products) and
-# rule_source.p (product id → rule). The run skips cart lines after the first 39.
+# Metafield-only cart discount input (no fetchResult — avoids fuel burn).
+# ruleSource.w = compact "all products" wildcard when product tiers MF is missing.
 # $customerSegmentTags comes from discount metafield volume_discount.input_variables
 # (union of tags from active logged-in-tag-any campaigns).
 query CartInput($customerSegmentTags: [String!] = []) {
@@ -30,6 +28,9 @@ query CartInput($customerSegmentTags: [String!] = []) {
           id
           product {
             id
+            tiersMetafield: metafield(namespace: "volume_discount", key: "tiers") {
+              jsonValue
+            }
           }
         }
       }

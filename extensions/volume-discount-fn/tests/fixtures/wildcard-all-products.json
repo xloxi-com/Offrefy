@@ -21,7 +21,8 @@
               "__typename": "ProductVariant",
               "id": "gid://shopify/ProductVariant/1",
               "product": {
-                "id": "gid://shopify/Product/8040248016986"
+                "id": "gid://shopify/Product/8040248016986",
+                "tiersMetafield": null
               }
             }
           }
