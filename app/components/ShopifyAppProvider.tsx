@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 
 /**
@@ -34,9 +34,62 @@ export function ShopifyAppProvider(props: ShopifyAppProviderProps) {
     <>
       {props.embedded === true ? <AppBridge apiKey={props.apiKey} /> : null}
       <script src={POLARIS_CDN_URL} />
-      {props.children}
+      {props.embedded === true ? (
+        <ShopifyReady>{props.children}</ShopifyReady>
+      ) : (
+        props.children
+      )}
     </>
   );
+}
+
+/**
+ * `useAppBridge()` throws on the client when `window.shopify` is not set yet.
+ * That crash is what the live admin was showing as the error page.
+ * Wait until App Bridge has installed the global, then render the app.
+ */
+function ShopifyReady({ children }: { children: ReactNode }) {
+  const [ready, setReady] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
+
+  useEffect(() => {
+    let timer = 0;
+    const check = () => {
+      if (window.shopify) {
+        setReady(true);
+        return true;
+      }
+      return false;
+    };
+    if (check()) return;
+    timer = window.setInterval(() => {
+      if (check()) window.clearInterval(timer);
+    }, 50);
+    const stop = window.setTimeout(() => setTimedOut(true), 8000);
+    return () => {
+      window.clearInterval(timer);
+      window.clearTimeout(stop);
+    };
+  }, []);
+
+  if (ready) return children;
+  if (timedOut) {
+    return (
+      <s-page heading="Something went wrong" inlineSize="base">
+        <s-banner heading="App Bridge did not load" tone="critical">
+          Reload the page and try again.
+        </s-banner>
+        <s-button
+          slot="primary-action"
+          variant="primary"
+          onClick={() => window.location.reload()}
+        >
+          Reload
+        </s-button>
+      </s-page>
+    );
+  }
+  return null;
 }
 
 function AppBridge({ apiKey }: { apiKey: string }) {

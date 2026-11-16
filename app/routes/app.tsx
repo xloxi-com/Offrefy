@@ -210,6 +210,12 @@ export default function App() {
 // Shopify throws a document Response (App Bridge reload / auth bounce).
 // `boundary.error` only detects it via constructor.name, which the production
 // bundle minifies, so the live app rendered the error page instead of booting.
+function errorDetail(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "string" && error) return error;
+  return "";
+}
+
 export function ErrorBoundary() {
   const error = useRouteError();
   if (isRouteErrorResponse(error)) {
@@ -220,7 +226,8 @@ export function ErrorBoundary() {
       />
     );
   }
-  return <AppErrorPage />;
+  console.error("[offrefy] app route error", error);
+  return <AppErrorPage detail={errorDetail(error)} />;
 }
 
 export const headers: HeadersFunction = (headersArgs) => {
