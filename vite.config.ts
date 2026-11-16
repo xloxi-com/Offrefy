@@ -94,7 +94,8 @@ export default defineConfig({
     hmr: hmrConfig,
     fs: {
       // See https://vitejs.dev/config/server-options.html#server-fs-allow for more information
-      allow: ["app", "node_modules"],
+      // `extensions` — admin BOGO preview inlines storefront CSS (`?raw`).
+      allow: ["app", "node_modules", "extensions"],
     },
   },
   plugins: [

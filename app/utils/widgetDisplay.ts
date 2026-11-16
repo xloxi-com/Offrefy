@@ -8,6 +8,8 @@ import {
 } from "./widgetFontSizes";
 import { parseWidgetFontWeight } from "./widgetFontWeights";
 import {
+  bogoClassicPresetCopy,
+  bogoColorsFromAppearancePatch,
   DEFAULT_BOGO_WIDGET_COPY,
   normalizeBogoWidgetCopy,
   type BogoWidgetCopy,
@@ -4364,6 +4366,16 @@ function pickAppearanceDecorThemeId(
   return "";
 }
 
+const SEASONAL_DECOR_THEME_RE =
+  /^(christmas_|newyear_|halloween_|ramadan_|diwali_|pongal_|valentine_|easter_)/;
+
+/** True when a template id has storefront decoration art (not Classic). */
+export function isSeasonalDecorThemeId(
+  id: string | null | undefined,
+): boolean {
+  return Boolean(id && SEASONAL_DECOR_THEME_RE.test(id));
+}
+
 /** Theme id used for seasonal CSS (`data-offrefy-theme`), including after Custom tweaks. */
 export function resolveWidgetAppearanceDecorThemeId(
   d: Pick<
@@ -4741,6 +4753,28 @@ export function applyVolumeDiscountAppearancePreset(
   return normalizeVolumeDiscountWidgetDisplay({
     ...current,
     ...patch,
+    appearanceTemplateId: presetId,
+    appearanceDecorThemeId: presetId,
+  });
+}
+
+/**
+ * Apply a quantity-break template to Buy X Get Y.
+ * Keeps labels and CTA copy; retints the card and keeps the same decoration theme.
+ */
+export function applyBogoAppearancePreset(
+  current: VolumeDiscountWidgetDisplay,
+  presetId: VolumeDiscountAppearancePresetId,
+): VolumeDiscountWidgetDisplay {
+  const row = VOLUME_DISCOUNT_APPEARANCE_PRESETS.find((p) => p.id === presetId);
+  if (!row) return current;
+  const patch = mergeAppearancePresetPatch(row.patch);
+  const classicCopy = bogoClassicPresetCopy(presetId, current.bogoCopy);
+  return normalizeVolumeDiscountWidgetDisplay({
+    ...current,
+    ...patch,
+    bogoCopy:
+      classicCopy ?? bogoColorsFromAppearancePatch(patch, current.bogoCopy),
     appearanceTemplateId: presetId,
     appearanceDecorThemeId: presetId,
   });

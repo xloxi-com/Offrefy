@@ -1,4 +1,6 @@
 import { useEffect, useRef } from "react";
+import { BOGO_PREVIEW_CSS } from "../utils/bogoPreviewCss";
+import { BOGO_PREVIEW_CRITICAL_CSS } from "../utils/bogoPreviewCriticalCss";
 
 export type BogoGiftTone = "classic" | "zero" | "light" | "generic";
 
@@ -28,9 +30,9 @@ export type BogoSpecialOfferCardProps = {
   buttonColor?: string;
   panelStyle?: string;
   customCss?: string;
+  /** Seasonal template shell provides the frame; the card itself stays clear. */
+  themed?: boolean;
 };
-
-const PREVIEW_CSS = "/vd-storefront.css?v=1.32.3";
 
 const CART =
   '<svg class="offrefy-bogo__ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="m1 1c-.55228475 0-1 .44771525-1 1s.44771525 1 1 1h1.7792969a.69367162.69367162 35.784145 0 1 .65808707.47435058l3.2969911 9.8928369c.14641172.43923517.16502704.91215746.05273437 1.3613281l-.27148437 1.0878906c-.39834445 1.5933778.84195876 3.1835938 2.484375 3.1835938h12c.55228475 0 1-.44771525 1-1s-.44771525-1-1-1h-12c-.38938619 0-.6393619-.31950554-.54492188-.69726562l.20473297-.81770594a.64062109.64062109 142.02823 0 1 .6214389-.48502844h10.71875c.43057012.00022511.81295428-.27515444.94921875-.68359375l2.6660156-8c.21596464-.64778704-.26638007-1.3167178-.94921876-1.3164062h-16.111328a.69371294.69371294 35.782526 0 1 -.65811388-.47434165l-.94735487-2.8420646c-.13626447-.40843931-.51864863-.68381886-.94921875-.68359375zm7 19c-1.1045695 0-2 .8954305-2 2s.8954305 2 2 2 2-.8954305 2-2-.8954305-2-2-2zm12 0c-1.1045695 0-2 .8954305-2 2s.8954305 2 2 2 2-.8954305 2-2-.8954305-2-2-2z"/></svg>';
@@ -105,7 +107,7 @@ function cardMarkup(props: BogoSpecialOfferCardProps) {
     .join(";");
   return (
     (css ? `<style data-offrefy-bogo-custom-css>${css}</style>` : "") +
-    `<div class="offrefy-bogo"${style ? ` style="${esc(style)}"` : ""}>` +
+    `<div class="offrefy-bogo${props.themed ? " offrefy-bogo--themed" : ""}"${style ? ` style="${esc(style)}"` : ""}>` +
     `<div class="offrefy-bogo__hero">` +
     `<div class="offrefy-bogo__hero-copy">` +
     `<div class="offrefy-bogo__title">${esc(props.heading && !/^special offer$/i.test(props.heading) ? props.heading : "Buy X, get Y free")}</div>` +
@@ -153,6 +155,7 @@ export function BogoSpecialOfferCard(props: BogoSpecialOfferCardProps) {
     props.limitLabel,
     props.panelStyle,
     props.customCss,
+    props.themed ? "themed" : "",
     props.buttonColor,
     props.buyImage,
     props.gifts.map((gift) => gift.id + gift.name + (gift.image || "")).join("|"),
@@ -162,16 +165,29 @@ export function BogoSpecialOfferCard(props: BogoSpecialOfferCardProps) {
     const host = hostRef.current;
     if (!host) return;
     const shadow = host.shadowRoot ?? host.attachShadow({ mode: "open" });
-    let link = shadow.querySelector<HTMLLinkElement>("link[data-offrefy-bogo-css]");
-    if (!link) {
-      link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.setAttribute("data-offrefy-bogo-css", "1");
-      shadow.appendChild(link);
+
+    // Full CSS is inlined in the JS bundle (no `/vd-storefront.css` fetch,
+    // no Vite `?raw` chunk) so production admin preview matches localhost.
+    let baseStyle = shadow.querySelector<HTMLStyleElement>(
+      "style[data-offrefy-bogo-base-css]",
+    );
+    if (!baseStyle) {
+      baseStyle = document.createElement("style");
+      baseStyle.setAttribute("data-offrefy-bogo-base-css", "1");
+      shadow.appendChild(baseStyle);
     }
-    if (link.href !== new URL(PREVIEW_CSS, window.location.origin).href) {
-      link.href = PREVIEW_CSS;
+    const sheet =
+      typeof BOGO_PREVIEW_CSS === "string" && BOGO_PREVIEW_CSS.trim().length > 0
+        ? BOGO_PREVIEW_CSS
+        : BOGO_PREVIEW_CRITICAL_CSS;
+    if (baseStyle.textContent !== sheet) {
+      baseStyle.textContent = sheet;
     }
+
+    shadow
+      .querySelectorAll("link[data-offrefy-bogo-css]")
+      .forEach((node) => node.remove());
+
     let scope = shadow.querySelector<HTMLElement>("[data-offrefy-bogo-root]");
     if (!scope) {
       scope = document.createElement("div");
@@ -181,6 +197,7 @@ export function BogoSpecialOfferCard(props: BogoSpecialOfferCardProps) {
       shadow.appendChild(scope);
     }
     scope.innerHTML = cardMarkup(propsRef.current);
+
     const scroller = scope.querySelector<HTMLElement>(".offrefy-bogo__choices");
     let dragged = false;
     let drag: { id: number; x: number; left: number } | null = null;

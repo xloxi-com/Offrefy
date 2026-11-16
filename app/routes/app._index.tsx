@@ -770,8 +770,6 @@ export default function AppHomePage() {
         {t("home.settings")}
       </s-button>
 
-      <s-paragraph color="subdued">{t("home.subtitle")}</s-paragraph>
-
       {!setupComplete && showGuide && !dismissedSetupBanner ? (
         <s-banner
           tone="info"
@@ -803,20 +801,17 @@ export default function AppHomePage() {
               description={t("home.setupGuideDescription")}
             />
           ) : (
-            <s-section heading={t("home.setupGuideTitle")}>
-              <s-stack
-                direction="inline"
-                gap="base"
-                alignItems="center"
-                justifyContent="space-between"
+            <s-section
+              heading={t("home.setupGuideTitle")}
+              subheading={t("home.setupDismissed")}
+            >
+              <s-button
+                slot="secondary-actions"
+                variant="tertiary"
+                onClick={restoreGuide}
               >
-                <s-paragraph color="subdued">
-                  {t("home.setupDismissed")}
-                </s-paragraph>
-                <s-button onClick={restoreGuide}>
-                  {t("home.showSetupGuide")}
-                </s-button>
-              </s-stack>
+                {t("home.showSetupGuide")}
+              </s-button>
             </s-section>
           )}
 

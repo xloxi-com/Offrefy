@@ -1,5 +1,7 @@
-import type { ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { AppearanceTemplateCategoryTabs } from "./AppearanceTemplateCategoryTabs";
+import { AppearanceTemplateGrid } from "./AppearanceTemplateGrid";
 import { useAdminI18n } from "./AdminI18nProvider";
 import { WidgetDisplayColorField } from "./WidgetDisplayColorField";
 import {
@@ -8,7 +10,12 @@ import {
   type StorefrontTranslationFields,
 } from "../utils/storefrontTranslations";
 import type { AdminUiMessageKey } from "../utils/adminUiMessages";
-import type { VolumeDiscountWidgetDisplay } from "../utils/widgetDisplay";
+import {
+  appearanceCategoryForPresetId,
+  appearancePresetsForCategory,
+  type AppearanceTemplateCategory,
+  type VolumeDiscountWidgetDisplay,
+} from "../utils/widgetDisplay";
 import { CTA_BUTTON_ACTION_OPTIONS } from "../utils/widgetDisplay";
 import { defaultBogoWidgetDisplay } from "../utils/bogoWidgetDisplay";
 import type { BogoWidgetCopy } from "../utils/bogoWidgetCopy";
@@ -252,14 +259,51 @@ export function BogoDisplayPanel({
 /** Colors / look only. */
 export function BogoAppearancePanel({
   widgetDisplay,
-  onChange,
+  onChange: commitStyle,
+  onApplyDisplay,
   onReset,
 }: {
   widgetDisplay: VolumeDiscountWidgetDisplay;
   onChange: (patch: Partial<VolumeDiscountWidgetDisplay>) => void;
+  onApplyDisplay: (next: VolumeDiscountWidgetDisplay) => void;
   onReset: () => void;
 }) {
   const { t } = useAdminI18n();
+  const [appearanceTemplateCategory, setAppearanceTemplateCategory] =
+    useState<AppearanceTemplateCategory>(() => {
+      const tid = widgetDisplay.appearanceTemplateId;
+      if (tid === "custom" && widgetDisplay.appearanceDecorThemeId) {
+        return appearanceCategoryForPresetId(
+          widgetDisplay.appearanceDecorThemeId,
+        );
+      }
+      return appearanceCategoryForPresetId(tid);
+    });
+
+  useEffect(() => {
+    if (widgetDisplay.appearanceTemplateId === "custom") return;
+    setAppearanceTemplateCategory(
+      appearanceCategoryForPresetId(widgetDisplay.appearanceTemplateId),
+    );
+  }, [widgetDisplay.appearanceTemplateId]);
+
+  const appearanceTemplatesInCategory = useMemo(
+    () => appearancePresetsForCategory(appearanceTemplateCategory, false),
+    [appearanceTemplateCategory],
+  );
+
+  const onChange = (patch: Partial<VolumeDiscountWidgetDisplay>) => {
+    const decor =
+      widgetDisplay.appearanceTemplateId !== "custom"
+        ? widgetDisplay.appearanceTemplateId
+        : widgetDisplay.appearanceDecorThemeId;
+    commitStyle({
+      ...patch,
+      appearanceTemplateId: "custom",
+      appearanceDecorThemeId: decor,
+    });
+  };
+
   return (
     // Polaris web: s-box — Appearance panel shell
     <s-box
@@ -278,8 +322,24 @@ export function BogoAppearancePanel({
           }
         />
         <s-paragraph color="subdued">
-          {t("offerEditor.appearance.intro")}
+          {t("offerEditor.appearance.templatesHelp")}
         </s-paragraph>
+        <AppearanceTemplateCategoryTabs
+          value={appearanceTemplateCategory}
+          onChange={setAppearanceTemplateCategory}
+        />
+        <AppearanceTemplateGrid
+          presets={appearanceTemplatesInCategory}
+          widgetDisplay={widgetDisplay}
+          setWidgetDisplay={onApplyDisplay}
+          patchWidgetDisplay={(patch) =>
+            onApplyDisplay({ ...widgetDisplay, ...patch })
+          }
+          appearanceTemplates="all"
+          forVolumeTable={false}
+          forBogo
+          ariaLabel={t("offerEditor.appearance.templatesAria")}
+        />
 
         <s-stack direction="block" gap="small">
           <s-heading>{t("bogo.colors.card")}</s-heading>

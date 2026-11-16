@@ -725,6 +725,6 @@
 .bogoPreviewCardPad {
   width: 100%;
   box-sizing: border-box;
-  padding: var(--p-space-400, 1rem);
+  padding: var(--p-space-300, 0.75rem);
   background: var(--p-color-bg-surface, #fff);
 }

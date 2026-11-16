@@ -5,6 +5,7 @@ import { adminEmbeddedPath } from "../utils/adminEmbeddedPath";
 import { isAppearancePresetAllowedForTier } from "../utils/appearanceTemplateAccess";
 import type { AppearanceTemplatesTier } from "../utils/pricingPlans";
 import {
+  applyBogoAppearancePreset,
   applyVolumeDiscountAppearancePreset,
   applyVolumeTableAppearancePreset,
   type VolumeDiscountAppearancePresetRow,
@@ -22,14 +23,18 @@ type AppearanceTemplateGridProps = {
   appearanceTemplates: AppearanceTemplatesTier;
   /** Volume table presets use a separate apply helper. */
   forVolumeTable: boolean;
+  /** Buy X Get Y uses the same presets, mapped onto the BOGO card. */
+  forBogo?: boolean;
   ariaLabel: string;
 };
 
 function applyPreset(
   forVolumeTable: boolean,
+  forBogo: boolean,
   widgetDisplay: VolumeDiscountWidgetDisplay,
   presetId: VolumeDiscountAppearancePresetRow["id"],
 ): VolumeDiscountWidgetDisplay {
+  if (forBogo) return applyBogoAppearancePreset(widgetDisplay, presetId);
   return forVolumeTable
     ? applyVolumeTableAppearancePreset(widgetDisplay, presetId)
     : applyVolumeDiscountAppearancePreset(widgetDisplay, presetId);
@@ -46,6 +51,7 @@ export function AppearanceTemplateGrid({
   patchWidgetDisplay,
   appearanceTemplates,
   forVolumeTable,
+  forBogo = false,
   ariaLabel,
 }: AppearanceTemplateGridProps) {
   const { t } = useAdminI18n();
@@ -71,7 +77,7 @@ export function AppearanceTemplateGrid({
 
         const selectPreset = () => {
           setWidgetDisplay(
-            applyPreset(forVolumeTable, widgetDisplay, preset.id),
+            applyPreset(forVolumeTable, forBogo, widgetDisplay, preset.id),
           );
         };
 

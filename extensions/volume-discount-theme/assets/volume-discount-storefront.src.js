@@ -2468,7 +2468,7 @@ import EmblaCarousel from "embla-carousel";
         );
       }
       var cards = "";
-      var cols = Math.min(3, getsLines.length);
+      var cols = Math.min(2, getsLines.length);
       for (var gi = 0; gi < getsLines.length; gi++) {
         var gl = getsLines[gi] || {};
         var gSrc = String(gl.imageUrl || "").trim();
@@ -2499,7 +2499,7 @@ import EmblaCarousel from "embla-carousel";
         cards +
         "</div>";
       var viewportHtml =
-        getPoolCount > 3
+        getPoolCount > 2
           ? '<div class="offrefy-bogo__viewport" data-offrefy-bogo-embla>' +
             choicesHtml +
             "</div>"
@@ -2508,7 +2508,7 @@ import EmblaCarousel from "embla-carousel";
     }
 
     function bogoPickerNavHtml() {
-      if (getPoolCount < 4) return "";
+      if (getPoolCount < 3) return "";
       return (
         '<div class="offrefy-bogo__navs">' +
         '<button type="button" class="offrefy-bogo__picker-nav" data-offrefy-bogo-gift-prev aria-label="Previous gifts">' +
@@ -2623,8 +2623,22 @@ import EmblaCarousel from "embla-carousel";
       if (root && root.classList) root.classList.add("offrefy-bogo-host");
     } catch (eHost) {}
 
+    var mergedWd = mergeWidgetDisplay(wd);
+    var bogoThemeId = String(mergedWd.appearanceTemplateId || "").trim();
+    if (!bogoThemeId || bogoThemeId === "custom") {
+      bogoThemeId = String(mergedWd.appearanceDecorThemeId || "").trim();
+    }
+    if (
+      !/^(christmas_|newyear_|halloween_|ramadan_|diwali_|pongal_|valentine_|easter_)/.test(
+        bogoThemeId,
+      )
+    ) {
+      bogoThemeId = "";
+    }
     var cardHtml =
-      '<div class="offrefy-bogo">' +
+      '<div class="offrefy-bogo' +
+      (bogoThemeId ? " offrefy-bogo--themed" : "") +
+      '">' +
       '<div class="offrefy-bogo__hero">' +
       '<div class="offrefy-bogo__hero-copy">' +
       '<div class="offrefy-bogo__title"></div>' +
@@ -2649,6 +2663,14 @@ import EmblaCarousel from "embla-carousel";
           "</button></div>"
         : "") +
       "</div>";
+    if (bogoThemeId) {
+      cardHtml =
+        '<div class="offrefy-bogo-theme-shell" data-offrefy-theme="' +
+        bogoThemeId +
+        '">' +
+        cardHtml +
+        "</div>";
+    }
 
     var scope = openBogoScope(mountEl, cardHtml);
 
@@ -2689,6 +2711,17 @@ import EmblaCarousel from "embla-carousel";
       cardEl.style.setProperty("--ob-badge-text", badgeText);
       if (wd.primaryColor) {
         cardEl.style.setProperty("--ob-cta", String(wd.primaryColor));
+      }
+      var bogoCardRadius = Number(mergedWd.cardBorderRadiusPx);
+      var bogoButtonRadius = Number(mergedWd.buttonBorderRadiusPx);
+      if (Number.isFinite(bogoCardRadius)) {
+        cardEl.style.setProperty("--ob-radius", Math.round(bogoCardRadius) + "px");
+      }
+      if (Number.isFinite(bogoButtonRadius)) {
+        cardEl.style.setProperty(
+          "--ob-cta-radius",
+          Math.round(bogoButtonRadius) + "px",
+        );
       }
     }
     var bogoCss = String(wd.customCss || "")
@@ -2773,7 +2806,7 @@ import EmblaCarousel from "embla-carousel";
 
     if (getPoolCount > 1) {
       var emblaRoot = scope.querySelector("[data-offrefy-bogo-embla]");
-      if (emblaRoot && getPoolCount > 3) {
+      if (emblaRoot && getPoolCount > 2) {
         try {
           bogoEmbla = EmblaCarousel(emblaRoot, {
             align: "start",

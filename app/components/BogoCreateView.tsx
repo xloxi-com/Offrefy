@@ -33,6 +33,9 @@ import {
   type StorefrontTranslationFields,
 } from "../utils/storefrontTranslations";
 import {
+  appearanceCategoryForPresetId,
+  applyBogoAppearancePreset,
+  isVolumeDiscountAppearancePresetId,
   normalizeVolumeDiscountWidgetDisplay,
   type VolumeDiscountWidgetDisplay,
 } from "../utils/widgetDisplay";
@@ -244,6 +247,23 @@ export function BogoCreateView({
       });
     },
   );
+
+  useEffect(() => {
+    setWidgetDisplay((prev) => {
+      const id = prev.appearanceTemplateId;
+      if (
+        !isVolumeDiscountAppearancePresetId(id) ||
+        appearanceCategoryForPresetId(id) !== "classic"
+      ) {
+        return prev;
+      }
+      const next = applyBogoAppearancePreset(prev, id);
+      if (JSON.stringify(next.bogoCopy) === JSON.stringify(prev.bogoCopy)) {
+        return prev;
+      }
+      return next;
+    });
+  }, [widgetDisplay.appearanceTemplateId]);
   const [campaignTranslations, setCampaignTranslations] =
     useState<SparseStorefrontTranslationsMap>(() =>
       parseSparseStorefrontTranslations(
@@ -1174,6 +1194,11 @@ export function BogoCreateView({
                             ...prev,
                             ...patch,
                           }),
+                        )
+                      }
+                      onApplyDisplay={(next) =>
+                        setWidgetDisplay(
+                          normalizeVolumeDiscountWidgetDisplay(next),
                         )
                       }
                       onReset={() =>

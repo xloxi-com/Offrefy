@@ -1,4 +1,5 @@
 import {
+  applyBogoAppearancePreset,
   DEFAULT_WIDGET_DISPLAY,
   normalizeVolumeDiscountWidgetDisplay,
   type VolumeDiscountWidgetDisplay,
@@ -8,7 +9,7 @@ import {
 export function defaultBogoWidgetDisplay(
   displayName?: string,
 ): VolumeDiscountWidgetDisplay {
-  return normalizeVolumeDiscountWidgetDisplay({
+  const base = normalizeVolumeDiscountWidgetDisplay({
     ...DEFAULT_WIDGET_DISPLAY,
     widgetHeading: (displayName || "").trim() || "Buy X, Get Y",
     ctaLabel: "Add to cart",
@@ -16,9 +17,6 @@ export function defaultBogoWidgetDisplay(
       "Discount applies automatically when Buy and Get quantities are in your cart.",
     showCountdown: true,
     ctaButtonAction: "add_to_cart_open_drawer",
-    primaryColor: "#18181b",
-    primaryHoverColor: "#3f3f46",
-    selectedBgColor: "#ffffff",
-    cardBorderColor: "#e8e8ea",
   });
+  return applyBogoAppearancePreset(base, "classic_burgundy");
 }

@@ -17,8 +17,21 @@ import {
   fillBogoTemplate,
   DEFAULT_BOGO_WIDGET_COPY,
 } from "../utils/bogoWidgetCopy";
-import type { VolumeDiscountWidgetDisplay } from "../utils/widgetDisplay";
+import {
+  isSeasonalDecorThemeId,
+  resolveWidgetAppearanceDecorThemeId,
+  type VolumeDiscountWidgetDisplay,
+} from "../utils/widgetDisplay";
 import createStyles from "../styles/volume-discount-create.module.css";
+import "../styles/christmas-theme-decor.css";
+import "../styles/newyear-theme-decor.css";
+import "../styles/halloween-theme-decor.css";
+import "../styles/ramadan-theme-decor.css";
+import "../styles/diwali-theme-decor.css";
+import "../styles/pongal-theme-decor.css";
+import "../styles/valentine-theme-decor.css";
+import "../styles/easter-theme-decor.css";
+import "../styles/seasonal-theme-responsive.css";
 
 export type BogoLivePreviewProps = {
   campaignName: string;
@@ -81,57 +94,90 @@ const SAMPLE_GIFTS: BogoGiftOption[] = [
   },
 ];
 
-/** Wide enough to skip ≤560 compact / ≤400 stack rules — real desktop product column. */
-const DESKTOP_CANVAS = 680;
+/**
+ * Sized for the sticky preview column so scale-to-fit stays near 1.
+ * Side-by-side Buy | + | Get is forced by DESKTOP_PREVIEW_CSS (not canvas width).
+ */
+const DESKTOP_CANVAS = 480;
 /** Phone width — hits ≤400 stack rules. */
 const MOBILE_CANVAS = 360;
 
 /** Keep Buy | + | Get side-by-side in admin desktop preview (beats @container). */
 const DESKTOP_PREVIEW_CSS = `
+.offrefy-bogo {
+  --ob-fs: 17px !important;
+  --ob-fs-title: 18px !important;
+  --ob-fs-sub: 14px !important;
+  --ob-fs-name: 15px !important;
+  --ob-fs-price: 22px !important;
+  --ob-fs-ribbon: 12px !important;
+  --ob-fs-hint: 13px !important;
+  --ob-fs-cta: 16px !important;
+  --ob-img: 128px !important;
+  padding: 18px !important;
+  gap: 16px !important;
+}
 .offrefy-bogo .offrefy-bogo__equation {
   display: grid !important;
-  grid-template-columns: minmax(0, 1fr) 32px minmax(0, 1fr) !important;
+  grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr) !important;
   align-items: stretch !important;
-  gap: 8px !important;
+  gap: 10px !important;
 }
 .offrefy-bogo .offrefy-bogo__op {
   display: inline-flex !important;
   align-self: center !important;
   justify-self: center !important;
+  width: 36px !important;
+  height: 36px !important;
 }
 .offrefy-bogo .offrefy-bogo__tile--buy,
 .offrefy-bogo .offrefy-bogo__tile--get {
   min-width: 0 !important;
   width: 100% !important;
+  padding: 12px !important;
 }
 .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media {
   flex: 0 0 auto !important;
-  height: 140px !important;
-  min-height: 140px !important;
-  max-height: 140px !important;
+  height: 168px !important;
+  min-height: 168px !important;
+  max-height: 168px !important;
 }
 .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media .offrefy-bogo__img {
-  transform: scale(1.15) !important;
+  transform: scale(1.22) !important;
+}
+.offrefy-bogo .offrefy-bogo__tile--get .offrefy-bogo__media,
+.offrefy-bogo .offrefy-bogo__choice .offrefy-bogo__media {
+  min-height: 120px !important;
 }
 .offrefy-bogo .offrefy-bogo__choice .offrefy-bogo__img {
-  height: 88px !important;
-  max-height: 88px !important;
+  height: 108px !important;
+  max-height: 108px !important;
 }
 .offrefy-bogo .offrefy-bogo__check {
-  width: 16px !important;
-  height: 16px !important;
+  width: 18px !important;
+  height: 18px !important;
+}
+.offrefy-bogo .offrefy-bogo__cta {
+  padding: 12px 16px !important;
+  min-height: 48px !important;
 }
 `;
 
 const MOBILE_PREVIEW_CSS = `
+.offrefy-bogo {
+  --ob-fs-title: 16px !important;
+  --ob-fs-sub: 13px !important;
+  --ob-fs-name: 14px !important;
+  --ob-fs-cta: 15px !important;
+}
 .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media {
-  flex: 0 0 88px !important;
-  height: 88px !important;
-  min-height: 88px !important;
-  max-height: 88px !important;
+  flex: 0 0 100px !important;
+  height: 100px !important;
+  min-height: 100px !important;
+  max-height: 100px !important;
 }
 .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media .offrefy-bogo__img {
-  transform: scale(1.2) !important;
+  transform: scale(1.25) !important;
 }
 `;
 
@@ -223,6 +269,10 @@ export function BogoLivePreview({
         ? SAMPLE_GIFTS.slice(0, 2)
         : SAMPLE_GIFTS.slice(0, Math.min(getPool, 4));
   const copy = widgetDisplay?.bogoCopy ?? DEFAULT_BOGO_WIDGET_COPY;
+  const decorThemeId = widgetDisplay
+    ? resolveWidgetAppearanceDecorThemeId(widgetDisplay)
+    : null;
+  const seasonalTheme = isSeasonalDecorThemeId(decorThemeId);
   const pickLabel = isFreeGet
     ? fillBogoTemplate(
         getsQty === 1 ? copy.pickLabel : copy.pickLabelPlural,
@@ -248,12 +298,14 @@ export function BogoLivePreview({
 
     const measure = () => {
       const frameW = Math.max(frame.clientWidth || 1, 1);
-      const nextScale = Math.min(1, frameW / canvasWidth);
+      // Floor scale so a 0-width frame never collapses the card to invisible.
+      const nextScale = Math.max(0.4, Math.min(1, frameW / canvasWidth));
       const hosts = Array.from(canvas.querySelectorAll("div"));
       let naturalH = 0;
       for (const host of hosts) {
         const shadowCard =
           host.shadowRoot?.querySelector<HTMLElement>(".offrefy-bogo") ??
+          host.shadowRoot?.querySelector<HTMLElement>("[data-offrefy-bogo-root]") ??
           host.shadowRoot?.querySelector<HTMLElement>(".offrefy-bogo-host");
         naturalH = Math.max(
           naturalH,
@@ -267,10 +319,10 @@ export function BogoLivePreview({
         naturalH,
         content?.scrollHeight ?? 0,
         content?.offsetHeight ?? 0,
-        1,
+        220,
       );
       setScale(nextScale);
-      setFrameHeight(Math.max(160, Math.ceil(naturalH * nextScale) + 16));
+      setFrameHeight(Math.max(220, Math.ceil(naturalH * nextScale) + 16));
     };
 
     measure();
@@ -301,6 +353,10 @@ export function BogoLivePreview({
     buysQty,
     gifts.length,
     widgetDisplay?.primaryColor,
+    widgetDisplay?.cardBorderRadiusPx,
+    widgetDisplay?.buttonBorderRadiusPx,
+    widgetDisplay?.appearanceTemplateId,
+    widgetDisplay?.appearanceDecorThemeId,
     widgetDisplay?.customCss,
     widgetDisplay?.bogoCopy,
   ]);
@@ -408,6 +464,18 @@ export function BogoLivePreview({
                 }}
               >
                 <div className={createStyles.bogoPreviewCardPad}>
+                  <div
+                    className={
+                      seasonalTheme
+                        ? "vd-admin-qb-preview offrefy-bogo-theme-shell"
+                        : "offrefy-bogo-theme-shell"
+                    }
+                    data-offrefy-theme={
+                      seasonalTheme ? decorThemeId ?? undefined : undefined
+                    }
+                    data-preview-device={previewDevice}
+                    style={{ width: "100%" }}
+                  >
                   <BogoSpecialOfferCard
                     heading={heading}
                     badgeLabel={copy.badgeLabel}
@@ -425,7 +493,11 @@ export function BogoLivePreview({
                     ctaLabel={ctaLabel}
                     limitLabel={limitLabel}
                     buttonColor={primary}
-                    panelStyle={bogoPanelColorStyle(copy, primary)}
+                    themed={seasonalTheme}
+                    panelStyle={bogoPanelColorStyle(copy, primary, {
+                      cardPx: widgetDisplay?.cardBorderRadiusPx,
+                      buttonPx: widgetDisplay?.buttonBorderRadiusPx,
+                    })}
                     customCss={[
                       previewDevice === "desktop"
                         ? DESKTOP_PREVIEW_CSS
@@ -435,6 +507,7 @@ export function BogoLivePreview({
                       .filter(Boolean)
                       .join("\n")}
                   />
+                  </div>
                 </div>
               </div>
             </div>

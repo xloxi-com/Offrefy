@@ -1,0 +1,1998 @@
+/* BOGO (Buy X Get Y) — clean theme-safe card (high specificity) */
+[data-offrefy-root]:has(.offrefy-bogo),
+[data-offrefy-root].offrefy-bogo-host {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  color: inherit !important;
+  margin-block: 0.75rem !important;
+  margin-inline: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+[data-offrefy-root].offrefy-bogo-host,
+.offrefy-bogo-host {
+  min-width: 0 !important;
+  container-type: inline-size;
+  container-name: offrefy-bogo;
+}
+[data-offrefy-root] [data-offrefy-mount]:has(.offrefy-bogo),
+[data-offrefy-root].offrefy-bogo-host [data-offrefy-mount] {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+[data-offrefy-root] .offrefy-bogo,
+.offrefy-bogo {
+  --ob-buy: #177245;
+  --ob-buy-soft: #f6faf7;
+  --ob-buy-line: #d7e6dc;
+  --ob-get: #9f2d55;
+  --ob-get-soft: #fbf7f9;
+  --ob-get-line: #ebd7df;
+  --ob-ink: #18181b;
+  --ob-muted: #71717a;
+  --ob-line: #e8e8ea;
+  --ob-surface: #ffffff;
+  --ob-soft: #f4f4f5;
+  --ob-badge-bg: #f4f4f5;
+  --ob-badge-text: #52525b;
+  --ob-radius: 12px;
+  --ob-cta: var(--vd-primary, #18181b);
+  --ob-cta-text: #ffffff;
+  --ob-cta-radius: 10px;
+  --ob-cta-weight: 700;
+  --ob-cta-tracking: 0.01em;
+  --ob-cta-transform: none;
+  --ob-font: inherit;
+  --ob-img: 112px;
+  --ob-fs: 16px;
+  --ob-fs-title: 16px;
+  --ob-fs-sub: 13px;
+  --ob-fs-name: 14px;
+  --ob-fs-price: 20px;
+  --ob-fs-ribbon: 11px;
+  --ob-fs-hint: 12px;
+  --ob-fs-cta: 15px;
+  container-type: inline-size;
+  container-name: offrefy-bogo;
+  color-scheme: light;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 14px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 16px !important;
+  font-family: var(--ob-font, inherit) !important;
+  font-size: var(--ob-fs) !important;
+  font-weight: 400 !important;
+  font-style: normal !important;
+  line-height: 1.4 !important;
+  letter-spacing: normal !important;
+  text-align: left !important;
+  text-transform: none !important;
+  text-decoration: none !important;
+  text-shadow: none !important;
+  color: var(--ob-ink) !important;
+  background: var(--ob-surface) !important;
+  border: 1px solid var(--ob-line) !important;
+  border-radius: var(--ob-radius) !important;
+  box-shadow: 0 1px 2px rgba(24, 24, 27, 0.04) !important;
+  outline: none !important;
+  -webkit-font-smoothing: antialiased;
+  isolation: isolate;
+  overflow: hidden !important;
+  position: relative !important;
+  z-index: 1 !important;
+  float: none !important;
+  clear: both !important;
+  transform: none !important;
+  filter: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+[data-offrefy-root] .offrefy-bogo *,
+[data-offrefy-root] .offrefy-bogo *::before,
+[data-offrefy-root] .offrefy-bogo *::after,
+.offrefy-bogo *,
+.offrefy-bogo *::before,
+.offrefy-bogo *::after {
+  box-sizing: border-box !important;
+}
+
+[data-offrefy-root] .offrefy-bogo a,
+[data-offrefy-root] .offrefy-bogo p,
+[data-offrefy-root] .offrefy-bogo span,
+[data-offrefy-root] .offrefy-bogo div,
+[data-offrefy-root] .offrefy-bogo button,
+[data-offrefy-root] .offrefy-bogo img,
+[data-offrefy-root] .offrefy-bogo svg,
+[data-offrefy-root] .offrefy-bogo label,
+.offrefy-bogo a,
+.offrefy-bogo p,
+.offrefy-bogo span,
+.offrefy-bogo div,
+.offrefy-bogo button,
+.offrefy-bogo img,
+.offrefy-bogo svg,
+.offrefy-bogo label {
+  font-family: inherit !important;
+  text-decoration: none !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  float: none !important;
+  clear: none !important;
+  max-width: none;
+}
+
+[data-offrefy-root] .offrefy-bogo button,
+.offrefy-bogo button {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  background: transparent !important;
+  border: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  line-height: 1 !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  color: inherit !important;
+  cursor: pointer !important;
+  border-radius: 0 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo img,
+.offrefy-bogo img {
+  border: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  vertical-align: middle !important;
+  object-fit: contain !important;
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+[data-offrefy-root] .offrefy-bogo p,
+.offrefy-bogo p {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo.offrefy-bogo--pending,
+.offrefy-bogo.offrefy-bogo--pending {
+  min-height: 220px !important;
+  background: var(--ob-soft) !important;
+  pointer-events: none !important;
+}
+
+/* Hero */
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__hero,
+.offrefy-bogo .offrefy-bogo__hero {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+  text-align: left !important;
+  background: var(--ob-soft) !important;
+  border: 1px solid var(--ob-line) !important;
+  border-radius: 12px !important;
+  padding: 12px 14px !important;
+  margin: 0 !important;
+  width: 100% !important;
+  transform: none !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__hero-icon,
+.offrefy-bogo .offrefy-bogo__hero-icon {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 8px !important;
+  background: var(--ob-ink) !important;
+  color: var(--ob-surface) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__hero-icon .offrefy-bogo__ico,
+.offrefy-bogo .offrefy-bogo__hero-icon .offrefy-bogo__ico {
+  width: 18px !important;
+  height: 18px !important;
+  display: block !important;
+  fill: currentColor !important;
+  color: var(--ob-surface) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__hero-copy,
+.offrefy-bogo .offrefy-bogo__hero-copy {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  padding-top: 1px !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__title,
+.offrefy-bogo .offrefy-bogo__title {
+  display: block !important;
+  font-size: var(--ob-fs-title) !important;
+  font-weight: 700 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: var(--ob-ink) !important;
+  line-height: 1.3 !important;
+  letter-spacing: -0.01em !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__sub,
+.offrefy-bogo .offrefy-bogo__sub {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  margin: 4px 0 0 !important;
+  padding: 0 !important;
+  font-size: var(--ob-fs-sub) !important;
+  line-height: 1.4 !important;
+  color: var(--ob-muted) !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+/* Equation row */
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__equation,
+.offrefy-bogo .offrefy-bogo__equation {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr) !important;
+  align-items: stretch !important;
+  gap: 6px !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__op,
+.offrefy-bogo .offrefy-bogo__op {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  align-self: center !important;
+  justify-self: center !important;
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  min-height: 30px !important;
+  border-radius: 999px !important;
+  background: var(--ob-surface) !important;
+  border: 1px solid var(--ob-line) !important;
+  color: #8a8a8a !important;
+  line-height: 0 !important;
+  z-index: 2 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  transform: none !important;
+  rotate: none !important;
+  writing-mode: horizontal-tb !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__op-ico,
+.offrefy-bogo .offrefy-bogo__op-ico {
+  display: block !important;
+  width: 14px !important;
+  height: 14px !important;
+  flex: 0 0 auto !important;
+  fill: currentColor !important;
+  transform: none !important;
+}
+
+/* Tiles */
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile,
+.offrefy-bogo .offrefy-bogo__tile {
+  position: relative !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  border: 1px solid var(--ob-line) !important;
+  border-radius: 10px !important;
+  background: var(--ob-surface) !important;
+  padding: 40px 12px 12px !important;
+  margin: 0 !important;
+  text-align: center !important;
+  overflow: hidden !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--buy,
+.offrefy-bogo .offrefy-bogo__tile--buy {
+  border-color: var(--ob-buy-line) !important;
+  background: var(--ob-buy-soft) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--get,
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--free,
+.offrefy-bogo .offrefy-bogo__tile--get,
+.offrefy-bogo .offrefy-bogo__tile--free {
+  border-color: var(--ob-get-line) !important;
+  background: var(--ob-get-soft) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__ribbon,
+.offrefy-bogo .offrefy-bogo__ribbon {
+  position: absolute !important;
+  top: 10px !important;
+  left: 10px !important;
+  right: auto !important;
+  bottom: auto !important;
+  z-index: 2 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  padding: 5px 9px !important;
+  border-radius: 6px !important;
+  white-space: nowrap !important;
+  color: #fff !important;
+  font-size: var(--ob-fs-ribbon) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em !important;
+  line-height: 1 !important;
+  text-transform: uppercase !important;
+  margin: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__ribbon .offrefy-bogo__ico,
+.offrefy-bogo .offrefy-bogo__ribbon .offrefy-bogo__ico {
+  width: 13px !important;
+  height: 13px !important;
+  display: block !important;
+  fill: currentColor !important;
+  color: #fff !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__ribbon--buy,
+.offrefy-bogo .offrefy-bogo__ribbon--buy {
+  background: var(--ob-buy) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__ribbon--get,
+.offrefy-bogo .offrefy-bogo__ribbon--get {
+  background: var(--ob-get) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__qty,
+.offrefy-bogo .offrefy-bogo__qty {
+  position: absolute !important;
+  top: 8px !important;
+  right: 8px !important;
+  left: auto !important;
+  bottom: auto !important;
+  z-index: 2 !important;
+  background: var(--ob-surface) !important;
+  color: var(--ob-buy) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  padding: 3px 7px !important;
+  border-radius: 6px !important;
+  line-height: 1.2 !important;
+  border: 1px solid var(--ob-buy-line) !important;
+  margin: 0 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--get .offrefy-bogo__qty,
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--free .offrefy-bogo__qty,
+.offrefy-bogo .offrefy-bogo__tile--get .offrefy-bogo__qty,
+.offrefy-bogo .offrefy-bogo__tile--free .offrefy-bogo__qty {
+  background: var(--ob-surface) !important;
+  color: var(--ob-get) !important;
+  border-color: var(--ob-get-line) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__media,
+.offrefy-bogo .offrefy-bogo__media {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 auto !important;
+  min-height: var(--ob-img) !important;
+  height: auto !important;
+  width: 100% !important;
+  margin: 0 0 10px !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  padding: 2px 4px !important;
+  border: 0 !important;
+  overflow: hidden !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__img,
+[data-offrefy-root] .offrefy-bogo img.offrefy-bogo__img,
+.offrefy-bogo .offrefy-bogo__img,
+.offrefy-bogo img.offrefy-bogo__img {
+  width: auto !important;
+  height: var(--ob-img) !important;
+  max-width: 100% !important;
+  max-height: var(--ob-img) !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  object-fit: contain !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  margin: 0 auto !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__img--ph,
+.offrefy-bogo .offrefy-bogo__img--ph {
+  width: var(--ob-img) !important;
+  height: var(--ob-img) !important;
+  border-radius: 12px !important;
+  background: linear-gradient(160deg, #f3f4f5 0%, #e7e8ea 100%) !important;
+}
+
+/* Gift picker — arrows sit on the photo, like a product carousel */
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__picker,
+.offrefy-bogo .offrefy-bogo__picker {
+  position: relative !important;
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 0 8px !important;
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__picker .offrefy-bogo__media--gift,
+.offrefy-bogo .offrefy-bogo__picker .offrefy-bogo__media--gift {
+  margin: 0 !important;
+  min-height: var(--ob-img) !important;
+  width: 100% !important;
+  overflow: hidden !important;
+  padding: 2px 34px !important;
+  position: relative !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__track,
+.offrefy-bogo .offrefy-bogo__track {
+  display: flex !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: var(--ob-img) !important;
+  will-change: transform;
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1) !important;
+  background: transparent !important;
+  border: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__track.is-instant,
+.offrefy-bogo .offrefy-bogo__track.is-instant {
+  transition: none !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__slide,
+.offrefy-bogo .offrefy-bogo__slide {
+  flex: 0 0 100% !important;
+  width: 100% !important;
+  min-width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 2px 4px !important;
+  background: transparent !important;
+  border: 0 !important;
+  margin: 0 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__picker .offrefy-bogo__media--gift .offrefy-bogo__img,
+.offrefy-bogo .offrefy-bogo__picker .offrefy-bogo__media--gift .offrefy-bogo__img {
+  pointer-events: none !important;
+  user-select: none !important;
+  -webkit-user-drag: none !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__picker-nav,
+.offrefy-bogo .offrefy-bogo__picker-nav {
+  position: absolute !important;
+  top: calc(var(--ob-img) / 2 + 2px) !important;
+  transform: translateY(-50%) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  min-height: 30px !important;
+  border-radius: 999px !important;
+  border: 1px solid #d0d0d0 !important;
+  background: var(--ob-surface) !important;
+  color: #3a3a3a !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  z-index: 3 !important;
+  box-shadow: 0 1px 2px rgba(17, 17, 17, 0.08) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__picker-nav[data-offrefy-bogo-gift-prev],
+.offrefy-bogo .offrefy-bogo__picker-nav[data-offrefy-bogo-gift-prev] {
+  left: 2px !important;
+  right: auto !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__picker-nav[data-offrefy-bogo-gift-next],
+.offrefy-bogo .offrefy-bogo__picker-nav[data-offrefy-bogo-gift-next] {
+  right: 2px !important;
+  left: auto !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__picker-nav:hover:not(:disabled),
+.offrefy-bogo .offrefy-bogo__picker-nav:hover:not(:disabled) {
+  background: var(--ob-surface) !important;
+  color: var(--ob-ink) !important;
+  border-color: var(--ob-ink) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__picker-nav:disabled,
+.offrefy-bogo .offrefy-bogo__picker-nav:disabled {
+  opacity: 0.4 !important;
+  cursor: default !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__picker-nav:focus-visible,
+.offrefy-bogo .offrefy-bogo__picker-nav:focus-visible {
+  outline: 2px solid var(--ob-cta) !important;
+  outline-offset: 2px !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__picker-nav svg,
+.offrefy-bogo .offrefy-bogo__picker-nav svg {
+  width: 14px !important;
+  height: 14px !important;
+  display: block !important;
+  fill: currentColor !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__dots,
+.offrefy-bogo .offrefy-bogo__dots {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  background: transparent !important;
+  border: 0 !important;
+  margin: 8px 0 0 !important;
+  padding: 0 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__dot,
+.offrefy-bogo .offrefy-bogo__dot {
+  width: 6px !important;
+  height: 6px !important;
+  min-width: 6px !important;
+  min-height: 6px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: #d0d0d0 !important;
+  cursor: pointer !important;
+  opacity: 0.9 !important;
+  transition: width 0.2s ease, background 0.2s ease !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__dot.is-active,
+.offrefy-bogo .offrefy-bogo__dot.is-active {
+  width: 14px !important;
+  background: var(--ob-ink) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__dot:focus-visible,
+.offrefy-bogo .offrefy-bogo__dot:focus-visible {
+  outline: 2px solid var(--ob-cta) !important;
+  outline-offset: 2px !important;
+}
+
+/* Copy + price */
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__name,
+.offrefy-bogo .offrefy-bogo__name {
+  font-size: var(--ob-fs-name) !important;
+  font-weight: 600 !important;
+  color: var(--ob-ink) !important;
+  line-height: 1.35 !important;
+  margin: 0 0 4px !important;
+  padding: 0 2px !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  min-height: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__hint,
+.offrefy-bogo .offrefy-bogo__hint {
+  font-size: var(--ob-fs-hint) !important;
+  color: var(--ob-muted) !important;
+  line-height: 1.35 !important;
+  margin: 0 0 4px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__price,
+.offrefy-bogo .offrefy-bogo__price {
+  font-size: var(--ob-fs-price) !important;
+  color: var(--ob-muted) !important;
+  line-height: 1.25 !important;
+  font-weight: 700 !important;
+  margin-top: auto !important;
+  padding: 4px 0 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__price--buy,
+.offrefy-bogo .offrefy-bogo__price--buy {
+  color: var(--ob-buy) !important;
+  font-size: var(--ob-fs-price) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__price--free,
+.offrefy-bogo .offrefy-bogo__price--free {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__price-was,
+.offrefy-bogo .offrefy-bogo__price-was {
+  text-decoration: line-through !important;
+  color: #8c9196 !important;
+  font-weight: 500 !important;
+  font-size: 13px !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__price-now,
+.offrefy-bogo .offrefy-bogo__price-now {
+  color: var(--ob-get) !important;
+  font-weight: 800 !important;
+  font-size: var(--ob-fs-price) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__limit,
+.offrefy-bogo .offrefy-bogo__limit {
+  font-size: 13px !important;
+  color: var(--ob-muted) !important;
+  text-align: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+/* CTA — match theme ATC scale */
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__cta,
+.offrefy-bogo .offrefy-bogo__cta {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  width: 100% !important;
+  min-height: 52px !important;
+  margin: 0 !important;
+  padding: 14px 18px !important;
+  border: none !important;
+  border-radius: var(--ob-cta-radius, 8px) !important;
+  background: var(--ob-cta) !important;
+  color: var(--ob-cta-text, #fff) !important;
+  font: inherit !important;
+  font-family: var(--ob-font, inherit) !important;
+  font-size: var(--ob-fs-cta) !important;
+  font-weight: var(--ob-cta-weight, 600) !important;
+  letter-spacing: var(--ob-cta-tracking, 0.01em) !important;
+  text-transform: var(--ob-cta-transform, none) !important;
+  cursor: pointer !important;
+  transition: opacity 0.15s ease, background 0.15s ease !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__cta .offrefy-bogo__ico,
+.offrefy-bogo .offrefy-bogo__cta .offrefy-bogo__ico {
+  width: 18px !important;
+  height: 18px !important;
+  flex: 0 0 auto !important;
+  color: var(--ob-cta-text, #fff) !important;
+  fill: currentColor !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__cta-label,
+.offrefy-bogo .offrefy-bogo__cta-label {
+  flex: 0 1 auto !important;
+  color: var(--ob-cta-text, #fff) !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__cta:hover:not(:disabled),
+.offrefy-bogo .offrefy-bogo__cta:hover:not(:disabled) {
+  background: var(--ob-cta) !important;
+  filter: brightness(0.92) !important;
+  opacity: 1 !important;
+  color: var(--ob-cta-text, #fff) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__cta:disabled,
+.offrefy-bogo .offrefy-bogo__cta:disabled {
+  opacity: 0.55 !important;
+  /* Never use cursor:wait — looks like a stuck pointer spinner. */
+  cursor: pointer !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__cta:focus-visible,
+.offrefy-bogo .offrefy-bogo__cta:focus-visible {
+  outline: 2px solid var(--ob-cta) !important;
+  outline-offset: 2px !important;
+}
+
+/* Sized to the product column, not the viewport — stays side by side on phones. */
+@container offrefy-bogo (max-width: 560px) {
+  [data-offrefy-root] .offrefy-bogo,
+  .offrefy-bogo {
+    --ob-img: 96px;
+    --ob-fs-name: 13px;
+    --ob-fs-price: 18px;
+    padding: 14px !important;
+    gap: 12px !important;
+  }
+}
+
+@container offrefy-bogo (max-width: 420px) {
+  [data-offrefy-root] .offrefy-bogo,
+  .offrefy-bogo {
+    --ob-img: 80px;
+    --ob-fs-title: 15px;
+    --ob-fs-sub: 12px;
+    --ob-fs-name: 13px;
+    --ob-fs-price: 17px;
+    --ob-fs-ribbon: 10px;
+    --ob-fs-hint: 11px;
+    padding: 12px !important;
+    gap: 10px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__equation,
+  .offrefy-bogo .offrefy-bogo__equation {
+    grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr) !important;
+    gap: 4px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__op,
+  .offrefy-bogo .offrefy-bogo__op {
+    width: 26px !important;
+    height: 26px !important;
+    min-width: 26px !important;
+    min-height: 26px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile,
+  .offrefy-bogo .offrefy-bogo__tile {
+    padding: 32px 8px 12px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__picker .offrefy-bogo__media--gift,
+  .offrefy-bogo .offrefy-bogo__picker .offrefy-bogo__media--gift {
+    padding-left: 28px !important;
+    padding-right: 28px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__picker-nav,
+  .offrefy-bogo .offrefy-bogo__picker-nav {
+    width: 26px !important;
+    height: 26px !important;
+    min-width: 26px !important;
+    min-height: 26px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__name,
+  .offrefy-bogo .offrefy-bogo__name {
+    min-height: 0 !important;
+  }
+}
+
+@container offrefy-bogo (max-width: 300px) {
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__equation,
+  .offrefy-bogo .offrefy-bogo__equation {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 8px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__op,
+  .offrefy-bogo .offrefy-bogo__op {
+    margin: 0 auto !important;
+  }
+  [data-offrefy-root] .offrefy-bogo,
+  .offrefy-bogo {
+    --ob-img: 120px;
+  }
+}
+
+/* Dark product sections: same card, inverted surfaces so it doesn't glow. */
+[data-offrefy-root] .offrefy-bogo[data-scheme="dark"],
+.offrefy-bogo[data-scheme="dark"] {
+  color-scheme: dark;
+  --ob-ink: var(--ob-theme-ink, #f4f4f5);
+  --ob-muted: #b4b4bb;
+  --ob-line: rgba(255, 255, 255, 0.14);
+  --ob-surface: var(--ob-theme-surface, #171717);
+  --ob-soft: rgba(255, 255, 255, 0.06);
+  --ob-buy: #7dce96;
+  --ob-buy-soft: rgba(46, 160, 80, 0.22);
+  --ob-buy-line: rgba(125, 206, 150, 0.45);
+  --ob-get: #ff7aab;
+  --ob-get-soft: rgba(216, 27, 96, 0.22);
+  --ob-get-line: rgba(255, 122, 171, 0.45);
+  box-shadow: none !important;
+}
+
+[data-offrefy-root] .offrefy-bogo[data-scheme="dark"] .offrefy-bogo__tile--buy,
+.offrefy-bogo[data-scheme="dark"] .offrefy-bogo__tile--buy {
+  background: rgba(46, 160, 80, 0.12) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo[data-scheme="dark"] .offrefy-bogo__tile--get,
+[data-offrefy-root] .offrefy-bogo[data-scheme="dark"] .offrefy-bogo__tile--free,
+.offrefy-bogo[data-scheme="dark"] .offrefy-bogo__tile--get,
+.offrefy-bogo[data-scheme="dark"] .offrefy-bogo__tile--free {
+  background: rgba(216, 27, 96, 0.12) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo[data-scheme="dark"] .offrefy-bogo__img--ph,
+.offrefy-bogo[data-scheme="dark"] .offrefy-bogo__img--ph {
+  background: linear-gradient(160deg, #2a2a2c 0%, #1c1c1e 100%) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo[data-scheme="dark"] .offrefy-bogo__cta,
+.offrefy-bogo[data-scheme="dark"] .offrefy-bogo__cta {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo[data-scheme="dark"] .offrefy-bogo__picker-nav,
+.offrefy-bogo[data-scheme="dark"] .offrefy-bogo__picker-nav {
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  color: var(--ob-ink) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo[data-scheme="dark"] .offrefy-bogo__dot,
+.offrefy-bogo[data-scheme="dark"] .offrefy-bogo__dot {
+  background: rgba(255, 255, 255, 0.28) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo[data-scheme="dark"] .offrefy-bogo__dot.is-active,
+.offrefy-bogo[data-scheme="dark"] .offrefy-bogo__dot.is-active {
+  background: var(--ob-ink) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo[data-scheme="dark"] .offrefy-bogo__price-was,
+.offrefy-bogo[data-scheme="dark"] .offrefy-bogo__price-was {
+  color: #a1a1aa !important;
+}
+
+/* RTL themes: ribbon and quantity swap sides; chevrons flip. */
+[dir="rtl"] [data-offrefy-root] .offrefy-bogo .offrefy-bogo__ribbon,
+[dir="rtl"] .offrefy-bogo .offrefy-bogo__ribbon {
+  left: auto !important;
+  right: 0 !important;
+  border-radius: 0 14px 0 12px !important;
+}
+
+[dir="rtl"] [data-offrefy-root] .offrefy-bogo .offrefy-bogo__qty,
+[dir="rtl"] .offrefy-bogo .offrefy-bogo__qty {
+  right: auto !important;
+  left: 8px !important;
+}
+
+[dir="rtl"] [data-offrefy-root] .offrefy-bogo .offrefy-bogo__picker-nav svg,
+[dir="rtl"] .offrefy-bogo .offrefy-bogo__picker-nav svg {
+  transform: scaleX(-1) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__cta,
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__picker-nav,
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__track,
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__dot,
+  .offrefy-bogo .offrefy-bogo__cta,
+  .offrefy-bogo .offrefy-bogo__picker-nav,
+  .offrefy-bogo .offrefy-bogo__track,
+  .offrefy-bogo .offrefy-bogo__dot {
+    transition: none !important;
+  }
+}
+
+/* Compact offer card: pill header, equal panels, selectable gifts, full-width CTA. */
+[data-offrefy-root] .offrefy-bogo,
+.offrefy-bogo {
+  --ob-img: 168px;
+  --ob-fs-price: 22px;
+  gap: 12px !important;
+  padding: 14px !important;
+  border-radius: var(--ob-radius, 12px) !important;
+  box-shadow: 0 1px 2px rgba(24, 24, 27, 0.05) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__hero,
+.offrefy-bogo .offrefy-bogo__hero {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  grid-template-rows: auto auto !important;
+  align-items: start !important;
+  justify-content: stretch !important;
+  column-gap: 12px !important;
+  row-gap: 4px !important;
+  text-align: left !important;
+  width: 100% !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__hero-copy,
+.offrefy-bogo .offrefy-bogo__hero-copy {
+  display: contents !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__hero-copy .offrefy-bogo__title,
+.offrefy-bogo .offrefy-bogo__hero-copy .offrefy-bogo__title {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  align-self: center !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: var(--ob-ink) !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  letter-spacing: -0.028em !important;
+  text-align: left !important;
+  white-space: normal !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__badge,
+.offrefy-bogo .offrefy-bogo__badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  height: 22px !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 8px 0 6px !important;
+  border-radius: 6px !important;
+  background: var(--ob-badge-bg, #f4f4f5) !important;
+  color: var(--ob-badge-text, #52525b) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  flex: 0 0 auto !important;
+  align-self: start !important;
+  justify-self: end !important;
+  white-space: nowrap !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__badge .offrefy-bogo__hero-icon,
+.offrefy-bogo .offrefy-bogo__badge .offrefy-bogo__hero-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: inherit !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__badge .offrefy-bogo__ico,
+.offrefy-bogo .offrefy-bogo__badge .offrefy-bogo__ico {
+  display: block !important;
+  width: 12px !important;
+  height: 12px !important;
+  color: inherit !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__badge > span:last-child,
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__badge .offrefy-bogo__title,
+.offrefy-bogo .offrefy-bogo__badge > span:last-child,
+.offrefy-bogo .offrefy-bogo__badge .offrefy-bogo__title {
+  color: inherit !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  letter-spacing: 0.01em !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__sub,
+.offrefy-bogo .offrefy-bogo__sub {
+  display: block !important;
+  -webkit-line-clamp: unset !important;
+  -webkit-box-orient: unset !important;
+  overflow: visible !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  line-height: 1.45 !important;
+  letter-spacing: -0.006em !important;
+  text-align: left !important;
+  text-wrap: pretty !important;
+  color: var(--ob-muted) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__hero .offrefy-bogo__sub,
+.offrefy-bogo .offrefy-bogo__hero .offrefy-bogo__sub {
+  grid-column: 1 !important;
+  grid-row: 2 !important;
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 3 !important;
+  line-clamp: 3 !important;
+  overflow: hidden !important;
+  width: auto !important;
+  max-width: 100% !important;
+  font-size: 12.5px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+  letter-spacing: -0.011em !important;
+  overflow-wrap: anywhere !important;
+  color: var(--ob-muted) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__equation,
+.offrefy-bogo .offrefy-bogo__equation {
+  grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr) !important;
+  align-items: stretch !important;
+  gap: 10px !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__op,
+.offrefy-bogo .offrefy-bogo__op {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  align-self: center !important;
+  justify-self: center !important;
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  min-height: 28px !important;
+  padding: 0 !important;
+  border: 1px solid var(--ob-line) !important;
+  border-radius: 999px !important;
+  background: var(--ob-surface) !important;
+  color: var(--ob-muted) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile,
+.offrefy-bogo .offrefy-bogo__tile {
+  height: 100% !important;
+  padding: 12px !important;
+  border-radius: var(--ob-radius, 14px) !important;
+  text-align: center !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__head,
+.offrefy-bogo .offrefy-bogo__head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  width: 100% !important;
+  min-height: 26px !important;
+  margin: 0 0 8px !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__head .offrefy-bogo__ribbon,
+.offrefy-bogo .offrefy-bogo__head .offrefy-bogo__ribbon {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  align-self: center !important;
+  margin: 0 !important;
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__navs,
+.offrefy-bogo .offrefy-bogo__navs {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 0 !important;
+  margin: 0 0 0 auto !important;
+  padding: 2px !important;
+  flex: 0 0 auto !important;
+  border: 1px solid var(--ob-get-line) !important;
+  border-radius: 999px !important;
+  background: var(--ob-surface) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__media,
+.offrefy-bogo .offrefy-bogo__media {
+  flex: 1 1 auto !important;
+  min-height: var(--ob-img) !important;
+  margin: 2px 0 8px !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media,
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__media,
+.offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media,
+.offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__media {
+  position: relative !important;
+  flex: 0 0 auto !important;
+  align-self: stretch !important;
+  min-height: 140px !important;
+  height: 140px !important;
+  max-height: 160px !important;
+  margin: 0 0 6px !important;
+  padding: 0 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media .offrefy-bogo__img,
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__media .offrefy-bogo__img,
+.offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media .offrefy-bogo__img,
+.offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__media .offrefy-bogo__img {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  object-fit: contain !important;
+  object-position: center !important;
+  transform: scale(1.22) !important;
+  transform-origin: center center !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__head,
+.offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__head {
+  margin-bottom: 2px !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__name,
+.offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__name {
+  margin: 0 0 2px !important;
+  padding: 0 6px !important;
+  line-height: 1.25 !important;
+  text-align: center !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__buy-meta,
+.offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__buy-meta {
+  margin-top: 0 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__buy-meta .offrefy-bogo__price,
+.offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__buy-meta .offrefy-bogo__price {
+  padding: 0 26px 0 0 !important;
+  line-height: 1.1 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--buy,
+.offrefy-bogo .offrefy-bogo__tile--buy {
+  background: var(--ob-buy-soft) !important;
+  border-color: var(--ob-buy-line) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--get,
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--free,
+.offrefy-bogo .offrefy-bogo__tile--get,
+.offrefy-bogo .offrefy-bogo__tile--free {
+  background: var(--ob-get-soft) !important;
+  border-color: var(--ob-get-line) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__ribbon,
+.offrefy-bogo .offrefy-bogo__ribbon {
+  position: static !important;
+  display: inline-flex !important;
+  align-self: flex-start !important;
+  gap: 4px !important;
+  margin: 0 0 6px !important;
+  padding: 4px 8px !important;
+  border-radius: 999px !important;
+  font-size: 10px !important;
+  letter-spacing: 0.04em !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__buy-meta,
+.offrefy-bogo .offrefy-bogo__buy-meta {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 28px !important;
+  margin-top: auto !important;
+  width: 100% !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__buy-meta .offrefy-bogo__price,
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__buy-meta .offrefy-bogo__price,
+.offrefy-bogo .offrefy-bogo__buy-meta .offrefy-bogo__price,
+.offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__buy-meta .offrefy-bogo__price {
+  grid-column: auto !important;
+  grid-row: auto !important;
+  margin: 0 !important;
+  padding: 0 34px !important;
+  width: 100% !important;
+  text-align: center !important;
+  line-height: 1.1 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__buy-meta .offrefy-bogo__qty,
+.offrefy-bogo .offrefy-bogo__buy-meta .offrefy-bogo__qty {
+  position: absolute !important;
+  top: 50% !important;
+  right: 0 !important;
+  left: auto !important;
+  bottom: auto !important;
+  transform: translateY(-50%) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__slider,
+.offrefy-bogo .offrefy-bogo__slider {
+  position: static !important;
+  display: flex !important;
+  flex: 1 1 auto !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__navs .offrefy-bogo__picker-nav,
+.offrefy-bogo .offrefy-bogo__navs .offrefy-bogo__picker-nav {
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
+  left: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #3a3a3a !important;
+  z-index: 4 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__navs .offrefy-bogo__picker-nav:hover:not(:disabled),
+.offrefy-bogo .offrefy-bogo__navs .offrefy-bogo__picker-nav:hover:not(:disabled) {
+  background: var(--ob-get-soft) !important;
+  color: var(--ob-ink) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__viewport,
+.offrefy-bogo .offrefy-bogo__viewport {
+  display: block !important;
+  overflow: hidden !important;
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__viewport .offrefy-bogo__choices,
+.offrefy-bogo .offrefy-bogo__viewport .offrefy-bogo__choices {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch !important;
+  gap: 0 !important;
+  width: auto !important;
+  max-width: none !important;
+  height: auto !important;
+  margin: 0 0 0 -8px !important;
+  overflow: visible !important;
+  scroll-snap-type: none !important;
+  cursor: grab;
+  touch-action: pan-y pinch-zoom !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__viewport .offrefy-bogo__choice,
+.offrefy-bogo .offrefy-bogo__viewport .offrefy-bogo__choice {
+  flex: 0 0 50% !important;
+  flex-basis: 50% !important;
+  flex-grow: 0 !important;
+  flex-shrink: 0 !important;
+  width: 50% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: auto !important;
+  padding: 0 0 0 8px !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__choices,
+.offrefy-bogo .offrefy-bogo__choices {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 2px 0 10px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  cursor: grab;
+  touch-action: pan-x;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__choices::-webkit-scrollbar,
+.offrefy-bogo .offrefy-bogo__choices::-webkit-scrollbar {
+  display: none;
+  height: 0;
+  width: 0;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__choices.is-dragging,
+.offrefy-bogo .offrefy-bogo__choices.is-dragging {
+  cursor: grabbing;
+  scroll-snap-type: none;
+  user-select: none;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__choice,
+.offrefy-bogo .offrefy-bogo__choice {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex-grow: 0 !important;
+  flex-shrink: 0 !important;
+  flex-basis: calc((100% - (var(--ob-choices, 3) - 1) * 8px) / var(--ob-choices, 3)) !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  width: calc((100% - (var(--ob-choices, 3) - 1) * 8px) / var(--ob-choices, 3)) !important;
+  min-width: 0 !important;
+  max-width: calc((100% - (var(--ob-choices, 3) - 1) * 8px) / var(--ob-choices, 3)) !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--ob-ink) !important;
+  box-shadow: none !important;
+  scroll-snap-align: start;
+  cursor: pointer !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__choice-card,
+.offrefy-bogo .offrefy-bogo__choice-card {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 6px !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 8px 6px 8px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: var(--ob-surface) !important;
+  color: var(--ob-ink) !important;
+  box-shadow: inset 0 0 0 1px var(--ob-line) !important;
+  transition: box-shadow 0.18s ease !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__choice.is-selected .offrefy-bogo__choice-card,
+.offrefy-bogo .offrefy-bogo__choice.is-selected .offrefy-bogo__choice-card {
+  box-shadow: inset 0 0 0 2px var(--ob-get) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__check,
+.offrefy-bogo .offrefy-bogo__check {
+  display: inline-flex !important;
+  position: absolute !important;
+  top: 5px !important;
+  right: 5px !important;
+  width: 16px !important;
+  height: 16px !important;
+  padding: 0 !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--ob-get) !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+  z-index: 3 !important;
+  filter: drop-shadow(0 0 1px #fff) !important;
+  opacity: 0 !important;
+  transform: scale(0.4) !important;
+  transform-origin: center !important;
+  transition: none !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__choice.is-selected .offrefy-bogo__check,
+.offrefy-bogo .offrefy-bogo__choice.is-selected .offrefy-bogo__check {
+  display: inline-flex !important;
+  opacity: 1 !important;
+  transform: none !important;
+  animation: offrefy-bogo-tick 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both !important;
+}
+
+@keyframes offrefy-bogo-tick {
+  0% {
+    opacity: 0;
+    transform: scale(0.35);
+  }
+  62% {
+    opacity: 1;
+    transform: scale(1.16);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__choice-card,
+  .offrefy-bogo .offrefy-bogo__choice-card,
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__check,
+  .offrefy-bogo .offrefy-bogo__check {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__check svg,
+.offrefy-bogo .offrefy-bogo__check svg {
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  overflow: visible !important;
+  fill: none !important;
+  stroke: currentColor !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__choice .offrefy-bogo__img,
+.offrefy-bogo .offrefy-bogo__choice .offrefy-bogo__img {
+  width: 100% !important;
+  height: 92px !important;
+  max-width: 100% !important;
+  max-height: 92px !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  flex: 0 0 auto !important;
+  margin: 2px auto 0 !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__choice-name,
+.offrefy-bogo .offrefy-bogo__choice-name {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  width: 100% !important;
+  min-height: 2.5em !important;
+  margin: auto 0 0 !important;
+  padding: 0 !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  line-height: 1.25 !important;
+  letter-spacing: -0.015em !important;
+  text-align: center !important;
+  word-break: normal !important;
+  overflow-wrap: anywhere !important;
+  color: var(--ob-ink) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__foot,
+.offrefy-bogo .offrefy-bogo__foot {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  width: 100% !important;
+  margin-top: 12px !important;
+  text-align: left !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__foot-copy,
+.offrefy-bogo .offrefy-bogo__foot-copy {
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__foot .offrefy-bogo__name,
+.offrefy-bogo .offrefy-bogo__foot .offrefy-bogo__name {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+  text-align: left !important;
+  -webkit-line-clamp: unset !important;
+  overflow: visible !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__foot .offrefy-bogo__name span,
+.offrefy-bogo .offrefy-bogo__foot .offrefy-bogo__name span {
+  display: block !important;
+  -webkit-line-clamp: unset !important;
+  overflow: hidden !important;
+  min-width: 0 !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+  line-height: 1.2 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__foot .offrefy-bogo__ico,
+.offrefy-bogo .offrefy-bogo__foot .offrefy-bogo__ico {
+  width: 14px !important;
+  height: 14px !important;
+  flex: 0 0 auto !important;
+  color: var(--ob-get) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__foot .offrefy-bogo__hint,
+.offrefy-bogo .offrefy-bogo__foot .offrefy-bogo__hint {
+  margin: 4px 0 0 20px !important;
+  text-align: left !important;
+  font-size: 11px !important;
+  line-height: 1.25 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__foot .offrefy-bogo__price,
+.offrefy-bogo .offrefy-bogo__foot .offrefy-bogo__price {
+  margin: 0 !important;
+  padding: 0 !important;
+  flex: 0 0 auto !important;
+  align-self: center !important;
+  line-height: 1 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__cta-row,
+.offrefy-bogo .offrefy-bogo__cta-row {
+  display: flex !important;
+  justify-content: center !important;
+  width: 100% !important;
+  margin: 2px 0 0 !important;
+  padding: 0 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__cta,
+.offrefy-bogo .offrefy-bogo__cta {
+  width: 100% !important;
+  align-self: stretch !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  margin: 0 !important;
+  padding: 0 18px !important;
+  gap: 8px !important;
+  border-radius: var(--ob-cta-radius, 12px) !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  letter-spacing: -0.011em !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__cta .offrefy-bogo__ico,
+.offrefy-bogo .offrefy-bogo__cta .offrefy-bogo__ico {
+  display: block !important;
+  width: 16px !important;
+  height: 16px !important;
+  margin: 0 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__cta .offrefy-bogo__cta-label,
+.offrefy-bogo .offrefy-bogo__cta .offrefy-bogo__cta-label {
+  line-height: 1 !important;
+  letter-spacing: -0.011em !important;
+  white-space: nowrap !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__head:has(.offrefy-bogo__navs) .offrefy-bogo__ribbon,
+.offrefy-bogo .offrefy-bogo__head:has(.offrefy-bogo__navs) .offrefy-bogo__ribbon {
+  max-width: calc(100% - 58px) !important;
+  min-width: 0 !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__ribbon span,
+.offrefy-bogo .offrefy-bogo__ribbon span {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__choice:focus-visible .offrefy-bogo__choice-card,
+.offrefy-bogo .offrefy-bogo__choice:focus-visible .offrefy-bogo__choice-card {
+  outline: 2px solid var(--ob-cta) !important;
+  outline-offset: 2px !important;
+}
+
+[data-offrefy-root] .offrefy-bogo[data-scheme="dark"] .offrefy-bogo__choice-card,
+.offrefy-bogo[data-scheme="dark"] .offrefy-bogo__choice-card {
+  background: rgba(255, 255, 255, 0.06) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo[data-scheme="dark"] .offrefy-bogo__choice.is-selected .offrefy-bogo__choice-card,
+.offrefy-bogo[data-scheme="dark"] .offrefy-bogo__choice.is-selected .offrefy-bogo__choice-card {
+  box-shadow: inset 0 0 0 2px var(--ob-get) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo[data-scheme="dark"] .offrefy-bogo__navs,
+.offrefy-bogo[data-scheme="dark"] .offrefy-bogo__navs,
+[data-offrefy-root] .offrefy-bogo[data-scheme="dark"] .offrefy-bogo__op,
+.offrefy-bogo[data-scheme="dark"] .offrefy-bogo__op {
+  background: var(--ob-surface) !important;
+  border-color: var(--ob-line) !important;
+  color: var(--ob-ink) !important;
+}
+
+[data-offrefy-root] .offrefy-bogo[data-scheme="dark"] .offrefy-bogo__badge,
+.offrefy-bogo[data-scheme="dark"] .offrefy-bogo__badge {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: var(--ob-ink) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+[data-offrefy-root] .offrefy-bogo[data-scheme="dark"] .offrefy-bogo__hero .offrefy-bogo__sub,
+.offrefy-bogo[data-scheme="dark"] .offrefy-bogo__hero .offrefy-bogo__sub {
+  color: var(--ob-muted) !important;
+}
+
+[dir="rtl"] [data-offrefy-root] .offrefy-bogo .offrefy-bogo__buy-meta .offrefy-bogo__qty,
+[dir="rtl"] .offrefy-bogo .offrefy-bogo__buy-meta .offrefy-bogo__qty {
+  right: auto !important;
+  left: 0 !important;
+}
+
+/* Product column: stay side by side, but shorter, with the photo filling the tile. */
+@container offrefy-bogo (max-width: 720px) {
+  [data-offrefy-root] .offrefy-bogo,
+  .offrefy-bogo {
+    --ob-fs-price: 18px;
+    padding: 12px !important;
+    gap: 10px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__hero-copy .offrefy-bogo__title,
+  .offrefy-bogo .offrefy-bogo__hero-copy .offrefy-bogo__title {
+    font-size: 15px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media,
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__media,
+  .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media,
+  .offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__media {
+    flex: 0 0 auto !important;
+    height: 120px !important;
+    min-height: 120px !important;
+    max-height: 140px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media .offrefy-bogo__img,
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__media .offrefy-bogo__img,
+  .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media .offrefy-bogo__img,
+  .offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__media .offrefy-bogo__img {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    transform: scale(1.2) !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__choice .offrefy-bogo__img,
+  .offrefy-bogo .offrefy-bogo__choice .offrefy-bogo__img {
+    height: 72px !important;
+    max-height: 72px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile,
+  .offrefy-bogo .offrefy-bogo__tile {
+    padding: 10px !important;
+  }
+}
+
+@container offrefy-bogo (max-width: 560px) {
+  [data-offrefy-root] .offrefy-bogo,
+  .offrefy-bogo {
+    --ob-fs-price: 17px;
+    padding: 12px !important;
+    gap: 12px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__hero,
+  .offrefy-bogo .offrefy-bogo__hero {
+    column-gap: 12px !important;
+    row-gap: 4px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__hero-copy .offrefy-bogo__title,
+  .offrefy-bogo .offrefy-bogo__hero-copy .offrefy-bogo__title {
+    font-size: 15px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__hero .offrefy-bogo__sub,
+  .offrefy-bogo .offrefy-bogo__hero .offrefy-bogo__sub {
+    font-size: 12px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__equation,
+  .offrefy-bogo .offrefy-bogo__equation {
+    grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr) !important;
+    gap: 8px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__op,
+  .offrefy-bogo .offrefy-bogo__op {
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    min-height: 24px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile,
+  .offrefy-bogo .offrefy-bogo__tile {
+    padding: 10px !important;
+    border-radius: var(--ob-radius, 12px) !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media,
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__media,
+  .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media,
+  .offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__media {
+    min-height: 92px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__name,
+  .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__name {
+    font-size: 12px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__choice .offrefy-bogo__img,
+  .offrefy-bogo .offrefy-bogo__choice .offrefy-bogo__img {
+    height: 64px !important;
+    max-height: 64px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__choice-name,
+  .offrefy-bogo .offrefy-bogo__choice-name {
+    font-size: 10.5px !important;
+    min-height: 2.4em !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__choice-card,
+  .offrefy-bogo .offrefy-bogo__choice-card {
+    padding: 8px 6px 8px !important;
+    gap: 6px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__foot,
+  .offrefy-bogo .offrefy-bogo__foot {
+    margin-top: 12px !important;
+    gap: 12px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__foot .offrefy-bogo__hint,
+  .offrefy-bogo .offrefy-bogo__foot .offrefy-bogo__hint {
+    margin-top: 4px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__foot .offrefy-bogo__name,
+  .offrefy-bogo .offrefy-bogo__foot .offrefy-bogo__name {
+    font-size: 12px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__cta,
+  .offrefy-bogo .offrefy-bogo__cta {
+    height: 40px !important;
+    min-height: 40px !important;
+    border-radius: var(--ob-cta-radius, 10px) !important;
+    font-size: 13px !important;
+  }
+}
+
+/* Phones: stack, and keep the buy photo a short filled band instead of a tall empty panel. */
+@container offrefy-bogo (max-width: 400px) {
+  [data-offrefy-root] .offrefy-bogo,
+  .offrefy-bogo {
+    --ob-img: 96px;
+    --ob-fs-price: 18px;
+    padding: 10px !important;
+    gap: 8px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__hero,
+  .offrefy-bogo .offrefy-bogo__hero {
+    column-gap: 8px !important;
+    row-gap: 2px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__hero-copy .offrefy-bogo__title,
+  .offrefy-bogo .offrefy-bogo__hero-copy .offrefy-bogo__title {
+    font-size: 14px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__badge,
+  .offrefy-bogo .offrefy-bogo__badge {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    align-self: center !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__hero .offrefy-bogo__sub,
+  .offrefy-bogo .offrefy-bogo__hero .offrefy-bogo__sub {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    -webkit-line-clamp: 3 !important;
+    line-clamp: 3 !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__equation,
+  .offrefy-bogo .offrefy-bogo__equation {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 6px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__op,
+  .offrefy-bogo .offrefy-bogo__op {
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    min-height: 24px !important;
+    margin: 0 auto !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media,
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__media,
+  .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media,
+  .offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__media {
+    flex: 0 0 88px !important;
+    height: 88px !important;
+    min-height: 88px !important;
+    max-height: 88px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media .offrefy-bogo__img,
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__media .offrefy-bogo__img,
+  .offrefy-bogo .offrefy-bogo__tile--buy .offrefy-bogo__media .offrefy-bogo__img,
+  .offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__media .offrefy-bogo__img {
+    transform: scale(1.45) !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__choice .offrefy-bogo__img,
+  .offrefy-bogo .offrefy-bogo__choice .offrefy-bogo__img {
+    height: 80px !important;
+    max-height: 80px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__choice-name,
+  .offrefy-bogo .offrefy-bogo__choice-name {
+    font-size: 11px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__cta,
+  .offrefy-bogo .offrefy-bogo__cta {
+    height: 42px !important;
+    min-height: 42px !important;
+  }
+}
+
+@container offrefy-bogo (max-width: 360px) {
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__hero-copy .offrefy-bogo__title,
+  .offrefy-bogo .offrefy-bogo__hero-copy .offrefy-bogo__title {
+    font-size: 14px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__badge,
+  .offrefy-bogo .offrefy-bogo__badge {
+    height: 24px !important;
+    padding: 0 8px 0 6px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__badge > span:last-child,
+  .offrefy-bogo .offrefy-bogo__badge > span:last-child {
+    font-size: 11px !important;
+  }
+  [data-offrefy-root] .offrefy-bogo .offrefy-bogo__foot,
+  .offrefy-bogo .offrefy-bogo__foot {
+    gap: 6px !important;
+  }
+}
+
+/* Seasonal quantity-break templates: the shell carries the art, the card stays clear. */
+[data-offrefy-root] .offrefy-bogo.offrefy-bogo--themed,
+.offrefy-bogo.offrefy-bogo--themed {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Single Get product: title centered, price directly underneath. Multi-gift picker stays a row. */
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__foot,
+.offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__foot {
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 2px !important;
+  margin-top: 4px !important;
+  text-align: center !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__foot-copy,
+.offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__foot-copy {
+  flex: 0 1 auto !important;
+  width: 100% !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__foot .offrefy-bogo__name,
+.offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__foot .offrefy-bogo__name {
+  justify-content: center !important;
+  width: 100% !important;
+  text-align: center !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__foot .offrefy-bogo__name span,
+.offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__foot .offrefy-bogo__name span {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  white-space: normal !important;
+  text-align: center !important;
+  text-overflow: ellipsis !important;
+  overflow: hidden !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__foot .offrefy-bogo__price,
+.offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__foot .offrefy-bogo__price {
+  justify-content: center !important;
+  width: 100% !important;
+  text-align: center !important;
+}
+
+/* One gift: both panels hug their content. No empty band under the price or above the photo. */
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__equation:not(:has(.offrefy-bogo__tile--multi)),
+.offrefy-bogo .offrefy-bogo__equation:not(:has(.offrefy-bogo__tile--multi)) {
+  align-items: start !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__equation:not(:has(.offrefy-bogo__tile--multi)) .offrefy-bogo__tile,
+.offrefy-bogo .offrefy-bogo__equation:not(:has(.offrefy-bogo__tile--multi)) .offrefy-bogo__tile {
+  height: auto !important;
+}
+
+[data-offrefy-root] .offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__head,
+.offrefy-bogo .offrefy-bogo__tile--get:not(.offrefy-bogo__tile--multi) .offrefy-bogo__head {
+  margin-bottom: 2px !important;
+}

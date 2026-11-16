@@ -1,22 +1,17 @@
-import { useEffect, useRef, useState, type ComponentProps } from "react";
-import { Button } from "./AppButton";
+import { type ComponentType, type MouseEventHandler } from "react";
 import { useAdminI18n } from "./AdminI18nProvider";
 
 export type SetupGuideButton = {
   content: string;
-  props?: Partial<
-    Pick<
-      ComponentProps<typeof Button>,
-      | "url"
-      | "external"
-      | "onClick"
-      | "loading"
-      | "disabled"
-      | "icon"
-      | "target"
-      | "download"
-    >
-  >;
+  props?: {
+    url?: string;
+    external?: boolean;
+    onClick?: MouseEventHandler<HTMLElement>;
+    loading?: boolean;
+    disabled?: boolean;
+    icon?: string;
+    target?: string;
+  };
 };
 
 export type SetupGuideItem = {
@@ -39,8 +34,8 @@ type SetupGuideProps = {
 };
 
 /**
- * New Polaris App Home setup-guide (homepage template).
- * Status-driven complete icons — same onDismiss / onRefresh / items handlers.
+ * Setup guide — all steps always open.
+ * Status via icon (no checkbox, no accordion).
  */
 export function SetupGuide({
   items,
@@ -51,145 +46,107 @@ export function SetupGuide({
   description,
 }: SetupGuideProps) {
   const { t } = useAdminI18n();
-  const resolvedTitle = title ?? t("home.setupGuideTitle");
-  const resolvedDescription =
-    description ?? t("home.setupGuideDescription");
-  const firstIncompleteId =
-    items.find((item) => !item.complete)?.id ?? items[0]?.id ?? null;
-  const [expandedId, setExpandedId] = useState<SetupGuideItem["id"] | null>(
-    firstIncompleteId,
-  );
-  const completedCount = items.filter((item) => item.complete).length;
-  const prevCompleted = useRef(completedCount);
-  const allDone = completedCount === items.length && items.length > 0;
-
-  useEffect(() => {
-    if (completedCount === prevCompleted.current) return;
-    prevCompleted.current = completedCount;
-    setExpandedId(
-      items.find((item) => !item.complete)?.id ?? items[0]?.id ?? null,
-    );
-  }, [completedCount, items]);
+  const heading = title ?? t("home.setupGuideTitle");
+  const subheading = description ?? t("home.setupGuideDescription");
+  const done = items.filter((item) => item.complete).length;
+  const total = items.length;
 
   return (
-    <s-section heading={resolvedTitle} subheading={resolvedDescription}>
+    <s-section heading={heading} subheading={subheading}>
       <s-text slot="supplemental" color="subdued">
-        {allDone
-          ? t("setup.done")
-          : t("setup.completed", {
-              done: completedCount,
-              total: items.length,
-            })}
+        {t("setup.completed", { done, total })}
       </s-text>
+
       {onRefresh ? (
         <s-button
           slot="secondary-actions"
+          accessibilityLabel={t("setup.reload")}
           variant="tertiary"
           tone="neutral"
           icon="refresh"
           loading={refreshing || undefined}
-          accessibilityLabel={t("setup.reload")}
           onClick={onRefresh}
         />
       ) : null}
       <s-button
         slot="secondary-actions"
+        accessibilityLabel={t("setup.dismissGuide")}
         variant="tertiary"
         tone="neutral"
         icon="x"
-        accessibilityLabel={t("setup.dismiss")}
         onClick={onDismiss}
       />
 
-      <s-stack direction="block" gap="small">
-        {items.map((item, index) => {
-          const open = expandedId === item.id;
-          return (
-            <s-stack key={item.id} direction="block" gap="small">
-              {index > 0 ? <s-divider /> : null}
-              <s-grid
-                gridTemplateColumns="1fr auto"
-                gap="base"
-                alignItems="center"
-              >
-                <s-stack
-                  direction="inline"
-                  gap="small"
-                  alignItems="center"
-                >
-                  <s-icon
-                    type={item.complete ? "check-circle" : "circle"}
-                    tone={item.complete ? "success" : undefined}
-                    color={item.complete ? undefined : "subdued"}
-                  />
-                  <s-text type="strong">{item.title}</s-text>
-                </s-stack>
-                <s-button
-                  variant="tertiary"
-                  tone="neutral"
-                  icon={open ? "chevron-up" : "chevron-down"}
-                  accessibilityLabel={item.title}
-                  onClick={() => setExpandedId(open ? null : item.id)}
-                />
-              </s-grid>
+      <s-stack gap="base">
+        {items.map((item, index) => (
+          <s-stack key={item.id} gap="base">
+            {index > 0 ? <s-divider /> : null}
 
-              {open ? (
-                <s-grid
-                  gridTemplateColumns="1fr auto"
-                  gap="base"
-                  alignItems="center"
-                  paddingInlineStart="large-200"
-                >
-                  <s-stack direction="block" gap="small-200">
-                    <s-paragraph color="subdued">
-                      {item.description}
-                    </s-paragraph>
-                    <s-stack direction="inline" gap="small-200">
-                      {item.primaryButton ? (
-                        <Button
-                          variant="primary"
-                          {...item.primaryButton.props}
-                        >
-                          {item.primaryButton.content}
-                        </Button>
-                      ) : null}
-                      {item.secondaryButton ? (
-                        <Button
-                          variant="tertiary"
-                          {...item.secondaryButton.props}
-                        >
-                          {item.secondaryButton.content}
-                        </Button>
-                      ) : null}
-                    </s-stack>
-                  </s-stack>
-                  {item.image ? (
-                    <s-box maxBlockSize="80px" maxInlineSize="80px">
-                      <s-image
-                        src={item.image.url}
-                        alt={item.image.alt}
-                        objectFit="contain"
-                      />
-                    </s-box>
+            <s-grid
+              gridTemplateColumns="auto 1fr auto"
+              gap="base"
+              alignItems="start"
+            >
+              <s-icon
+                type={item.complete ? "check-circle" : "circle"}
+                tone={item.complete ? "success" : undefined}
+                color={item.complete ? undefined : "subdued"}
+                accessibilityLabel={
+                  item.complete
+                    ? t("setup.checkComplete")
+                    : item.title
+                }
+              />
+
+              <s-stack gap="small-200">
+                <s-heading>{item.title}</s-heading>
+                <s-paragraph color="subdued">{item.description}</s-paragraph>
+                <s-stack direction="inline" gap="small-200">
+                  {item.primaryButton ? (
+                    <Action button={item.primaryButton} variant="secondary" />
                   ) : null}
-                </s-grid>
-              ) : null}
-            </s-stack>
-          );
-        })}
-      </s-stack>
+                  {item.secondaryButton ? (
+                    <Action button={item.secondaryButton} variant="tertiary" />
+                  ) : null}
+                </s-stack>
+              </s-stack>
 
-      {allDone ? (
-        <s-stack
-          direction="inline"
-          justifyContent="end"
-          paddingBlockStart="base"
-        >
-          <s-button variant="secondary" onClick={onDismiss}>
-            {t("setup.dismissGuide")}
-          </s-button>
-        </s-stack>
-      ) : null}
+              {item.image ? (
+                <s-box maxBlockSize="80px" maxInlineSize="80px">
+                  <s-image src={item.image.url} alt={item.image.alt} />
+                </s-box>
+              ) : null}
+            </s-grid>
+          </s-stack>
+        ))}
+      </s-stack>
     </s-section>
+  );
+}
+
+function Action({
+  button,
+  variant,
+}: {
+  button: SetupGuideButton;
+  variant: "secondary" | "tertiary";
+}) {
+  const p = button.props;
+  const SButton = "s-button" as unknown as ComponentType<
+    Record<string, unknown>
+  >;
+  return (
+    <SButton
+      variant={variant}
+      tone="neutral"
+      href={p?.url}
+      target={p?.target || (p?.external ? "_blank" : undefined)}
+      loading={p?.loading || undefined}
+      disabled={p?.disabled || undefined}
+      icon={p?.icon}
+      onClick={p?.onClick}
+    >
+      {button.content}
+    </SButton>
   );
 }
