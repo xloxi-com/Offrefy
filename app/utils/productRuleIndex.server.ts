@@ -395,6 +395,58 @@ export function splitProductRuleIndexIntoMetafieldChunks(
   return { chunks, productCount, needsRemoteLookup: false };
 }
 
+/**
+ * Checkout Function instruction budget is ~11M. One discount metafield is parsed
+ * on every cart, so the product map stays well under the 128KB metafield cap.
+ */
+export const FUNCTION_PRODUCT_MAP_MAX_CHARS = 24_000;
+
+/** Fields the checkout Function reads. Schedule/widget fields stay on the product metafield. */
+export function slimRuleForFunction(rule: CompactProductRule): CompactProductRule {
+  const out: CompactProductRule = {
+    c: rule.c,
+    q: rule.q,
+    ct: rule.ct,
+    t: rule.t,
+  };
+  if (rule.m) out.m = rule.m;
+  if (rule.tg?.length) out.tg = rule.tg;
+  if (rule.vs?.length) out.vs = rule.vs;
+  if (rule.cx?.length) out.cx = rule.cx;
+  return out;
+}
+
+/**
+ * Product id → rule for `rule_source.p`. `*` stays on `w`, not in this map.
+ * Stops before the JSON would pass the fuel-safe size. Dropped products get
+ * the all-products wildcard when one exists, otherwise no checkout discount.
+ */
+export function buildFunctionProductRuleMap(
+  index: ProductRuleIndex,
+): Record<string, CompactProductRule> | undefined {
+  const ids = Object.keys(index)
+    .filter((id) => id !== "*")
+    .sort();
+  if (!ids.length) return undefined;
+
+  const out: Record<string, CompactProductRule> = {};
+  let size = 2;
+  let count = 0;
+  for (const id of ids) {
+    const rule = index[id];
+    if (!rule?.t?.length) continue;
+    const slim = slimRuleForFunction(rule);
+    const piece = JSON.stringify(slim);
+    const next = size + id.length + piece.length + 4;
+    if (count > 0 && next > FUNCTION_PRODUCT_MAP_MAX_CHARS) break;
+    if (piece.length + id.length + 8 > FUNCTION_PRODUCT_MAP_MAX_CHARS) continue;
+    out[id] = slim;
+    size = next;
+    count++;
+  }
+  return count ? out : undefined;
+}
+
 /** Build one compact rule object for a product tiers metafield write. */
 export function buildCompactRuleForProduct(args: {
   campaign: ProductRuleCampaignInput;

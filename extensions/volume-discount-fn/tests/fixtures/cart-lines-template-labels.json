@@ -22,16 +22,7 @@
               "__typename": "ProductVariant",
               "id": "gid://shopify/ProductVariant/1",
               "product": {
-                "id": "gid://shopify/Product/2001",
-                "tiersMetafield": {
-                  "jsonValue": {
-                    "c": "camp-pct",
-                    "m": "{{ discount }} OFF",
-                    "q": "v",
-                    "ct": "e",
-                    "t": [{ "m": 3, "p": 10 }]
-                  }
-                }
+                "id": "gid://shopify/Product/2001"
               }
             }
           },
@@ -48,16 +39,7 @@
               "__typename": "ProductVariant",
               "id": "gid://shopify/ProductVariant/2",
               "product": {
-                "id": "gid://shopify/Product/2002",
-                "tiersMetafield": {
-                  "jsonValue": {
-                    "c": "camp-ae",
-                    "m": "{{ discount }} OFF",
-                    "q": "v",
-                    "ct": "e",
-                    "t": [{ "m": 3, "f": 2, "e": 1 }]
-                  }
-                }
+                "id": "gid://shopify/Product/2002"
               }
             }
           },
@@ -74,16 +56,7 @@
               "__typename": "ProductVariant",
               "id": "gid://shopify/ProductVariant/3",
               "product": {
-                "id": "gid://shopify/Product/2003",
-                "tiersMetafield": {
-                  "jsonValue": {
-                    "c": "camp-fp",
-                    "m": "{{ amount }} OFF",
-                    "q": "v",
-                    "ct": "e",
-                    "t": [{ "m": 2, "fp": 7 }]
-                  }
-                }
+                "id": "gid://shopify/Product/2003"
               }
             }
           }
@@ -93,7 +66,29 @@
         "discountClasses": ["PRODUCT"],
         "ruleSource": {
           "jsonValue": {
-            "mode": "metafield"
+            "p": {
+              "2001": {
+                "c": "camp-pct",
+                "m": "{{ discount }} OFF",
+                "q": "v",
+                "ct": "e",
+                "t": [{ "m": 3, "p": 10 }]
+              },
+              "2002": {
+                "c": "camp-ae",
+                "m": "{{ discount }} OFF",
+                "q": "v",
+                "ct": "e",
+                "t": [{ "m": 3, "f": 2, "e": 1 }]
+              },
+              "2003": {
+                "c": "camp-fp",
+                "m": "{{ amount }} OFF",
+                "q": "v",
+                "ct": "e",
+                "t": [{ "m": 2, "fp": 7 }]
+              }
+            }
           }
         }
       }

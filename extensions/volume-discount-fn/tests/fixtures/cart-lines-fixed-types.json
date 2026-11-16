@@ -15,18 +15,10 @@
               }
             },
             "merchandise": {
+              "__typename": "ProductVariant",
+              "id": "gid://shopify/ProductVariant/1001",
               "product": {
-                "id": "gid://shopify/Product/1001",
-                "tiersMetafield": {
-                  "jsonValue": {
-                    "c": "camp-ae",
-                    "m": "Amount off",
-                    "q": "v",
-                    "ct": "e",
-                    "tg": [],
-                    "t": [{ "m": 3, "f": 2, "e": 1 }]
-                  }
-                }
+                "id": "gid://shopify/Product/1001"
               }
             }
           },
@@ -39,18 +31,10 @@
               }
             },
             "merchandise": {
+              "__typename": "ProductVariant",
+              "id": "gid://shopify/ProductVariant/1002",
               "product": {
-                "id": "gid://shopify/Product/1002",
-                "tiersMetafield": {
-                  "jsonValue": {
-                    "c": "camp-fp",
-                    "m": "Fixed price",
-                    "q": "v",
-                    "ct": "e",
-                    "tg": [],
-                    "t": [{ "m": 2, "fp": 7 }]
-                  }
-                }
+                "id": "gid://shopify/Product/1002"
               }
             }
           }
@@ -59,7 +43,26 @@
       "fetchResult": null,
       "discount": {
         "discountClasses": ["PRODUCT"],
-        "ruleSource": null
+        "ruleSource": {
+          "jsonValue": {
+            "p": {
+              "1001": {
+                "c": "camp-ae",
+                "m": "Amount off",
+                "q": "v",
+                "ct": "e",
+                "t": [{ "m": 3, "f": 2, "e": 1 }]
+              },
+              "1002": {
+                "c": "camp-fp",
+                "m": "Fixed price",
+                "q": "v",
+                "ct": "e",
+                "t": [{ "m": 2, "fp": 7 }]
+              }
+            }
+          }
+        }
       }
     },
     "output": {
