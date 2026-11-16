@@ -51,6 +51,11 @@ function stripWrappingQuotes(value: string): string {
   return v;
 }
 
+/** True when this request must use one short-lived Prisma client (Cloudflare Workers). */
+function usingPerRequestClient(): boolean {
+  return process.env.CF_HYPERDRIVE === "1" || process.env.CF_WORKER_DB === "1";
+}
+
 /** True when Workers wired Hyperdrive into DATABASE_URL (see workers/app.ts). */
 function usingHyperdrive(): boolean {
   return process.env.CF_HYPERDRIVE === "1";
@@ -60,8 +65,8 @@ function usingHyperdrive(): boolean {
 function runtimeDatasourceUrl(): string | undefined {
   const raw = stripWrappingQuotes(process.env.DATABASE_URL ?? "");
   if (!raw) return undefined;
-  // Hyperdrive already pools — leave its connection string untouched.
-  if (usingHyperdrive()) return raw;
+  // Hyperdrive and the Worker session-pooler URL are already complete.
+  if (usingPerRequestClient()) return raw;
   try {
     const url = new URL(raw);
     if (!url.searchParams.has("pgbouncer") && url.port === "6543") {
@@ -94,7 +99,8 @@ function needsTls(connectionString: string): boolean {
 function createPrismaClient(): AppPrismaClient {
   /**
    * Workers: DATABASE_URL comes from Hyperdrive (session pooler :5432 / IPv4).
-   * Node/Vercel: use pooler URL on DATABASE_URL (port 6543, ?pgbouncer=true).
+   * One client per request, closed before the response ends.
+   * Node/Vercel: pooler URL on DATABASE_URL (port 6543, ?pgbouncer=true).
    * DIRECT_URL (port 5432) is for migrations only.
    */
   const datasourceUrl = runtimeDatasourceUrl();
@@ -109,15 +115,18 @@ function createPrismaClient(): AppPrismaClient {
       ? (["query", "warn", "error"] as const)
       : (["warn", "error"] as const);
 
-  if (usingHyperdrive()) {
-    // One connection per request. PrismaPg's default Pool (max 10) exhausts
-    // Supabase session mode (~15) and the next admin load dies as Application Error.
+  if (usingPerRequestClient()) {
+    // One connection per request. A shared Pool exhausts Supabase session mode
+    // (~15) and the next admin load dies as Application Error.
     const pool = new pg.Pool({
       connectionString: datasourceUrl,
       max: 1,
       idleTimeoutMillis: 5_000,
       connectionTimeoutMillis: 8_000,
       allowExitOnIdle: true,
+      ...(needsTls(datasourceUrl)
+        ? { ssl: { rejectUnauthorized: false } }
+        : {}),
     });
     const adapter = new PrismaPg(pool, { disposeExternalPool: true });
     return new PrismaClient({ adapter, log: [...log] });
@@ -145,7 +154,7 @@ function createPrismaClient(): AppPrismaClient {
 }
 
 function getPrisma(): AppPrismaClient {
-  if (usingHyperdrive()) {
+  if (usingPerRequestClient()) {
     const fromAls = hyperdrivePrismaAls.getStore();
     if (fromAls && clientHasExpectedModels(fromAls)) return fromAls;
     if (clientHasExpectedModels(hyperdriveFallbackClient)) {
@@ -175,7 +184,7 @@ function getPrisma(): AppPrismaClient {
 export async function withHyperdrivePrisma<T>(
   run: () => Promise<T>,
 ): Promise<T> {
-  if (!usingHyperdrive()) {
+  if (!usingPerRequestClient()) {
     return run();
   }
   const client = createPrismaClient();

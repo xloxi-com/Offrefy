@@ -22,7 +22,9 @@ function applyEnvToProcess(env: CloudflareEnv) {
     // Always prefer Worker secrets/vars over any stale process.env from the isolate.
     process.env[key] = value;
   }
-  // Hyperdrive provides a Worker-local pooled TCP path to Postgres (direct pg times out).
+  // Worker sockets to Supabase drop ("Connection terminated unexpectedly").
+  // Hyperdrive is the path that actually reaches Postgres.
+  // Free plan: 100,000 queries/day, then 58000 until 00:00 UTC.
   if (env.HYPERDRIVE?.connectionString) {
     process.env.DATABASE_URL = env.HYPERDRIVE.connectionString;
     process.env.CF_HYPERDRIVE = "1";
