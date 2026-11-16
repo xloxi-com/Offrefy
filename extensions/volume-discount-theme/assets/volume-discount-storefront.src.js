@@ -8444,7 +8444,7 @@ import EmblaCarousel from "embla-carousel";
       "https://offrey.xloxi.com";
     var ver =
       (typeof offrefyNs().assetVersion === "string" && offrefyNs().assetVersion) ||
-      "1.30.6";
+      "1.42.0";
     var link = document.createElement("link");
     link.rel = "stylesheet";
     link.href =
