@@ -1,0 +1,20 @@
+/* React Polaris 13 sets --p-font-family-sans to Inter.
+   The live admin (Polaris 2) uses ShopifyInter only. */
+:root,
+.p-theme-light {
+  --p-font-family-sans: ShopifyInter, "Noto Sans Arabic", "Noto Sans Hebrew",
+    ui-sans-serif, system-ui, sans-serif !important;
+}
+
+html,
+body {
+  font-family: ShopifyInter, "Noto Sans Arabic", "Noto Sans Hebrew",
+    ui-sans-serif, system-ui, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}

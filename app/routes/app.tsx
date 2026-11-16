@@ -1,5 +1,6 @@
 import polarisStylesUrl from "@shopify/polaris/build/esm/styles.css?url";
 import polarisButtonPressedUrl from "../styles/polaris-button-pressed.css?url";
+import polarisAdminFontUrl from "../styles/polaris-admin-font.css?url";
 import tailwindStylesUrl from "../styles/tailwind.css?url";
 import type {
   HeadersFunction,
@@ -55,6 +56,7 @@ import { resolveAdminLanguage } from "../utils/adminLanguage.server";
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: polarisStylesUrl },
   { rel: "stylesheet", href: polarisButtonPressedUrl },
+  { rel: "stylesheet", href: polarisAdminFontUrl },
   { rel: "preload", href: tailwindStylesUrl, as: "style" },
   { rel: "stylesheet", href: tailwindStylesUrl },
 ];
