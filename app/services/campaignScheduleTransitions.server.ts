@@ -12,6 +12,18 @@ export type CampaignScheduleTransitionResult = {
   markedScheduledIds: string[];
 };
 
+const EMPTY_RESULT: CampaignScheduleTransitionResult = {
+  shopsNeedingShopifySync: [],
+  shopsStatusOnly: [],
+  activatedIds: [],
+  deactivatedIds: [],
+  markedScheduledIds: [],
+};
+
+/** Skip the 4 findMany fan-out when a shop recently had nothing due. */
+const emptyScheduleProbeAt = new Map<string, number>();
+const EMPTY_SCHEDULE_PROBE_TTL_MS = 12_000;
+
 /**
  * Flip campaign status from schedule window:
  * - scheduled + start time due (+ end not passed) → active (respects plan active caps)
@@ -24,6 +36,13 @@ export async function applyDueCampaignScheduleTransitions(
 ): Promise<CampaignScheduleTransitionResult> {
   const now = new Date();
   const shopWhere = shopFilter ? { shop: shopFilter } : {};
+
+  if (shopFilter) {
+    const probedAt = emptyScheduleProbeAt.get(shopFilter);
+    if (probedAt != null && Date.now() - probedAt < EMPTY_SCHEDULE_PROBE_TTL_MS) {
+      return { ...EMPTY_RESULT };
+    }
+  }
 
   const [toActivate, toDeactivate, toExpireScheduled, toMarkScheduled] =
     await Promise.all([
@@ -114,13 +133,27 @@ export async function applyDueCampaignScheduleTransitions(
     for (const r of toMarkScheduled) shopsStatusOnly.add(r.shop);
   }
 
-  return {
+  const markedScheduledIds = toMarkScheduled.map((r) => r.id);
+  const result: CampaignScheduleTransitionResult = {
     shopsNeedingShopifySync: [...shopsNeedingShopifySync],
     shopsStatusOnly: [...shopsStatusOnly].filter(
       (s) => !shopsNeedingShopifySync.has(s),
     ),
     activatedIds,
     deactivatedIds,
-    markedScheduledIds: toMarkScheduled.map((r) => r.id),
+    markedScheduledIds,
   };
+
+  if (
+    shopFilter &&
+    result.activatedIds.length === 0 &&
+    result.deactivatedIds.length === 0 &&
+    result.markedScheduledIds.length === 0
+  ) {
+    emptyScheduleProbeAt.set(shopFilter, Date.now());
+  } else if (shopFilter) {
+    emptyScheduleProbeAt.delete(shopFilter);
+  }
+
+  return result;
 }

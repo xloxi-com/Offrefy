@@ -94,16 +94,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   // Auth already runs ensureDefaultFreePlanOnInstall — use DB on normal visits.
   // Only re-hit Shopify billing after checkout return (?billing=success).
-  let currentPlan = billingSuccess
-    ? await syncPlanFromActiveSubscription(
-        session.shop,
-        admin,
-        preferredPlan,
-      )
-    : await resolveShopPlan(session.shop);
   let justActivated: PricingPlanId | null = null;
+  let currentPlan: PricingPlanId;
+  let billingTestMode: boolean;
 
   if (billingSuccess) {
+    currentPlan = await syncPlanFromActiveSubscription(
+      session.shop,
+      admin,
+      preferredPlan,
+    );
     // Enforce free-plan campaign caps after merchant approved the charge.
     if (currentPlan === "free" || preferredPlan === "free") {
       const enforce = await setShopPlan(session.shop, "free");
@@ -121,12 +121,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // Rebuild storefront widget so plan-gated templates/CSS match the new plan.
     scheduleStorefrontWidgetRefresh(admin, session.shop);
     justActivated = currentPlan;
+    billingTestMode = await resolveBillingIsTest(admin, session.shop);
+  } else {
+    [currentPlan, billingTestMode] = await Promise.all([
+      resolveShopPlan(session.shop),
+      resolveBillingIsTest(admin, session.shop),
+    ]);
   }
 
   return {
     currentPlan,
     justActivated,
-    billingTestMode: await resolveBillingIsTest(admin, session.shop),
+    billingTestMode,
   };
 };
 

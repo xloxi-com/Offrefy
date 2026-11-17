@@ -525,14 +525,52 @@ function productGid(productId: string): string {
   return trimmed;
 }
 
+const productTitleCache = new Map<string, { title: string; expiresAt: number }>();
+const PRODUCT_TITLE_CACHE_TTL_MS = 60 * 60 * 1000;
+
+function cachedProductTitle(productId: string): string | null {
+  const keys = [productId, productGid(productId)];
+  const now = Date.now();
+  for (const key of keys) {
+    const hit = productTitleCache.get(key);
+    if (!hit) continue;
+    if (hit.expiresAt <= now) {
+      productTitleCache.delete(key);
+      continue;
+    }
+    return hit.title;
+  }
+  return null;
+}
+
+function rememberProductTitle(id: string, title: string): void {
+  const expiresAt = Date.now() + PRODUCT_TITLE_CACHE_TTL_MS;
+  productTitleCache.set(id, { title, expiresAt });
+  const numeric = id.split("/").pop();
+  if (numeric) productTitleCache.set(numeric, { title, expiresAt });
+}
+
 async function fetchProductTitles(
   admin: AdminGraphql | null | undefined,
   productIds: string[],
 ): Promise<Map<string, string>> {
   const titles = new Map<string, string>();
-  if (!admin || !productIds.length) return titles;
+  if (!productIds.length) return titles;
 
-  const gids = [...new Set(productIds.map(productGid))].slice(0, 8);
+  const missing: string[] = [];
+  for (const id of productIds) {
+    const cached = cachedProductTitle(id);
+    if (cached) {
+      titles.set(id, cached);
+      titles.set(productGid(id), cached);
+    } else {
+      missing.push(id);
+    }
+  }
+
+  if (!admin || missing.length === 0) return titles;
+
+  const gids = [...new Set(missing.map(productGid))].slice(0, 8);
   try {
     const res = await admin.graphql(
       `#graphql
@@ -553,6 +591,7 @@ async function fetchProductTitles(
     };
     for (const node of body.data?.nodes ?? []) {
       if (node?.id && node.title) {
+        rememberProductTitle(node.id, node.title);
         titles.set(node.id, node.title);
         const numeric = node.id.split("/").pop();
         if (numeric) titles.set(numeric, node.title);
@@ -1714,32 +1753,41 @@ export async function loadAnalyticsDashboard(
   };
 
   const [
-    activeCount,
-    campaignCount,
+    campaignCounts,
     current,
     previous,
     chartData,
     campaignRows,
-    trackingCount,
+    trackingSample,
     topProductStats,
     dayOfWeek,
   ] = await Promise.all([
-    prisma.volumeDiscountCampaign.count({
-      where: { shop, status: "active" },
-    }),
-    prisma.volumeDiscountCampaign.count({ where: { shop } }),
+    prisma.$queryRaw<Array<{ campaignCount: bigint; activeCount: bigint }>>`
+      SELECT
+        COUNT(*)::bigint AS "campaignCount",
+        COUNT(*) FILTER (WHERE c."status" = 'active')::bigint AS "activeCount"
+      FROM "VolumeDiscountCampaign" c
+      WHERE c."shop" = ${shop}
+    `,
     totalsForPeriod(shop, start, end),
     comparePrevious
       ? totalsForPeriod(shop, prevStart, prevEnd)
       : Promise.resolve(emptyTotals),
     chartDataForRange(shop, chartPreset, spanDays, start, end),
     campaignRowsForRange(shop, start, end),
-    prisma.volumeDiscountAnalyticsEvent.count({ where: { shop } }),
+    prisma.volumeDiscountAnalyticsEvent.findFirst({
+      where: { shop },
+      select: { id: true },
+    }),
     topProductsForRange(shop, start, end),
     dayOfWeekForRange(shop, start, end),
   ]);
 
-  /* Titles are nice-to-have; don't block analytics paint on Admin GraphQL. */
+  const campaignCount = Number(campaignCounts[0]?.campaignCount ?? 0);
+  const activeCount = Number(campaignCounts[0]?.activeCount ?? 0);
+  const trackingCount = trackingSample ? 1 : 0;
+
+  /* Titles: memory cache first; GraphQL only for misses, capped at 80ms. */
   const productTitles =
     topProductStats.length > 0
       ? await Promise.race([
@@ -1748,7 +1796,17 @@ export async function loadAnalyticsDashboard(
             topProductStats.map((row) => row.productId),
           ),
           new Promise<Map<string, string>>((resolve) =>
-            setTimeout(() => resolve(new Map()), 250),
+            setTimeout(() => {
+              const cached = new Map<string, string>();
+              for (const row of topProductStats) {
+                const title = cachedProductTitle(row.productId);
+                if (title) {
+                  cached.set(row.productId, title);
+                  cached.set(productGid(row.productId), title);
+                }
+              }
+              resolve(cached);
+            }, 80),
           ),
         ])
       : new Map<string, string>();

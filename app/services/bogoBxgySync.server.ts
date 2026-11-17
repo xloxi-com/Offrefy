@@ -557,10 +557,21 @@ export async function setBogoCampaignsStatus(
   return { errors, synced };
 }
 
+const emptyBogoScheduleProbeAt = new Map<string, number>();
+const EMPTY_BOGO_SCHEDULE_PROBE_TTL_MS = 12_000;
+
 /** Flip scheduled→active / active→draft for due BOGO windows (plan-capped). */
 export async function applyDueBogoScheduleTransitions(
   shop: string,
 ): Promise<{ flipped: number; idsNeedingSync: string[] }> {
+  const probedAt = emptyBogoScheduleProbeAt.get(shop);
+  if (
+    probedAt != null &&
+    Date.now() - probedAt < EMPTY_BOGO_SCHEDULE_PROBE_TTL_MS
+  ) {
+    return { flipped: 0, idsNeedingSync: [] };
+  }
+
   const now = new Date();
   const dueActive = await prisma.bogoCampaign.findMany({
     where: {
@@ -612,8 +623,14 @@ export async function applyDueBogoScheduleTransitions(
   const idsNeedingSync = [
     ...new Set([...activatedIds, ...dueEnded.map((r) => r.id)]),
   ];
+  const flipped = activatedIds.length + dueEnded.length;
+  if (flipped === 0) {
+    emptyBogoScheduleProbeAt.set(shop, Date.now());
+  } else {
+    emptyBogoScheduleProbeAt.delete(shop);
+  }
   return {
-    flipped: activatedIds.length + dueEnded.length,
+    flipped,
     idsNeedingSync,
   };
 }

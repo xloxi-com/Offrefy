@@ -276,17 +276,16 @@ export async function syncStorefrontTranslationsWithShopLanguages(
   const previousKeys = Object.keys(existingTranslations);
   const addedLanguages = languageKeys.filter((key) => !previousKeys.includes(key));
   const removedLanguages = previousKeys.filter((key) => !languageKeys.includes(key));
-  const needsFieldBackfill = languageKeys.some((key) => {
-    const merged = translations[key];
-    const raw = existingTranslations[key];
-    if (!merged || !raw) return true;
-    return JSON.stringify(merged) !== JSON.stringify(raw);
-  });
+  /*
+   * Do NOT persist when in-memory sheets are only expanded with presets
+   * (JSON.stringify(full) !== sparse always). Read paths already call
+   * buildStorefrontTranslationsForLanguages. Persist only on language-set
+   * changes or real auto-translate writes — avoids a DB write on every Settings GET.
+   */
   const shouldPersist =
     previousKeys.length === 0 ||
     addedLanguages.length > 0 ||
     removedLanguages.length > 0 ||
-    needsFieldBackfill ||
     tierStringsBackfilled ||
     cartBadgeStringsBackfilled;
 

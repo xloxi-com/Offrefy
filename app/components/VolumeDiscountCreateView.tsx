@@ -519,8 +519,8 @@ type VolumeDiscountCreateViewProps = {
   shopTimezone?: string;
   /** Published shop languages for the Translations tab. */
   shopLanguages?: OfferEditorShopLanguage[];
-  /** Shop-wide Settings translations (placeholders / inherit defaults). */
-  shopTranslations?: StorefrontTranslationsMap;
+  /** Shop-wide Settings overrides (merged with curated presets for placeholders). */
+  shopTranslations?: StorefrontTranslationsMap | SparseStorefrontTranslationsMap;
 };
 
 export function VolumeDiscountCreateView({
@@ -1571,9 +1571,10 @@ export function VolumeDiscountCreateView({
   const isAutoTranslating = translateFetcher.state !== "idle";
 
   const activeCampaignTranslation = campaignTranslations[selectedTransLang] ?? {};
-  const shopTranslationDefaults =
-    shopTranslations[selectedTransLang] ||
-    translationPresetForLanguage(selectedTransLang);
+  const shopTranslationDefaults = {
+    ...translationPresetForLanguage(selectedTransLang),
+    ...(shopTranslations[selectedTransLang] ?? {}),
+  };
   const isPrimaryTransLang = selectedTransLang === primaryLang;
 
   const translationFieldValue = (field: keyof StorefrontTranslationFields) => {

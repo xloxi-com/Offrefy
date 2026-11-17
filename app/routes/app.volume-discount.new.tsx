@@ -48,6 +48,7 @@ import {
 import {
   packCampaignTranslationBlob,
   seedCampaignCartOverridesFromDisplayName,
+  shopTranslationOverridesForEditor,
   sparsifyStorefrontTranslations,
   type SparseStorefrontTranslationsMap,
 } from "../utils/storefrontTranslations";
@@ -115,8 +116,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       shopLocales.languages.length > 0
         ? shopLocales.languages
         : FALLBACK_SHOP_LANGUAGES,
-    shopTranslations: parseStoredStorefrontTranslations(
-      settingsRow.translationsString,
+    shopTranslations: shopTranslationOverridesForEditor(
+      parseStoredStorefrontTranslations(settingsRow.translationsString),
     ),
   };
 };

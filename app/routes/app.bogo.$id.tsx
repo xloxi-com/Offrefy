@@ -1,5 +1,5 @@
 import { useAppBridge } from "@shopify/app-bridge-react";
-import { useCallback } from "react";
+import { lazy, Suspense, useCallback } from "react";
 import type {
   ActionFunctionArgs,
   HeadersFunction,
@@ -8,7 +8,11 @@ import type {
 import { useLoaderData, useLocation, useNavigate } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 
-import { BogoCreateView } from "../components/BogoCreateView";
+const BogoCreateView = lazy(() =>
+  import("../components/BogoCreateView").then((m) => ({
+    default: m.BogoCreateView,
+  })),
+);
 import { syncBogoCampaignToShopify } from "../services/bogoBxgySync.server";
 import { flushStorefrontWidgetPayloadNow } from "../services/refreshStorefrontWidget.server";
 import { authenticate } from "../shopify.server";
@@ -66,6 +70,32 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const [row, shopTimezone] = await Promise.all([
     bogoCampaignDb().findFirst({
       where: { id, shop: session.shop },
+      select: {
+        id: true,
+        campaignName: true,
+        displayName: true,
+        status: true,
+        startsAt: true,
+        endsAt: true,
+        buysRequirement: true,
+        buysQuantity: true,
+        buysAmount: true,
+        buysScope: true,
+        buysProductIds: true,
+        buysCollectionIds: true,
+        getsQuantity: true,
+        getsScope: true,
+        getsProductIds: true,
+        getsCollectionIds: true,
+        getsValueType: true,
+        getsValue: true,
+        usesPerOrderLimit: true,
+        widgetDisplay: true,
+        displayNameTranslations: true,
+        combinesWithProductDiscounts: true,
+        combinesWithOrderDiscounts: true,
+        combinesWithShippingDiscounts: true,
+      },
     }) as Promise<BogoRow | null>,
     resolveShopIanaTimezone(admin, session.shop),
   ]);
@@ -241,13 +271,15 @@ export default function BogoEditRoute() {
   }, [navigate, search, shopify]);
 
   return (
-    <BogoCreateView
-      onBack={() => navigate(adminEmbeddedPath("/app/offers", search))}
-      onSuccess={onSuccess}
-      defaultCampaignName={campaign.campaignName}
-      initialCampaign={campaign}
-      shopTimezone={shopTimezone}
-    />
+    <Suspense fallback={null}>
+      <BogoCreateView
+        onBack={() => navigate(adminEmbeddedPath("/app/offers", search))}
+        onSuccess={onSuccess}
+        defaultCampaignName={campaign.campaignName}
+        initialCampaign={campaign}
+        shopTimezone={shopTimezone}
+      />
+    </Suspense>
   );
 }
 

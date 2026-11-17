@@ -720,6 +720,37 @@ export function sparsifyStorefrontTranslations(
   return parseSparseStorefrontTranslations(map);
 }
 
+/**
+ * Editor payload: only merchant overrides that differ from curated presets.
+ * Client merges with translationPresetForLanguage — same UI, much smaller JSON.
+ */
+export function shopTranslationOverridesForEditor(
+  map: StorefrontTranslationsMap | SparseStorefrontTranslationsMap,
+): SparseStorefrontTranslationsMap {
+  const out: SparseStorefrontTranslationsMap = {};
+  for (const [langRaw, fields] of Object.entries(map ?? {})) {
+    const lang = langRaw.trim().toLowerCase();
+    if (!lang || !fields || typeof fields !== "object") continue;
+    const preset = translationPresetForLanguage(lang);
+    const sparse: Partial<StorefrontTranslationFields> = {};
+    let any = false;
+    for (const field of [
+      ...STOREFRONT_TRANSLATION_FIELD_KEYS,
+      ...BOGO_TRANSLATION_FIELD_KEYS,
+    ]) {
+      const value = (fields as Partial<StorefrontTranslationFields>)[field];
+      if (typeof value !== "string") continue;
+      const trimmed = value.trim();
+      if (!trimmed) continue;
+      if (trimmed === String(preset[field] ?? "").trim()) continue;
+      sparse[field] = trimmed;
+      any = true;
+    }
+    if (any) out[lang] = sparse;
+  }
+  return out;
+}
+
 export function campaignHasTranslationOverrides(
   overrides: SparseStorefrontTranslationsMap,
 ): boolean {

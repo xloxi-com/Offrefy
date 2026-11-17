@@ -52,6 +52,7 @@ import {
 import {
   packCampaignTranslationBlob,
   seedCampaignCartOverridesFromDisplayName,
+  shopTranslationOverridesForEditor,
   sparsifyStorefrontTranslations,
   unpackCampaignTranslationBlob,
   type SparseStorefrontTranslationsMap,
@@ -114,7 +115,7 @@ export type VolumeDiscountEditLoaderData = {
   planCapabilities: PlanCapabilities;
   shopTimezone: string;
   shopLanguages: ShopLanguageOption[];
-  shopTranslations: StorefrontTranslationsMap;
+  shopTranslations: SparseStorefrontTranslationsMap;
 };
 
 function jsonStringArrayField(value: unknown): string[] {
@@ -174,8 +175,8 @@ export const loader = async ({
     shopLocales.languages.length > 0
       ? shopLocales.languages
       : FALLBACK_SHOP_LANGUAGES;
-  const shopTranslations = parseStoredStorefrontTranslations(
-    settingsRow.translationsString,
+  const shopTranslations = shopTranslationOverridesForEditor(
+    parseStoredStorefrontTranslations(settingsRow.translationsString),
   );
 
   return {

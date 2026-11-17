@@ -94,34 +94,34 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const forceSetupRefresh = url.searchParams.get("setupRefresh") === "1";
 
-  // App Store install (or reinstall): send merchants to Pricing once, then normal home.
-  const { consumePostInstallPricingRedirect } = await import(
-    "../utils/shopPlan.server"
-  );
-  if (await consumePostInstallPricingRedirect(session.shop)) {
-    throw redirect(adminEmbeddedPath("/app/pricing", url.search));
-  }
-
   const grantedScopes = parseSessionScopes(session.scope);
   const hasWriteThemes = grantedScopes.includes("write_themes");
   const hasWriteScriptTags = grantedScopes.includes("write_script_tags");
 
   // Fast path: DB only. Theme / legacy ScriptTag cleanup runs after the response.
-  const [counts, lastSyncedAt, planCtx] = await Promise.all([
-    prisma.$queryRaw<Array<{ campaignCount: bigint; activeCount: bigint }>>(
-      Prisma.sql`
-        SELECT
-          COUNT(*)::bigint AS "campaignCount",
-          COUNT(*) FILTER (WHERE c."status" = 'active')::bigint AS "activeCount"
-        FROM "VolumeDiscountCampaign" c
-        WHERE c."shop" = ${session.shop}
-      `,
-    ),
-    resolveShopLastSyncedAt(session.shop),
-    import("../utils/shopPlan.server").then((m) =>
-      m.resolveShopPlanContext(session.shop),
-    ),
-  ]);
+  // Post-install pricing redirect runs in parallel with counts (rare redirect).
+  const [shouldPricingRedirect, counts, lastSyncedAt, planCtx] =
+    await Promise.all([
+      import("../utils/shopPlan.server").then((m) =>
+        m.consumePostInstallPricingRedirect(session.shop),
+      ),
+      prisma.$queryRaw<Array<{ campaignCount: bigint; activeCount: bigint }>>(
+        Prisma.sql`
+          SELECT
+            COUNT(*)::bigint AS "campaignCount",
+            COUNT(*) FILTER (WHERE c."status" = 'active')::bigint AS "activeCount"
+          FROM "VolumeDiscountCampaign" c
+          WHERE c."shop" = ${session.shop}
+        `,
+      ),
+      resolveShopLastSyncedAt(session.shop),
+      import("../utils/shopPlan.server").then((m) =>
+        m.resolveShopPlanContext(session.shop),
+      ),
+    ]);
+  if (shouldPricingRedirect) {
+    throw redirect(adminEmbeddedPath("/app/pricing", url.search));
+  }
 
   const campaignCount = Number(counts[0]?.campaignCount ?? 0);
   const activeCount = Number(counts[0]?.activeCount ?? 0);

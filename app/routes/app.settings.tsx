@@ -43,6 +43,7 @@ import {
   adminLanguageCookieHeader,
   isAdminLanguageCode,
   normalizeAdminLanguage,
+  readAdminLanguageCookie,
   type AdminLanguageCode,
 } from "../utils/adminLanguage";
 import {
@@ -78,12 +79,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     hasLocaleScope = true;
   }
 
-  const [dbSettings, localesResult, lastSyncedAt, adminLanguage] =
+  const cookieLang = readAdminLanguageCookie(request.headers.get("Cookie"));
+
+  const [dbSettings, localesResult, lastSyncedAt, adminLanguage, planCtx, combinesWith] =
     await Promise.all([
       readStorefrontSettingsRow(session.shop),
       fetchShopPublishedLocales(admin, session.shop),
       resolveShopLastSyncedAt(session.shop),
-      resolveAdminLanguage(session.shop),
+      cookieLang
+        ? Promise.resolve(cookieLang)
+        : resolveAdminLanguage(session.shop),
+      resolveShopPlanContext(session.shop),
+      import("../utils/discountCombinesWith.server").then((m) =>
+        m.readDiscountCombinesWith(session.shop),
+      ),
     ]);
 
   let { languages: shopLanguages, errors: shopLanguageErrors, missingLocaleScope } =
@@ -152,13 +161,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     lastSyncedAt,
   );
   applyShopCampaignScheduleTransitionsIfNeeded(session.shop);
-
-  const [planCtx, combinesWith] = await Promise.all([
-    resolveShopPlanContext(session.shop),
-    import("../utils/discountCombinesWith.server").then((m) =>
-      m.readDiscountCombinesWith(session.shop),
-    ),
-  ]);
 
   const settings: SettingsData = {
     syncInterval: dbSettings.syncInterval,

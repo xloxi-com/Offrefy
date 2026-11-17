@@ -1,5 +1,5 @@
 import { useAppBridge } from "@shopify/app-bridge-react";
-import { useCallback } from "react";
+import { lazy, Suspense, useCallback } from "react";
 import type {
   ActionFunctionArgs,
   HeadersFunction,
@@ -8,7 +8,11 @@ import type {
 import { useLoaderData, useLocation, useNavigate } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 
-import { BogoCreateView } from "../components/BogoCreateView";
+const BogoCreateView = lazy(() =>
+  import("../components/BogoCreateView").then((m) => ({
+    default: m.BogoCreateView,
+  })),
+);
 import { syncBogoCampaignToShopify } from "../services/bogoBxgySync.server";
 import { flushStorefrontWidgetPayloadNow } from "../services/refreshStorefrontWidget.server";
 import { authenticate } from "../shopify.server";
@@ -166,12 +170,14 @@ export default function BogoNewRoute() {
   }, [navigate, search, shopify]);
 
   return (
-    <BogoCreateView
-      onBack={() => navigate(adminEmbeddedPath("/app/offers", search))}
-      onSuccess={onSuccess}
-      defaultCampaignName={defaultCampaignName}
-      shopTimezone={shopTimezone}
-    />
+    <Suspense fallback={null}>
+      <BogoCreateView
+        onBack={() => navigate(adminEmbeddedPath("/app/offers", search))}
+        onSuccess={onSuccess}
+        defaultCampaignName={defaultCampaignName}
+        shopTimezone={shopTimezone}
+      />
+    </Suspense>
   );
 }
 
