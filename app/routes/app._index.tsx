@@ -132,39 +132,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     invalidateQuantityBreaksBlockStatusCache(session.shop);
   }
 
+  // Fast path: never block first paint on theme GraphQL. Peek cache for instant
+  // Setup Guide; warm after response. Client soft-refreshes when stale.
   const embedCached = forceSetupRefresh
     ? null
     : peekMainThemeAppEmbedStatus(session.shop);
   const blockCached = forceSetupRefresh
     ? null
     : peekQuantityBreaksBlockInLiveTheme(session.shop);
-  let appEmbedEnabled = embedCached?.enabled ?? false;
-  let appEmbedErrors = embedCached?.errors ?? [];
-  let mainThemeId = mainThemeIdFromGid(embedCached?.themeId ?? null);
-  let productBlockPresent = blockCached ?? false;
-  let setupStatusStale = !embedCached || blockCached === null;
-
-  // Live Setup Guide: when forced (tab focus) or cache miss, fetch theme status now.
-  if (forceSetupRefresh || !embedCached || blockCached === null) {
-    try {
-      const [embed, blockPresent] = await Promise.all([
-        getMainThemeAppEmbedStatus(admin, session.shop, {
-          force: true,
-        }),
-        isQuantityBreaksBlockInLiveTheme(admin, session.shop, {
-          force: true,
-        }),
-      ]);
-      appEmbedEnabled = embed.enabled;
-      appEmbedErrors = embed.errors;
-      mainThemeId = mainThemeIdFromGid(embed.themeId) ?? mainThemeId;
-      productBlockPresent = blockPresent;
-      setupStatusStale = false;
-    } catch (error) {
-      console.warn("[Offrefy] home setup status", error);
-      setupStatusStale = true;
-    }
-  }
+  const appEmbedEnabled = embedCached?.enabled ?? false;
+  const appEmbedErrors = embedCached?.errors ?? [];
+  const mainThemeId = mainThemeIdFromGid(embedCached?.themeId ?? null);
+  const productBlockPresent = blockCached ?? false;
+  const setupStatusStale = !embedCached || blockCached === null;
 
   const scriptTagOk = false;
   // Widget JS loads only from Theme App Embed (Shopify CDN after deploy).
@@ -173,13 +153,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   runAfterResponse(
     (async () => {
       try {
-        // Warm theme caches only — widget/discount push runs on Sync / offer save.
-        if (!forceSetupRefresh) {
-          await Promise.all([
-            getMainThemeAppEmbedStatus(admin, session.shop),
-            isQuantityBreaksBlockInLiveTheme(admin, session.shop),
-          ]);
-        }
+        // Warm theme caches — widget/discount push runs on Sync / offer save.
+        await Promise.all([
+          getMainThemeAppEmbedStatus(admin, session.shop, {
+            force: forceSetupRefresh,
+          }),
+          isQuantityBreaksBlockInLiveTheme(admin, session.shop, {
+            force: forceSetupRefresh,
+          }),
+        ]);
 
         if (hasWriteScriptTags) {
           await ensureOffrefyStorefrontScriptTag(admin, session.shop).catch(

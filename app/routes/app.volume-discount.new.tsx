@@ -63,6 +63,7 @@ async function resolveCampaignTranslationsForSave(
       options?: { variables?: Record<string, unknown> },
     ) => Promise<Response>;
   },
+  shop: string,
   formOverrides: SparseStorefrontTranslationsMap,
   displayName: string,
 ): Promise<SparseStorefrontTranslationsMap> {
@@ -70,7 +71,7 @@ async function resolveCampaignTranslationsForSave(
   if (!isCartDiscountDisplayTemplate(displayName)) {
     return sparse;
   }
-  const { languages } = await fetchShopPublishedLocales(admin);
+  const { languages } = await fetchShopPublishedLocales(admin, shop);
   const languageKeys = languageKeysFromShopLanguages(
     languages.length > 0 ? languages : FALLBACK_SHOP_LANGUAGES,
   );
@@ -100,8 +101,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     await Promise.all([
       resolveShopPlanContext(session.shop),
       countActiveCampaigns(session.shop),
-      resolveShopIanaTimezone(admin),
-      fetchShopPublishedLocales(admin),
+      resolveShopIanaTimezone(admin, session.shop),
+      fetchShopPublishedLocales(admin, session.shop),
       readStorefrontSettingsRow(session.shop),
     ]);
   return {
@@ -195,6 +196,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const nextDisplayName = (d.displayName || "").trim();
   const displayNameLocales = await resolveCampaignTranslationsForSave(
     admin,
+    session.shop,
     d.displayNameTranslations,
     nextDisplayName,
   );

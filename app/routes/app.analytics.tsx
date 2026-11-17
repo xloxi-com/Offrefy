@@ -260,7 +260,7 @@ export default function AnalyticsPage() {
   );
 
   useEffect(() => {
-    const intervalMs = 30_000;
+    const intervalMs = 60_000;
     const tick = () => {
       if (document.visibilityState !== "visible") return;
       revalidator.revalidate();

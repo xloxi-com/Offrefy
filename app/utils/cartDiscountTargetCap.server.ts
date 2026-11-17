@@ -45,10 +45,23 @@ export function maxCartDiscountTargets(
   return CART_DISCOUNT_TARGET_CAP_PLUS;
 }
 
-/** Read whether the shop is on Shopify Plus (Admin GraphQL). */
+const shopPlanCapCache = new Map<
+  string,
+  { value: ShopifyShopPlanCap; expiresAt: number }
+>();
+const SHOP_PLAN_CAP_TTL_MS = 10 * 60 * 1000;
+
+/** Read whether the shop is on Shopify Plus (Admin GraphQL). Pass `shop` for cache. */
 export async function resolveShopifyShopPlanCap(
   admin: GraphqlAdmin,
+  shop?: string,
 ): Promise<ShopifyShopPlanCap> {
+  const cacheKey = shop?.trim() || "default";
+  const cached = shopPlanCapCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
+
   try {
     const res = await admin.graphql(SHOP_PLAN_QUERY);
     const json = (await res.json()) as {
@@ -64,11 +77,16 @@ export async function resolveShopifyShopPlanCap(
     const plan = json.data?.shop?.plan;
     const shopifyPlus = plan?.shopifyPlus === true;
     const partnerDevelopment = plan?.partnerDevelopment === true;
-    return {
+    const value: ShopifyShopPlanCap = {
       shopifyPlus,
       partnerDevelopment,
       maxTargets: maxCartDiscountTargets(shopifyPlus, partnerDevelopment),
     };
+    shopPlanCapCache.set(cacheKey, {
+      value,
+      expiresAt: Date.now() + SHOP_PLAN_CAP_TTL_MS,
+    });
+    return value;
   } catch (error) {
     console.warn("[Offrefy] resolveShopifyShopPlanCap", error);
     return {

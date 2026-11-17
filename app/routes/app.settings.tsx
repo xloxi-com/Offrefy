@@ -153,7 +153,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   );
   applyShopCampaignScheduleTransitionsIfNeeded(session.shop);
 
-  const [{ capabilities }, combinesWith] = await Promise.all([
+  const [planCtx, combinesWith] = await Promise.all([
     resolveShopPlanContext(session.shop),
     import("../utils/discountCombinesWith.server").then((m) =>
       m.readDiscountCombinesWith(session.shop),
@@ -165,7 +165,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     lastSynced: lastSyncedAt ? new Date(lastSyncedAt).toISOString() : null,
     translations: translationSync.translations,
     combinesWith,
-    canUseSchedulingAutomation: capabilities.schedulingAutomation,
+    canUseSchedulingAutomation: planCtx.capabilities.schedulingAutomation,
   };
 
   const needsLocaleScope = missingLocaleScope || !hasLocaleScope;
@@ -204,8 +204,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       needsLocaleScope,
       translationsInitialized: translationSync.persisted,
       addedLanguages: translationSync.addedLanguages,
-      canEditTranslations: (await resolveShopPlanContext(session.shop))
-        .capabilities.translations,
+      canEditTranslations: planCtx.capabilities.translations,
       adminLanguage,
     },
     {
@@ -316,7 +315,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const submittedTranslations = parseStoredStorefrontTranslations(
       String(formData.get("translationsString") ?? "{}"),
     );
-    const { languages: shopLanguages } = await fetchShopPublishedLocales(admin);
+    const { languages: shopLanguages } = await fetchShopPublishedLocales(
+      admin,
+      session.shop,
+    );
     const languageKeys = (shopLanguages.length > 0
       ? shopLanguages
       : FALLBACK_SHOP_LANGUAGES
@@ -388,7 +390,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const submittedTranslations = parseStoredStorefrontTranslations(
       String(formData.get("translationsString") ?? "{}"),
     );
-    const { languages: shopLanguages } = await fetchShopPublishedLocales(admin);
+    const { languages: shopLanguages } = await fetchShopPublishedLocales(
+      admin,
+      session.shop,
+    );
     const languageKeys = (shopLanguages.length > 0
       ? shopLanguages
       : FALLBACK_SHOP_LANGUAGES

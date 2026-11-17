@@ -67,7 +67,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     bogoCampaignDb().findFirst({
       where: { id, shop: session.shop },
     }) as Promise<BogoRow | null>,
-    resolveShopIanaTimezone(admin),
+    resolveShopIanaTimezone(admin, session.shop),
   ]);
   if (!row) {
     throw new Response("Not found", { status: 404 });

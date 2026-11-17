@@ -66,6 +66,7 @@ import {
 
 async function resolveCampaignTranslationsForSave(
   admin: { graphql: (query: string, options?: { variables?: Record<string, unknown> }) => Promise<Response> },
+  shop: string,
   formOverrides: SparseStorefrontTranslationsMap,
   displayName: string,
 ): Promise<SparseStorefrontTranslationsMap> {
@@ -73,7 +74,7 @@ async function resolveCampaignTranslationsForSave(
   if (!isCartDiscountDisplayTemplate(displayName)) {
     return sparse;
   }
-  const { languages } = await fetchShopPublishedLocales(admin);
+  const { languages } = await fetchShopPublishedLocales(admin, shop);
   const languageKeys = languageKeysFromShopLanguages(
     languages.length > 0 ? languages : FALLBACK_SHOP_LANGUAGES,
   );
@@ -153,8 +154,8 @@ export const loader = async ({
         countdownEndsAt: true,
       } as unknown as Prisma.VolumeDiscountCampaignSelect,
     }),
-    resolveShopIanaTimezone(admin),
-    fetchShopPublishedLocales(admin),
+    resolveShopIanaTimezone(admin, session.shop),
+    fetchShopPublishedLocales(admin, session.shop),
     readStorefrontSettingsRow(session.shop),
   ]);
   if (!row) {
@@ -297,6 +298,7 @@ export const action = async ({
   const nextDisplayName = (d.displayName || "").trim();
   const displayNameLocales = await resolveCampaignTranslationsForSave(
     admin,
+    session.shop,
     d.displayNameTranslations,
     nextDisplayName,
   );

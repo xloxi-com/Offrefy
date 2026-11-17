@@ -130,16 +130,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     })
   );
 
-  /* Flip Scheduled → Active / Active → Ended before listing. */
-  const flipped = await applyDueCampaignScheduleTransitions(session.shop);
+  /* Flip Scheduled → Active / Active → Ended before listing (parallel). */
+  const [flipped, bogoFlipped] = await Promise.all([
+    applyDueCampaignScheduleTransitions(session.shop),
+    applyDueBogoScheduleTransitions(session.shop),
+  ]);
   if (flipped.shopsNeedingShopifySync.length) {
     scheduleVolumeDiscountShopSync(admin, session.shop, {
       skipScheduleTransitions: true,
       force: true,
     });
   }
-
-  const bogoFlipped = await applyDueBogoScheduleTransitions(session.shop);
   if (bogoFlipped.idsNeedingSync.length) {
     const idsToSync = bogoFlipped.idsNeedingSync;
     runAfterResponse(
@@ -615,18 +616,32 @@ export default function Index() {
   const [sortSelected, setSortSelected] = useState<string[]>(["modified desc"]);
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
-  // Tick every second so Scheduled → Active (and end → Draft) flip live in the table.
+  // Tick only when a row can flip by clock (scheduled / timed active) — avoids 1 Hz re-renders.
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const needsLiveClock = useMemo(
+    () =>
+      campaigns.some((c) => {
+        const status = String(c.status ?? "").toLowerCase();
+        if (status === "scheduled") return true;
+        if (status === "active" && c.countdownEndsAt) return true;
+        return false;
+      }),
+    [campaigns],
+  );
   useEffect(() => {
+    if (!needsLiveClock) {
+      setNowMs(Date.now());
+      return;
+    }
     const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [needsLiveClock]);
 
-  // Persist schedule flips + analytics via loader (stable interval; ref avoids effect churn).
+  // Persist schedule flips via loader. 30s is enough — client clock already flips badges live.
   const revalidatorRef = useRef(revalidator);
   revalidatorRef.current = revalidator;
   useEffect(() => {
-    const POLL_MS = 8_000;
+    const POLL_MS = 30_000;
     const softRevalidate = () => {
       if (document.visibilityState !== "visible") return;
       const r = revalidatorRef.current;

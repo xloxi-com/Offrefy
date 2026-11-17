@@ -43,7 +43,7 @@ import {
 import {
   pricingPlanFromBillingName,
 } from "../utils/billingPlans";
-import { resolveShopPlan, setShopPlan, ensureDefaultFreePlanOnInstall } from "../utils/shopPlan.server";
+import { resolveShopPlan, setShopPlan } from "../utils/shopPlan.server";
 import {
   scheduleStorefrontWidgetRefresh,
   scheduleVolumeDiscountShopSync,
@@ -92,15 +92,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const preferredRaw = url.searchParams.get("plan");
   const preferredPlan = isPricingPlanId(preferredRaw) ? preferredRaw : null;
 
-  let currentPlan = await ensureDefaultFreePlanOnInstall(session.shop, admin);
+  // Auth already runs ensureDefaultFreePlanOnInstall — use DB on normal visits.
+  // Only re-hit Shopify billing after checkout return (?billing=success).
+  let currentPlan = billingSuccess
+    ? await syncPlanFromActiveSubscription(
+        session.shop,
+        admin,
+        preferredPlan,
+      )
+    : await resolveShopPlan(session.shop);
   let justActivated: PricingPlanId | null = null;
 
   if (billingSuccess) {
-    currentPlan = await syncPlanFromActiveSubscription(
-      session.shop,
-      admin,
-      preferredPlan,
-    );
     // Enforce free-plan campaign caps after merchant approved the charge.
     if (currentPlan === "free" || preferredPlan === "free") {
       const enforce = await setShopPlan(session.shop, "free");
@@ -123,7 +126,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return {
     currentPlan,
     justActivated,
-    billingTestMode: await resolveBillingIsTest(admin),
+    billingTestMode: await resolveBillingIsTest(admin, session.shop),
   };
 };
 

@@ -111,11 +111,13 @@ export async function cancelActiveAppSubscriptions(
 
 /**
  * Prefer test charges on development stores; otherwise follow env / NODE_ENV.
+ * Pass `shop` so plan-cap GraphQL can be cached across Pricing loads.
  */
 export async function resolveBillingIsTest(
   admin: GraphqlAdmin,
+  shop?: string,
 ): Promise<boolean> {
-  const { partnerDevelopment } = await resolveShopifyShopPlanCap(admin);
+  const { partnerDevelopment } = await resolveShopifyShopPlanCap(admin, shop);
   return billingIsTest({ partnerDevelopment });
 }
 

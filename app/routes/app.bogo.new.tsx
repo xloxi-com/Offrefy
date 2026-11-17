@@ -36,7 +36,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   const [{ plan }, shopTimezone] = await Promise.all([
     resolveShopPlanContext(session.shop),
-    resolveShopIanaTimezone(admin),
+    resolveShopIanaTimezone(admin, session.shop),
   ]);
   return { plan, shopTimezone };
 };

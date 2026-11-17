@@ -188,7 +188,7 @@ export async function syncStorefrontTranslationsWithShopLanguages(
 }> {
   const shopLanguages =
     options.shopLanguages ??
-    (await fetchShopPublishedLocales(admin)).languages;
+    (await fetchShopPublishedLocales(admin, shop)).languages;
   const resolvedShopLanguages =
     shopLanguages.length > 0 ? shopLanguages : FALLBACK_SHOP_LANGUAGES;
   const languageKeys = languageKeysFromShopLanguages(resolvedShopLanguages);
@@ -331,7 +331,7 @@ export async function syncCartDiscountTranslationsFromDisplayName(
 
   const settings = await readStorefrontSettingsRow(shop);
   const shopLanguages =
-    (await fetchShopPublishedLocales(admin)).languages;
+    (await fetchShopPublishedLocales(admin, shop)).languages;
   const resolvedShopLanguages =
     shopLanguages.length > 0 ? shopLanguages : FALLBACK_SHOP_LANGUAGES;
   const languageKeys = languageKeysFromShopLanguages(resolvedShopLanguages);
